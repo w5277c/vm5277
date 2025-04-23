@@ -1,0 +1,17 @@
+program = { import | class | function | statement } ;
+
+import = "import" string_literal ";" ;
+class = "class" identifier "{" { field | method } "}" ;
+field = type identifier ";" ;
+method = type identifier "(" [parameters] ")" block ;
+
+function = type identifier "(" [parameters] ")" block ;
+parameters = type identifier { "," type identifier } ;
+
+statement = var_decl | if_stmt | while_loop | assignment | method_call | return_stmt | block ;
+var_decl = type identifier [ "=" expression ] ";" ;
+method_call = (identifier | ("this" ".")) identifier "(" [arguments] ")" ";" ;
+return_stmt = "return" [expression] ";" ;
+
+expression = equality | object_creation ;
+object_creation = "new" identifier "(" [arguments] ")" ;

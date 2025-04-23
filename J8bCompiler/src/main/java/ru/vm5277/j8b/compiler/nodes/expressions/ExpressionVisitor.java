@@ -1,0 +1,18 @@
+/*--------------------------------------------------------------------------------------------------------------------------------------------------------------
+Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+23.04.2025	konstantin@5277.ru		Начало
+--------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+package ru.vm5277.j8b.compiler.nodes.expressions;
+
+/**
+ *
+ * @author kostas
+ */
+public class ExpressionVisitor<T> {
+
+	<T> T visit(ExpressionNode aThis) {
+		throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+	}
+	
+}
