@@ -8,20 +8,21 @@ package ru.vm5277.j8b.compiler.nodes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import ru.vm5277.j8b.compiler.tokens.enums.Delimiter;
-import ru.vm5277.j8b.compiler.tokens.enums.Keyword;
-import ru.vm5277.j8b.compiler.tokens.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.Delimiter;
+import ru.vm5277.j8b.compiler.enums.Keyword;
+import ru.vm5277.j8b.compiler.enums.TokenType;
 
 public class ClassNode extends AstNode {
 	private	final	Set<Keyword>	modifiers;
 	private			String			name;
+	private			String			parentClassName;
 	private			List<String>	interfaces	= new ArrayList<>();
-	private	final	BlockNode		body;
 	
-	public ClassNode(TokenBuffer tb, Set<Keyword> modifiers) {
+	public ClassNode(TokenBuffer tb, Set<Keyword> modifiers, String parentClassName) {
 		super(tb);
 		
 		this.modifiers = modifiers;
+		this.parentClassName = parentClassName;
 		
 		// 1. Парсинг заголовка класса
         tb.consume(TokenType.OOP, Keyword.CLASS);	// Пропуск class токена
@@ -38,6 +39,18 @@ public class ClassNode extends AstNode {
         }
 
         // 3. Парсинг тела класса
-		this.body = new BlockNode(tb);
+		blocks.add(new BlockNode(tb, name));
+	}
+	
+	public String getName() {
+		return name;
+	}
+	
+	public String getFullName() {
+		return null == parentClassName ? name : parentClassName + "." + name;
+	}
+	
+	public BlockNode getBody() {
+		return blocks.get(0);
 	}
 }

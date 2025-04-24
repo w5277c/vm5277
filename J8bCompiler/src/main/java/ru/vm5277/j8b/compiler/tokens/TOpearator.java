@@ -5,8 +5,8 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.tokens;
 
-import ru.vm5277.j8b.compiler.tokens.enums.TokenType;
-import ru.vm5277.j8b.compiler.tokens.enums.Operator;
+import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.Operator;
 
 public class TOpearator extends Token {
 	public TOpearator(Operator value, int endPos, int line, int column) {

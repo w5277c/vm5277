@@ -6,7 +6,7 @@
 package ru.vm5277.j8b.compiler.tokens;
 
 import ru.vm5277.j8b.compiler.ParseError;
-import ru.vm5277.j8b.compiler.tokens.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.TokenType;
 
 public class TChar extends Token {
 	public TChar(String src, int pos, int line, int column) {

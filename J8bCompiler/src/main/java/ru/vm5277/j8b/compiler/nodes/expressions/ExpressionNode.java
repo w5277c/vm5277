@@ -5,15 +5,29 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes.expressions;
 
+import ru.vm5277.j8b.compiler.enums.Operator;
+import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.nodes.AstNode;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
+import ru.vm5277.j8b.compiler.semantic.SymbolTable;
 
 public abstract class ExpressionNode extends AstNode {
 	public ExpressionNode(TokenBuffer tb) {
 		super(tb);
-		
 	}
+	
+	public abstract VarType semanticAnalyze(SymbolTable symbolTable);
 	
 	// Для визитора (понадобится при кодогенерации)
     public abstract <T> T accept(ExpressionVisitor<T> visitor);
+	
+	protected boolean isUnaryOperationValid(VarType type, Operator op) {
+		switch (op) {
+			case NOT: return VarType.BOOL == type;
+			case BIT_NOT: return type.isInteger();
+			case PLUS:
+			case MINUS: return type.isNumeric();
+			default: return false;
+		}
+	}
 }

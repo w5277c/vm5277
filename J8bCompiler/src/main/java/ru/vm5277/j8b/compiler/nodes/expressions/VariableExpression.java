@@ -5,7 +5,10 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes.expressions;
 
+import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
+import ru.vm5277.j8b.compiler.semantic.SymbolEntry;
+import ru.vm5277.j8b.compiler.semantic.SymbolTable;
 
 public class VariableExpression extends ExpressionNode {
     private final String name;
@@ -16,8 +19,17 @@ public class VariableExpression extends ExpressionNode {
 		this.name = name;
     }
     
+	@Override
+	public VarType semanticAnalyze(SymbolTable symbolTable) {
+	    return symbolTable.lookup(name).getType();
+	}
+	
     @Override
     public <T> T accept(ExpressionVisitor<T> visitor) {
         return visitor.visit(this);
     }
+	
+	public String getName() {
+		return name;
+	}
 }

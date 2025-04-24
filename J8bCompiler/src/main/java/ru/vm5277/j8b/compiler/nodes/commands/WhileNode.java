@@ -8,11 +8,10 @@ package ru.vm5277.j8b.compiler.nodes.commands;
 import ru.vm5277.j8b.compiler.nodes.*;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
-import ru.vm5277.j8b.compiler.tokens.enums.Delimiter;
+import ru.vm5277.j8b.compiler.enums.Delimiter;
 
 public class WhileNode extends AstNode {
 	private	final	ExpressionNode	condition;
-    private	final	BlockNode		body;
 	
 	public WhileNode(TokenBuffer tb) {
 		super(tb);
@@ -22,7 +21,7 @@ public class WhileNode extends AstNode {
         this.condition = new ExpressionParser(tb).parse();
         tb.consume(Delimiter.RIGHT_PAREN);
 
-		body = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement());
+		blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, "") : new BlockNode(tb, parseStatement()));
 	}
 	
 	public ExpressionNode getCondition() {
@@ -30,6 +29,6 @@ public class WhileNode extends AstNode {
 	}
 
 	public BlockNode getBody() {
-		return body;
+		return blocks.get(0);
 	}
 }

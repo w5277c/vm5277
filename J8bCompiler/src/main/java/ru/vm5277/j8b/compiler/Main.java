@@ -14,7 +14,10 @@ public class Main {
 	public static void main(String[] args) throws IOException {
 		try (InputStreamReader isr = new InputStreamReader(new FileInputStream(args[0x00]))) {
 			Lexer lexer = new Lexer(isr);
+			
 			Parser parser = new Parser(lexer.getTokens());
+			
+			SemanticAnalyzer analyzer = new SemanticAnalyzer(parser.getAst());
 		}
 		catch(Exception ex) {
 			ex.printStackTrace();

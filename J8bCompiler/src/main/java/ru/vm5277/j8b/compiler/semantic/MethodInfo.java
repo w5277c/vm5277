@@ -1,30 +1,27 @@
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------
 Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-23.04.2025	konstantin@5277.ru		Начало
+25.04.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.j8b.compiler;
+package ru.vm5277.j8b.compiler.semantic;
 
-import java.io.IOException;
 import java.util.List;
-import ru.vm5277.j8b.compiler.nodes.ProgramNode;
-import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
-import ru.vm5277.j8b.compiler.tokens.Token;
+import ru.vm5277.j8b.compiler.enums.VarType;
 
-public class Parser {
-	private final	List<Token>		tokens;
-	private			ProgramNode		ast;
-	
-	public Parser(List<Token> tokens) throws IOException {
-		this.tokens = tokens;
+public class MethodInfo {
+	private	final	VarType			returnType;
+	private	final	List<VarType>	parameters;
 
-		if(tokens.isEmpty()) return;
-		
-		ast = new ProgramNode(new TokenBuffer(tokens.iterator())); // Создаём корень AST
+	public MethodInfo(VarType returnType, List<VarType> parameters) {
+		this.returnType = returnType;
+		this.parameters = parameters;
+	}
+
+	public VarType getReturnType() {
+		return returnType;
 	}
 	
-	public ProgramNode getAst() {
-		return ast;
+	public List<VarType> getParameters() {
+		return parameters;
 	}
 }
-

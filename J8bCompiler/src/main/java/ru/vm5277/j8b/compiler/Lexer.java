@@ -16,7 +16,7 @@ import ru.vm5277.j8b.compiler.tokens.TNumber;
 import ru.vm5277.j8b.compiler.tokens.TOpearator;
 import ru.vm5277.j8b.compiler.tokens.TString;
 import ru.vm5277.j8b.compiler.tokens.Token;
-import ru.vm5277.j8b.compiler.tokens.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.TokenType;
 
 public class Lexer {
 	private	final	String			src;

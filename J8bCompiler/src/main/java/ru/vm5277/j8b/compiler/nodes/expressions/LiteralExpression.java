@@ -5,7 +5,9 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes.expressions;
 
+import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
+import ru.vm5277.j8b.compiler.semantic.SymbolTable;
 
 public class LiteralExpression extends ExpressionNode {
     private final Object value;
@@ -16,6 +18,14 @@ public class LiteralExpression extends ExpressionNode {
 		this.value = value;
     }
     
+	@Override
+	public VarType semanticAnalyze(SymbolTable symbolTable) {
+		if (value instanceof Integer) return VarType.INT;
+		if (value instanceof Boolean) return VarType.BOOL;
+		if (value instanceof String) return VarType.STRING;
+		return VarType.UNKNOWN;
+	}
+	
     @Override
     public <T> T accept(ExpressionVisitor<T> visitor) {
         return visitor.visit(this);

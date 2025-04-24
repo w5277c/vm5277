@@ -16,15 +16,20 @@ import ru.vm5277.j8b.compiler.nodes.commands.WhileNode;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
 import ru.vm5277.j8b.compiler.nodes.expressions.MethodCallExpression;
-import ru.vm5277.j8b.compiler.tokens.enums.Delimiter;
-import ru.vm5277.j8b.compiler.tokens.enums.Keyword;
-import ru.vm5277.j8b.compiler.tokens.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.Delimiter;
+import ru.vm5277.j8b.compiler.enums.Keyword;
+import ru.vm5277.j8b.compiler.enums.TokenType;
 
 public abstract class AstNode {
-	protected	TokenBuffer	tb;
-
+	protected			TokenBuffer				tb;
+	protected			int						line;
+	protected			int						column;
+	protected	final	ArrayList<BlockNode>	blocks	= new ArrayList<>();
+	
 	protected AstNode(TokenBuffer tb) {
         this.tb = tb;
+		this.line = tb.current().getLine();
+		this.column = tb.current().getColumn();
     }
 
 	protected AstNode parseStatement() {
@@ -54,7 +59,7 @@ public abstract class AstNode {
 		}
 		else if (tb.match(Delimiter.LEFT_BRACE)) {
 			
-			return new BlockNode(tb);
+			return new BlockNode(tb, "");
 		}
 		throw new ParseError("Unexpected statement token: " + tb.current(),	tb.current().getLine(),	tb.current().getColumn());
 	}
@@ -108,4 +113,16 @@ public abstract class AstNode {
         }
         return modifiers;
     }
+	
+	public int getLine() {
+		return line;
+	}
+	
+	public int getColumn() {
+		return column;
+	}
+	
+	public List<BlockNode> getBlocks() {
+		return blocks;
+	}
 }

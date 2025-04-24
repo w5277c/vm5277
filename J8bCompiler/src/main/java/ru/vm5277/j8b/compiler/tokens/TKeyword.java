@@ -5,8 +5,8 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.tokens;
 
-import ru.vm5277.j8b.compiler.tokens.enums.TokenType;
-import ru.vm5277.j8b.compiler.tokens.enums.Keyword;
+import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.Keyword;
 
 public class TKeyword extends Token {
 	public TKeyword(String src, int pos, int line, int column) {

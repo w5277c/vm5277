@@ -8,17 +8,18 @@ package ru.vm5277.j8b.compiler.nodes;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
 import java.util.Set;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
-import ru.vm5277.j8b.compiler.tokens.enums.Delimiter;
-import ru.vm5277.j8b.compiler.tokens.enums.Keyword;
-import ru.vm5277.j8b.compiler.tokens.enums.Operator;
+import ru.vm5277.j8b.compiler.enums.Delimiter;
+import ru.vm5277.j8b.compiler.enums.Keyword;
+import ru.vm5277.j8b.compiler.enums.Operator;
+import ru.vm5277.j8b.compiler.enums.VarType;
 
 public class FieldNode extends AstNode {
 	private	final	Set<Keyword>	modifiers;
-	private			Keyword			returnType;
+	private			VarType			returnType;
 	private			String			name;
 	private	final	ExpressionNode	initializer;
 	
-	public FieldNode(TokenBuffer tb, Set<Keyword> modifiers, Keyword type, String name) {
+	public FieldNode(TokenBuffer tb, Set<Keyword> modifiers, VarType type, String name) {
 		super(tb);
 
 		this.modifiers = modifiers;
@@ -33,5 +34,21 @@ public class FieldNode extends AstNode {
 			initializer = new ExpressionParser(tb).parse();
 		}
         tb.consume(Delimiter.SEMICOLON);
+	}
+	
+	public Set<Keyword> getModifiers() {
+		return modifiers;
+	}
+	
+	public VarType getType() {
+		return returnType;
+	}
+	
+	public String getName() {
+		return name;
+	}
+	
+	public ExpressionNode getInitializer() {
+		return initializer;
 	}
 }

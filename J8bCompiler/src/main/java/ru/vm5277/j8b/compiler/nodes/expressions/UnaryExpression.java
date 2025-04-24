@@ -5,20 +5,35 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes.expressions;
 
+import ru.vm5277.j8b.compiler.SemanticError;
+import ru.vm5277.j8b.compiler.enums.Operator;
+import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
-import ru.vm5277.j8b.compiler.tokens.Token;
+import ru.vm5277.j8b.compiler.semantic.SymbolTable;
 
 public class UnaryExpression extends ExpressionNode {
-    private final Token operator;
+    private final Operator		 operator;
     private final ExpressionNode operand;
     
-    public UnaryExpression(TokenBuffer tb, Token operator, ExpressionNode operand) {
+    public UnaryExpression(TokenBuffer tb, Operator operator, ExpressionNode operand) {
         super(tb);
         this.operator = operator;
         this.operand = operand;
     }
     
-    @Override
+	@Override
+	public VarType semanticAnalyze(SymbolTable symbolTable) {
+		VarType operandType = operand.semanticAnalyze(symbolTable);
+
+		// Проверка допустимости операции для типа
+		if (!isUnaryOperationValid(operandType, operator)) {
+			throw new SemanticError(String.format("Invalid unary operation %s for type %s", operator, operandType), line, column);
+		}
+
+		return operandType; // Для большинства унарных операций тип сохраняется
+	}
+    
+	@Override
     public <T> T accept(ExpressionVisitor<T> visitor) {
         return visitor.visit(this);
     }

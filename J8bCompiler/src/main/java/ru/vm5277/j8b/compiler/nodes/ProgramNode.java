@@ -9,9 +9,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.j8b.compiler.tokens.Token;
-import ru.vm5277.j8b.compiler.tokens.enums.Delimiter;
-import ru.vm5277.j8b.compiler.tokens.enums.Keyword;
-import ru.vm5277.j8b.compiler.tokens.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.Delimiter;
+import ru.vm5277.j8b.compiler.enums.Keyword;
+import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.VarType;
 
 public class ProgramNode extends AstNode {
 	private	List<AstNode> declarations = new ArrayList<>(); // Импорты, глобальные переменные, функции, классы
@@ -30,18 +31,18 @@ public class ProgramNode extends AstNode {
 
 			// 2. Обработка классов с модификаторами
 			if (tb.match(TokenType.OOP) && Keyword.CLASS == tb.current().getValue()) {
-				declarations.add(new ClassNode(tb, modifiers));
+				declarations.add(new ClassNode(tb, modifiers, null));
 				continue;
 			}
 
 			// 3. Обработка функций и глобальных переменных
 			if (tb.match(TokenType.TYPE)) {
-				Keyword type = (Keyword)tb.current().getValue();
+				VarType type = VarType.fromKeyword((Keyword)tb.current().getValue());
 				tb.consume();
 				Token nameToken = tb.consume(TokenType.ID);
             
 				if(tb.match(TokenType.DELIMITER) && Delimiter.LEFT_PAREN == tb.current().getValue()) { // Это функция
-					declarations.add(new FunctionNode(tb, type, (String)nameToken.getValue()));
+					declarations.add(new MethodNode(tb, modifiers, type, (String)nameToken.getValue()));
 				}
 				else { // Глобальная переменная
 					declarations.add(new FieldNode(tb, modifiers, type, (String)nameToken.getValue()));
@@ -50,7 +51,15 @@ public class ProgramNode extends AstNode {
             }
 			
 			// 4. Обработка остальных statement (if, while, вызовы и т.д.)
-			declarations.add(parseStatement());
+			AstNode statement = parseStatement();
+			declarations.add(statement);
+			if(statement instanceof BlockNode) {
+				blocks.add((BlockNode)statement);
+			}
         }
 	}        
+	
+	public List<AstNode> getDeclarations() {
+		return declarations;
+	}
 }

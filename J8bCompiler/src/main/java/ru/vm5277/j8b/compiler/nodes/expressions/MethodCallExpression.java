@@ -6,7 +6,10 @@
 package ru.vm5277.j8b.compiler.nodes.expressions;
 
 import java.util.List;
+import ru.vm5277.j8b.compiler.SemanticError;
+import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
+import ru.vm5277.j8b.compiler.semantic.SymbolTable;
 
 public class MethodCallExpression extends ExpressionNode {
 	private	final	ExpressionNode			target;
@@ -24,5 +27,22 @@ public class MethodCallExpression extends ExpressionNode {
 	@Override
     public <T> T accept(ExpressionVisitor<T> visitor) {
 		return visitor.visit(this);
+	}
+	
+	public String getMethodName() {
+		return methodName;
+	}
+	
+	public ExpressionNode getTarget() {
+		return target;
+	}
+
+	public List<ExpressionNode> getArguments() {
+		return arguments;
+	}
+	
+	@Override
+	public VarType semanticAnalyze(SymbolTable symbolTable) {
+		throw new SemanticError("Not supported yet.", line, column);
 	}
 }

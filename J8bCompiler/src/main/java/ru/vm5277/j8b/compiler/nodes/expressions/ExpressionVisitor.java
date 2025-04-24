@@ -5,14 +5,6 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes.expressions;
 
-/**
- *
- * @author kostas
- */
-public class ExpressionVisitor<T> {
-
-	<T> T visit(ExpressionNode aThis) {
-		throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
-	}
-	
+public interface ExpressionVisitor<T> {
+	T visit(ExpressionNode aThis);
 }

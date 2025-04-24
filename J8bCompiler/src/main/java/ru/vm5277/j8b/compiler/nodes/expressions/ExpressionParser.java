@@ -10,9 +10,9 @@ import java.util.List;
 import ru.vm5277.j8b.compiler.ParseError;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler.tokens.Token;
-import ru.vm5277.j8b.compiler.tokens.enums.Delimiter;
-import ru.vm5277.j8b.compiler.tokens.enums.Operator;
-import ru.vm5277.j8b.compiler.tokens.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.Delimiter;
+import ru.vm5277.j8b.compiler.enums.Operator;
+import ru.vm5277.j8b.compiler.enums.TokenType;
 
 public class ExpressionParser {
     private final TokenBuffer tb;
@@ -29,9 +29,9 @@ public class ExpressionParser {
 		ExpressionNode left = parseBinary(0);
         
         if (tb.match(TokenType.OPERATOR) && isAssignmentOperator((Operator)tb.current().getValue())) {
-            Token nextToken = tb.consume();
+            Operator operator = ((Operator)tb.consume().getValue()); //TODO check it
             ExpressionNode right = parseAssignment();
-            return new BinaryExpression(tb, left, nextToken, right);
+            return new BinaryExpression(tb, left, operator, right);
         }
         
         return left;
@@ -41,14 +41,14 @@ public class ExpressionParser {
         ExpressionNode left = parseUnary();
         
         while (tb.match(TokenType.OPERATOR)) {
-            Token opToken = tb.current();
-            Integer precedence = Operator.PRECEDENCE.get((Operator)opToken.getValue());
+            Operator operator = ((Operator)tb.consume().getValue());
+            Integer precedence = Operator.PRECEDENCE.get(operator);
             
             if (precedence == null || precedence<minPrecedence) break;
             
             tb.consume();
             ExpressionNode right = parseBinary(precedence+1);
-            left = new BinaryExpression(tb, left, opToken, right);
+            left = new BinaryExpression(tb, left, operator, right);
         }
         
         return left;
@@ -57,9 +57,9 @@ public class ExpressionParser {
 	
 	private ExpressionNode parseUnary() {
 		if (tb.match(TokenType.OPERATOR) && isUnaryOperator((Operator)tb.current().getValue())) {
-			Token op = tb.consume();
+			Operator operator = ((Operator)tb.consume().getValue()); //TODO check it
 			ExpressionNode operand = parseUnary();
-			return new UnaryExpression(tb, op, operand);
+			return new UnaryExpression(tb, operator, operand);
 		}
 
 		return parsePostfix();

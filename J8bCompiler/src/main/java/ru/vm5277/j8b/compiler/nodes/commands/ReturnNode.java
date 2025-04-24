@@ -8,7 +8,7 @@ package ru.vm5277.j8b.compiler.nodes.commands;
 import ru.vm5277.j8b.compiler.nodes.*;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
-import ru.vm5277.j8b.compiler.tokens.enums.Delimiter;
+import ru.vm5277.j8b.compiler.enums.Delimiter;
 
 public class ReturnNode extends AstNode {
 	private	final	ExpressionNode	expression;

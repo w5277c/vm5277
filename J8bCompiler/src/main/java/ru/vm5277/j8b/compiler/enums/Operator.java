@@ -3,7 +3,7 @@
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 22.04.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.j8b.compiler.tokens.enums;
+package ru.vm5277.j8b.compiler.enums;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -86,5 +86,46 @@ public enum Operator {
 			}
 		}
 		return null;
+	}
+	
+	// Проверяет, является ли оператор сравнением
+	public boolean isComparison() {
+		return this == EQ || this == NEQ || this == LT || this == GT || this == LTE || this == GTE;
+	}
+
+	// Проверяет, является ли оператор логическим
+	public boolean isLogical() {
+		return this == AND || this == OR || this == NOT;
+	}
+
+	// Проверяет, является ли оператор битовым
+	public boolean isBitwise() {
+		return this == BIT_AND || this == BIT_OR || this == BIT_XOR || this == BIT_NOT || this == SHL || this == SHR;
+	}
+
+	// Проверяет, является ли оператор арифметическим
+	public boolean isArithmetic() {
+		return this == PLUS || this == MINUS || this == MULT || this == DIV || this == MOD;
+	}
+
+	// Проверяет, является ли оператор присваиванием
+	public boolean isAssignment() {
+		return	this == ASSIGN || this == PLUS_ASSIGN || this == MINUS_ASSIGN || this == MULT_ASSIGN || this == DIV_ASSIGN || this == MOD_ASSIGN || 
+				this == AND_ASSIGN || this == OR_ASSIGN || this == XOR_ASSIGN || this == SHL_ASSIGN || this == SHR_ASSIGN;
+	}
+
+	// Проверяет, является ли оператор унарным
+	public boolean isUnary() {
+		return this == NOT || this == BIT_NOT || this == PLUS || this == MINUS;
+	}
+
+	// Проверяет, можно ли применять оператор к boolean
+	public boolean isBooleanOperator() {
+		return isLogical() || (isComparison() && !isBitwise());
+	}
+
+	// Проверяет, можно ли применять оператор к числам
+	public boolean isNumericOperator() {
+		return isArithmetic() || isBitwise() || this == PLUS || this == MINUS; // Унарные + и -
 	}
 }

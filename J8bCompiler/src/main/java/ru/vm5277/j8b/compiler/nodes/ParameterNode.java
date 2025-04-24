@@ -5,18 +5,26 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes;
 
-import ru.vm5277.j8b.compiler.tokens.enums.Keyword;
-import ru.vm5277.j8b.compiler.tokens.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.Keyword;
+import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.VarType;
 
 public class ParameterNode extends AstNode {
-	private	final	Keyword	type;
+	private	final	VarType	type;
     private	final	String	name;
 	
 	public ParameterNode(TokenBuffer tb) {
 		super(tb);
 		
-        this.type = (Keyword)tb.consume(TokenType.TYPE).getValue();
+        this.type = VarType.fromKeyword((Keyword)tb.consume(TokenType.TYPE).getValue());
         this.name = (String)tb.consume(TokenType.ID).getValue();
 	}
-
+	
+	public VarType getType() {
+		return type;
+	}
+	
+	public String getName() {
+		return name;
+	}
 }

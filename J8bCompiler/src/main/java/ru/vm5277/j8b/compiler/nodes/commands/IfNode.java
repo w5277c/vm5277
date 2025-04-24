@@ -5,18 +5,16 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes.commands;
 
-import java.util.List;
+import java.util.ArrayList;
 import ru.vm5277.j8b.compiler.nodes.*;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
-import ru.vm5277.j8b.compiler.tokens.enums.Delimiter;
-import ru.vm5277.j8b.compiler.tokens.enums.Keyword;
-import ru.vm5277.j8b.compiler.tokens.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.Delimiter;
+import ru.vm5277.j8b.compiler.enums.Keyword;
+import ru.vm5277.j8b.compiler.enums.TokenType;
 
 public class IfNode extends AstNode {
     private	final	ExpressionNode	condition;
-    private	final	BlockNode		thenBranch;
-    private	final	BlockNode		elseBranch;
 	
 	public IfNode(TokenBuffer tb) {
 		super(tb);
@@ -29,7 +27,7 @@ public class IfNode extends AstNode {
         tb.consume(Delimiter.RIGHT_PAREN);
 
 		// Then блок
-		thenBranch = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement());
+		blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, "") : new BlockNode(tb, parseStatement()));
 
 		// Else блок
         if (tb.match(TokenType.COMMAND, Keyword.ELSE)) {
@@ -37,14 +35,11 @@ public class IfNode extends AstNode {
         
 			if (tb.match(TokenType.COMMAND, Keyword.IF)) {
 				// Обработка else if
-				elseBranch = new BlockNode(tb, new IfNode(tb));
+				blocks.add(new BlockNode(tb, new IfNode(tb)));
 			}
 			else {
-				elseBranch = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement());
+				blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, "") : new BlockNode(tb, parseStatement()));
 			}
-		}
-		else {
-			elseBranch = null;
 		}
 	}
 
@@ -53,11 +48,11 @@ public class IfNode extends AstNode {
         return condition;
     }
 
-    public BlockNode getThenBranch() {
-        return thenBranch;
+    public BlockNode getThenBlock() {
+        return blocks.get(0);
     }
 
-    public BlockNode getElseBranch() {
-        return elseBranch;
+    public BlockNode getElseBlock() {
+        return (0x02 == blocks.size() ? blocks.get(1) : null);
     }
 }

@@ -6,9 +6,9 @@
 package ru.vm5277.j8b.compiler.nodes;
 
 import ru.vm5277.j8b.compiler.tokens.Token;
-import ru.vm5277.j8b.compiler.tokens.enums.Delimiter;
-import ru.vm5277.j8b.compiler.tokens.enums.Keyword;
-import ru.vm5277.j8b.compiler.tokens.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.Delimiter;
+import ru.vm5277.j8b.compiler.enums.Keyword;
+import ru.vm5277.j8b.compiler.enums.TokenType;
 
 public class ImportNode extends AstNode {
 	private	final	boolean	isStatic;

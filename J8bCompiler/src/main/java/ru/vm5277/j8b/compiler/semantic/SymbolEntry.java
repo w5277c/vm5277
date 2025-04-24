@@ -1,25 +1,32 @@
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------
 Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-23.04.2025	konstantin@5277.ru		Начало
+24.04.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.j8b.compiler.nodes;
+package ru.vm5277.j8b.compiler.semantic;
 
-import java.util.List;
-import ru.vm5277.j8b.compiler.tokens.enums.Keyword;
+import ru.vm5277.j8b.compiler.enums.VarType;
 
-public class FunctionNode extends AstNode {
-	private	Keyword				type;
-	private	String				name;
-	private	List<ParameterNode>	parameters;
-	private	BlockNode			body;
+public class SymbolEntry {
+	final	VarType	type;
+	final	boolean	isMutable;
+	final	int		line;
 
-	public FunctionNode(TokenBuffer tb, Keyword type, String name) {
-		super(tb);
-
+	SymbolEntry(VarType type, boolean isMutable, int line) {
 		this.type = type;
-		this.name = name;
-		
-		//TODO
+		this.isMutable = isMutable;
+		this.line = line;
+	}
+
+	public VarType getType() {
+		return type;
+	}
+
+	public boolean isMutable() {
+		return isMutable;
+	}
+
+	public int getLine() {
+		return line;
 	}
 }

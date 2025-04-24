@@ -5,16 +5,18 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes.expressions;
 
+import ru.vm5277.j8b.compiler.SemanticError;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
-import ru.vm5277.j8b.compiler.tokens.Token;
-import ru.vm5277.j8b.compiler.tokens.enums.Operator;
+import ru.vm5277.j8b.compiler.enums.Operator;
+import ru.vm5277.j8b.compiler.enums.VarType;
+import ru.vm5277.j8b.compiler.semantic.SymbolTable;
 
 public class BinaryExpression extends ExpressionNode {
     private final ExpressionNode	left;
-    private final Token				operator;
+    private final Operator			operator;
     private final ExpressionNode	right;
     
-    public BinaryExpression(TokenBuffer tb, ExpressionNode left, Token operator, ExpressionNode right) {
+    public BinaryExpression(TokenBuffer tb, ExpressionNode left, Operator operator, ExpressionNode right) {
         super(tb);
         
 		this.left = left;
@@ -27,4 +29,32 @@ public class BinaryExpression extends ExpressionNode {
     public <T> T accept(ExpressionVisitor<T> visitor) {
         return visitor.visit(this);
     }
+	
+	public ExpressionNode getLeft() {
+		return left;
+	}
+	
+	public Operator getOperastor() {
+		return operator;
+	}
+	
+	public ExpressionNode getRight() {
+		return right;
+	}
+
+	@Override
+	public VarType semanticAnalyze(SymbolTable symbolTable) {
+		VarType leftType = left.semanticAnalyze(symbolTable);
+		VarType rightType = right.semanticAnalyze(symbolTable);
+
+		// Проверка совместимости типов
+		if (!leftType.isCompatibleWith(rightType)) {
+			throw new SemanticError(String.format("Type mismatch in binary operation: %s %s %s", leftType, operator, rightType), line, column);
+		}
+
+		// Определение типа результата операции
+		if (operator.isComparison()) return VarType.BOOL;
+		if (operator.isLogical()) return VarType.BOOL;
+		return leftType.getSize() >= rightType.getSize() ? leftType : rightType;
+	}
 }

@@ -5,8 +5,8 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.tokens;
 
-import ru.vm5277.j8b.compiler.tokens.enums.TokenType;
-import ru.vm5277.j8b.compiler.tokens.enums.Delimiter;
+import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.Delimiter;
 
 public class TDelimiter extends Token {
 	public TDelimiter(Delimiter value, int endPos, int line, int column) {
