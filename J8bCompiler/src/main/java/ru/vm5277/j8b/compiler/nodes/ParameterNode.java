@@ -27,4 +27,9 @@ public class ParameterNode extends AstNode {
 	public String getName() {
 		return name;
 	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + ": " + type + ", " + name;
+	}
 }

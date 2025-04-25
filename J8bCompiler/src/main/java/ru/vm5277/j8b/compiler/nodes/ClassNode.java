@@ -53,4 +53,10 @@ public class ClassNode extends AstNode {
 	public BlockNode getBody() {
 		return blocks.get(0);
 	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + ": " + modifiers + ", " + name + ", " + interfaces;
+	}
+
 }

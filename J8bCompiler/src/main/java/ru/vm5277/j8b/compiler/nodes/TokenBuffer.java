@@ -23,8 +23,9 @@ public class TokenBuffer {
 	}
 	
 	public Token consume() { // Или next
-		current  =  iterator.hasNext() ? iterator.next() : new Token(TokenType.EOF, null, current.getLine(), current.getColumn());
-		return current;
+		Token result = current;
+		current =  iterator.hasNext() ? iterator.next() : new Token(TokenType.EOF, null, current.getLine(), current.getColumn());
+		return result;
 	}
 	
 	public Token current() {
@@ -33,9 +34,7 @@ public class TokenBuffer {
 	
 	public Token consume(TokenType expectedType) {
 		if (current.getType() == expectedType) {
-            Token consumed = current;
-            consume();
-            return consumed;
+            return consume();
         }
         throw new ParseError("Expected " + expectedType + ", but got " + current.getType(), current.getLine(), current.getColumn());
     }
@@ -43,9 +42,7 @@ public class TokenBuffer {
 	public Token consume(Delimiter delimiter) {
 		if (TokenType.DELIMITER == current.getType()) {
             if(delimiter == current.getValue()) {
-				Token consumed = current;
-				consume();
-				return consumed;
+				return consume();
 			}
 			else {
 				throw new ParseError("Expected delimiter " + delimiter + ", but got " + current.getValue(), current.getLine(), current.getColumn());
@@ -57,9 +54,7 @@ public class TokenBuffer {
 	public Token consume(TokenType type, Keyword keyword) {
 		if (type == current.getType()) {
             if(keyword == current.getValue()) {
-				Token consumed = current;
-				consume();
-				return consumed;
+				return consume();
 			}
 			else {
 				throw new ParseError("Expected keyword " + keyword + ", but got " + current.getValue(), current.getLine(), current.getColumn());

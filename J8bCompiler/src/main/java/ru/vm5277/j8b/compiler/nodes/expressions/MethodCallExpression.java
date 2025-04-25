@@ -45,4 +45,9 @@ public class MethodCallExpression extends ExpressionNode {
 	public VarType semanticAnalyze(SymbolTable symbolTable) {
 		throw new SemanticError("Not supported yet.", line, column);
 	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + ": " + target + ", " + methodName + ", " + arguments.toArray();
+	}
 }

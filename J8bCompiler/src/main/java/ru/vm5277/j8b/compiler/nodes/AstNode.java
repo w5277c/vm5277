@@ -19,6 +19,8 @@ import ru.vm5277.j8b.compiler.nodes.expressions.MethodCallExpression;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.VarType;
+import ru.vm5277.j8b.compiler.tokens.Token;
 
 public abstract class AstNode {
 	protected			TokenBuffer				tb;
@@ -84,7 +86,7 @@ public abstract class AstNode {
 
 		return base;
 	}
-	private List<ExpressionNode> parseArguments() {
+	public List<ExpressionNode> parseArguments() {
 		List<ExpressionNode> args = new ArrayList<>();
 		tb.consume(Delimiter.LEFT_PAREN);
 
@@ -105,11 +107,69 @@ public abstract class AstNode {
 		return args;
 	}
 	
+	protected void parseBody(List<AstNode> declarations, String className) {
+		while (!tb.match(TokenType.EOF) && !tb.match(Delimiter.RIGHT_BRACE)) {		
+			Set<Keyword> modifiers = collectModifiers();
+
+			// 2. Обработка классов с модификаторами
+			if (tb.match(TokenType.OOP) && Keyword.CLASS == tb.current().getValue()) {
+				declarations.add(new ClassNode(tb, modifiers, null));
+				continue;
+			}
+
+			// Обработка функций и глобальных переменных
+			if (tb.match(TokenType.TYPE)) {
+				VarType type = VarType.fromKeyword((Keyword)tb.current().getValue());
+				tb.consume();
+
+				// Обработка массива (int[10])
+				while (tb.match(Delimiter.LEFT_BRACKET)) {
+					tb.consume(); // Пропускаем '['
+
+					int depth = 0;
+					Integer size = null;
+					if(tb.match(TokenType.NUMBER)) {
+						depth++;
+						if (depth > 3) {
+							throw new ParseError("Maximum array nesting depth is 3", tb.current().getLine(), tb.current().getColumn());
+						}
+						size = (Integer)tb.consume().getValue();
+						if (size <= 0) {
+							throw new ParseError("Array size must be positive", tb.current().getLine(), tb.current().getColumn());
+						}
+						type = VarType.arrayOf(type, size);
+					}
+					tb.consume(Delimiter.RIGHT_BRACKET);  // Пропускаем ']'
+					type = size != null ? VarType.arrayOf(type, size) : VarType.arrayOf(type);
+				}
+
+				Token nameToken = tb.consume(TokenType.ID);
+
+				if(tb.match(TokenType.DELIMITER) && Delimiter.LEFT_PAREN == tb.current().getValue()) { // Это функция
+					declarations.add(new MethodNode(tb, modifiers, type, (String)nameToken.getValue()));
+				}
+				else if (tb.match(TokenType.DELIMITER) && Delimiter.LEFT_BRACKET == tb.current().getValue()) { // Это объявление массива
+					declarations.add(new ArrayDeclarationNode(tb, modifiers, type, (String)nameToken.getValue()));
+				}
+				else { // Глобальная переменная
+					declarations.add(new FieldNode(tb, modifiers, type, (String)nameToken.getValue()));
+				}
+				continue;
+			}
+
+			// 4. Обработка остальных statement (if, while, вызовы и т.д.)
+			AstNode statement = parseStatement();
+			declarations.add(statement);
+			if(statement instanceof BlockNode) {
+				blocks.add((BlockNode)statement);
+			}
+		}
+	}
+
 	protected final Set<Keyword> collectModifiers() {
         Set<Keyword> modifiers = new HashSet<>();
         while (tb.current().getType() == TokenType.MODIFIER) {
-			modifiers.add((Keyword)tb.current().getValue());
-            tb.consume();
+			modifiers.add((Keyword)tb.consume().getValue());
         }
         return modifiers;
     }

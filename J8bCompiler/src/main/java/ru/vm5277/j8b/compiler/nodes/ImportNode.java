@@ -19,7 +19,7 @@ public class ImportNode extends AstNode {
         super(tb);
 		
 		// Пропуск import токена
-		tb.consume(TokenType.KEYWORD, Keyword.IMPORT);
+		tb.consume();
         
 		if (Keyword.STATIC == tb.current().getValue()) {
             tb.consume();
@@ -67,4 +67,9 @@ public class ImportNode extends AstNode {
     public String getAlias() {
         return alias;
     }
+
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + ": " + importPath;
+	}
 }

@@ -10,7 +10,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 public class VarType {
-	private static final Map<String, VarType> CLASS_TYPES = new HashMap<>();
+	private	static	final	Map<String, VarType>	CLASS_TYPES = new HashMap<>();
 	
 	// Примитивные типы
 	public	static	final	VarType	VOID		= new VarType("void");
@@ -28,10 +28,14 @@ public class VarType {
 	public	static	final	VarType	CLASS		= new VarType("class");
 
 	// Специальные типы
+	public	static	final	VarType	NULL		= new VarType("null");
 	public	static	final	VarType	UNKNOWN		= new VarType("?");
 
 	private	final	String	name;
 	private	final	String	className; // Для классовых типов
+	private			boolean	isArray;
+    private			VarType	elementType; // Для массивов: тип элементов
+	private			int		arraySize;
 	
 	// Конструктор для ссылочных типов
 	private VarType(String name) {
@@ -43,6 +47,32 @@ public class VarType {
 	private VarType(String name, String className) {
 		this.name = name;
 		this.className = className;
+	}
+
+	// Конструктор для массивов
+    public static VarType arrayOf(VarType elementType) {
+        VarType type = new VarType("array");
+        type.isArray = true;
+        type.elementType = elementType;
+        return type;
+    }
+	
+	public static VarType arrayOf(VarType elementType, int size) {
+		VarType type = new VarType("array");
+		type.isArray = true;
+		type.elementType = elementType;
+		type.arraySize = size;
+		return type;
+	}
+
+	public int getArrayDepth() {
+		int depth = 0;
+		VarType current = this;
+		while (current.isArray()) {
+			depth++;
+			current = current.getElementType();
+		}
+		return depth;
 	}
 	
 	// Создаем тип для конкретного класса.
@@ -149,6 +179,18 @@ public class VarType {
 		return 0;
 	}
 
+	public boolean isArray() {
+		return isArray;
+	}
+    
+	public VarType getElementType() {
+		return elementType;
+	}
+	
+	public Integer getArraySize() {
+		return arraySize;
+	}
+	
 	@Override
 	public String toString() {
 		return getName();

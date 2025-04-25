@@ -58,7 +58,7 @@ public class TNumber extends Token {
 				throw new ParseError("Binary number too large", line, this.column);
 			}
 		}
-		else if (endPos<src.length() && '0'==src.charAt(endPos)) {
+		else if (endPos<src.length() && '0'==src.charAt(endPos) && (endPos+1<src.length() && '.'!=src.charAt(endPos+1))) {
             // Восьмеричные числа (0...)
 			StringBuilder oct = new StringBuilder();
 			oct.append(src.charAt(endPos));

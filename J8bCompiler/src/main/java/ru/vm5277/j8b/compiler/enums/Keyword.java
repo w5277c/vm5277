@@ -15,7 +15,7 @@ public enum Keyword {
 	// Модификаторы
 	STATIC, FINAL, PRIVATE, PUBLIC, NATIVE, ATOMIC,
 	// Ключевые слова ООП
-	CLASS, INTERFACE, IMPLEMENTS,
+	CLASS, INTERFACE, IMPLEMENTS, THIS,
 	//Остальное
 	IMPORT, AS;
 	
@@ -51,10 +51,13 @@ public enum Keyword {
 			case FINAL:
 			case PRIVATE:
 			case PUBLIC:
+			case NATIVE:
+			case ATOMIC:
 				return TokenType.MODIFIER;
 			case CLASS:
 			case IMPLEMENTS:
 			case INTERFACE:
+			case THIS:
 				return TokenType.OOP;
 			default:
 				return TokenType.KEYWORD;

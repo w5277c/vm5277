@@ -57,6 +57,19 @@ public class SemanticAnalyzer {
     private void registerNestedClasses(ClassNode clazz) throws SemanticError {
 		ClassInfo classInfo = new ClassInfo();
 		symbolTable.addClass(clazz.getFullName(), classInfo);
+		for(AstNode decl : clazz.getBody().getDeclarations()) {
+			if(decl instanceof FieldNode) {
+				classInfo.addField(((FieldNode)decl).getName(), ((FieldNode)decl).getType());
+			}
+			else if(decl instanceof MethodNode) {
+				MethodNode method = (MethodNode)decl;
+                List<VarType> paramTypes = new ArrayList<>();
+                for (ParameterNode param : method.getParameters()) {
+                    paramTypes.add(param.getType());
+                }
+                classInfo.addMethod(method.getName(), new MethodInfo(method.getType(), paramTypes));
+			}
+		}
 		
 		BlockNode body = clazz.getBody();
 		if(null != body) {
@@ -103,9 +116,6 @@ public class SemanticAnalyzer {
 			throw new SemanticError("Unknown field type: " + declaredType, field.getLine(), field.getColumn());
         }
 
-		// Регистрация поля
-		classInfo.addField(field.getName(), field.getType());
-		
 		// Проверка инициализатора
 		if (null != field.getInitializer()) {
 			VarType initType = checkExpression(field.getInitializer());
@@ -134,13 +144,6 @@ public class SemanticAnalyzer {
 	private void analyzeMethod(MethodNode method, String className) throws SemanticError {
 		ClassInfo classInfo = symbolTable.getClassInfo(className);
 		
-		// Собираем типы параметров и регистрируем метод
-		List<VarType> paramTypes = new ArrayList<>();
-		for (ParameterNode param : method.getParameters()) {
-			paramTypes.add(param.getType());
-		}
-		classInfo.addMethod(method.getName(), new MethodInfo(method.getType(), paramTypes));
-
 		// Проверяем тип возвращаемого значения
 		VarType returnType = method.getType();
 		if (returnType == VarType.UNKNOWN) {
@@ -237,7 +240,7 @@ public class SemanticAnalyzer {
 		// Проверка целевого объекта
 		VarType targetType = checkExpression(expr.getTarget());
 
-		if (!targetType.isClassType()) {
+		if (null != targetType && !targetType.isClassType()) {
 			throw new SemanticError("Method call on non-class type: " + targetType, expr.getLine(), expr.getColumn());
 		}
 

@@ -57,4 +57,9 @@ public class BinaryExpression extends ExpressionNode {
 		if (operator.isLogical()) return VarType.BOOL;
 		return leftType.getSize() >= rightType.getSize() ? leftType : rightType;
 	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + ": " + left + ", " + operator + ", " + right;
+	}
 }

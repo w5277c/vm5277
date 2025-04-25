@@ -19,7 +19,7 @@ public class FieldNode extends AstNode {
 	private			String			name;
 	private	final	ExpressionNode	initializer;
 	
-	public FieldNode(TokenBuffer tb, Set<Keyword> modifiers, VarType type, String name) {
+	public FieldNode(TokenBuffer tb, Set<Keyword> modifiers, VarType returnType, String name) {
 		super(tb);
 
 		this.modifiers = modifiers;
@@ -50,5 +50,10 @@ public class FieldNode extends AstNode {
 	
 	public ExpressionNode getInitializer() {
 		return initializer;
+	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + ": " + modifiers + ", " + returnType + ", " + name;
 	}
 }

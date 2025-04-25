@@ -7,7 +7,6 @@ package ru.vm5277.j8b.compiler.nodes.expressions;
 
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
-import ru.vm5277.j8b.compiler.semantic.SymbolEntry;
 import ru.vm5277.j8b.compiler.semantic.SymbolTable;
 
 public class VariableExpression extends ExpressionNode {
@@ -31,5 +30,10 @@ public class VariableExpression extends ExpressionNode {
 	
 	public String getName() {
 		return name;
+	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + ": " + name;
 	}
 }

@@ -29,7 +29,7 @@ public class ExpressionParser {
 		ExpressionNode left = parseBinary(0);
         
         if (tb.match(TokenType.OPERATOR) && isAssignmentOperator((Operator)tb.current().getValue())) {
-            Operator operator = ((Operator)tb.consume().getValue()); //TODO check it
+            Operator operator = ((Operator)tb.consume().getValue());
             ExpressionNode right = parseAssignment();
             return new BinaryExpression(tb, left, operator, right);
         }
@@ -41,12 +41,14 @@ public class ExpressionParser {
         ExpressionNode left = parseUnary();
         
         while (tb.match(TokenType.OPERATOR)) {
-            Operator operator = ((Operator)tb.consume().getValue());
+            Operator operator = ((Operator)tb.current().getValue());
             Integer precedence = Operator.PRECEDENCE.get(operator);
             
-            if (precedence == null || precedence<minPrecedence) break;
-            
+            if (precedence == null || precedence<minPrecedence) {
+				break;
+			}
             tb.consume();
+			
             ExpressionNode right = parseBinary(precedence+1);
             left = new BinaryExpression(tb, left, operator, right);
         }
@@ -69,8 +71,12 @@ public class ExpressionParser {
 		ExpressionNode expr = parsePrimary();
         
 		while (true) {
-			if (tb.match(Delimiter.LEFT_PAREN)) {
-				expr = parseMethodCall(expr);
+//			if (tb.match(Delimiter.LEFT_PAREN)) {
+//				expr = parseMethodCall(expr);
+			//}
+//			else
+			if (tb.match(Delimiter.LEFT_BRACKET)) {
+				expr = new ArrayExpression(tb, expr);
 			}
 			else {
 				break;
@@ -96,6 +102,15 @@ public class ExpressionParser {
 		}
 		else if(tb.match(TokenType.ID)) {
 			tb.consume();
+			if(tb.match(Delimiter.LEFT_PAREN)) {
+				tb.consume();
+				List<ExpressionNode> args = new ArrayList<>();
+				if(!tb.match(Delimiter.RIGHT_PAREN)) {
+					//TODO parse args
+				}
+				tb.consume();
+				return new MethodCallExpression(tb, new VariableExpression(tb, "this"), token.getValue().toString(), args);
+			}
 			return new VariableExpression(tb, token.getValue().toString());
 		}
 		else {
@@ -123,7 +138,8 @@ public class ExpressionParser {
         }
         
         tb.consume(Delimiter.RIGHT_PAREN);
-        return new MethodCallExpression(tb, target, "", args); //TODO
+		String methodName = (target instanceof VariableExpression) ? ((VariableExpression)target).getName() : "";
+        return new MethodCallExpression(tb, target, methodName, args);
     }
 	
 	private boolean isAssignmentOperator(Operator op) {
