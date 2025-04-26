@@ -53,6 +53,6 @@ public class TChar extends Token {
 		endPos++;
 		column++;
     
-		value = ch;
+		value = String.valueOf(ch);
 	}
 }

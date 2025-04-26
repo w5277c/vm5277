@@ -5,6 +5,8 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes.expressions;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.j8b.compiler.ParseError;
@@ -12,6 +14,7 @@ import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler.tokens.Token;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Operator;
+import static ru.vm5277.j8b.compiler.enums.Operator.BIT_XOR;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 
 public class ExpressionParser {
@@ -31,7 +34,8 @@ public class ExpressionParser {
         if (tb.match(TokenType.OPERATOR) && isAssignmentOperator((Operator)tb.current().getValue())) {
             Operator operator = ((Operator)tb.consume().getValue());
             ExpressionNode right = parseAssignment();
-            return new BinaryExpression(tb, left, operator, right);
+            ExpressionNode result = constantFolding(left, operator, right);
+			return null == result ? new BinaryExpression(tb, left, operator, right) : result;
         }
         
         return left;
@@ -50,17 +54,71 @@ public class ExpressionParser {
             tb.consume();
 			
             ExpressionNode right = parseBinary(precedence+1);
-            left = new BinaryExpression(tb, left, operator, right);
+            ExpressionNode folded = constantFolding(left, operator, right);
+			left = (folded != null) ? folded : new BinaryExpression(tb, left, operator, right);
         }
         
         return left;
     }
 	
+	private LiteralExpression constantFolding(ExpressionNode left, Operator operator, ExpressionNode right) {
+		if (left instanceof LiteralExpression && right instanceof LiteralExpression) {
+			Object leftVal = ((LiteralExpression)left).getValue();
+			Object rightVal = ((LiteralExpression)right).getValue();
+
+			if(Operator.PLUS == operator && leftVal instanceof String && rightVal instanceof String) {
+				return new LiteralExpression(tb, ((String)leftVal) + ((String)rightVal));
+			}
+			if(Operator.PLUS == operator && leftVal instanceof String && rightVal instanceof Number) {
+				return new LiteralExpression(tb, ((String)leftVal) + (rightVal instanceof BigDecimal ?	((BigDecimal)rightVal).toPlainString() :
+																										rightVal.toString()));
+			}
+			if (leftVal instanceof Number && rightVal instanceof Number) {
+				if(leftVal instanceof BigDecimal || rightVal instanceof BigDecimal) {
+					BigDecimal a = (leftVal instanceof BigDecimal ? (BigDecimal)leftVal : BigDecimal.valueOf(((Number)leftVal).longValue()));
+					BigDecimal b = (rightVal instanceof BigDecimal ? (BigDecimal)rightVal : BigDecimal.valueOf(((Number)rightVal).longValue()));
+					switch (operator) {
+						case PLUS:		return new LiteralExpression(tb, a.add(b));
+						case MINUS:		return new LiteralExpression(tb, a.subtract(b));
+						case MULT:		return new LiteralExpression(tb, a.multiply(b));
+						case DIV:		return new LiteralExpression(tb, a.divide(b));
+				    }
+				}
+				else {
+					BigInteger a = (leftVal instanceof BigInteger ? (BigInteger)leftVal : BigInteger.valueOf(((Number)leftVal).longValue()));
+					BigInteger b = (rightVal instanceof BigInteger ? (BigInteger)rightVal : BigInteger.valueOf(((Number)rightVal).longValue()));
+					switch (operator) {
+						case PLUS:		return new LiteralExpression(tb, a.add(b));
+						case MINUS:		return new LiteralExpression(tb, a.subtract(b));
+						case MULT:		return new LiteralExpression(tb, a.multiply(b));
+						case DIV:		return new LiteralExpression(tb, a.divide(b));
+						case MOD:		return new LiteralExpression(tb, a.mod(b));
+						case BIT_AND:	return new LiteralExpression(tb, a.and(b));
+						case BIT_OR:	return new LiteralExpression(tb, a.or(b));
+						case BIT_XOR:	return new LiteralExpression(tb, a.xor(b));
+				    }
+				}
+			}
+		}
+		return null;
+	}
+	
+
 	
 	private ExpressionNode parseUnary() {
 		if (tb.match(TokenType.OPERATOR) && isUnaryOperator((Operator)tb.current().getValue())) {
 			Operator operator = ((Operator)tb.consume().getValue()); //TODO check it
 			ExpressionNode operand = parseUnary();
+			if (Operator.MINUS == operator  && operand instanceof LiteralExpression) {
+				Object value = ((LiteralExpression)operand).getValue();
+				if(value instanceof Integer) return new LiteralExpression(tb, -(Integer)value);
+				else if(value instanceof Long) return new LiteralExpression(tb, -(Long)value);
+				else if(value instanceof BigInteger) return new LiteralExpression(tb, ((BigInteger)value).negate());
+				else if(value instanceof BigDecimal) return new LiteralExpression(tb, ((BigDecimal)value).negate());
+			}
+			else if (Operator.PLUS == operator) {
+                return parseUnary(); // Пропускаем '+' и парсим дальше
+            }
 			return new UnaryExpression(tb, operator, operand);
 		}
 
@@ -90,7 +148,7 @@ public class ExpressionParser {
 	private ExpressionNode parsePrimary() {
 		Token token = tb.current();
         
-		if(tb.match(TokenType.NUMBER) || tb.match(TokenType.STRING)) {
+		if(tb.match(TokenType.NUMBER) || tb.match(TokenType.STRING) || tb.match(TokenType.CHAR)) {
 			tb.consume();
 			return new LiteralExpression(tb, token.getValue());
 		}

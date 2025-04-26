@@ -105,8 +105,8 @@ public class Lexer {
 				}
 				catch(ParseError e) {
 					tokens.add(new Token(TokenType.CHAR, "?", e));
-					pos = e.getColumn()-column;
-					column = e.getColumn();
+					pos += (e.getColumn()-column)-1;
+					column = e.getColumn()-1;
 				}
 				continue;
 			}
@@ -121,8 +121,8 @@ public class Lexer {
 				}
 				catch(ParseError e) {
 					tokens.add(new Token(TokenType.STRING, "????", e));
-					pos = e.getColumn()-column;
-					column = e.getColumn();
+					pos += e.getColumn()-column;
+					column = e.getColumn(); // TODO check it
 				}
 				continue;
 			}
@@ -137,8 +137,8 @@ public class Lexer {
 				}
 				catch(ParseError e) {
 					tokens.add(new Token(TokenType.NUMBER, 0, e));
-					pos = e.getColumn()-column;
-					column = e.getColumn();
+					pos += e.getColumn()-column;
+					column = e.getColumn();  // TODO check it
 				}
 				continue;
             }
