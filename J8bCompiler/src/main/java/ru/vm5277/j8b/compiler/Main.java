@@ -10,7 +10,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 
 public class Main {
-    public	final	static	String	VERSION	= "0.0.2";
+    public	final	static	String	VERSION	= "0.0.3";
 	
 	public static void main(String[] args) throws IOException {
 		try (InputStreamReader isr = new InputStreamReader(new FileInputStream(args[0x00]))) {

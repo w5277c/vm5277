@@ -1,5 +1,4 @@
 (* Основные конструкции языка *)
-
 program = { import_decl | class_decl | interface_decl | statement };
 
 (* Декларации *)
@@ -30,26 +29,29 @@ statement = block | if_stmt | while_stmt | for_stmt | return_stmt | expr_stmt | 
 block = "{", { statement }, "}";
 if_stmt = "if", "(", expression, ")", statement, [ "else", statement ];
 while_stmt = "while", "(", expression, ")", statement;
-for_stmt = "for", "(", [ for_init ], ";", [ expression ], ";", [ for_update ], ")", statement;
+for_stmt = "for", "(", [ for_init ], ";", [ expression ], ";", [ for_update ], ")", statement, [ else_clause ];
 for_init = variable_decl | expr_list;
 for_update = expr_list;
+else_clause = "else", statement;
 return_stmt = "return", [ expression ], ";";
 expr_stmt = expression, ";";
 variable_decl = type, identifier, [ "=", expression ], { ",", identifier, [ "=", expression ] }, ";";
 
 (* Выражения *)
-expression = assignment_expr;
-assignment_expr = binary_expr, [ assignment_operator, assignment_expr ];
-binary_expr = unary_expr, { binary_operator, binary_expr };
-unary_expr = [ unary_operator ], postfix_expr;
+expression = ternary_expr;
+ternary_expr = logical_or_expr, [ "?", expression, ":", expression ];
+logical_or_expr = logical_and_expr, { "||", logical_and_expr };
+logical_and_expr = equality_expr, { "&&", equality_expr };
+equality_expr = relational_expr, { ("==" | "!="), relational_expr };
+relational_expr = additive_expr, { ("<" | ">" | "<=" | ">="), additive_expr };
+additive_expr = multiplicative_expr, { ("+" | "-"), multiplicative_expr };
+multiplicative_expr = unary_expr, { ("*" | "/" | "%"), unary_expr };
+unary_expr = [ ("!" | "~" | "+" | "-") ], postfix_expr;
 postfix_expr = primary_expr, { postfix_operator };
 primary_expr = literal | "(", expression, ")" | identifier | method_call | array_access;
 
 (* Операторы *)
 assignment_operator = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=";
-binary_operator = "&&" | "||" | "&" | "|" | "^" | "==" | "!=" | "<" | ">" | "<=" | ">=" 
-                | "<<" | ">>" | "+" | "-" | "*" | "/" | "%";
-unary_operator = "!" | "~" | "+" | "-";
 postfix_operator = "[" expression "]" | "(" [ argument_list ] ")";
 
 (* Литералы и идентификаторы *)

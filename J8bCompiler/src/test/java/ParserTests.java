@@ -19,8 +19,8 @@ public class ParserTests {
 								"	byte[] s1=\"a\"+\"b\"; byte[] s2=\"a\"+123; byte[] s3=\"z\"+0.9; byte[] s4=\"ZX Spectru\"+'m'; byte[] s5='1'+'z';" +
 								"	bool b1=true && false; bool b2=true || false; bool b3=true == true; bool b4=true!=true; bool b5 = !true;" +
 								"	bool b6=!(65>3); bool b7=3<=3;" +
-								"	int t1=-5; int t2=5+i1+i2-2-i3; }";
-//		String source = "class A{ int t1=5+i1+i2-2-i3;}";
+								"	int t1=-5; int t2=5+i1+i2-2-i3; int t3=7==10-6/2?7:2; int t4=5<3 ? 7:2; int t5=true?1:0;}";
+//		String source = "class A{ int t3=7==10-6/2?7:2;}";
 		Lexer lexer = new Lexer(new StringReader(source));
 		Parser parser = new Parser(lexer.getTokens());
 		
@@ -139,5 +139,18 @@ public class ParserTests {
 		assertEquals(Operator.MINUS, e1.getOperator());
 		assertEquals(true, e1.getRight()instanceof VariableExpression);
 		assertEquals("i3", toStringValue(((VariableExpression)e1.getRight()).getValue()));
+		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(24);
+		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
+		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Number);
+		assertEquals("7", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
+		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(25);
+		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
+		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Number);
+		assertEquals("2", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
+		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(26);
+		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
+		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Number);
+		assertEquals("1", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
+
 	}
 }

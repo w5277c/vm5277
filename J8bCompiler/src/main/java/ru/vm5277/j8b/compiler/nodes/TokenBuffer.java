@@ -39,6 +39,18 @@ public class TokenBuffer {
         throw new ParseError("Expected " + expectedType + ", but got " + current.getType(), current.getLine(), current.getColumn());
     }
 	
+	public Token consume(Operator op) {
+		if (TokenType.OPERATOR == current.getType()) {
+            if(op == current.getValue()) {
+				return consume();
+			}
+			else {
+				throw new ParseError("Expected operator " + op + ", but got " + current.getValue(), current.getLine(), current.getColumn());
+			}
+        }
+        throw new ParseError("Expected " + TokenType.OPERATOR + ", but got " + current.getType(), current.getLine(), current.getColumn());
+    }
+
 	public Token consume(Delimiter delimiter) {
 		if (TokenType.DELIMITER == current.getType()) {
             if(delimiter == current.getValue()) {

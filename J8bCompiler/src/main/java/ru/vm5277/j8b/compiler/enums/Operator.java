@@ -19,11 +19,15 @@ public enum Operator {
 	BIT_AND("&"), BIT_OR("|"), BIT_XOR("^"), BIT_NOT("~"), SHL("<<"), SHR(">>"),
 	// Присваивание (простое и составное)
 	ASSIGN("="), PLUS_ASSIGN("+="), MINUS_ASSIGN("-="), MULT_ASSIGN("*="), DIV_ASSIGN("/="), MOD_ASSIGN("%="), AND_ASSIGN("&="), OR_ASSIGN("|="),
-	XOR_ASSIGN("^="), SHL_ASSIGN("<<="), SHR_ASSIGN(">>=");
-
+	XOR_ASSIGN("^="), SHL_ASSIGN("<<="), SHR_ASSIGN(">>="),
+	//Тернарный
+	TERNARY("?");
+	
 	public static final Map<Operator, Integer> PRECEDENCE = new HashMap<>();
 	static {
-	    // 1. Присваивание (низший приоритет)
+	    // 0. Тенарный оператор
+		PRECEDENCE.put(Operator.TERNARY, 0);
+		// 1. Присваивание (низший приоритет)
 		PRECEDENCE.put(Operator.ASSIGN, 1);
 		PRECEDENCE.put(Operator.PLUS_ASSIGN, 1);
 		PRECEDENCE.put(Operator.MINUS_ASSIGN, 1);

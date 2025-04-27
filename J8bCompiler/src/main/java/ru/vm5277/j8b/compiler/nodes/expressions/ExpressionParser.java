@@ -25,7 +25,7 @@ public class ExpressionParser {
     public ExpressionNode parse() {
         return parseAssignment();
     }
-    
+   
 	private ExpressionNode parseAssignment() {
 		ExpressionNode left = parseBinary(0);
         
@@ -43,8 +43,26 @@ public class ExpressionParser {
         
         while (tb.match(TokenType.OPERATOR)) {
             Operator operator = ((Operator)tb.current().getValue());
-            Integer precedence = Operator.PRECEDENCE.get(operator);
-            
+
+			if (operator == Operator.TERNARY) {
+				if (minPrecedence > Operator.PRECEDENCE.get(operator)) {
+					break;
+				}
+				tb.consume();
+
+				ExpressionNode trueExpr = parseBinary(Operator.PRECEDENCE.get(operator));
+				tb.consume(Delimiter.COLON);
+				ExpressionNode falseExpr = parseBinary(Operator.PRECEDENCE.get(operator));
+				if(left instanceof LiteralExpression) {
+					Object val = ((LiteralExpression)left).getValue();
+					if (val instanceof Boolean) {
+						return (Boolean)val ? trueExpr : falseExpr;
+					}
+				}
+				return new TernaryExpression(tb, left, trueExpr, falseExpr);
+			}
+			
+			Integer precedence = Operator.PRECEDENCE.get(operator);
             if (precedence == null || precedence<minPrecedence) {
 				break;
 			}
