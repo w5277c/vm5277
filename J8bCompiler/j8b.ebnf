@@ -1,17 +1,73 @@
-program = { import | class | function | statement } ;
+(* Основные конструкции языка *)
 
-import = "import" string_literal ";" ;
-class = "class" identifier "{" { field | method } "}" ;
-field = type identifier ";" ;
-method = type identifier "(" [parameters] ")" block ;
+program = { import_decl | class_decl | interface_decl | statement };
 
-function = type identifier "(" [parameters] ")" block ;
-parameters = type identifier { "," type identifier } ;
+(* Декларации *)
+import_decl = "import", identifier, [ "as", identifier ], ";";
+class_decl = { modifier }, "class", identifier, [ "implements", identifier, { ",", identifier } ], "{", { class_member }, "}";
+interface_decl = { modifier }, "interface", identifier, "{", { interface_member }, "}";
 
-statement = var_decl | if_stmt | while_loop | assignment | method_call | return_stmt | block ;
-var_decl = type identifier [ "=" expression ] ";" ;
-method_call = (identifier | ("this" ".")) identifier "(" [arguments] ")" ";" ;
-return_stmt = "return" [expression] ";" ;
+(* Члены класса/интерфейса *)
+class_member = field_decl | method_decl | constructor_decl;
+interface_member = field_decl | method_decl;
+field_decl = { modifier }, type, identifier, [ "=", expression ], ";";
+method_decl = { modifier }, (type | "void"), identifier, "(", [ parameter_list ], ")", (block | ";");
+constructor_decl = { modifier }, identifier, "(", [ parameter_list ], ")", block;
+parameter_list = parameter, { ",", parameter };
+parameter = type, identifier;
 
-expression = equality | object_creation ;
-object_creation = "new" identifier "(" [arguments] ")" ;
+(* Модификаторы *)
+modifier = "public" | "private" | "static" | "final" | "native" | "atomic";
+
+(* Типы *)
+type = primitive_type | class_type | array_type;
+primitive_type = "bool" | "byte" | "short" | "int" | "fixed";
+class_type = identifier;
+array_type = type, "[", [ expression ], "]";
+
+(* Операторы *)
+statement = block | if_stmt | while_stmt | for_stmt | return_stmt | expr_stmt | variable_decl | ";";
+block = "{", { statement }, "}";
+if_stmt = "if", "(", expression, ")", statement, [ "else", statement ];
+while_stmt = "while", "(", expression, ")", statement;
+for_stmt = "for", "(", [ for_init ], ";", [ expression ], ";", [ for_update ], ")", statement;
+for_init = variable_decl | expr_list;
+for_update = expr_list;
+return_stmt = "return", [ expression ], ";";
+expr_stmt = expression, ";";
+variable_decl = type, identifier, [ "=", expression ], { ",", identifier, [ "=", expression ] }, ";";
+
+(* Выражения *)
+expression = assignment_expr;
+assignment_expr = binary_expr, [ assignment_operator, assignment_expr ];
+binary_expr = unary_expr, { binary_operator, binary_expr };
+unary_expr = [ unary_operator ], postfix_expr;
+postfix_expr = primary_expr, { postfix_operator };
+primary_expr = literal | "(", expression, ")" | identifier | method_call | array_access;
+
+(* Операторы *)
+assignment_operator = "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=";
+binary_operator = "&&" | "||" | "&" | "|" | "^" | "==" | "!=" | "<" | ">" | "<=" | ">=" 
+                | "<<" | ">>" | "+" | "-" | "*" | "/" | "%";
+unary_operator = "!" | "~" | "+" | "-";
+postfix_operator = "[" expression "]" | "(" [ argument_list ] ")";
+
+(* Литералы и идентификаторы *)
+literal = number | string | char | "true" | "false" | "null";
+number = integer | fixed_point;
+integer = digit, { digit };
+fixed_point = integer, ".", integer;
+string = '"', { character - '"' }, '"';
+char = "'", (character - "'"), "'";
+identifier = ( letter | "_" ), { letter | digit | "_" };
+
+(* Вспомогательные *)
+expr_list = expression, { ",", expression };
+argument_list = expression, { ",", expression };
+method_call = identifier, "(", [ argument_list ], ")";
+array_access = identifier, "[", expression, "]";
+
+(* Базовые символы *)
+letter = "A" | "B" | ... | "Z" | "a" | "b" | ... | "z";
+digit = "0" | "1" | ... | "9";
+character = ? любой символ, кроме управляющих ? ;

@@ -34,7 +34,7 @@ public class BinaryExpression extends ExpressionNode {
 		return left;
 	}
 	
-	public Operator getOperastor() {
+	public Operator getOperator() {
 		return operator;
 	}
 	

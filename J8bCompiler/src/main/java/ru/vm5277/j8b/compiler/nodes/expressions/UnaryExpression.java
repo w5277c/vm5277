@@ -37,4 +37,17 @@ public class UnaryExpression extends ExpressionNode {
     public <T> T accept(ExpressionVisitor<T> visitor) {
         return visitor.visit(this);
     }
+	
+	public Operator getOperator() {
+		return operator;
+	}
+	
+	public ExpressionNode getOperand() {
+		return operand;
+	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + " " + operator + " " + operand;
+	}
 }

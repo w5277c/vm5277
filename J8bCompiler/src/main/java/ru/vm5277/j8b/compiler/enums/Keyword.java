@@ -9,7 +9,7 @@ public enum Keyword {
 	// Литералы
 	TRUE, FALSE, NULL,
 	// Типы примитив
-	VOID, BOOL, BYTE, SHORT, INT, FIXED,
+	VOID, BOOL, BYTE, SHORT, INT, FIXED,	
 	// Команды
 	IF, ELSE, WHILE, FOR, RETURN,
 	// Модификаторы

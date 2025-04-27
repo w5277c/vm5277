@@ -10,17 +10,17 @@ import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler.semantic.SymbolTable;
 
 public class VariableExpression extends ExpressionNode {
-    private final String name;
+    private final String value;
     
-    public VariableExpression(TokenBuffer tb, String name) {
+    public VariableExpression(TokenBuffer tb, String value) {
         super(tb);
         
-		this.name = name;
+		this.value = value;
     }
     
 	@Override
 	public VarType semanticAnalyze(SymbolTable symbolTable) {
-	    return symbolTable.lookup(name).getType();
+	    return symbolTable.lookup(value).getType();
 	}
 	
     @Override
@@ -28,12 +28,12 @@ public class VariableExpression extends ExpressionNode {
         return visitor.visit(this);
     }
 	
-	public String getName() {
-		return name;
+	public String getValue() {
+		return value;
 	}
 	
 	@Override
 	public String toString() {
-		return getClass().getSimpleName() + ": " + name;
+		return getClass().getSimpleName() + ": " + value;
 	}
 }

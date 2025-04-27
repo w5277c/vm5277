@@ -27,11 +27,11 @@ public class LexerTests {
         
 		// Проверка литералов
 		assertEquals(TokenType.LITERAL, tokens.get(0).getType());
-		assertEquals(Keyword.TRUE, tokens.get(0).getValue());
+		assertEquals(true, tokens.get(0).getValue());
 		assertEquals(TokenType.LITERAL, tokens.get(1).getType());
-		assertEquals(Keyword.FALSE, tokens.get(1).getValue());
+		assertEquals(false, tokens.get(1).getValue());
 		assertEquals(TokenType.LITERAL, tokens.get(2).getType());
-		assertEquals(Keyword.NULL, tokens.get(2).getValue());
+		assertEquals(null, tokens.get(2).getValue());
 
 		// Проверка типов
 		assertEquals(TokenType.TYPE, tokens.get(3).getType());
@@ -128,7 +128,7 @@ public class LexerTests {
         
 		//BigInteger
 		assertEquals(TokenType.NUMBER, tokens.get(8).getType());
-        assertEquals("18446744073709551616", tokens.get(8).getValue().toString());
+        assertEquals("18446744073709551616", tokens.get(8).getStringValue());
 
 		//Zero
 		assertEquals(TokenType.NUMBER, tokens.get(9).getType());
@@ -145,11 +145,11 @@ public class LexerTests {
         assertEquals(3, tokens.size() - 1); // -1 для EOF
         
         assertEquals(TokenType.NUMBER, tokens.get(0).getType());
-        assertEquals("3.141", tokens.get(0).getValue().toString());
+        assertEquals("3.141", tokens.get(0).getStringValue());
         assertEquals(TokenType.NUMBER, tokens.get(1).getType());
-        assertEquals("127.001", tokens.get(1).getValue().toString());
+        assertEquals("127.001", tokens.get(1).getStringValue());
         assertEquals(TokenType.NUMBER, tokens.get(2).getType());
-        assertEquals("1E-10", tokens.get(2).getValue().toString());
+        assertEquals("0.0000000001", tokens.get(2).getStringValue());
     }
 
     @Test

@@ -5,7 +5,6 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes.expressions;
 
-import java.math.BigDecimal;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler.semantic.SymbolTable;
@@ -39,7 +38,7 @@ public class LiteralExpression extends ExpressionNode {
 	@Override
 	public String toString() {
         if (null == value) return getClass().getSimpleName() + ":null";
-		if(value instanceof BigDecimal) return getClass().getSimpleName() + ":" + ((BigDecimal)value).toPlainString();
+		if(value instanceof Double) return getClass().getSimpleName() + ":" + ((Double)value).toString();
 		if(value instanceof Number) return getClass().getSimpleName() + ":" + ((Number)value).toString();
 		if(value instanceof String) return getClass().getSimpleName() + ":" + ((String)value);
 		return getClass().getSimpleName() + ":" + value;

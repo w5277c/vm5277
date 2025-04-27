@@ -6,7 +6,6 @@
 package ru.vm5277.j8b.compiler.tokens;
 
 import ru.vm5277.j8b.compiler.enums.TokenType;
-import java.math.BigDecimal;
 import java.math.BigInteger;
 import ru.vm5277.j8b.compiler.ParseError;
 
@@ -122,7 +121,7 @@ public class TNumber extends Token {
     
 			try {
 				if (hasDecimalPoint || isFloat) {
-					value = new BigDecimal(dec.toString());
+					value = new Double(dec.toString());
 				}
 				else {
 					String numStr = dec.toString();
