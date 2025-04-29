@@ -1,0 +1,317 @@
+/*--------------------------------------------------------------------------------------------------------------------------------------------------------------
+Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+30.04.2025	konstantin@5277.ru		Начало
+--------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+package ru.vm5277.j8b.compiler;
+
+import java.util.List;
+import java.util.Set;
+import ru.vm5277.j8b.compiler.enums.Keyword;
+import ru.vm5277.j8b.compiler.nodes.ArrayDeclarationNode;
+import ru.vm5277.j8b.compiler.nodes.AstNode;
+import ru.vm5277.j8b.compiler.nodes.BlockNode;
+import ru.vm5277.j8b.compiler.nodes.ClassBlockNode;
+import ru.vm5277.j8b.compiler.nodes.ClassNode;
+import ru.vm5277.j8b.compiler.nodes.FieldNode;
+import ru.vm5277.j8b.compiler.nodes.LabelNode;
+import ru.vm5277.j8b.compiler.nodes.MethodNode;
+import ru.vm5277.j8b.compiler.nodes.ParameterNode;
+import ru.vm5277.j8b.compiler.nodes.commands.BreakNode;
+import ru.vm5277.j8b.compiler.nodes.commands.ContinueNode;
+import ru.vm5277.j8b.compiler.nodes.commands.DoWhileNode;
+import ru.vm5277.j8b.compiler.nodes.commands.ForNode;
+import ru.vm5277.j8b.compiler.nodes.commands.GotoNode;
+import ru.vm5277.j8b.compiler.nodes.commands.IfNode;
+import ru.vm5277.j8b.compiler.nodes.commands.ReturnNode;
+import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode;
+import ru.vm5277.j8b.compiler.nodes.commands.WhileNode;
+import ru.vm5277.j8b.compiler.nodes.expressions.BinaryExpression;
+import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
+import ru.vm5277.j8b.compiler.nodes.expressions.LiteralExpression;
+import ru.vm5277.j8b.compiler.nodes.expressions.MethodCallExpression;
+import ru.vm5277.j8b.compiler.nodes.expressions.UnaryExpression;
+import ru.vm5277.j8b.compiler.nodes.expressions.VariableExpression;
+import ru.vm5277.j8b.compiler.tokens.Token;
+
+public class ASTPrinter {
+	private class Printer {
+		private	StringBuilder	sb		= new StringBuilder();
+		private	StringBuilder	spacer	= new StringBuilder();
+		
+		public void put(String str) {
+			sb.append(str);
+		}
+		
+		public void extend() {
+			spacer.append("    ");
+		}
+		public void reduce() {
+			spacer.delete(spacer.length()-4, spacer.length());
+		}
+		public void removeLast(int qnt) {
+			sb.delete(sb.length()-qnt, sb.length());
+		}
+		public void print() {
+			System.out.print(spacer.toString());
+			printLeft();
+		}
+		public void printLeft() {
+			System.out.println(sb.toString());
+			sb = new StringBuilder();
+		}
+	}
+	
+	private	Printer	out	= new Printer();
+	
+	public ASTPrinter(ClassNode clazz) {
+		printClass(clazz);
+	}
+
+	void printClass(ClassNode clazz) {
+		printModifiers(clazz.getModifiers());
+		out.put("class " + clazz.getName() + " ");
+		ClassBlockNode cbn = clazz.getBody();
+		if(null != cbn) {
+			out.put("{"); out.print(); out.extend();
+			for(AstNode node : cbn.getDeclarations()) {
+				if(node instanceof ClassNode) {
+					printClass((ClassNode)node);
+				}
+				else if(node instanceof MethodNode) {
+					printMethod((MethodNode)node);
+				}
+				else if(node instanceof ArrayDeclarationNode) {
+					//printArray((ArrayDeclarationNode)node);
+				}
+				else if(node instanceof FieldNode) {
+					//printFields((FieldNode)node);
+				}
+				else {
+					out.put("!unknown node:" + node); out.print();
+				}
+
+			}
+			out.reduce();
+			out.put("}");
+		}
+		out.print();
+	}
+	
+	void printModifiers(Set<Keyword> modifiers) {
+		for(Keyword kw : modifiers) {
+			out.put(kw.toString().toLowerCase() + " ");
+		}
+	}
+	
+	void printMethod(MethodNode method) {
+		printModifiers(method.getModifiers());
+		out.put(method.getType() + " ");
+		out.put(method.getName() + "(");
+		printParameters(method.getParameters());
+		out.put(") ");
+		BlockNode body = method.getBody();
+		if(null == body) {
+			out.put(";");
+			out.print();
+		}
+		else {
+			printBody(body);
+			out.print();
+		}
+	}
+	
+	void printParameters(List<ParameterNode> parameters) {
+		if(null != parameters && !parameters.isEmpty()) {
+			for(ParameterNode parameter : parameters) {
+				out.put(parameter.getType() + " ");
+				out.put(parameter.getName() + ", ");
+			}
+			out.removeLast(2);
+		}
+	}
+	
+	void printArguments(List<ExpressionNode> arguments) {
+		if(null != arguments && !arguments.isEmpty()) {
+			for(ExpressionNode arg : arguments) {
+				printExpr(arg); out.put(", ");
+			}
+			out.removeLast(2);
+		}
+	}
+
+	
+	void printBody(BlockNode body)  {
+		out.put("{"); out.print(); out.extend();
+		for(AstNode node : body.getDeclarations()) {
+			if(node instanceof LabelNode) {
+				out.put(((LabelNode)node).getName() + ":");
+				continue;
+			}
+			else if(node instanceof BreakNode) {
+				BreakNode bn = (BreakNode)node;
+				out.put("break");
+				if(null != bn.getLabel()) out.put(" " + bn.getLabel());
+				out.put(";");
+			}
+			else if(node instanceof ContinueNode) {
+				out.put("continue;");
+			}
+			else if(node instanceof DoWhileNode) {
+				DoWhileNode dwn = (DoWhileNode)node;
+				out.put("do ");
+				printBody(dwn.getBody());
+				out.put(" while(");
+				printExpr(dwn.getCondition());
+				out.put(")");
+				if(null != dwn.getElseBlock()) {
+					out.put(" else ");
+					printBody(dwn.getBody());
+				}
+				out.put(";"); out.print();
+			}
+			else if(node instanceof ForNode) {
+				ForNode fn = (ForNode)node;
+				out.put("for (");
+				if(fn.getInitialization() instanceof FieldNode) {
+					printField((FieldNode)fn.getInitialization());
+				}
+				else {
+					printExpr((ExpressionNode)fn.getInitialization());
+				}
+			}
+			else if(node instanceof GotoNode) {
+				out.put("goto " + ((GotoNode)node).getLabel() + ";");
+			}
+			else if(node instanceof IfNode) {
+				IfNode in = (IfNode)node;
+				out.put("if (");
+				printExpr(in.getCondition());
+				out.put(") ");
+				printBody(in.getThenBlock());
+				if(null != in.getElseBlock()) {
+					out.print();
+					out.put("else ");
+					printBody(in.getElseBlock());
+				}
+			}
+			else if(node instanceof ReturnNode) {
+				ReturnNode rn = (ReturnNode)node;
+				out.put("return");
+				if(null != rn.getExpression()) {
+					out.put(" ");
+					printExpr(rn.getExpression());
+				}
+				out.put(";");
+			}
+			else if(node instanceof SwitchNode) {
+				SwitchNode sn = (SwitchNode)node;
+				out.put("switch (");
+				printExpr(sn.getExpression());
+				out.put(") {"); out.extend(); out.print();
+				for(SwitchNode.Case c : sn.getCases()) {
+					out.put("case " + c.getFrom());
+					if(-1 != c.getTo()) {
+						out.put(".." + c.getTo());
+					}
+					out.put(": ");
+					out.extend(); out.print();
+					printBody(c.getBlock());
+					out.reduce(); out.print();
+				}
+				out.reduce(); out.put("}");
+			}
+			else if(node instanceof WhileNode) {
+				WhileNode wn = (WhileNode)node;
+				out.put("while (");
+				printExpr(wn.getCondition());
+				out.put(") ");
+				printBody(wn.getBody());
+				out.print();
+				if(null != wn.getElseBlock()) {
+					out.put(" else ");
+					printBody(wn.getElseBlock());
+				}
+			}
+			else if(node instanceof ClassNode) {
+				printClass((ClassNode)node);
+			}
+			else if(node instanceof ArrayDeclarationNode) {
+				//TODO
+			}
+			else if(node instanceof FieldNode) {
+				printField((FieldNode)node);
+				out.put(";");
+			}
+			else if(node instanceof ExpressionNode) {
+				printExpr((ExpressionNode)node);
+				out.put(";");
+			}
+			else if(node instanceof BlockNode) {
+				printBody((BlockNode)node);
+			}
+			else {
+				out.put("!unknown node:" + node); out.print();
+			}
+			out.print();
+		}
+		out.reduce(); out.put("}");
+	}
+	
+	void printField(FieldNode node) {
+		if(null != node.getType()) {
+			out.put(node.getType() + " ");
+		}
+		out.put(node.getName());
+		if(null != node.getInitializer()) {
+			out.put(" = ");
+			printExpr(node.getInitializer());
+		}
+	}
+	
+	void printExpr(ExpressionNode expr) {
+		if(expr instanceof BinaryExpression) {
+			BinaryExpression be = (BinaryExpression)expr;
+			if(null != be.getLeft()) {
+				printExpr(be.getLeft());
+			}
+			else {
+				//TODO!
+			}
+			out.put(be.getOperator().getSymbol());
+			if(null != be.getRight()) {
+				printExpr(be.getRight());
+			}
+			else {
+				//TODO!
+			}
+		}
+		else if (expr instanceof LiteralExpression) {
+			LiteralExpression le = (LiteralExpression)expr;
+			out.put(Token.toStringValue(le.getValue()));
+		}
+		else if(expr instanceof MethodCallExpression) {
+			MethodCallExpression mce = (MethodCallExpression)expr;
+			if(null != mce.getTarget()) {
+				printExpr(mce.getTarget());
+				out.put(" = ");
+			}
+			out.put(mce.getMethodName() + "(");
+			printArguments(mce.getArguments());
+			out.put(")");
+		}
+		else if(expr instanceof VariableExpression) {
+			out.put(((VariableExpression)expr).getValue());
+		}
+		else if(expr instanceof UnaryExpression) {
+			UnaryExpression ue = (UnaryExpression)expr;
+			out.put(ue.getOperator().getSymbol());
+			if(null != ue.getOperand()) {
+				printExpr(ue.getOperand());
+			}
+		}
+		else {
+			out.put("!unknown expr:" + expr); out.print();
+		}
+	}
+}

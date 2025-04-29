@@ -18,7 +18,9 @@ public class Main {
 			
 			ASTParser parser = new ASTParser(lexer.getTokens());
 			
-			SemanticAnalyzer analyzer = new SemanticAnalyzer(parser.getClazz());
+			new ASTPrinter(parser.getClazz());
+			
+			//SemanticAnalyzer analyzer = new SemanticAnalyzer(parser.getClazz());
 		}
 		catch(Exception ex) {
 			ex.printStackTrace();

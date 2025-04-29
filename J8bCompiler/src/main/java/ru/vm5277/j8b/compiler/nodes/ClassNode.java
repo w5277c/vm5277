@@ -53,8 +53,12 @@ public class ClassNode extends AstNode {
 		return null == parentClassName ? name : parentClassName + "." + name;
 	}
 	
-	public BlockNode getBody() {
-		return blocks.get(0);
+	public ClassBlockNode getBody() {
+		return (ClassBlockNode)blocks.get(0);
+	}
+	
+	public Set<Keyword> getModifiers() {
+		return modifiers;
 	}
 	
 	@Override

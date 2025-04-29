@@ -36,6 +36,7 @@ public class BlockNode extends AstNode {
 			if(tb.match(TokenType.LABEL)) {
 				LabelNode label = new LabelNode(tb);
 				labels.put(label.getName(), label);
+				declarations.add(label);
 			}
 			if (tb.match(TokenType.COMMAND)) {
 				declarations.add(parseCommand());

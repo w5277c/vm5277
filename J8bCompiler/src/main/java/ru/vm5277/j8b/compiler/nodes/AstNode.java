@@ -91,7 +91,7 @@ public abstract class AstNode {
 				ExpressionNode expr = new ExpressionParser(tb).parse();
 				tb.consume(Delimiter.SEMICOLON);
 				return expr;
-			}
+		}
 		else if (tb.match(Delimiter.LEFT_BRACE)) {
 			return new BlockNode(tb);
 		}
