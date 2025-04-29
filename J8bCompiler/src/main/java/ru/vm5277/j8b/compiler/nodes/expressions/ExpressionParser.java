@@ -340,23 +340,35 @@ public class ExpressionParser {
 	}
 	
 	private ExpressionNode parseUnary() {
-		if (tb.match(TokenType.OPERATOR) && ((Operator)tb.current().getValue()).isUnary()) {
-			Operator operator = ((Operator)tb.consume().getValue()); //TODO check it
-			ExpressionNode operand = parseUnary();
-			if (Operator.MINUS == operator  && operand instanceof LiteralExpression) {
-				Object value = ((LiteralExpression)operand).getValue();
-				if(value instanceof Integer) return new LiteralExpression(tb, -(Integer)value);
-				else if(value instanceof Long) return new LiteralExpression(tb, -(Long)value);
-				else if(value instanceof BigInteger) return new LiteralExpression(tb, ((BigInteger)value).negate());
-				else if(value instanceof Double) return new LiteralExpression(tb, -(Double)value);
+		if (tb.match(TokenType.OPERATOR)) {
+			Operator operator = ((Operator)tb.current().getValue()); //TODO check it
+			if(operator.isUnary()) {
+				tb.consume();
+				ExpressionNode operand = parseUnary();							
+				
+				if (Operator.MINUS == operator  && operand instanceof LiteralExpression) {
+					Object value = ((LiteralExpression)operand).getValue();
+					if(value instanceof Integer) return new LiteralExpression(tb, -(Integer)value);
+					else if(value instanceof Long) return new LiteralExpression(tb, -(Long)value);
+					else if(value instanceof BigInteger) return new LiteralExpression(tb, ((BigInteger)value).negate());
+					else if(value instanceof Double) return new LiteralExpression(tb, -(Double)value);
+				}
+				else if (Operator.NOT == operator && operand instanceof LiteralExpression) {
+					Object value = ((LiteralExpression)operand).getValue();
+					if(value instanceof Boolean) return new LiteralExpression(tb, !(Boolean)value);
+				}
+				else if (Operator.PLUS == operator) {
+					return parseUnary(); // Пропускаем '+' и парсим дальше
+				}
 			}
-			else if (Operator.NOT == operator && operand instanceof LiteralExpression) {
-				Object value = ((LiteralExpression)operand).getValue();
-				if(value instanceof Boolean) return new LiteralExpression(tb, !(Boolean)value);
+			else if (operator == Operator.INC || operator == Operator.DEC) {
+				tb.consume();
+				
+				Operator realOp = (operator == Operator.INC) ? Operator.PRE_INC : Operator.PRE_DEC;
+				return new UnaryExpression(tb, realOp, parseUnary());
 			}
-			else if (Operator.PLUS == operator) {
-                return parseUnary(); // Пропускаем '+' и парсим дальше
-            }
+			tb.consume();
+			ExpressionNode operand = parseUnary();							
 			return new UnaryExpression(tb, operator, operand);
 		}
 
@@ -367,12 +379,18 @@ public class ExpressionParser {
 		ExpressionNode expr = parsePrimary();
         
 		while (true) {
-//			if (tb.match(Delimiter.LEFT_PAREN)) {
-//				expr = parseMethodCall(expr);
-			//}
-//			else
 			if (tb.match(Delimiter.LEFT_BRACKET)) {
 				expr = new ArrayExpression(tb, expr);
+			}
+			else if (tb.match(TokenType.OPERATOR)) { // Обработка постфиксных операторов ++ и --
+				Operator operator = (Operator)tb.current().getValue();
+				if (operator == Operator.INC || operator == Operator.DEC) {
+					tb.consume();
+					Operator realOp = (operator == Operator.INC) ? Operator.POST_INC : Operator.POST_DEC;
+					expr = new UnaryExpression(tb, realOp, expr);
+					continue;
+				}
+				break;
 			}
 			else {
 				break;

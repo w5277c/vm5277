@@ -18,8 +18,24 @@ import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
 import ru.vm5277.j8b.compiler.nodes.expressions.MethodCallExpression;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
+import static ru.vm5277.j8b.compiler.enums.Keyword.BREAK;
+import static ru.vm5277.j8b.compiler.enums.Keyword.CONTINUE;
+import static ru.vm5277.j8b.compiler.enums.Keyword.DO;
+import static ru.vm5277.j8b.compiler.enums.Keyword.FOR;
+import static ru.vm5277.j8b.compiler.enums.Keyword.GOTO;
+import static ru.vm5277.j8b.compiler.enums.Keyword.IF;
+import static ru.vm5277.j8b.compiler.enums.Keyword.RETURN;
+import static ru.vm5277.j8b.compiler.enums.Keyword.SWITCH;
+import static ru.vm5277.j8b.compiler.enums.Keyword.WHILE;
+import ru.vm5277.j8b.compiler.enums.Operator;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.VarType;
+import ru.vm5277.j8b.compiler.nodes.commands.BreakNode;
+import ru.vm5277.j8b.compiler.nodes.commands.ContinueNode;
+import ru.vm5277.j8b.compiler.nodes.commands.DoWhileNode;
+import ru.vm5277.j8b.compiler.nodes.commands.ForNode;
+import ru.vm5277.j8b.compiler.nodes.commands.GotoNode;
+import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode;
 import ru.vm5277.j8b.compiler.tokens.Token;
 
 public abstract class AstNode {
@@ -28,23 +44,35 @@ public abstract class AstNode {
 	protected			int						column;
 	protected	final	ArrayList<BlockNode>	blocks	= new ArrayList<>();
 	
+	protected AstNode() {
+	}
+	
 	protected AstNode(TokenBuffer tb) {
         this.tb = tb;
 		this.line = tb.current().getLine();
 		this.column = tb.current().getColumn();
     }
 
+	protected AstNode parseCommand() {
+		Keyword keyword = (Keyword)tb.current().getValue();
+		switch(keyword) {
+			case IF:		return new IfNode(tb);
+			case FOR:		return new ForNode(tb);
+			case DO:		return new DoWhileNode(tb);
+			case WHILE:		return new WhileNode(tb);
+			case CONTINUE:	return new ContinueNode(tb);
+			case BREAK:		return new BreakNode(tb);
+			case RETURN:	return new ReturnNode(tb);
+			case GOTO:		return new GotoNode(tb);
+			case SWITCH:	return new SwitchNode(tb);
+			default:
+				throw new ParseError("Unexpected command token " + tb.current(), tb.current().getLine(), tb.current().getColumn());
+		}
+	}
+
 	protected AstNode parseStatement() {
 		if (tb.match(TokenType.COMMAND)) {
-			Keyword keyword = (Keyword)tb.current().getValue();
-
-			switch(keyword) {
-				case IF: return new IfNode(tb);
-				case WHILE:	return new WhileNode(tb);
-				case RETURN: return new ReturnNode(tb);
-				default:
-					throw new ParseError("Unexpected command token " + tb.current(), tb.current().getLine(), tb.current().getColumn());
-			}
+			return parseCommand();
 		}
 		else if (tb.match(TokenType.ID)) {
 			// Парсим цепочку выражений (включая вызовы методов)
@@ -59,11 +87,77 @@ public abstract class AstNode {
 			}
 			return expr;
 		}
+		else if (tb.match(Operator.INC) || tb.match(Operator.DEC)) {
+				ExpressionNode expr = new ExpressionParser(tb).parse();
+				tb.consume(Delimiter.SEMICOLON);
+				return expr;
+			}
 		else if (tb.match(Delimiter.LEFT_BRACE)) {
-			
-			return new BlockNode(tb, "");
+			return new BlockNode(tb);
 		}
-		throw new ParseError("Unexpected statement token: " + tb.current(),	tb.current().getLine(),	tb.current().getColumn());
+/*		else if(tb.match(TokenType.OPERATOR)) {
+			Operator operator = (Operator)tb.current().getValue();
+			if (Operator.INC == operator || Operator.DEC == operator || operator.isAssignment()) {
+				ExpressionNode expr = new ExpressionParser(tb).parse();
+				tb.consume(Delimiter.SEMICOLON);
+				return expr;
+			}
+			throw new ParseError("Unexpected operator: " + operator, tb.current().getLine(), tb.current().getColumn());
+		}*/
+		throw new ParseError("Unexpected statement token: " + tb.current(), tb.current().getLine(), tb.current().getColumn());
+	}
+
+	protected VarType checkPrimtiveType() {
+		if(tb.match(TokenType.TYPE)) {
+			VarType type = VarType.fromKeyword((Keyword)tb.consume().getValue());
+			if(null != type) return checkArrayType(type);
+		}
+		return null;
+	}
+	protected boolean checkConstructor(String className) {
+		if (tb.match(TokenType.ID)) {
+			String typeName = (String)tb.current().getValue();
+			if (typeName.equals(className)) {
+				tb.consume();
+				return true;
+			}
+		}
+		return false;
+	}
+	protected VarType checkClassType() {
+		if (tb.match(TokenType.ID)) {
+			VarType type = VarType.fromClassName((String)tb.current().getValue());
+			if(null != type) {
+				tb.consume();
+				return checkArrayType(type);
+			}
+		}
+		return null;
+	}
+	protected VarType checkArrayType(VarType type) {
+		// Обработка полей-массивов
+		if (null != type && tb.match(Delimiter.LEFT_BRACKET)) { //'['
+			while (tb.match(Delimiter.LEFT_BRACKET)) { //'['
+				tb.consume(); // Пропускаем '['
+
+				int depth = 0;
+				Integer size = null;
+				if(tb.match(TokenType.NUMBER)) {
+					depth++;
+					if (depth > 3) {
+						throw new ParseError("Maximum array nesting depth is 3", tb.current().getLine(), tb.current().getColumn());
+					}
+					size = (Integer)tb.consume().getValue();
+					if (size <= 0) {
+						throw new ParseError("Array size must be positive", tb.current().getLine(), tb.current().getColumn());
+					}
+					type = VarType.arrayOf(type, size);
+				}
+				tb.consume(Delimiter.RIGHT_BRACKET);  // Пропускаем ']'
+				type = size != null ? VarType.arrayOf(type, size) : VarType.arrayOf(type);
+			}
+		}
+		return type;
 	}
 
 	private ExpressionNode parseFullQualifiedExpression() {
@@ -107,66 +201,7 @@ public abstract class AstNode {
 		return args;
 	}
 	
-	protected void parseBody(List<AstNode> declarations, String className) {
-		while (!tb.match(TokenType.EOF) && !tb.match(Delimiter.RIGHT_BRACE)) {		
-			Set<Keyword> modifiers = collectModifiers();
-
-			// 2. Обработка классов с модификаторами
-			if (tb.match(TokenType.OOP) && Keyword.CLASS == tb.current().getValue()) {
-				declarations.add(new ClassNode(tb, modifiers, null));
-				continue;
-			}
-
-			// Обработка функций и глобальных переменных
-			if (tb.match(TokenType.TYPE)) {
-				VarType type = VarType.fromKeyword((Keyword)tb.current().getValue());
-				tb.consume();
-
-				// Обработка массива (int[10])
-				while (tb.match(Delimiter.LEFT_BRACKET)) {
-					tb.consume(); // Пропускаем '['
-
-					int depth = 0;
-					Integer size = null;
-					if(tb.match(TokenType.NUMBER)) {
-						depth++;
-						if (depth > 3) {
-							throw new ParseError("Maximum array nesting depth is 3", tb.current().getLine(), tb.current().getColumn());
-						}
-						size = (Integer)tb.consume().getValue();
-						if (size <= 0) {
-							throw new ParseError("Array size must be positive", tb.current().getLine(), tb.current().getColumn());
-						}
-						type = VarType.arrayOf(type, size);
-					}
-					tb.consume(Delimiter.RIGHT_BRACKET);  // Пропускаем ']'
-					type = size != null ? VarType.arrayOf(type, size) : VarType.arrayOf(type);
-				}
-
-				Token nameToken = tb.consume(TokenType.ID);
-
-				if(tb.match(TokenType.DELIMITER) && Delimiter.LEFT_PAREN == tb.current().getValue()) { // Это функция
-					declarations.add(new MethodNode(tb, modifiers, type, (String)nameToken.getValue()));
-				}
-				else if (tb.match(TokenType.DELIMITER) && Delimiter.LEFT_BRACKET == tb.current().getValue()) { // Это объявление массива
-					declarations.add(new ArrayDeclarationNode(tb, modifiers, type, (String)nameToken.getValue()));
-				}
-				else { // Глобальная переменная
-					declarations.add(new FieldNode(tb, modifiers, type, (String)nameToken.getValue()));
-				}
-				continue;
-			}
-
-			// 4. Обработка остальных statement (if, while, вызовы и т.д.)
-			AstNode statement = parseStatement();
-			declarations.add(statement);
-			if(statement instanceof BlockNode) {
-				blocks.add((BlockNode)statement);
-			}
-		}
-	}
-
-	protected final Set<Keyword> collectModifiers() {
+	public static final Set<Keyword> collectModifiers(TokenBuffer tb) {
         Set<Keyword> modifiers = new HashSet<>();
         while (tb.current().getType() == TokenType.MODIFIER) {
 			modifiers.add((Keyword)tb.consume().getValue());

@@ -27,7 +27,7 @@ public class MethodNode extends AstNode {
 		
 		this.parameters = parseParameters();
 
-		blocks.add(new BlockNode(tb, ""));
+		blocks.add(new BlockNode(tb));
 	}
 	
 	private List<ParameterNode> parseParameters() {

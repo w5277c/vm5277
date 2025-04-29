@@ -1,27 +1,20 @@
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------
 Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-22.04.2025	konstantin@5277.ru		Начало
+30.04.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.j8b.compiler.enums;
+package ru.vm5277.j8b.compiler.tokens;
 
-public enum TokenType {
-	// Ключевые слова, keywords(разбитые по категориям)
-	LITERAL,	//Булевые заняения и null
-	TYPE,		//Типы данных
-	COMMAND,	//Команды
-	MODIFIER,	//Модификаторы
-	OOP,		//Ключевые слова ООП
-	KEYWORD,	//Остальные ключевые слова
-	
-	ID,
-	LABEL,
-	NUMBER,
-	NOTE,
-	OPERATOR,
-	DELIMITER,
-	STRING,
-	CHAR,
-	EOF,
-	NEWLINE
+import ru.vm5277.j8b.compiler.enums.TokenType;
+
+public class TLabel extends Token {
+	public TLabel(String keyword, int pos, int line, int column) {
+		type = TokenType.LABEL;
+		
+		endPos = pos+1;
+		this.line = line;
+		this.column++;
+		
+		value = keyword;
+	}
 }

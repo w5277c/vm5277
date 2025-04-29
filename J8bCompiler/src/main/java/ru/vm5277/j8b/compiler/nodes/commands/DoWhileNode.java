@@ -1,8 +1,7 @@
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------
 Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-23.04.2025	konstantin@5277.ru		Начало
-28.04.2025	konstantin@5277.ru		Доработан
+28.04.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes.commands;
 
@@ -13,17 +12,13 @@ import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 
-public class WhileNode extends AstNode {
+public class DoWhileNode extends AstNode {
 	private	final	ExpressionNode	condition;
 
-	public WhileNode(TokenBuffer tb) {
+	public DoWhileNode(TokenBuffer tb) {
 		super(tb);
 
-		tb.consume(); // Пропускаем "while"
-		tb.consume(Delimiter.LEFT_PAREN);
-		this.condition = new ExpressionParser(tb).parse();
-		tb.consume(Delimiter.RIGHT_PAREN);
-
+		tb.consume();
 		if(tb.match(Delimiter.LEFT_BRACE)) {
 			try {
 				tb.getLoopStack().add(this);
@@ -34,6 +29,13 @@ public class WhileNode extends AstNode {
 			}
 		}
 		else blocks.add(new BlockNode(tb, parseStatement()));
+
+		tb.consume(TokenType.COMMAND, Keyword.WHILE);
+		tb.consume(Delimiter.LEFT_PAREN);
+
+		this.condition = new ExpressionParser(tb).parse();
+		tb.consume(Delimiter.RIGHT_PAREN);
+		tb.consume(Delimiter.SEMICOLON);
 
 		if (tb.match(Keyword.ELSE)) {
 			tb.consume();
@@ -55,10 +57,11 @@ public class WhileNode extends AstNode {
 
 	@Override
 	public String toString() {
-		StringBuilder sb = new StringBuilder("while (");
-		sb.append(condition);
-		sb.append(") ");
+		StringBuilder sb = new StringBuilder("do ");
 		sb.append(getBody());
+		sb.append(" while (");
+		sb.append(condition);
+		sb.append(");");
 
 		if (getElseBlock() != null) {
 			sb.append(" else ").append(getElseBlock());

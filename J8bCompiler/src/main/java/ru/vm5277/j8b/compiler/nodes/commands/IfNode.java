@@ -5,7 +5,6 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes.commands;
 
-import java.util.ArrayList;
 import ru.vm5277.j8b.compiler.nodes.*;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
@@ -27,10 +26,10 @@ public class IfNode extends AstNode {
         tb.consume(Delimiter.RIGHT_PAREN);
 
 		// Then блок
-		blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, "") : new BlockNode(tb, parseStatement()));
+		blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));
 
 		// Else блок
-        if (tb.match(TokenType.COMMAND, Keyword.ELSE)) {
+        if (tb.match(Keyword.ELSE)) {
 			tb.consume();
         
 			if (tb.match(TokenType.COMMAND, Keyword.IF)) {
@@ -38,7 +37,7 @@ public class IfNode extends AstNode {
 				blocks.add(new BlockNode(tb, new IfNode(tb)));
 			}
 			else {
-				blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, "") : new BlockNode(tb, parseStatement()));
+				blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));
 			}
 		}
 	}

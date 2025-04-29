@@ -11,13 +11,13 @@ public enum Keyword {
 	// Типы примитив
 	VOID, BOOL, BYTE, SHORT, INT, FIXED,	
 	// Команды
-	IF, ELSE, WHILE, FOR, RETURN,
+	IF, DO, WHILE, FOR, RETURN, CONTINUE, BREAK, GOTO, SWITCH,
 	// Модификаторы
 	STATIC, FINAL, PRIVATE, PUBLIC, NATIVE, ATOMIC,
 	// Ключевые слова ООП
 	CLASS, INTERFACE, IMPLEMENTS, THIS,
 	//Остальное
-	IMPORT, AS;
+	IMPORT, AS, ELSE, CASE, DEFAULT;
 	
 	public static Keyword fromString(String str) {
 		try {
@@ -42,10 +42,14 @@ public enum Keyword {
 			case FIXED:
 				return TokenType.TYPE;
 			case IF:
-			case ELSE:
+			case DO:
 			case WHILE:
 			case FOR:
 			case RETURN:
+			case CONTINUE:
+			case BREAK:
+			case GOTO:
+			case SWITCH:
 				return TokenType.COMMAND;
 			case STATIC:
 			case FINAL:

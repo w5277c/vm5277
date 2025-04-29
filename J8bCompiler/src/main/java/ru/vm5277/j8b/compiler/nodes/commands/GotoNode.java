@@ -1,30 +1,32 @@
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------
 Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-23.04.2025	konstantin@5277.ru		Начало
+28.04.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.j8b.compiler;
+package ru.vm5277.j8b.compiler.nodes.commands;
 
-import java.io.IOException;
-import java.util.List;
-import ru.vm5277.j8b.compiler.nodes.ProgramNode;
-import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
-import ru.vm5277.j8b.compiler.tokens.Token;
+import ru.vm5277.j8b.compiler.enums.Delimiter;
+import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.nodes.*;
 
-public class Parser {
-	private final	List<Token>		tokens;
-	private			ProgramNode		ast;
+public class GotoNode extends AstNode {
+    private	String	label;
 	
-	public Parser(List<Token> tokens) throws IOException {
-		this.tokens = tokens;
+	public GotoNode(TokenBuffer tb) {
+        super(tb);
+        
+        tb.consume();
+        
+		label = tb.consume(TokenType.ID).toString();
+		tb.consume(Delimiter.SEMICOLON);
+    }
 
-		if(tokens.isEmpty()) return;
-		
-		ast = new ProgramNode(new TokenBuffer(tokens.iterator())); // Создаём корень AST
+	public String getLabel() {
+		return label;
 	}
 	
-	public ProgramNode getAst() {
-		return ast;
-	}
+	@Override
+    public String toString() {
+        return getClass().getSimpleName();
+    }
 }
-

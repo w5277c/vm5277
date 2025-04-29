@@ -6,6 +6,7 @@
 package ru.vm5277.j8b.compiler.nodes;
 
 import java.util.Iterator;
+import java.util.Stack;
 import ru.vm5277.j8b.compiler.ParseError;
 import ru.vm5277.j8b.compiler.tokens.Token;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
@@ -16,6 +17,7 @@ import ru.vm5277.j8b.compiler.enums.TokenType;
 public class TokenBuffer {
 	private	Token	current;
 	private	final	Iterator<Token> iterator;
+	private	final	Stack<AstNode>	loopStack	= new Stack<>();
 	
 	public TokenBuffer(Iterator<Token> iterator) {
 		this.iterator = iterator;
@@ -94,4 +96,8 @@ public class TokenBuffer {
 	public boolean match(Operator operator) {
         return TokenType.OPERATOR == current.getType() && current.getValue() == operator;
     }
+	
+	public Stack<AstNode> getLoopStack() {
+		return loopStack;
+	}
 }

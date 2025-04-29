@@ -1,8 +1,8 @@
-import ru.vm5277.j8b.compiler.Lexer;
+package ru.vm5277.j8b.compiler;
+
 import java.io.StringReader;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
-import ru.vm5277.j8b.compiler.Parser;
 import ru.vm5277.j8b.compiler.enums.Operator;
 import ru.vm5277.j8b.compiler.nodes.FieldNode;
 import ru.vm5277.j8b.compiler.nodes.expressions.BinaryExpression;
@@ -22,106 +22,106 @@ public class ParserTests {
 								"	int t1=-5; int t2=5+i1+i2-2-i3; int t3=7==10-6/2?7:2; int t4=5<3 ? 7:2; int t5=true?1:0;}";
 //		String source = "class A{ int t3=7==10-6/2?7:2;}";
 		Lexer lexer = new Lexer(new StringReader(source));
-		Parser parser = new Parser(lexer.getTokens());
+		ASTParser parser = new ASTParser(lexer.getTokens());
 		
-		FieldNode field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(0);
+		FieldNode field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(0);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Number);
 		assertEquals("-12", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(1);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(1);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Number);
 		assertEquals("1", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(2);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(2);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Long);
 		assertEquals("11", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(3);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(3);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Number);
 		assertEquals("207", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(4);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(4);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Number);
 		assertEquals("14", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(5);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(5);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Number);
 		assertEquals("17", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
 
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(6);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(6);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Number);
 		assertEquals("6", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(7);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(7);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Number);
 		assertEquals("3.5", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(8);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(8);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Number);
 		assertEquals("3", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(9);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(9);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Double);
 		assertEquals("2.5", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
 
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(10);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(10);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof String);
 		assertEquals("ab", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(11);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(11);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof String);
 		assertEquals("a123", ((LiteralExpression)field.getInitializer()).getValue().toString());
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(12);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(12);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof String);
 		assertEquals("z0.9", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(13);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(13);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof String);
 		assertEquals("ZX Spectrum", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(14);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(14);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof String);
 		assertEquals("1z", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
 
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(15);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(15);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Boolean);
 		assertEquals("false", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(16);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(16);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Boolean);
 		assertEquals("true", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(17);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(17);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Boolean);
 		assertEquals("true", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(18);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(18);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Boolean);
 		assertEquals("false", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(19);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(19);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Boolean);
 		assertEquals("false", ((LiteralExpression)field.getInitializer()).getValue().toString());
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(20);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(20);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Boolean);
 		assertEquals("false", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(21);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(21);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Boolean);
 		assertEquals("true", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
 		
 
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(22);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(22);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Number);
 		assertEquals("-5", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(23);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(23);
 		assertEquals(true, field.getInitializer() instanceof BinaryExpression);
 		BinaryExpression e1 = (BinaryExpression)field.getInitializer();
 		assertEquals(true, e1.getLeft() instanceof BinaryExpression);
@@ -139,18 +139,68 @@ public class ParserTests {
 		assertEquals(Operator.MINUS, e1.getOperator());
 		assertEquals(true, e1.getRight()instanceof VariableExpression);
 		assertEquals("i3", toStringValue(((VariableExpression)e1.getRight()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(24);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(24);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Number);
 		assertEquals("7", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(25);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(25);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Number);
 		assertEquals("2", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-		field = (FieldNode)parser.getAst().getDeclarations().get(0).getBlocks().get(0).getDeclarations().get(26);
+		field = (FieldNode)parser.getClazz().getBlocks().get(0).getDeclarations().get(26);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Number);
 		assertEquals("1", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
-
 	}
+
+
+	@Test
+	public void incrementDecrementTest() throws Exception {
+		String source = "class A{ public A() {int i=1; i++; i--; ++i; --i;}}";
+		Lexer lexer = new Lexer(new StringReader(source));
+		ASTParser parser = new ASTParser(lexer.getTokens());
+	}
+	
+	@Test
+	public void ifTest() throws Exception {
+		String source = "class A{ public A() { int r=0; if(5>3) r=1; if(6>3) {r=1;} else r=2; if(5>3) {r=1;r++;} else {r=2;r++;}}}";
+		new ASTParser(new Lexer(new StringReader(source)).getTokens());
+	}
+	
+	@Test
+	public void doWhileTest() throws Exception {
+		String source = "class A{ public A() { int i=0; do { i++; } while(i<10); else {i+=10;}}}";
+		new ASTParser(new Lexer(new StringReader(source)).getTokens());
+	}
+
+	@Test
+	public void whileTest() throws Exception {
+		String source = "class A{ public A() { int i=0; while(i<10) { i++; } else {i+=10;}}}";
+		new ASTParser(new Lexer(new StringReader(source)).getTokens());
+	}
+
+	@Test
+	public void forTest() throws Exception {
+		String source = "class A{ public A() { int i=0; for(int f=0; f<10; f++) { if(1==f) continue; if(2==f) break; } else {i+=10;}}}";
+		new ASTParser(new Lexer(new StringReader(source)).getTokens());
+	}
+
+	@Test
+	public void gotoTest() throws Exception {
+		String source = "class A{ public A() { label2: int i=0; goto label1; i++; label1: i++;}}";
+		new ASTParser(new Lexer(new StringReader(source)).getTokens());
+	}
+
+	@Test
+	public void returnTest() throws Exception {
+		String source = "class A{ public int A() { return 123+i;} void B() { return;}}";
+		new ASTParser(new Lexer(new StringReader(source)).getTokens());
+	}
+
+	@Test
+	public void switchTest() throws Exception {
+		String source ="class A{ public int A() { int t=0; switch(t) { case 0: return 1; case 1..10: return 2; case 11: {t++; return 3;} default: return 4;}}}";
+		new ASTParser(new Lexer(new StringReader(source)).getTokens());
+	}
+	
 }

@@ -13,10 +13,8 @@ import ru.vm5277.j8b.compiler.nodes.AstNode;
 import ru.vm5277.j8b.compiler.nodes.BlockNode;
 import ru.vm5277.j8b.compiler.nodes.ClassNode;
 import ru.vm5277.j8b.compiler.nodes.FieldNode;
-import ru.vm5277.j8b.compiler.nodes.ImportNode;
 import ru.vm5277.j8b.compiler.nodes.MethodNode;
 import ru.vm5277.j8b.compiler.nodes.ParameterNode;
-import ru.vm5277.j8b.compiler.nodes.ProgramNode;
 import ru.vm5277.j8b.compiler.nodes.commands.ReturnNode;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.j8b.compiler.nodes.expressions.MethodCallExpression;
@@ -27,31 +25,9 @@ import ru.vm5277.j8b.compiler.semantic.SymbolTable;
 public class SemanticAnalyzer {
 	private final	SymbolTable	symbolTable			= new SymbolTable();
 	
-	public SemanticAnalyzer(ProgramNode ast) {
-		// Объявление классов (для forward reference)
-		for (AstNode decl : ast.getDeclarations()) {
-			if(decl instanceof ClassNode) {
-				registerNestedClasses((ClassNode)decl);
-			}
-		}
-		// Полный анализ
-		for (AstNode decl : ast.getDeclarations()) {
-			if(decl instanceof ImportNode) {
-				//TODO
-			}
-			else if(decl instanceof ClassNode) {
-				analyzeClass((ClassNode)decl);
-			}
-			else if(decl instanceof MethodNode) {
-				throw new SemanticError("Method declarations must be inside a class", decl.getLine(), decl.getColumn());			
-			}
-			else if(decl instanceof FieldNode) {
-				throw new SemanticError("Field declarations must be inside a class", decl.getLine(), decl.getColumn());
-			}
-			else {
-				throw new SemanticError("Only class and import declarations are allowed at root level", decl.getLine(), decl.getColumn());
-			}
-		}
+	public SemanticAnalyzer(ClassNode clazz) {
+		registerNestedClasses(clazz);
+		analyzeClass(clazz);
     }
 	
     private void registerNestedClasses(ClassNode clazz) throws SemanticError {
@@ -156,7 +132,7 @@ public class SemanticAnalyzer {
 		try {
 			// Добавление this для нестатических методов
             if (!method.getModifiers().contains(Keyword.STATIC)) {
-                symbolTable.addSymbol("this", VarType.forClassName(className), false, method.getLine());
+             //TODO   symbolTable.addSymbol("this", VarType.addClass(className), false, method.getLine());
             }
 			
 			// Добавляем параметры в таблицу символов

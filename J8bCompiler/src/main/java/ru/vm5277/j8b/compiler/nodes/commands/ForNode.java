@@ -11,9 +11,10 @@ import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.VarType;
 
 public class ForNode extends AstNode {
-    private final ExpressionNode initialization;
+    private final AstNode initialization;
     private final ExpressionNode condition;
     private final ExpressionNode iteration;
     
@@ -24,8 +25,21 @@ public class ForNode extends AstNode {
         tb.consume(Delimiter.LEFT_PAREN);
         
         // Инициализация
-        this.initialization = tb.match(Delimiter.SEMICOLON) ? null : new ExpressionParser(tb).parse();
-        tb.consume(Delimiter.SEMICOLON);
+        if(!tb.match(Delimiter.SEMICOLON)) {
+			VarType type = checkPrimtiveType();
+			if(null == type) type = checkClassType();
+			if(null != type) {
+				String name = tb.consume(TokenType.ID).getStringValue();
+				this.initialization = new FieldNode(tb, null, type, name);
+			}
+			else {
+				this.initialization = new ExpressionParser(tb).parse();
+			}
+		}
+		else {
+			this.initialization = null;
+			tb.consume(Delimiter.SEMICOLON);
+		}
         
         // Условие
         this.condition = tb.match(Delimiter.SEMICOLON) ? null : new ExpressionParser(tb).parse();
@@ -36,17 +50,26 @@ public class ForNode extends AstNode {
         tb.consume(Delimiter.RIGHT_PAREN);
         
         // Основной блок
-        blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, "") : new BlockNode(tb, parseStatement()));
-        
+		if(tb.match(Delimiter.LEFT_BRACE)) {
+			try {
+				tb.getLoopStack().add(this);
+				blocks.add(new BlockNode(tb));
+			}
+			finally {
+				tb.getLoopStack().remove(this);
+			}
+		}
+		else blocks.add(new BlockNode(tb, parseStatement()));
+       
         // Блок else (если есть)
-        if (tb.match(TokenType.COMMAND, Keyword.ELSE)) {
+        if (tb.match(Keyword.ELSE)) {
 			tb.consume();
-            blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, "") : new BlockNode(tb, parseStatement()));
+            blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));
         }
     }
     
     // Геттеры
-    public ExpressionNode getInitialization() {
+    public AstNode getInitialization() {
         return initialization;
     }
     

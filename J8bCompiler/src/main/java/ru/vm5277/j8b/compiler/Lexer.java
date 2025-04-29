@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.List;
+import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.tokens.TChar;
 import ru.vm5277.j8b.compiler.tokens.TDelimiter;
 import ru.vm5277.j8b.compiler.tokens.TKeyword;
@@ -17,6 +18,8 @@ import ru.vm5277.j8b.compiler.tokens.TOpearator;
 import ru.vm5277.j8b.compiler.tokens.TString;
 import ru.vm5277.j8b.compiler.tokens.Token;
 import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.tokens.TLabel;
+import ru.vm5277.j8b.compiler.tokens.TNote;
 
 public class Lexer {
 	private	final	String			src;
@@ -95,6 +98,25 @@ public class Lexer {
 				}
 			}
 			
+			//Блок данных
+			if((pos+1)<src.length() && '#'==ch) {
+				pos++;
+				column++;
+				char type = src.charAt(pos);
+				pos++;
+				column++;
+				
+				switch(type) {
+					case 'p':
+						Token token = new TNote(src, pos, line, column);
+						tokens.add(token);
+						column += (token.getEndPos()-pos);
+						pos=token.getEndPos();
+						continue;
+					default: throw new ParseError("Unsupported #block: '" + type + "'", line, column);		
+				}
+			}
+			
 			// Символ
 			if ('\''==ch) {
 				try {
@@ -146,9 +168,16 @@ public class Lexer {
 			// Идентификаторы и ключевые слова
 			if (Character.isLetter(ch) || '_'==ch) {
 				Token token = new TKeyword(src, pos, line, column);
-				tokens.add(token);
 				column += (token.getEndPos()-pos);
 				pos=token.getEndPos();
+
+				// Добавляем проверку на метку
+				if (!(token.getValue() instanceof Keyword) && pos < src.length() && src.charAt(pos) == ':') {
+					token = new TLabel(token.getStringValue(), token.getEndPos(), token.getLine(), token.getColumn());
+					column += (token.getEndPos()-pos);
+					pos=token.getEndPos();
+				}
+				tokens.add(token);
 				continue;
 			}
 			
@@ -169,7 +198,6 @@ public class Lexer {
 				pos=token.getEndPos();
                 continue;
             }
-        
 			throw new ParseError("Unexpected character: '" + ch + "'", line, column);
         }
         tokens.add(new Token(TokenType.EOF, "", line, column));

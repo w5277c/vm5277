@@ -11,6 +11,7 @@ import java.util.Set;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.VarType;
 
 public class ClassNode extends AstNode {
 	private	final	Set<Keyword>	modifiers;
@@ -27,7 +28,8 @@ public class ClassNode extends AstNode {
 		// 1. Парсинг заголовка класса
         tb.consume(TokenType.OOP, Keyword.CLASS);	// Пропуск class токена
 		this.name = (String)tb.consume(TokenType.ID).getValue();
-
+		VarType.addClassName(name);
+		
         // 2. Парсинг интерфейсов (если есть)
         if (tb.match(Keyword.IMPLEMENTS) || tb.match(Delimiter.COLON)) {
             tb.consume();
@@ -37,9 +39,10 @@ public class ClassNode extends AstNode {
 				tb.consume();
 			}
         }
-
-        // 3. Парсинг тела класса
-		blocks.add(new BlockNode(tb, name));
+		// 3. todo добавить парсинг field и method
+		
+        // 4. Парсинг тела класса
+		blocks.add(new ClassBlockNode(tb, name));
 	}
 	
 	public String getName() {

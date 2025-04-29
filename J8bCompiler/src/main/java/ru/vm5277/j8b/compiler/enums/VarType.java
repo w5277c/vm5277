@@ -7,7 +7,6 @@ package ru.vm5277.j8b.compiler.enums;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.function.Function;
 
 public class VarType {
 	private	static	final	Map<String, VarType>	CLASS_TYPES = new HashMap<>();
@@ -36,7 +35,7 @@ public class VarType {
 	private			boolean	isArray;
     private			VarType	elementType; // Для массивов: тип элементов
 	private			int		arraySize;
-	
+
 	// Конструктор для ссылочных типов
 	private VarType(String name) {
 		this.name = name;
@@ -76,15 +75,16 @@ public class VarType {
 	}
 	
 	// Создаем тип для конкретного класса.
-	public static VarType forClassName(String className) {
-		return CLASS_TYPES.computeIfAbsent(className, new Function<String, VarType>() {
-			@Override
-			public VarType apply(String str) {
-				return new VarType("class:" + className, className);
-			}
-		});
+	public static void addClassName(String className) {
+		if(CLASS_TYPES.containsKey(className)) {
+			VarType type = new VarType("class:" + className, className);
+			CLASS_TYPES.put(className, type);
+		}
 	}
-
+	public static VarType fromClassName(String className) {
+		return CLASS_TYPES.get(className);
+	}
+	
 	// Преобразуем Keyword в VarType.
     public static VarType fromKeyword(Keyword value) {
 		if (null == value) return UNKNOWN;

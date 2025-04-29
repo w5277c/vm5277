@@ -5,10 +5,10 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.tokens;
 
-import java.math.BigInteger;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.Locale;
+import javax.xml.bind.DatatypeConverter;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.ParseError;
 import ru.vm5277.j8b.compiler.enums.Keyword;
@@ -63,6 +63,7 @@ public class Token {
 		if(value instanceof Double) return Token.df.format((Double)value);
 		if(value instanceof Number) return ((Number)value).toString();
 		if(value instanceof Boolean) return ((Boolean)value).toString();
+		if(value instanceof byte[]) return "0x" + DatatypeConverter.printHexBinary((byte[])value);
 		return (String)value;
 	}
 

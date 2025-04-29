@@ -43,7 +43,7 @@ public class TNumber extends Token {
 			column+=2;
 			StringBuilder bin = new StringBuilder();
 			while (endPos<src.length() && isBinaryDigit(src.charAt(endPos))) {
-				bin.append(src.charAt(endPos));
+				bin.append(isBinaryTrue(src.charAt(endPos)) ? '1' : '0');
 				endPos++;
 				column++;
 			}
@@ -92,6 +92,9 @@ public class TNumber extends Token {
 					dec.append(ch);
 					endPos++;
 					column++;
+				}
+				else if (endPos+1<src.length() && '.'==ch && '.'==src.charAt(endPos+1)) {
+					break;	//Это Demimiter.RANGE
 				}
 				else if ('.'==ch && !hasDecimalPoint) {
 					dec.append(ch);
@@ -152,7 +155,10 @@ public class TNumber extends Token {
 	}
 	
 	private boolean isBinaryDigit(char ch) {
-		return '0'==ch || '1'==ch;
+		return '0'==ch || '1'==ch || '!'==ch || '.'==ch;
+	}
+	private boolean isBinaryTrue(char ch) {
+		return '1'==ch || '!'==ch;
 	}
 
 	private boolean isOctalDigit(char ch) {
