@@ -10,6 +10,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.j8b.compiler.ParseError;
+import ru.vm5277.j8b.compiler.SourceBuffer;
 import ru.vm5277.j8b.compiler.nodes.commands.IfNode;
 import ru.vm5277.j8b.compiler.nodes.commands.ReturnNode;
 import ru.vm5277.j8b.compiler.nodes.commands.WhileNode;
@@ -36,12 +37,10 @@ import ru.vm5277.j8b.compiler.nodes.commands.DoWhileNode;
 import ru.vm5277.j8b.compiler.nodes.commands.ForNode;
 import ru.vm5277.j8b.compiler.nodes.commands.GotoNode;
 import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode;
-import ru.vm5277.j8b.compiler.tokens.Token;
 
 public abstract class AstNode {
 	protected			TokenBuffer				tb;
-	protected			int						line;
-	protected			int						column;
+	protected			SourceBuffer			sb;
 	protected	final	ArrayList<BlockNode>	blocks	= new ArrayList<>();
 	
 	protected AstNode() {
@@ -49,8 +48,7 @@ public abstract class AstNode {
 	
 	protected AstNode(TokenBuffer tb) {
         this.tb = tb;
-		this.line = tb.current().getLine();
-		this.column = tb.current().getColumn();
+		this.sb = tb.current().getSB().clone();
     }
 
 	protected AstNode parseCommand() {
@@ -66,7 +64,7 @@ public abstract class AstNode {
 			case GOTO:		return new GotoNode(tb);
 			case SWITCH:	return new SwitchNode(tb);
 			default:
-				throw new ParseError("Unexpected command token " + tb.current(), tb.current().getLine(), tb.current().getColumn());
+				throw new ParseError("Unexpected command token " + tb.current(), tb.getSB());
 		}
 	}
 
@@ -83,7 +81,7 @@ public abstract class AstNode {
 				tb.consume(Delimiter.SEMICOLON);
 			}
 			else {
-				throw new ParseError("Expected ';' after statement", tb.current().getLine(), tb.current().getColumn());
+				throw new ParseError("Expected ';' after statement", tb.getSB());
 			}
 			return expr;
 		}
@@ -104,7 +102,7 @@ public abstract class AstNode {
 			}
 			throw new ParseError("Unexpected operator: " + operator, tb.current().getLine(), tb.current().getColumn());
 		}*/
-		throw new ParseError("Unexpected statement token: " + tb.current(), tb.current().getLine(), tb.current().getColumn());
+		throw new ParseError("Unexpected statement token: " + tb.current(), tb.getSB());
 	}
 
 	protected VarType checkPrimtiveType() {
@@ -145,11 +143,11 @@ public abstract class AstNode {
 				if(tb.match(TokenType.NUMBER)) {
 					depth++;
 					if (depth > 3) {
-						throw new ParseError("Maximum array nesting depth is 3", tb.current().getLine(), tb.current().getColumn());
+						throw new ParseError("Maximum array nesting depth is 3", tb.getSB());
 					}
 					size = (Integer)tb.consume().getValue();
 					if (size <= 0) {
-						throw new ParseError("Array size must be positive", tb.current().getLine(), tb.current().getColumn());
+						throw new ParseError("Array size must be positive", tb.getSB());
 					}
 					type = VarType.arrayOf(type, size);
 				}
@@ -174,7 +172,7 @@ public abstract class AstNode {
 			}
 			else {
 				// Доступ к полю (можно добавить FieldAccessNode)
-				throw new ParseError("Field access not implemented yet", tb.current().getLine(), tb.current().getColumn());
+				throw new ParseError("Field access not implemented yet", tb.getSB());
 			}
 		}
 
@@ -209,15 +207,11 @@ public abstract class AstNode {
         return modifiers;
     }
 	
-	public int getLine() {
-		return line;
-	}
-	
-	public int getColumn() {
-		return column;
-	}
-	
 	public List<BlockNode> getBlocks() {
 		return blocks;
+	}
+	
+	public SourceBuffer getSB() {
+		return sb;
 	}
 }

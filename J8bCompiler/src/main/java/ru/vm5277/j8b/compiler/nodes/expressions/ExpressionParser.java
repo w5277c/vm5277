@@ -106,7 +106,7 @@ public class ExpressionParser {
 					case GT:	return new LiteralExpression(tb, 0d < delta);
 					case LTE:	return new LiteralExpression(tb, 0d <= delta);
 					case GTE:	return new LiteralExpression(tb, 0d >= delta);
-					default: throw new ParseError("Invalid comparision operator: " + op, tb.current().getLine(), tb.current().getColumn());
+					default: throw new ParseError("Invalid comparision operator: " + op, tb.getSB());
 				}
 			}
 		}
@@ -492,7 +492,7 @@ public class ExpressionParser {
 			return new VariableExpression(tb, token.getValue().toString());
 		}
 		else {
-			throw new ParseError("Unexpected token in expression: " + token, tb.current().getLine(), tb.current().getColumn());
+			throw new ParseError("Unexpected token in expression: " + token, tb.getSB());
         }
     }
 }

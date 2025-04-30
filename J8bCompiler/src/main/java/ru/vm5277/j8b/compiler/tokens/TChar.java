@@ -6,33 +6,23 @@
 package ru.vm5277.j8b.compiler.tokens;
 
 import ru.vm5277.j8b.compiler.ParseError;
+import ru.vm5277.j8b.compiler.SourceBuffer;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 
 public class TChar extends Token {
-	public TChar(String src, int pos, int line, int column) {
+	
+	public TChar(SourceBuffer sb) {
+		super(sb);
 		type = TokenType.CHAR;
-		
-		endPos = pos;
-		this.line = line;
-		this.column = column;
 
-		endPos++; // Пропускаем открывающую кавычку
-		column++;
-		if (endPos >= src.length()) {
-			throw new ParseError("Unterminated ASCII char literal", line, column);
-		}
-    
-		char ch = src.charAt(endPos);
-    
+		if (!sb.hasNext()) throw new ParseError("Unterminated ASCII char literal", sb);
+		sb.next();
+		char ch = sb.getChar(); // Пропускаем открывающую кавычку
 		// Обработка экранированных символов (\n, \t, \', \\)
 		if ('\\'==ch) {
-			endPos++;
-			column++;
-			if (endPos >= src.length()) {
-				throw new ParseError("Invalid escape sequence", line, column);
-			}
-			
-			ch = src.charAt(endPos);
+			if (!sb.hasNext()) throw new ParseError("Invalid escape sequence", sb);
+			sb.next();
+			ch = sb.getChar();
 			switch (ch) {
 				case 'n':	ch = '\n';	break;
 				case 't':	ch = '\t';	break;
@@ -40,19 +30,14 @@ public class TChar extends Token {
 				case '\\':	ch = '\\';	break;
 				case '0':	ch = '\0';	break;
 				default:
-					throw new ParseError("Unknown escape: \\" + ch, line, column);
+					throw new ParseError("Unknown escape: \\" + ch, sb);
 			}
 	    }
     
 		// Пропускаем символ и проверяем закрывающую кавычку '
-		endPos++;
-		column++;
-		if (endPos >= src.length() || '\'' != src.charAt(endPos)) {
-	        throw new ParseError("Char literal must be 1 ASCII character", line, column);
-		}
-		endPos++;
-		column++;
-    
+		sb.next();
+		if (!sb.hasNext() || '\'' != sb.getChar()) throw new ParseError("Char literal must be 1 ASCII character", sb);
+		sb.next();
 		value = String.valueOf(ch);
 	}
 }

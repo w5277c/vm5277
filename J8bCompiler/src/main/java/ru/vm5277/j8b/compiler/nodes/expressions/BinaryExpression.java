@@ -49,7 +49,7 @@ public class BinaryExpression extends ExpressionNode {
 
 		// Проверка совместимости типов
 		if (!leftType.isCompatibleWith(rightType)) {
-			throw new SemanticError(String.format("Type mismatch in binary operation: %s %s %s", leftType, operator, rightType), line, column);
+			throw new SemanticError(String.format("Type mismatch in binary operation: %s %s %s", leftType, operator, rightType), tb.getSB());
 		}
 
 		// Определение типа результата операции

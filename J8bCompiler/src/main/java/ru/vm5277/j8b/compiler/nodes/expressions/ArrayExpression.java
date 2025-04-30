@@ -32,11 +32,11 @@ public class ArrayExpression extends ExpressionNode {
 
 		// Проверка на null
 		if (arrayType == VarType.NULL) {
-			throw new SemanticError("Null pointer array access", line, column);
+			throw new SemanticError("Null pointer array access", tb.getSB());
 		}
 
 		if (!arrayType.isArray()) {
-			throw new SemanticError(String.format("Array access on non-array type '%s'", arrayType.getName()), line, column);
+			throw new SemanticError(String.format("Array access on non-array type '%s'", arrayType.getName()), tb.getSB());
 		}
 
 		// 2. Проверка глубины вложенности (максимум 3 уровня)
@@ -46,14 +46,14 @@ public class ArrayExpression extends ExpressionNode {
 			depth++;
 			currentType = currentType.getElementType();
 			if (depth > 3) {
-				throw new SemanticError("Array nesting depth exceeds maximum allowed (3 levels)", getLine(), getColumn());
+				throw new SemanticError("Array nesting depth exceeds maximum allowed (3 levels)", tb.getSB());
 			}
 		}
 
 		// 3. Проверяем индекс (должен быть целочисленным)
 		VarType indexType = index.semanticAnalyze(symbolTable);
 		if (!indexType.isInteger()) {
-			throw new SemanticError("Array index must be integer type, got '" + indexType.getName() + "'", index.getLine(), index.getColumn());
+			throw new SemanticError("Array index must be integer type, got '" + indexType.getName() + "'", tb.getSB());
 		}
 
 		// 4. Проверка границ для статических массивов
@@ -61,7 +61,7 @@ public class ArrayExpression extends ExpressionNode {
 			if (index instanceof LiteralExpression) {
 				int idxValue = (int)((LiteralExpression)index).getValue();
 				if (idxValue < 0 || idxValue >= arrayType.getArraySize()) {
-					throw new SemanticError(String.format("Array index out of bounds [0..%d]", arrayType.getArraySize()-1), index.getLine(), index.getColumn());
+					throw new SemanticError(String.format("Array index out of bounds [0..%d]", arrayType.getArraySize()-1), tb.getSB());
 				}
 			}
 		}

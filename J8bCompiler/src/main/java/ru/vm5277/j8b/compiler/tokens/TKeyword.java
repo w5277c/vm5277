@@ -5,22 +5,20 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.tokens;
 
+import ru.vm5277.j8b.compiler.SourceBuffer;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 
 public class TKeyword extends Token {
-	public TKeyword(String src, int pos, int line, int column) {
-		endPos = pos;
-		this.line = line;
-		this.column = column;
+	public TKeyword(SourceBuffer sb) {
+		super(sb);
 		
-		StringBuilder sb = new StringBuilder();
-        while (endPos<src.length() && (Character.isLetterOrDigit(src.charAt(endPos)) || '_'==src.charAt(endPos))) {
-            sb.append(src.charAt(endPos));
-			endPos++;
-			column++;
+		StringBuilder stringBuilder = new StringBuilder();
+        while (sb.hasNext() && (Character.isLetterOrDigit(sb.getChar()) || '_'==sb.getChar())) {
+            stringBuilder.append(sb.getChar());
+			sb.next();
         }
-        String id = sb.toString();
+        String id = stringBuilder.toString();
         Keyword keyword = Keyword.fromString(id);
 		
 		if(null != keyword) {

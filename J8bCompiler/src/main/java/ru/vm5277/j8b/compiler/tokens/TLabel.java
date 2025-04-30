@@ -5,16 +5,14 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.tokens;
 
+import ru.vm5277.j8b.compiler.SourceBuffer;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 
 public class TLabel extends Token {
-	public TLabel(String keyword, int pos, int line, int column) {
+	public TLabel(String keyword, SourceBuffer sb) {
+		super(sb);
 		type = TokenType.LABEL;
-		
-		endPos = pos+1;
-		this.line = line;
-		this.column++;
-		
+		sb.next();
 		value = keyword;
 	}
 }

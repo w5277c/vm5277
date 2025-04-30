@@ -67,7 +67,7 @@ public class SwitchNode extends AstNode {
 				defaultBlock = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement());
 			}
 			else {
-				throw new ParseError("Expected 'case' or 'default' in switch statement", line, column);
+				throw new ParseError("Expected 'case' or 'default' in switch statement", tb.getSB());
 			}
 		}
 		tb.consume(Delimiter.RIGHT_BRACE);
@@ -98,7 +98,7 @@ public class SwitchNode extends AstNode {
 				return number.longValue();
 			}
 		}
-		throw new ParseError("Expected numeric value(or range) for 'case' in switch statement", line, column);
+		throw new ParseError("Expected numeric value(or range) for 'case' in switch statement", tb.getSB());
 	}
 
 	public ExpressionNode getExpression() {

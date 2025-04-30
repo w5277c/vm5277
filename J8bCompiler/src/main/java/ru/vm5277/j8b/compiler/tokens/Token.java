@@ -11,39 +11,33 @@ import java.util.Locale;
 import javax.xml.bind.DatatypeConverter;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.ParseError;
+import ru.vm5277.j8b.compiler.SourceBuffer;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 
 public class Token {
 	private		final	static	DecimalFormat	df	= new DecimalFormat("0.####################", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
-	protected					TokenType	type;
-	protected					Object		value;
-	protected					int			line;
-	protected					int			column;
-	protected					int			endPos;
-	private						ParseError	error;
+	protected					TokenType		type;
+	protected					Object			value;
+	protected					SourceBuffer	sb;
+	private						ParseError		error;
 	
-	public Token() {
+	public Token(SourceBuffer sb) {
+		this.sb = sb;
 	}
 	
 	public Token(TokenType type, Object value, ParseError error) {
 		this.type = type;
 		this.value = value;
-		this.line = error.getLine();
-		this.column = error.getColumn();
+		this.sb = (null == error ? null : error.getSP());
 		this.error = error;
 	}
 
-	public Token(TokenType type, Object value, int line, int column) {
+	public Token(SourceBuffer sb, TokenType type, Object value) {
 		this.type = type;
 		this.value = value;
-		this.line = line;
-		this.column = column;
+		this.sb = sb;
 	}
 
-	public int getEndPos() {
-		return endPos;
-	}
-	
 	public Object getValue() {
 		if(TokenType.LITERAL == type) {
 			switch((Keyword)value) {
@@ -71,12 +65,8 @@ public class Token {
 		return type;
 	}
 	
-	public int getLine() {
-		return line;
-	}
-	
-	public int getColumn() {
-		return column;
+	public SourceBuffer getSB() {
+		return sb;
 	}
 	
 	public ParseError getError() {
@@ -85,10 +75,6 @@ public class Token {
 	
 	@Override
 	public String toString() {
-		return type + "(" + value + ")[" + line + ":" + column + "]";
+		return type + "(" + value + ")" + sb;
 	}
-	
-	public static Token parse() {
-		return null;
-	};
 }

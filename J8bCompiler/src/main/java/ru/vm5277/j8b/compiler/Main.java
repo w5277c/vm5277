@@ -10,7 +10,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 
 public class Main {
-    public	final	static	String	VERSION	= "0.0.5";
+    public	final	static	String	VERSION	= "0.0.6";
 	
 	public static void main(String[] args) throws IOException {
 		try (InputStreamReader isr = new InputStreamReader(new FileInputStream(args[0x00]))) {
@@ -20,7 +20,7 @@ public class Main {
 			
 			new ASTPrinter(parser.getClazz());
 			
-			//SemanticAnalyzer analyzer = new SemanticAnalyzer(parser.getClazz());
+			SemanticAnalyzer analyzer = new SemanticAnalyzer(parser.getClazz());
 		}
 		catch(Exception ex) {
 			ex.printStackTrace();

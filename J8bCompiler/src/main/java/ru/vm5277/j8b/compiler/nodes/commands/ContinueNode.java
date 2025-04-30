@@ -18,7 +18,7 @@ public class ContinueNode extends AstNode {
         
 		AstNode node = tb.getLoopStack().peek();
 		if (null == node || !(node instanceof ForNode || node instanceof WhileNode || node instanceof DoWhileNode)) {
-            throw new ParseError("'continue' can only be used inside loop statements", line, column);
+            throw new ParseError("'continue' can only be used inside loop statements", tb.getSB());
         }
     }
 

@@ -6,6 +6,8 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.enums;
 
+import ru.vm5277.j8b.compiler.SourceBuffer;
+
 public enum Delimiter {
     // Группировка
     LEFT_PAREN("(", "Открывающая скобка"),
@@ -60,23 +62,26 @@ public enum Delimiter {
     }
 
     // Получить самый длинный возможный разделитель с текущей позиции
-    public static Delimiter matchLongestDelimiter(String input, int pos) {
+    public static Delimiter matchLongestDelimiter(SourceBuffer sb) {
         // Проверяем трехсимвольные (только ELLIPSIS)
-        if (pos+2 < input.length()) {
-            String threeChar = input.substring(pos, pos+3);
+        if (sb.hasNext(2)) {
+            String threeChar = sb.getSource().substring(sb.getPos(), sb.getPos()+3);
             if (threeChar.equals(ELLIPSIS.symbol)) {
-                return ELLIPSIS;
+                sb.next(3);
+				return ELLIPSIS;
             }
         }
 		// Проверяем двухсимвольные (только RANGE)
-        if (pos+1 < input.length()) {
-            String twoChar = input.substring(pos, pos+2);
+        if (sb.hasNext(1)) {
+            String twoChar = sb.getSource().substring(sb.getPos(), sb.getPos()+2);
             if (twoChar.equals(RANGE.symbol)) {
-                return RANGE;
+                sb.next(2);
+				return RANGE;
             }
         }
         // Проверяем односимвольные
-        String singleChar = input.substring(pos, pos + 1);
-        return fromSymbol(singleChar);
+        String singleChar = sb.getSource().substring(sb.getPos(), sb.getPos()+1);
+        sb.next();
+		return fromSymbol(singleChar);
     }
 }

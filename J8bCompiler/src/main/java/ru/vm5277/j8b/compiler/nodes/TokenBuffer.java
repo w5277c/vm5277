@@ -8,6 +8,7 @@ package ru.vm5277.j8b.compiler.nodes;
 import java.util.Iterator;
 import java.util.Stack;
 import ru.vm5277.j8b.compiler.ParseError;
+import ru.vm5277.j8b.compiler.SourceBuffer;
 import ru.vm5277.j8b.compiler.tokens.Token;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
@@ -21,12 +22,12 @@ public class TokenBuffer {
 	
 	public TokenBuffer(Iterator<Token> iterator) {
 		this.iterator = iterator;
-		this.current = iterator.hasNext() ? iterator.next() : new Token(TokenType.EOF, null, -1, -1);
+		this.current = iterator.hasNext() ? iterator.next() : new Token(null, TokenType.EOF, (Object)null);
 	}
 	
 	public Token consume() { // Или next
 		Token result = current;
-		current =  iterator.hasNext() ? iterator.next() : new Token(TokenType.EOF, null, current.getLine(), current.getColumn());
+		current =  iterator.hasNext() ? iterator.next() : new Token(current.getSB(), TokenType.EOF, null);
 		return result;
 	}
 	
@@ -38,7 +39,7 @@ public class TokenBuffer {
 		if (current.getType() == expectedType) {
             return consume();
         }
-        throw new ParseError("Expected " + expectedType + ", but got " + current.getType(), current.getLine(), current.getColumn());
+        throw new ParseError("Expected " + expectedType + ", but got " + current.getType(), current.getSB());
     }
 	
 	public Token consume(Operator op) {
@@ -47,10 +48,10 @@ public class TokenBuffer {
 				return consume();
 			}
 			else {
-				throw new ParseError("Expected operator " + op + ", but got " + current.getValue(), current.getLine(), current.getColumn());
+				throw new ParseError("Expected operator " + op + ", but got " + current.getValue(), current.getSB());
 			}
         }
-        throw new ParseError("Expected " + TokenType.OPERATOR + ", but got " + current.getType(), current.getLine(), current.getColumn());
+        throw new ParseError("Expected " + TokenType.OPERATOR + ", but got " + current.getType(), current.getSB());
     }
 
 	public Token consume(Delimiter delimiter) {
@@ -59,10 +60,10 @@ public class TokenBuffer {
 				return consume();
 			}
 			else {
-				throw new ParseError("Expected delimiter " + delimiter + ", but got " + current.getValue(), current.getLine(), current.getColumn());
+				throw new ParseError("Expected delimiter " + delimiter + ", but got " + current.getValue(), current.getSB());
 			}
         }
-        throw new ParseError("Expected " + TokenType.DELIMITER + ", but got " + current.getType(), current.getLine(), current.getColumn());
+        throw new ParseError("Expected " + TokenType.DELIMITER + ", but got " + current.getType(), current.getSB());
     }
 
 	public Token consume(TokenType type, Keyword keyword) {
@@ -71,10 +72,10 @@ public class TokenBuffer {
 				return consume();
 			}
 			else {
-				throw new ParseError("Expected keyword " + keyword + ", but got " + current.getValue(), current.getLine(), current.getColumn());
+				throw new ParseError("Expected keyword " + keyword + ", but got " + current.getValue(), current.getSB());
 			}
         }
-        throw new ParseError("Expected " + TokenType.KEYWORD + ", but got " + current.getType(), current.getLine(), current.getColumn());
+        throw new ParseError("Expected " + TokenType.KEYWORD + ", but got " + current.getType(), current.getSB());
     }
 
 	public boolean match(TokenType type) {
@@ -99,5 +100,9 @@ public class TokenBuffer {
 	
 	public Stack<AstNode> getLoopStack() {
 		return loopStack;
+	}
+	
+	public SourceBuffer getSB() {
+		return current.getSB();
 	}
 }

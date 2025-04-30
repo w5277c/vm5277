@@ -20,7 +20,7 @@ public class VariableExpression extends ExpressionNode {
     
 	@Override
 	public VarType semanticAnalyze(SymbolTable symbolTable) {
-	    return symbolTable.lookup(value).getType();
+	   return symbolTable.lookup(value, tb.getSB()).getType();
 	}
 	
     @Override

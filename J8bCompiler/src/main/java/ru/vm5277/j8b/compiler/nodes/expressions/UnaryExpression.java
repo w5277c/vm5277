@@ -27,7 +27,7 @@ public class UnaryExpression extends ExpressionNode {
 
 		// Проверка допустимости операции для типа
 		if (!isUnaryOperationValid(operandType, operator)) {
-			throw new SemanticError(String.format("Invalid unary operation %s for type %s", operator, operandType), line, column);
+			throw new SemanticError(String.format("Invalid unary operation %s for type %s", operator, operandType), tb.getSB());
 		}
 
 		return operandType; // Для большинства унарных операций тип сохраняется

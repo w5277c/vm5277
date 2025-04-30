@@ -6,20 +6,14 @@
 package ru.vm5277.j8b.compiler;
 
 public class ParseError extends RuntimeException {
-	private	final	int	line;
-	private	final	int	column;
+	private	final	SourceBuffer	sp;
 
-	public ParseError(String message, int line, int column) {
-		super(message + " at line " + line + ", column " + column);
-		this.line = line;
-		this.column = column;
+	public ParseError(String message, SourceBuffer sb) {
+		super(message + " at " + sb);
+		this.sp = sb.clone();
 	}
 	
-	public int getLine() {
-		return line;
-	}
-	
-	public int getColumn() {
-		return column;
+	public SourceBuffer getSP() {
+		return sp;
 	}
 }

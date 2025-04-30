@@ -5,27 +5,21 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.tokens;
 
+import ru.vm5277.j8b.compiler.SourceBuffer;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 
 public class TDelimiter extends Token {
-	public TDelimiter(Delimiter value, int endPos, int line, int column) {
+	public TDelimiter(SourceBuffer sb, Delimiter value) {
+		super(sb);
 		this.type = TokenType.DELIMITER;
 		this.value = value;
-		this.endPos = endPos;
-		this.line = line;
-		this.column = column;
 	}
 
-	public static TDelimiter parse(String src, int pos, int line, int column) {
-
-		int endPos = pos;
-		
-		Delimiter delim = Delimiter.matchLongestDelimiter(src, endPos);
-		if (null!=delim) {
-			endPos += delim.getSymbol().length();
-			column += delim.getSymbol().length();
-			return new TDelimiter(delim, endPos, line, column);
+	public static TDelimiter parse(SourceBuffer sb) {
+		Delimiter delimiter = Delimiter.matchLongestDelimiter(sb);
+		if (null!=delimiter) {
+			return new TDelimiter(sb, delimiter);
 		}
 	    return null;
 	}

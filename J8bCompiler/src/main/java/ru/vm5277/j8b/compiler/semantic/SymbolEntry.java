@@ -5,17 +5,18 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.semantic;
 
+import ru.vm5277.j8b.compiler.SourceBuffer;
 import ru.vm5277.j8b.compiler.enums.VarType;
 
 public class SymbolEntry {
-	final	VarType	type;
-	final	boolean	isMutable;
-	final	int		line;
+	final	VarType			type;
+	final	boolean			isMutable;
+	final	SourceBuffer	sb;
 
-	SymbolEntry(VarType type, boolean isMutable, int line) {
+	SymbolEntry(VarType type, boolean isMutable, SourceBuffer sb) {
 		this.type = type;
 		this.isMutable = isMutable;
-		this.line = line;
+		this.sb = sb;
 	}
 
 	public VarType getType() {
@@ -24,9 +25,5 @@ public class SymbolEntry {
 
 	public boolean isMutable() {
 		return isMutable;
-	}
-
-	public int getLine() {
-		return line;
 	}
 }
