@@ -14,6 +14,7 @@ import ru.vm5277.j8b.compiler.tokens.Token;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Operator;
 import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.nodes.AstNode;
 
 public class ExpressionParser {
     private final TokenBuffer tb;
@@ -40,7 +41,9 @@ public class ExpressionParser {
 	
 	private ExpressionNode parseBinary(int minPrecedence) {
         ExpressionNode left = parseUnary();
-        
+        if(left instanceof UnaryExpression) {
+			left = optimizeUnary((UnaryExpression)left);
+		}
         while (tb.match(TokenType.OPERATOR)) {
             Operator operator = ((Operator)tb.current().getValue());
 
@@ -69,7 +72,6 @@ public class ExpressionParser {
             tb.consume();
 			
 			ExpressionNode right = parseBinary(precedence + (operator.isAssignment() ? 0 : 1));
-
 			left = optimizeOperationChain(left, operator, right, precedence);
 		}
         return left;
@@ -102,7 +104,7 @@ public class ExpressionParser {
 				}
 			}
 		}
-		
+
 		switch(op) {
 			case PLUS:
 			case MINUS:
@@ -115,7 +117,7 @@ public class ExpressionParser {
 			case BIT_AND:
 			case BIT_XOR:
 				return optimizeBitwiseChain(left, op, right);
-			
+
 			default:
 				return new BinaryExpression(tb, left, op, right);
 		}
@@ -152,7 +154,7 @@ public class ExpressionParser {
 		}
 
 		List<Term> terms = new ArrayList<>();
-		collectTerms(left, terms, true);
+		collectAdditiveTerms(left, terms, true);
 		terms.add(new Term(op, right, op != Operator.MINUS));
 
 		double constValue = 0;
@@ -181,11 +183,12 @@ public class ExpressionParser {
 
 		for (Term term : varTerms) {
 			ExpressionNode node = term.getNode();
-//			if (!term.isPositive()) {
-//				node = new BinaryExpression(tb, result, Operator.MINUS, node);//new UnaryExpression(tb, Operator.MINUS, node);
-//			}
-//			result = result == null ? node : new BinaryExpression(tb, result, Operator.PLUS, node);
-			result = new BinaryExpression(tb, result, term.isPositive() ? Operator.PLUS : Operator.MINUS, node);
+			if(null == result) {
+				result = term.isPositive() ? node : optimizeUnary(new UnaryExpression(tb, Operator.MINUS, node));
+			}
+			else {
+				result = new BinaryExpression(tb, result, term.isPositive() ? Operator.PLUS : Operator.MINUS, node);
+			}
 		}
 		return result != null ? result : new LiteralExpression(tb, hasDoubles ? 0.0 : 0L);
 	}
@@ -222,7 +225,7 @@ public class ExpressionParser {
 
 		// Оптимизация цепочек
 		List<Term> terms = new ArrayList<>();
-		collectTerms(left, terms, true);
+		collectMultiplicativeTerms(left, terms, true);
 		terms.add(new Term(op, right, op == Operator.MULT));
 
 		double constValue = 1;
@@ -318,60 +321,71 @@ public class ExpressionParser {
 		return new BinaryExpression(tb, left, Operator.PLUS, right);
 	}	
 
-	private void collectTerms(ExpressionNode node, List<Term> terms, boolean isPositive) {
+	ExpressionNode optimizeUnary(UnaryExpression expr) {
+		Operator operator = ((UnaryExpression)expr).getOperator();
+		ExpressionNode operand = ((UnaryExpression)expr).getOperand();
+
+		if (Operator.MINUS == operator  && operand instanceof LiteralExpression) {
+			Object value = ((LiteralExpression)operand).getValue();
+			if(value instanceof Integer) return new LiteralExpression(tb, -(Integer)value);
+			else if(value instanceof Long) return new LiteralExpression(tb, -(Long)value);
+			else if(value instanceof BigInteger) return new LiteralExpression(tb, ((BigInteger)value).negate());
+			else if(value instanceof Double) return new LiteralExpression(tb, -(Double)value);
+		}
+		else if (Operator.NOT == operator && operand instanceof LiteralExpression) {
+			Object value = ((LiteralExpression)operand).getValue();
+			if(value instanceof Boolean) return new LiteralExpression(tb, !(Boolean)value);
+		}
+//		else if (Operator.PLUS == operator) {
+//			return parseUnary(); // Пропускаем '+' и парсим дальше
+//		}
+		return expr;
+	}
+	
+	private void collectAdditiveTerms(ExpressionNode node, List<Term> terms, boolean isPositive) {
 		if (node instanceof BinaryExpression) {
 			BinaryExpression binExpr = (BinaryExpression)node;
 			Operator op = binExpr.getOperator();
-
-			if (Operator.PLUS == op || Operator.MINUS == op || Operator.MULT == op || Operator.DIV == op || Operator.MOD == op) {
-				// Рекурсивно обрабатываем левую часть с текущим знаком
-				collectTerms(binExpr.getLeft(), terms, isPositive);
-				// Определяем знак для правой части
-				boolean rightPositive = isPositive;
-				if (binExpr.getOperator() == Operator.MINUS || binExpr.getOperator() == Operator.DIV) {
-					rightPositive = !rightPositive;
-				}
-				// Добавляем правую часть
-				terms.add(new Term(binExpr.getOperator(), binExpr.getRight(), rightPositive));
+			if (op == Operator.PLUS || op == Operator.MINUS) {
+				collectAdditiveTerms(binExpr.getLeft(), terms, isPositive);
+				boolean rightPositive = op == Operator.PLUS ? isPositive : !isPositive;
+				terms.add(new Term(op, binExpr.getRight(), rightPositive));
 				return;
 			}
 		}
 		terms.add(new Term(isPositive ? Operator.PLUS : Operator.MINUS, node, isPositive));
+	}	
+
+	private void collectMultiplicativeTerms(ExpressionNode node, List<Term> terms, boolean isPositive) {
+		if (node instanceof BinaryExpression) {
+			BinaryExpression binExpr = (BinaryExpression)node;
+			Operator op = binExpr.getOperator();
+			// Собираем ТОЛЬКО *, /, %
+			if (op == Operator.MULT || op == Operator.DIV || op == Operator.MOD) {
+				collectMultiplicativeTerms(binExpr.getLeft(), terms, isPositive);
+				boolean rightPositive = op == Operator.MULT ? isPositive : !isPositive;
+				terms.add(new Term(op, binExpr.getRight(), rightPositive));
+				return;
+			}
+		}
+		terms.add(new Term(isPositive ? Operator.MULT : Operator.DIV, node, isPositive));
 	}
 	
 	private ExpressionNode parseUnary() {
 		if (tb.match(TokenType.OPERATOR)) {
 			Operator operator = ((Operator)tb.current().getValue()); //TODO check it
+			
 			if(operator.isUnary()) {
 				tb.consume();
 				ExpressionNode operand = parseUnary();							
-				
-				if (Operator.MINUS == operator  && operand instanceof LiteralExpression) {
-					Object value = ((LiteralExpression)operand).getValue();
-					if(value instanceof Integer) return new LiteralExpression(tb, -(Integer)value);
-					else if(value instanceof Long) return new LiteralExpression(tb, -(Long)value);
-					else if(value instanceof BigInteger) return new LiteralExpression(tb, ((BigInteger)value).negate());
-					else if(value instanceof Double) return new LiteralExpression(tb, -(Double)value);
-				}
-				else if (Operator.NOT == operator && operand instanceof LiteralExpression) {
-					Object value = ((LiteralExpression)operand).getValue();
-					if(value instanceof Boolean) return new LiteralExpression(tb, !(Boolean)value);
-				}
-				else if (Operator.PLUS == operator) {
-					return parseUnary(); // Пропускаем '+' и парсим дальше
-				}
+				return new UnaryExpression(tb, operator, operand);
 			}
 			else if (operator == Operator.INC || operator == Operator.DEC) {
 				tb.consume();
-				
 				Operator realOp = (operator == Operator.INC) ? Operator.PRE_INC : Operator.PRE_DEC;
 				return new UnaryExpression(tb, realOp, parseUnary());
 			}
-			tb.consume();
-			ExpressionNode operand = parseUnary();							
-			return new UnaryExpression(tb, operator, operand);
 		}
-
 		return parsePostfix();
 	}
 	
@@ -417,42 +431,12 @@ public class ExpressionParser {
 		else if(tb.match(TokenType.ID)) {
 			tb.consume();
 			if(tb.match(Delimiter.LEFT_PAREN)) {
-				tb.consume();
-				List<ExpressionNode> args = new ArrayList<>();
-				if(!tb.match(Delimiter.RIGHT_PAREN)) {
-					//TODO parse args
-				}
-				tb.consume();
-				return new MethodCallExpression(tb, new VariableExpression(tb, "this"), token.getValue().toString(), args);
+				return new MethodCallExpression(tb, null, token.getValue().toString(), AstNode.parseArguments(tb));
 			}
 			return new VariableExpression(tb, token.getValue().toString());
 		}
 		else {
 			throw new ParseError("Unexpected token in expression: " + token, tb.current().getLine(), tb.current().getColumn());
         }
-    }
-	
-	private MethodCallExpression parseMethodCall(ExpressionNode target) {
-        tb.consume(Delimiter.LEFT_PAREN);
-        List<ExpressionNode> args = new ArrayList<>();
-        
-        // Если сразу идет закрывающая скобка ')', значит аргументов нет
-		if (!tb.match(Delimiter.RIGHT_PAREN)) {
-			// Парсим аргументы через запятую
-			while(true) {
-				// Парсим выражение-аргумент
-				args.add(parse());
-				
-				// Если после выражения нет запятой - выходим из цикла
-				if (!tb.match(Delimiter.COMMA)) break;
-            
-	            // Пропускаем запятую
-		        tb.consume(Delimiter.COMMA);
-			} 
-        }
-        
-        tb.consume(Delimiter.RIGHT_PAREN);
-		String methodName = (target instanceof VariableExpression) ? ((VariableExpression)target).getValue() : "";
-        return new MethodCallExpression(tb, target, methodName, args);
     }
 }

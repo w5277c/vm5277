@@ -202,5 +202,17 @@ public class ParserTests {
 		String source ="class A{ public int A() { int t=0; switch(t) { case 0: return 1; case 1..10: return 2; case 11: {t++; return 3;} default: return 4;}}}";
 		new ASTParser(new Lexer(new StringReader(source)).getTokens());
 	}
+
+	@Test
+	public void someTest1() throws Exception {
+		String source ="class A{ public int A() { if(count %2 == 0) {} }}";
+		new ASTParser(new Lexer(new StringReader(source)).getTokens());
+	}
+	
+	@Test
+	public void someTest2() throws Exception {
+		String source ="class A{ public int A() { return -a-b; }}";
+		new ASTParser(new Lexer(new StringReader(source)).getTokens());
+	}
 	
 }

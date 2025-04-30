@@ -12,18 +12,18 @@ import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler.semantic.SymbolTable;
 
 public class MethodCallExpression extends ExpressionNode {
-	private	final	ExpressionNode			target;
+	private	final	ExpressionNode			parent;
 	private	final	String					methodName;
 	private	final	List<ExpressionNode>	arguments;
     
-    public MethodCallExpression(TokenBuffer tb, ExpressionNode target, String methodName, List<ExpressionNode> arguments) {
+    public MethodCallExpression(TokenBuffer tb, ExpressionNode parent, String methodName, List<ExpressionNode> arguments) {
         super(tb);
         
-		this.target = target;
+		this.parent = parent;
 		this.methodName = methodName;
         this.arguments = arguments;
     }
-    
+
 	@Override
     public <T> T accept(ExpressionVisitor<T> visitor) {
 		return visitor.visit(this);
@@ -33,8 +33,8 @@ public class MethodCallExpression extends ExpressionNode {
 		return methodName;
 	}
 	
-	public ExpressionNode getTarget() {
-		return target;
+	public ExpressionNode getParent() {
+		return parent;
 	}
 
 	public List<ExpressionNode> getArguments() {
@@ -44,10 +44,5 @@ public class MethodCallExpression extends ExpressionNode {
 	@Override
 	public VarType semanticAnalyze(SymbolTable symbolTable) {
 		throw new SemanticError("Not supported yet.", line, column);
-	}
-	
-	@Override
-	public String toString() {
-		return getClass().getSimpleName() + ": " + target + ", " + methodName + ", " + arguments.toArray();
 	}
 }

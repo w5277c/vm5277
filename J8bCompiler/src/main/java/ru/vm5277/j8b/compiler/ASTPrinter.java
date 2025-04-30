@@ -8,6 +8,7 @@ package ru.vm5277.j8b.compiler;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.j8b.compiler.enums.Keyword;
+import ru.vm5277.j8b.compiler.enums.Operator;
 import ru.vm5277.j8b.compiler.nodes.ArrayDeclarationNode;
 import ru.vm5277.j8b.compiler.nodes.AstNode;
 import ru.vm5277.j8b.compiler.nodes.BlockNode;
@@ -30,6 +31,7 @@ import ru.vm5277.j8b.compiler.nodes.expressions.BinaryExpression;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.j8b.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.j8b.compiler.nodes.expressions.MethodCallExpression;
+import ru.vm5277.j8b.compiler.nodes.expressions.TernaryExpression;
 import ru.vm5277.j8b.compiler.nodes.expressions.UnaryExpression;
 import ru.vm5277.j8b.compiler.nodes.expressions.VariableExpression;
 import ru.vm5277.j8b.compiler.tokens.Token;
@@ -272,19 +274,9 @@ public class ASTPrinter {
 	void printExpr(ExpressionNode expr) {
 		if(expr instanceof BinaryExpression) {
 			BinaryExpression be = (BinaryExpression)expr;
-			if(null != be.getLeft()) {
-				printExpr(be.getLeft());
-			}
-			else {
-				//TODO!
-			}
+			printOperand(be.getLeft(), be.getOperator(), true);
 			out.put(be.getOperator().getSymbol());
-			if(null != be.getRight()) {
-				printExpr(be.getRight());
-			}
-			else {
-				//TODO!
-			}
+			printOperand(be.getRight(), be.getOperator(), false);
 		}
 		else if (expr instanceof LiteralExpression) {
 			LiteralExpression le = (LiteralExpression)expr;
@@ -292,9 +284,9 @@ public class ASTPrinter {
 		}
 		else if(expr instanceof MethodCallExpression) {
 			MethodCallExpression mce = (MethodCallExpression)expr;
-			if(null != mce.getTarget()) {
-				printExpr(mce.getTarget());
-				out.put(" = ");
+			if(null != mce.getParent()) {
+				printExpr(mce.getParent());
+				out.put(".");
 			}
 			out.put(mce.getMethodName() + "(");
 			printArguments(mce.getArguments());
@@ -305,13 +297,46 @@ public class ASTPrinter {
 		}
 		else if(expr instanceof UnaryExpression) {
 			UnaryExpression ue = (UnaryExpression)expr;
-			out.put(ue.getOperator().getSymbol());
-			if(null != ue.getOperand()) {
-				printExpr(ue.getOperand());
+			Operator op = ue.getOperator();
+			if(op.isPostfix()) {
+				if(null != ue.getOperand()) {
+					printExpr(ue.getOperand());
+				}
+				out.put(ue.getOperator().getSymbol());
 			}
+			else {
+				out.put(ue.getOperator().getSymbol());
+				if(null != ue.getOperand()) {
+					printExpr(ue.getOperand());
+				}
+			}
+		}
+		else if(expr instanceof TernaryExpression) {
+			TernaryExpression te = (TernaryExpression)expr;
+			printExpr(te.getCondition());
+			out.put(" ? ");
+			printExpr(te.getTrueExpr());
+			out.put(" : ");
+			printExpr(te.getFalseExpr());
 		}
 		else {
 			out.put("!unknown expr:" + expr); out.print();
 		}
+	}
+	
+	void printOperand(ExpressionNode operand, Operator parentOp, boolean isLeft) {
+		boolean needParentheses = false;
+
+		if (operand instanceof BinaryExpression) {
+			Operator childOp = ((BinaryExpression) operand).getOperator();
+			int parentPriority = Operator.PRECEDENCE.get(parentOp);
+			int childPriority = Operator.PRECEDENCE.get(childOp);
+
+			needParentheses = childPriority < parentPriority || (childPriority == parentPriority && !isLeft);
+		}
+
+		if (needParentheses) out.put("(");
+		printExpr(operand);
+		if (needParentheses) out.put(")");
 	}
 }

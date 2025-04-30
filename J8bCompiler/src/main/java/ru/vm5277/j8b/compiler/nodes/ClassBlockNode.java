@@ -32,17 +32,24 @@ public class ClassBlockNode extends BlockNode {
 
 			// Определение типа (примитив, класс или конструктор)
 			VarType type = checkPrimtiveType();
-			boolean isConstructor = false;
+			boolean isClassName = false;
 			if (null == type) {
-				isConstructor = checkConstructor(className);
-				if(!isConstructor) type = checkClassType();
+				isClassName = checkClassName(className);
+				if(!isClassName) type = checkClassType();
 			}
 			
 			// Получаем имя метода/конструктора
-			String name = isConstructor ? null : tb.consume(TokenType.ID).getStringValue();
+			String name = null;
+			if(tb.match(TokenType.ID)) {
+				if(isClassName) {
+					isClassName = false;
+					type = VarType.fromClassName(className);
+				}
+				name = tb.consume().getStringValue();
+			}
 
 			if(tb.match(Delimiter.LEFT_PAREN)) { //'(' Это метод
-				if(isConstructor) {
+				if(isClassName) {
 					declarations.add(new MethodNode(tb, modifiers, null, className));
 				}
 				else {

@@ -16,6 +16,8 @@ public abstract class ExpressionNode extends AstNode {
 		super(tb);
 	}
 	
+	//TODO перенести сюда содержимое ExpressionParser
+	
 	public abstract VarType semanticAnalyze(SymbolTable symbolTable);
 	
 	// Для визитора (понадобится при кодогенерации)

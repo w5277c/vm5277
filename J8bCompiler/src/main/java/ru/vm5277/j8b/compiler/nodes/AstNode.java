@@ -76,7 +76,7 @@ public abstract class AstNode {
 		}
 		else if (tb.match(TokenType.ID)) {
 			// Парсим цепочку выражений (включая вызовы методов)
-			ExpressionNode expr = parseFullQualifiedExpression();			
+			ExpressionNode expr = parseFullQualifiedExpression(tb);			
 
 			// Если statement заканчивается точкой с запятой (но не в case-выражениях и т.д.)
 			if (tb.match(Delimiter.SEMICOLON)) {
@@ -114,7 +114,7 @@ public abstract class AstNode {
 		}
 		return null;
 	}
-	protected boolean checkConstructor(String className) {
+	protected boolean checkClassName(String className) {
 		if (tb.match(TokenType.ID)) {
 			String typeName = (String)tb.current().getValue();
 			if (typeName.equals(className)) {
@@ -160,8 +160,8 @@ public abstract class AstNode {
 		return type;
 	}
 
-	private ExpressionNode parseFullQualifiedExpression() {
-		ExpressionNode base = new ExpressionParser(tb).parse();
+	private static ExpressionNode parseFullQualifiedExpression(TokenBuffer tb) {
+		ExpressionNode parent = new ExpressionParser(tb).parse();
 
 		// Обрабатываем цепочки вызовов через точку
 		while (tb.match(Delimiter.DOT)) {
@@ -170,7 +170,7 @@ public abstract class AstNode {
 
 			if (tb.match(Delimiter.LEFT_PAREN)) {
 				// Это вызов метода
-				base = new MethodCallExpression(tb, base, methodName, parseArguments());
+				parent = new MethodCallExpression(tb, parent, methodName, parseArguments(tb));
 			}
 			else {
 				// Доступ к полю (можно добавить FieldAccessNode)
@@ -178,16 +178,16 @@ public abstract class AstNode {
 			}
 		}
 
-		return base;
+		return parent;
 	}
-	public List<ExpressionNode> parseArguments() {
+	public static List<ExpressionNode> parseArguments(TokenBuffer tb) {
 		List<ExpressionNode> args = new ArrayList<>();
 		tb.consume(Delimiter.LEFT_PAREN);
 
 		if (!tb.match(Delimiter.RIGHT_PAREN)) {
 			while(true) {
 				// Парсим выражение-аргумент
-				args.add(parseFullQualifiedExpression());
+				args.add(parseFullQualifiedExpression(tb));
 				
 				// Если после выражения нет запятой - выходим из цикла
 				if (!tb.match(Delimiter.COMMA)) break;

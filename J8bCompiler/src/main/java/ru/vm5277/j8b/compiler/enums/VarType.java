@@ -76,7 +76,7 @@ public class VarType {
 	
 	// Создаем тип для конкретного класса.
 	public static void addClassName(String className) {
-		if(CLASS_TYPES.containsKey(className)) {
+		if(!CLASS_TYPES.containsKey(className)) {
 			VarType type = new VarType("class:" + className, className);
 			CLASS_TYPES.put(className, type);
 		}
