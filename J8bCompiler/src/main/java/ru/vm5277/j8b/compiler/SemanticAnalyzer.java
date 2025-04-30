@@ -214,7 +214,7 @@ public class SemanticAnalyzer {
 	
 	private VarType checkMethodCallExpression(MethodCallExpression expr) throws SemanticError {
 		// Проверка целевого объекта
-		VarType targetType = checkExpression(expr.getTarget());
+		VarType targetType = checkExpression(expr.getParent());
 
 		if (null != targetType && !targetType.isClassType()) {
 			throw new SemanticError("Method call on non-class type: " + targetType, expr.getLine(), expr.getColumn());

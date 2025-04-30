@@ -33,18 +33,17 @@ public class ExpressionParser {
         if (tb.match(TokenType.OPERATOR) && ((Operator)tb.current().getValue()).isAssignment()) {
             Operator operator = ((Operator)tb.consume().getValue());
             ExpressionNode right = parseAssignment();
-			return new BinaryExpression(tb, left, operator, right);
+			
+			return optimizeExpression(new BinaryExpression(tb, left, operator, right));
         }
         
-        return left;
+        return optimizeExpression(left);
     }    
 	
 	private ExpressionNode parseBinary(int minPrecedence) {
         ExpressionNode left = parseUnary();
-        if(left instanceof UnaryExpression) {
-			left = optimizeUnary((UnaryExpression)left);
-		}
-        while (tb.match(TokenType.OPERATOR)) {
+
+		while (tb.match(TokenType.OPERATOR)) {
             Operator operator = ((Operator)tb.current().getValue());
 
 			if (operator == Operator.TERNARY) {
@@ -77,7 +76,14 @@ public class ExpressionParser {
         return left;
     }
 	
+	// Агрессивная оптимизация
 	private ExpressionNode optimizeOperationChain(ExpressionNode left, Operator op, ExpressionNode right, int precedence) {
+		// Оптимизация унарных операций (если левая часть - унарный оператор)
+		if (right instanceof UnaryExpression) {
+			UnaryExpression unary = (UnaryExpression)right;
+			right = optimizeUnary(unary.getOperator(), unary.getOperand());
+		}
+		
 		if (left instanceof LiteralExpression && right instanceof LiteralExpression) {
 			Object leftVal = ((LiteralExpression)left).getValue();
 			Object rightVal = ((LiteralExpression)right).getValue();
@@ -105,6 +111,24 @@ public class ExpressionParser {
 			}
 		}
 
+		if (op.isAssignment() && right instanceof BinaryExpression) {
+			BinaryExpression bRight = (BinaryExpression)right;
+			if (left instanceof VariableExpression && (Operator.PLUS==bRight.getOperator() || Operator.MINUS==bRight.getOperator())) {
+				if(	(bRight.getLeft() instanceof VariableExpression && bRight.getRight() instanceof LiteralExpression) ||
+					(bRight.getLeft() instanceof LiteralExpression && bRight.getRight() instanceof VariableExpression)) {
+					
+					VariableExpression ve = (VariableExpression)(bRight.getLeft() instanceof VariableExpression ? bRight.getLeft() : bRight.getRight());
+					LiteralExpression le = (LiteralExpression)(bRight.getLeft() instanceof VariableExpression ? bRight.getRight(): bRight.getLeft());
+					if(	ve.getValue().equals(((VariableExpression)left).getValue()) && le.isInteger()) {
+						long num = le.toLong();
+						if(-1 == num || 1 == num) {
+							return new UnaryExpression(tb, (Operator.PLUS==bRight.getOperator()^(-1==num)) ? Operator.PRE_INC : Operator.PRE_DEC, left);
+						}					
+					}
+				}
+			}
+		}
+		
 		switch(op) {
 			case PLUS:
 			case MINUS:
@@ -124,7 +148,7 @@ public class ExpressionParser {
 	}
 
 	private ExpressionNode optimizeAdditiveChain(ExpressionNode left, Operator op, ExpressionNode right) {
-		if (op == Operator.PLUS) {
+		if (Operator.PLUS==op) {
 			boolean leftIsString = (left instanceof LiteralExpression && ((LiteralExpression)left).getValue() instanceof String);
 			boolean rightIsString = (right instanceof LiteralExpression && ((LiteralExpression)right).getValue() instanceof String);
 
@@ -157,19 +181,24 @@ public class ExpressionParser {
 		collectAdditiveTerms(left, terms, true);
 		terms.add(new Term(op, right, op != Operator.MINUS));
 
-		double constValue = 0;
-		List<Term> varTerms = new ArrayList<>();
+		long constValueLong = 0;
+		double constValueDouble = 0;
 		boolean hasDoubles = false;
-
+		boolean hasLongs = false;
+		List<Term> varTerms = new ArrayList<>();
 		for (Term term : terms) {
 			if (term.isNumber()) {
 				Number num = (Number)((LiteralExpression)term.getNode()).getValue();
-				double val = num.doubleValue();
-
 				if (num instanceof Double) {
 					hasDoubles = true;
+					double val = num.doubleValue();
+					constValueDouble = term.isPositive() ? constValueDouble + val : constValueDouble - val;
 				}
-				constValue = term.isPositive() ? constValue + val : constValue - val;
+				else {
+					hasLongs = true;
+					long val = num.longValue();
+					constValueLong = term.isPositive() ? constValueLong + val : constValueLong - val;
+				}
 			}
 			else {
 				varTerms.add(term);
@@ -177,14 +206,20 @@ public class ExpressionParser {
 		}
 
 		ExpressionNode result = null;
-		if (constValue != 0) {
-			result = new LiteralExpression(tb, hasDoubles ? constValue : (long)constValue);
+		if (hasDoubles) {
+			double totalConst = constValueDouble + constValueLong;
+			if (totalConst != 0) {
+				result = new LiteralExpression(tb, totalConst);
+			}
+		}
+		else if (constValueLong != 0) {
+			result = new LiteralExpression(tb, constValueLong);
 		}
 
 		for (Term term : varTerms) {
 			ExpressionNode node = term.getNode();
 			if(null == result) {
-				result = term.isPositive() ? node : optimizeUnary(new UnaryExpression(tb, Operator.MINUS, node));
+				result = term.isPositive() ? node : new UnaryExpression(tb, Operator.MINUS, node);
 			}
 			else {
 				result = new BinaryExpression(tb, result, term.isPositive() ? Operator.PLUS : Operator.MINUS, node);
@@ -193,6 +228,23 @@ public class ExpressionParser {
 		return result != null ? result : new LiteralExpression(tb, hasDoubles ? 0.0 : 0L);
 	}
 
+	private ExpressionNode optimizeExpression(ExpressionNode node) {
+		// Оптимизация унарных операций
+		if (node instanceof UnaryExpression) {
+			UnaryExpression ue = (UnaryExpression)node;
+			return optimizeUnary(ue.getOperator(), ue.getOperand());
+		}
+
+		// Оптимизация бинарных операций
+		if (node instanceof BinaryExpression) {
+			BinaryExpression bin = (BinaryExpression)node;
+			ExpressionNode left = optimizeExpression(bin.getLeft());
+			ExpressionNode right = optimizeExpression(bin.getRight());
+			return optimizeOperationChain(left, bin.getOperator(), right, 0);
+		}
+
+		return node;
+	}
 	private ExpressionNode optimizeMultiplicativeChain(ExpressionNode left, Operator op, ExpressionNode right) {
 		if (left instanceof LiteralExpression && right instanceof LiteralExpression) {
 			Object leftVal = ((LiteralExpression)left).getValue();
@@ -223,37 +275,37 @@ public class ExpressionParser {
 			}
 		}
 
+		if (Operator.MOD == op) {
+			return new BinaryExpression(tb, left, op, right);
+		}
+		
 		// Оптимизация цепочек
 		List<Term> terms = new ArrayList<>();
 		collectMultiplicativeTerms(left, terms, true);
-		terms.add(new Term(op, right, op == Operator.MULT));
+		terms.add(new Term(op, right, Operator.MULT==op || Operator.MOD==op));
 
-		double constValue = 1;
-		List<Term> varTerms = new ArrayList<>();
+		long constValueLong = 1;
+		double constValueDouble = 1;
 		boolean hasDoubles = false;
 		boolean hasDivision = false;
+		List<Term> varTerms = new ArrayList<>();
 
 		for (Term term : terms) {
 			if (term.isNumber()) {
 				Number num = (Number)((LiteralExpression)term.getNode()).getValue();
-				double val = num.doubleValue();
-
 				if (num instanceof Double) {
 					hasDoubles = true;
-				}
-
-				switch (term.getOperator()) {
-					case MULT:
-						constValue *= val;
-						break;
-					case DIV:
-						constValue /= val;
-						hasDivision = true;
-						break;
-					case MOD:
-						constValue %= val;
-						hasDivision = true;
-						break;
+					double val = num.doubleValue();
+					switch (term.getOperator()) {
+						case MULT: constValueDouble *= val; break;
+						case DIV:  constValueDouble /= val; hasDivision = true; break;
+					}
+				} else {
+					long val = num.longValue();
+					switch (term.getOperator()) {
+						case MULT: constValueLong *= val; break;
+						case DIV:  constValueLong /= val; hasDivision = true; break;
+					}
 				}
 			}
 			else {
@@ -262,9 +314,16 @@ public class ExpressionParser {
 		}
 
 		ExpressionNode result = null;
-		if (constValue != 1 || hasDivision) {
-			result = new LiteralExpression(tb, hasDoubles || hasDivision ? constValue : (long)constValue);
+		if (hasDoubles) {
+			double totalConst = constValueDouble * constValueLong;
+			if (totalConst != 1 || hasDivision) {
+				result = new LiteralExpression(tb, totalConst);
+			}
 		}
+		else if (constValueLong != 1 || hasDivision) {
+			result = new LiteralExpression(tb, constValueLong);
+		}
+
 		for (Term term : varTerms) {
 			ExpressionNode node = term.getNode();
 			result = result == null ? node : new BinaryExpression(tb, result, term.getOperator(), node);
@@ -320,35 +379,33 @@ public class ExpressionParser {
 		}
 		return new BinaryExpression(tb, left, Operator.PLUS, right);
 	}	
-
-	ExpressionNode optimizeUnary(UnaryExpression expr) {
-		Operator operator = ((UnaryExpression)expr).getOperator();
-		ExpressionNode operand = ((UnaryExpression)expr).getOperand();
-
-		if (Operator.MINUS == operator  && operand instanceof LiteralExpression) {
+	
+	ExpressionNode optimizeUnary(Operator op, ExpressionNode operand) {
+		if (operand instanceof LiteralExpression) {
 			Object value = ((LiteralExpression)operand).getValue();
-			if(value instanceof Integer) return new LiteralExpression(tb, -(Integer)value);
-			else if(value instanceof Long) return new LiteralExpression(tb, -(Long)value);
-			else if(value instanceof BigInteger) return new LiteralExpression(tb, ((BigInteger)value).negate());
-			else if(value instanceof Double) return new LiteralExpression(tb, -(Double)value);
+			if (Operator.MINUS == op  && value instanceof Number) {
+				if(value instanceof Integer) return new LiteralExpression(tb, -(Integer)value);
+				else if(value instanceof Long) return new LiteralExpression(tb, -(Long)value);
+				else if(value instanceof BigInteger) return new LiteralExpression(tb, ((BigInteger)value).negate());
+				else if(value instanceof Double) return new LiteralExpression(tb, -(Double)value);
+			}
+			else if (Operator.NOT == op && value instanceof Boolean) {
+				if(value instanceof Boolean) return new LiteralExpression(tb, !(Boolean)value);
+			}
+			else if (Operator.PLUS == op) {
+				return operand;
+			}
 		}
-		else if (Operator.NOT == operator && operand instanceof LiteralExpression) {
-			Object value = ((LiteralExpression)operand).getValue();
-			if(value instanceof Boolean) return new LiteralExpression(tb, !(Boolean)value);
-		}
-//		else if (Operator.PLUS == operator) {
-//			return parseUnary(); // Пропускаем '+' и парсим дальше
-//		}
-		return expr;
+		return new UnaryExpression(tb, op, operand);
 	}
 	
 	private void collectAdditiveTerms(ExpressionNode node, List<Term> terms, boolean isPositive) {
 		if (node instanceof BinaryExpression) {
 			BinaryExpression binExpr = (BinaryExpression)node;
 			Operator op = binExpr.getOperator();
-			if (op == Operator.PLUS || op == Operator.MINUS) {
+			if (Operator.PLUS==op || Operator.MINUS==op) {
 				collectAdditiveTerms(binExpr.getLeft(), terms, isPositive);
-				boolean rightPositive = op == Operator.PLUS ? isPositive : !isPositive;
+				boolean rightPositive = Operator.PLUS==op ? isPositive : !isPositive;
 				terms.add(new Term(op, binExpr.getRight(), rightPositive));
 				return;
 			}
@@ -361,9 +418,9 @@ public class ExpressionParser {
 			BinaryExpression binExpr = (BinaryExpression)node;
 			Operator op = binExpr.getOperator();
 			// Собираем ТОЛЬКО *, /, %
-			if (op == Operator.MULT || op == Operator.DIV || op == Operator.MOD) {
+			if (Operator.MULT==op || Operator.DIV==op || Operator.MOD==op) {
 				collectMultiplicativeTerms(binExpr.getLeft(), terms, isPositive);
-				boolean rightPositive = op == Operator.MULT ? isPositive : !isPositive;
+				boolean rightPositive = Operator.DIV!=op ? isPositive : !isPositive;
 				terms.add(new Term(op, binExpr.getRight(), rightPositive));
 				return;
 			}
@@ -377,8 +434,7 @@ public class ExpressionParser {
 			
 			if(operator.isUnary()) {
 				tb.consume();
-				ExpressionNode operand = parseUnary();							
-				return new UnaryExpression(tb, operator, operand);
+				return new UnaryExpression(tb, operator, parseUnary());
 			}
 			else if (operator == Operator.INC || operator == Operator.DEC) {
 				tb.consume();

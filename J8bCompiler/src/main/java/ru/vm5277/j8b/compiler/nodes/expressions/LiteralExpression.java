@@ -5,6 +5,7 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes.expressions;
 
+import java.math.BigInteger;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler.semantic.SymbolTable;
@@ -33,6 +34,14 @@ public class LiteralExpression extends ExpressionNode {
     
     public Object getValue() {
 		return value;
+	}
+	
+	public boolean isInteger() {
+		return value instanceof Integer || value instanceof Long || value instanceof BigInteger;
+	}
+	
+	public long toLong() {
+		return ((Number)value).longValue();
 	}
 	
 	@Override

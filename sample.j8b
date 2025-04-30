@@ -4,11 +4,11 @@ import hardware.timer;  // Проверка импортов
 public class Main {
     // Глобальная переменная
     int counter = 0;
-    
+
     // Главная функция
     void main() {
         // Вызов функции
-        initSystem();
+        base.getSystem().init();
         
         // Цикл while
         while (counter < 10) {
