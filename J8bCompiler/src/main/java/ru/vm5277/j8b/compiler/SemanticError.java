@@ -6,11 +6,17 @@
 package ru.vm5277.j8b.compiler;
 
 public class SemanticError extends RuntimeException {
-    private	final	SourceBuffer sb;
+    private	final	SourcePosition	sp;
 
-    public SemanticError(String message, SourceBuffer sb) {
-        super("[Semantic Error] " + message + " at " + sb.toString());
+    public SemanticError(String message) {
+        super("[Semantic Error] " + message);
         
-		this.sb = sb.clone();
+		this.sp = null;
+    }
+
+	public SemanticError(String message, SourcePosition sp) {
+        super("[Semantic Error] " + message + " at " + sp.toString());
+        
+		this.sp = sp;
     }
 }

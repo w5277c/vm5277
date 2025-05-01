@@ -8,10 +8,11 @@ package ru.vm5277.j8b.compiler.tokens;
 import ru.vm5277.j8b.compiler.ParseError;
 import ru.vm5277.j8b.compiler.SourceBuffer;
 import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 
 public class TChar extends Token {
 	
-	public TChar(SourceBuffer sb) {
+	public TChar(SourceBuffer sb, MessageContainer mc) {
 		super(sb);
 		type = TokenType.CHAR;
 
@@ -20,7 +21,10 @@ public class TChar extends Token {
 		char ch = sb.getChar(); // Пропускаем открывающую кавычку
 		// Обработка экранированных символов (\n, \t, \', \\)
 		if ('\\'==ch) {
-			if (!sb.hasNext()) throw new ParseError("Invalid escape sequence", sb);
+			if (!sb.hasNext()) {
+				setError("Invalid escape sequence", mc);
+				return;
+			}
 			sb.next();
 			ch = sb.getChar();
 			switch (ch) {
@@ -36,8 +40,13 @@ public class TChar extends Token {
     
 		// Пропускаем символ и проверяем закрывающую кавычку '
 		sb.next();
-		if (!sb.hasNext() || '\'' != sb.getChar()) throw new ParseError("Char literal must be 1 ASCII character", sb);
-		sb.next();
+		if (!sb.hasNext() || '\'' != sb.getChar()) {
+			setError("Char literal must be 1 ASCII character", mc);
+			
+		}
+		else {
+			sb.next();
+		}
 		value = String.valueOf(ch);
 	}
 }

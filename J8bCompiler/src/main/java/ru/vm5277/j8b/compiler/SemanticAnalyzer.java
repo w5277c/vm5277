@@ -35,7 +35,7 @@ public class SemanticAnalyzer {
 		symbolTable.addClass(clazz.getFullName(), classInfo, null);
 		for(AstNode decl : clazz.getBody().getDeclarations()) {
 			if(decl instanceof FieldNode) {
-				classInfo.addField(((FieldNode)decl).getName(), ((FieldNode)decl).getType(), clazz.getSB());
+				classInfo.addField(((FieldNode)decl).getName(), ((FieldNode)decl).getType(), clazz.getSP());
 			}
 			else if(decl instanceof MethodNode) {
 				MethodNode method = (MethodNode)decl;
@@ -43,7 +43,7 @@ public class SemanticAnalyzer {
                 for (ParameterNode param : method.getParameters()) {
                     paramTypes.add(param.getType());
                 }
-                classInfo.addMethod(method.getName(), new MethodInfo(method.getType(), paramTypes), method.getSB());
+                classInfo.addMethod(method.getName(), new MethodInfo(method.getType(), paramTypes), method.getSP());
 			}
 		}
 		
@@ -58,7 +58,7 @@ public class SemanticAnalyzer {
 	}
 	
 	private void analyzeClass(ClassNode classNode) throws SemanticError {
-		ClassInfo classInfo = symbolTable.getClassInfo(classNode.getFullName(), classNode.getSB());
+		ClassInfo classInfo = symbolTable.getClassInfo(classNode.getFullName(), classNode.getSP());
 		symbolTable.enterScope();
 
 		try {
@@ -82,14 +82,14 @@ public class SemanticAnalyzer {
 	
 	// Анализ поля
 	private void analyzeField(FieldNode field, String className) throws SemanticError {
-		ClassInfo classInfo = symbolTable.getClassInfo(className, field.getSB());
+		ClassInfo classInfo = symbolTable.getClassInfo(className, field.getSP());
 		
 		boolean isFinal = field.getModifiers().contains(Keyword.FINAL);
 		
 		// Проверка типа поля
 	    VarType declaredType = field.getType();
 		if (VarType.UNKNOWN == field.getType()) {
-			throw new SemanticError("Unknown field type: " + declaredType, field.getSB());
+			throw new SemanticError("Unknown field type: " + declaredType, field.getSP());
         }
 
 		// Проверка инициализатора
@@ -98,32 +98,32 @@ public class SemanticAnalyzer {
 			// Проверяем совместимость типов
 			if (!declaredType.isCompatibleWith(initType)) {
 				throw new SemanticError(String.format("Type mismatch: cannot assign %s to %s", initType.getName(), declaredType.getName()),
-										field.getInitializer().getSB());
+										field.getInitializer().getSP());
 			}
 		}
 
 		// Проверка final поля
 		if (isFinal && field.getInitializer() == null) {
-			throw new SemanticError("Final field must be initialized", field.getSB());
+			throw new SemanticError("Final field must be initialized", field.getSP());
 		}
 		
 		// 4. Добавляем поле в таблицу символов
 		try {
-			symbolTable.addSymbol(field.getName(), declaredType, !isFinal, field.getSB()); // mutable если не final
+			symbolTable.addSymbol(field.getName(), declaredType, !isFinal, field.getSP()); // mutable если не final
 		}
 		catch (SemanticError e) {
-			throw new SemanticError(String.format("Field '%s': %s", field.getName(), e.getMessage()), field.getSB());
+			throw new SemanticError(String.format("Field '%s': %s", field.getName(), e.getMessage()), field.getSP());
 		}
 	}
 	
 	// Анализ метода экземпляра
 	private void analyzeMethod(MethodNode method, String className) throws SemanticError {
-		ClassInfo classInfo = symbolTable.getClassInfo(className, method.getSB());
+		ClassInfo classInfo = symbolTable.getClassInfo(className, method.getSP());
 		
 		// Проверяем тип возвращаемого значения
 		VarType returnType = method.getType();
 		if (returnType == VarType.UNKNOWN) {
-			throw new SemanticError("Invalid return type: " + method.getType(), method.getSB());
+			throw new SemanticError("Invalid return type: " + method.getType(), method.getSP());
 		}
 
 		// Входим в новую область видимости для параметров метода
@@ -151,10 +151,10 @@ public class SemanticAnalyzer {
         for (ParameterNode param : params) {
 			VarType paramType = param.getType();
 			if (paramType == VarType.UNKNOWN) {
-				throw new SemanticError("Unknown parameter type: " + param.getType(), param.getSB());
+				throw new SemanticError("Unknown parameter type: " + param.getType(), param.getSP());
 			}
 
-			symbolTable.addSymbol(param.getName(), paramType, true, param.getSB());
+			symbolTable.addSymbol(param.getName(), paramType, true, param.getSP());
         }
     }
 
@@ -170,7 +170,7 @@ public class SemanticAnalyzer {
 
 				if (!actualType.isCompatibleWith(expectedReturnType)) {
 					throw new SemanticError(String.format("Return type mismatch: expected %s, got %s", expectedReturnType.getName(),
-											actualType.getName()), returnNode.getSB());
+											actualType.getName()), returnNode.getSP());
 				}
 				hasReturn = true;
 			}
@@ -188,7 +188,7 @@ public class SemanticAnalyzer {
 
 		// Проверка возвращаемого значения
 		if (expectedReturnType != VarType.VOID && !isConstructor && !hasReturn) {
-			throw new SemanticError("Missing return statement in non-void method", block.getSB());
+			throw new SemanticError("Missing return statement in non-void method", block.getSP());
 		}
 		
 		return hasReturn;
@@ -217,20 +217,20 @@ public class SemanticAnalyzer {
 		VarType targetType = checkExpression(expr.getParent());
 
 		if (null == targetType || !targetType.isClassType()) {
-			throw new SemanticError("Method call on non-class type: " + targetType, expr.getSB());
+			throw new SemanticError("Method call on non-class type: " + targetType, expr.getSP());
 		}
 
 		// Поиск метода
-		MethodInfo methodInfo = symbolTable.lookupMethod(targetType.getName(), expr.getMethodName(), expr.getSB());
+		MethodInfo methodInfo = symbolTable.lookupMethod(targetType.getName(), expr.getMethodName(), expr.getSP());
 		if(null == methodInfo) {
-			throw new SemanticError(String.format("Method '%s' not found in class %s", expr.getMethodName(), targetType.getName()), expr.getSB());
+			throw new SemanticError(String.format("Method '%s' not found in class %s", expr.getMethodName(), targetType.getName()), expr.getSP());
 		}
 		
 		// Проверка аргументов
 		List<ExpressionNode> args = expr.getArguments();
 		int size = null == methodInfo.getParameters() ? 0 : methodInfo.getParameters().size();
 		if (args.size() != size) {
-			throw new SemanticError(String.format("Expected %d arguments, got %d", size, args.size()), expr.getSB());
+			throw new SemanticError(String.format("Expected %d arguments, got %d", size, args.size()), expr.getSP());
 		}
 
 		for (int i = 0; i < size; i++) {
@@ -238,7 +238,7 @@ public class SemanticAnalyzer {
 			VarType paramType = methodInfo.getParameters().get(i);
 
 			if (!argType.isCompatibleWith(paramType)) {
-				throw new SemanticError(String.format("Argument %d type mismatch: expected %s, got %s", i+1, paramType, argType), args.get(i).getSB());
+				throw new SemanticError(String.format("Argument %d type mismatch: expected %s, got %s", i+1, paramType, argType), args.get(i).getSP());
 			}
 		}
 

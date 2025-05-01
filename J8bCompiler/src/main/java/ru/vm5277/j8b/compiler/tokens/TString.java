@@ -5,12 +5,12 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.tokens;
 
-import ru.vm5277.j8b.compiler.ParseError;
 import ru.vm5277.j8b.compiler.SourceBuffer;
 import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 
 public class TString extends Token {
-	public TString(SourceBuffer sb) {
+	public TString(SourceBuffer sb, MessageContainer mc) {
 		super(sb);
 		type = TokenType.STRING;
 		
@@ -20,8 +20,12 @@ public class TString extends Token {
 			str.append(sb.getChar());
 			sb.next();			
         }
-		if (!sb.hasNext()) throw new ParseError("Unterminated string literal", sb);
-		sb.next();
+		if (!sb.hasNext()) {
+			setError("Unterminated string literal", mc);
+		}
+		else {
+			sb.next();
+		}
         value = str.toString();
 	}
 }

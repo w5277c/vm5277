@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Set;
 import ru.vm5277.j8b.compiler.ParseError;
 import ru.vm5277.j8b.compiler.SourceBuffer;
+import ru.vm5277.j8b.compiler.SourcePosition;
 import ru.vm5277.j8b.compiler.nodes.commands.IfNode;
 import ru.vm5277.j8b.compiler.nodes.commands.ReturnNode;
 import ru.vm5277.j8b.compiler.nodes.commands.WhileNode;
@@ -40,7 +41,7 @@ import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode;
 
 public abstract class AstNode {
 	protected			TokenBuffer				tb;
-	protected			SourceBuffer			sb;
+	protected			SourcePosition			sp;
 	protected	final	ArrayList<BlockNode>	blocks	= new ArrayList<>();
 	
 	protected AstNode() {
@@ -48,7 +49,7 @@ public abstract class AstNode {
 	
 	protected AstNode(TokenBuffer tb) {
         this.tb = tb;
-		this.sb = tb.current().getSB().clone();
+		this.sp = tb.current().getSP();
     }
 
 	protected AstNode parseCommand() {
@@ -64,7 +65,7 @@ public abstract class AstNode {
 			case GOTO:		return new GotoNode(tb);
 			case SWITCH:	return new SwitchNode(tb);
 			default:
-				throw new ParseError("Unexpected command token " + tb.current(), tb.getSB());
+				throw new ParseError("Unexpected command token " + tb.current(), sp);
 		}
 	}
 
@@ -81,7 +82,7 @@ public abstract class AstNode {
 				tb.consume(Delimiter.SEMICOLON);
 			}
 			else {
-				throw new ParseError("Expected ';' after statement", tb.getSB());
+				throw new ParseError("Expected ';' after statement", sp);
 			}
 			return expr;
 		}
@@ -102,7 +103,7 @@ public abstract class AstNode {
 			}
 			throw new ParseError("Unexpected operator: " + operator, tb.current().getLine(), tb.current().getColumn());
 		}*/
-		throw new ParseError("Unexpected statement token: " + tb.current(), tb.getSB());
+		throw new ParseError("Unexpected statement token: " + tb.current(), sp);
 	}
 
 	protected VarType checkPrimtiveType() {
@@ -143,11 +144,11 @@ public abstract class AstNode {
 				if(tb.match(TokenType.NUMBER)) {
 					depth++;
 					if (depth > 3) {
-						throw new ParseError("Maximum array nesting depth is 3", tb.getSB());
+						throw new ParseError("Maximum array nesting depth is 3", sp);
 					}
 					size = (Integer)tb.consume().getValue();
 					if (size <= 0) {
-						throw new ParseError("Array size must be positive", tb.getSB());
+						throw new ParseError("Array size must be positive", sp);
 					}
 					type = VarType.arrayOf(type, size);
 				}
@@ -172,7 +173,7 @@ public abstract class AstNode {
 			}
 			else {
 				// Доступ к полю (можно добавить FieldAccessNode)
-				throw new ParseError("Field access not implemented yet", tb.getSB());
+				throw new ParseError("Field access not implemented yet", tb.current().getSP());
 			}
 		}
 
@@ -211,7 +212,7 @@ public abstract class AstNode {
 		return blocks;
 	}
 	
-	public SourceBuffer getSB() {
-		return sb;
+	public SourcePosition getSP() {
+		return sp;
 	}
 }

@@ -9,9 +9,10 @@ import ru.vm5277.j8b.compiler.enums.TokenType;
 import java.math.BigInteger;
 import ru.vm5277.j8b.compiler.ParseError;
 import ru.vm5277.j8b.compiler.SourceBuffer;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 
 public class TNumber extends Token {
-	public TNumber(SourceBuffer sb) {
+	public TNumber(SourceBuffer sb, MessageContainer mc) {
 		super(sb);
 		type = TokenType.NUMBER;
 		
@@ -23,13 +24,18 @@ public class TNumber extends Token {
 				hex.append(sb.getChar());
 				sb.next();
 			}
-			if (0==hex.length()) throw new ParseError("Invalid hexadecimal number", sb);
-
-			try {
-				value = Integer.parseInt(hex.toString(), 0x10);
+			if (0==hex.length()) {
+				setError("Invalid hexadecimal number", mc);
+				value = 0;
 			}
-			catch (NumberFormatException e) {
-				throw new ParseError("Hexadecimal number too large", sb);
+			else {
+				try {
+					value = Integer.parseInt(hex.toString(), 0x10);
+				}
+				catch (NumberFormatException e) {
+					setError("Hexadecimal number too large", mc);
+					value = 0;
+				}
 			}
 		}
 		else if (sb.hasNext(1) && '0'==sb.getChar() && 'b'==(sb.getChar(1)|0x20)) {
@@ -40,12 +46,18 @@ public class TNumber extends Token {
 				bin.append(isBinaryTrue(sb.getChar()) ? '1' : '0');
 				sb.next();
 			}
-			if (0==bin.length()) throw new ParseError("Invalid binary number", sb);
-			try {
-				value = Integer.parseInt(bin.toString(), 0b10);
+			if (0==bin.length()) {
+				setError("Invalid binary number", mc);
+				value = 0;
 			}
-			catch (NumberFormatException e) {
-				throw new ParseError("Binary number too large", sb);
+			else {
+				try {
+					value = Integer.parseInt(bin.toString(), 0b10);
+				}
+				catch (NumberFormatException e) {
+					setError("Binary number too large", mc);
+					value = 0;
+				}
 			}
 		}
 		else if (sb.hasNext() && '0'==sb.getChar() && (sb.hasNext(1) && '.'!=sb.getChar(1))) {
@@ -64,7 +76,8 @@ public class TNumber extends Token {
 					value = Integer.parseInt(oct.toString(), 010);
 				}
 				catch (NumberFormatException e) {
-					throw new ParseError("Octal number too large", sb);
+					setError("Octal number too large", mc);
+					value = 0;
 				}
 			}
 		}
@@ -127,7 +140,7 @@ public class TNumber extends Token {
 				}
 			}
 			catch (NumberFormatException e) {
-				throw new ParseError("Invalid number format", sb);
+				setError("Invalid number format", mc);
 			}
 		}    
 	}

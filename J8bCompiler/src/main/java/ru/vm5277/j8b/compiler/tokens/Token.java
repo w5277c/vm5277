@@ -9,33 +9,36 @@ import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.Locale;
 import javax.xml.bind.DatatypeConverter;
+import ru.vm5277.j8b.compiler.Lexer;
 import ru.vm5277.j8b.compiler.enums.TokenType;
-import ru.vm5277.j8b.compiler.ParseError;
 import ru.vm5277.j8b.compiler.SourceBuffer;
+import ru.vm5277.j8b.compiler.SourcePosition;
 import ru.vm5277.j8b.compiler.enums.Keyword;
+import ru.vm5277.j8b.compiler.messages.ErrorMessage;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 
 public class Token {
 	private		final	static	DecimalFormat	df	= new DecimalFormat("0.####################", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
 	protected					TokenType		type;
 	protected					Object			value;
 	protected					SourceBuffer	sb;
-	private						ParseError		error;
+	protected					SourcePosition	sp;
+	private						ErrorMessage	error;
 	
 	public Token(SourceBuffer sb) {
 		this.sb = sb;
+		this.sp = sb.snapSP();
+	}
+	public Token(SourceBuffer sb, SourcePosition sp) {
+		this.sb = sb;
+		this.sp = sp;
 	}
 	
-	public Token(TokenType type, Object value, ParseError error) {
-		this.type = type;
-		this.value = value;
-		this.sb = (null == error ? null : error.getSP());
-		this.error = error;
-	}
-
 	public Token(SourceBuffer sb, TokenType type, Object value) {
+		this.sb = sb;
+		this.sp = sb.snapSP();
 		this.type = type;
 		this.value = value;
-		this.sb = sb;
 	}
 
 	public Object getValue() {
@@ -65,12 +68,29 @@ public class Token {
 		return type;
 	}
 	
-	public SourceBuffer getSB() {
-		return sb;
+	public SourcePosition getSP() {
+		return sp;
 	}
 	
-	public ParseError getError() {
+	public ErrorMessage getError() {
 		return error;
+	}
+
+
+	public void setErrorAndSkipToken(String text, MessageContainer mc) {
+		setError(text, mc);
+		skipToken(sb, mc);
+	}
+	public void setError(String text, MessageContainer mc) {
+		error = new ErrorMessage(text, sb);
+		mc.add(error);
+	}
+	public static void skipToken(SourceBuffer sb, MessageContainer mc) {
+		while(sb.hasNext() && ';'!=sb.getChar()) {
+			if(Lexer.skipWhiteSpaces(sb)) continue;
+			if(Lexer.skipComment(sb, mc)) continue;
+			sb.next();
+		}
 	}
 	
 	@Override

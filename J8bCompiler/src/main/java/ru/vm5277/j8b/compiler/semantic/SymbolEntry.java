@@ -6,17 +6,18 @@
 package ru.vm5277.j8b.compiler.semantic;
 
 import ru.vm5277.j8b.compiler.SourceBuffer;
+import ru.vm5277.j8b.compiler.SourcePosition;
 import ru.vm5277.j8b.compiler.enums.VarType;
 
 public class SymbolEntry {
 	final	VarType			type;
 	final	boolean			isMutable;
-	final	SourceBuffer	sb;
+	final	SourcePosition	sp;
 
-	SymbolEntry(VarType type, boolean isMutable, SourceBuffer sb) {
+	SymbolEntry(VarType type, boolean isMutable, SourcePosition sb) {
 		this.type = type;
 		this.isMutable = isMutable;
-		this.sb = sb;
+		this.sp = sb;
 	}
 
 	public VarType getType() {

@@ -10,6 +10,7 @@ import java.util.List;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.ParseError;
 import ru.vm5277.j8b.compiler.SourceBuffer;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 
 // Нотная запись для полифонии, пример m/8e5-e5-e5-c5-e5-/4g5-g4, т.е. e5 = Ми, c5 = До, g5 = Соль (без диезов-заглавная буква)
 public class TNote extends Token {
@@ -26,7 +27,7 @@ public class TNote extends Token {
 	//   [6]   - 1=пауза, 0=обычная длительность
 	//   [5:0] - значение длительности (0:/1, 1:/4, 2:/8, 3:/16)
 
-	public TNote(SourceBuffer sb) {
+	public TNote(SourceBuffer sb, MessageContainer mc) {
 		super(sb);
 		
 		List<Byte> byteBuffer = new ArrayList<>();
@@ -50,7 +51,10 @@ public class TNote extends Token {
 			if ('/'==ch) {
 				sb.next();
 				ch = sb.getChar();
-				if (!sb.hasNext() || !Character.isDigit(ch)) throw new ParseError("Invalid duration", sb);
+				if (!sb.hasNext() || !Character.isDigit(ch)) {
+					setErrorAndSkipToken("Invalid duration", mc);
+					return;
+				}
 				strValue.append(ch);
 				currentDuration = (byte) (Character.getNumericValue(ch) & 0x3F);
 				sb.next();
@@ -87,7 +91,8 @@ public class TNote extends Token {
 				sb.next();
 				continue;
 			}
-			throw new ParseError("Unexpected symbol: " + ch, sb);
+			setErrorAndSkipToken("Unexpected symbol: " + ch, mc);
+			return;
 		}
 
 		byte[] result = new byte[byteBuffer.size()];

@@ -8,7 +8,7 @@ package ru.vm5277.j8b.compiler.semantic;
 import java.util.HashMap;
 import java.util.Map;
 import ru.vm5277.j8b.compiler.SemanticError;
-import ru.vm5277.j8b.compiler.SourceBuffer;
+import ru.vm5277.j8b.compiler.SourcePosition;
 import ru.vm5277.j8b.compiler.enums.VarType;
 
 public class ClassInfo {
@@ -16,35 +16,35 @@ public class ClassInfo {
     private	final	Map<String, VarType>	fields	= new HashMap<>();
 
 	// Добавляем поле
-    public void addField(String name, VarType type, SourceBuffer sb) throws SemanticError {
+    public void addField(String name, VarType type, SourcePosition sp) throws SemanticError {
         if (fields.containsKey(name)) {
-            throw new SemanticError("Duplicate field: " + name, sb);
+            throw new SemanticError("Duplicate field: " + name, sp);
         }
         fields.put(name, type);
     }
 
     // Добавляем метод
-    public void addMethod(String name, MethodInfo method, SourceBuffer sb) throws SemanticError {
+    public void addMethod(String name, MethodInfo method, SourcePosition sp) throws SemanticError {
         if (methods.containsKey(name)) {
-            throw new SemanticError("Duplicate method: " + name, sb);
+            throw new SemanticError("Duplicate method: " + name, sp);
         }
         methods.put(name, method);
     }
 
 	// Получаем тип поля
-    public VarType getFieldType(String name, SourceBuffer sb) throws SemanticError {
+    public VarType getFieldType(String name, SourcePosition sp) throws SemanticError {
         VarType type = fields.get(name);
         if (type == null) {
-            throw new SemanticError("Field not found: " + name, sb);
+            throw new SemanticError("Field not found: " + name, sp);
         }
         return type;
     }
 
     // Получаем метод
-    public MethodInfo getMethod(String name, SourceBuffer sb) throws SemanticError {
+    public MethodInfo getMethod(String name, SourcePosition sp) throws SemanticError {
         MethodInfo method = methods.get(name);
         if (method == null) {
-            throw new SemanticError("Method not found: " + name, sb);
+            throw new SemanticError("Method not found: " + name, sp);
         }
         return method;
     }

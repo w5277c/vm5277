@@ -81,7 +81,8 @@ public enum Delimiter {
         }
         // Проверяем односимвольные
         String singleChar = sb.getSource().substring(sb.getPos(), sb.getPos()+1);
-        sb.next();
-		return fromSymbol(singleChar);
+		Delimiter result = fromSymbol(singleChar);
+		if(null != result) sb.next();
+		return result;
     }
 }

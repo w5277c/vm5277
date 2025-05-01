@@ -1,29 +1,27 @@
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------
 Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-22.04.2025	konstantin@5277.ru		Начало
+01.05.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.j8b.compiler;
+package ru.vm5277.j8b.compiler.nodes;
 
-public class ParseError extends RuntimeException {
-	private	final	SourcePosition	sp;
+import ru.vm5277.j8b.compiler.enums.Delimiter;
+import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
+import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
 
-	public ParseError(String message) {
-		super(message);
-		sp = null;
+public class FreeNode extends AstNode {
+	private final ExpressionNode target;
+
+	public FreeNode(TokenBuffer tb) {
+		super(tb);
+
+		tb.consume();
+		this.target = new ExpressionParser(tb).parse();
+		tb.consume(Delimiter.SEMICOLON);
 	}
 
-	public ParseError(String message, SourceBuffer sb) {
-		super(message + " at " + sb.toString());
-		this.sp = sb.snapSP();
-	}
-	
-	public ParseError(String message, SourcePosition sp) {
-		super(message + " at " + sp.toString());
-		this.sp = sp;
-	}
-
-	public SourcePosition getSP() {
-		return sp;
+	@Override
+	public String toString() {
+		return "free: " + target;
 	}
 }

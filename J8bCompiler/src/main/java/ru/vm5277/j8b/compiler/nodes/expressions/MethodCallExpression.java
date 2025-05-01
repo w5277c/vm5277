@@ -43,6 +43,6 @@ public class MethodCallExpression extends ExpressionNode {
 	
 	@Override
 	public VarType semanticAnalyze(SymbolTable symbolTable) {
-		throw new SemanticError("Not supported yet.", tb.getSB());
+		throw new SemanticError("Not supported yet.", sp);
 	}
 }

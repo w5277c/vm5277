@@ -42,6 +42,10 @@ public class BlockNode extends AstNode {
 				declarations.add(parseCommand());
 				continue;
 			}
+			if(tb.match(Keyword.FREE)) {
+				declarations.add(new FreeNode(tb));
+				continue;
+			}
 			
 			Set<Keyword> modifiers = collectModifiers(tb);
 

@@ -11,7 +11,6 @@ import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
-import ru.vm5277.j8b.compiler.enums.TokenType;
 
 public class WhileNode extends AstNode {
 	private	final	ExpressionNode	condition;

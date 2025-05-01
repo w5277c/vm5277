@@ -5,28 +5,17 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler;
 
-public class SourceBuffer implements Cloneable {
-	private	String	src		= null;
-	private	int		pos		= -1;
-	private	int		line	= 1;
-	private	int		column	= 1;
+public class SourceBuffer extends SourcePosition {
+	private	String			src		= null;
+	private	int				pos		= -1;
 
 	public SourceBuffer(String src) {
 		this.src = src;
 		this.pos = 0;
+		this.line = 1;
+		this.column = 1;
 	}
 
-	private SourceBuffer(int line, int column) {	//Для Error
-		this.line = line;
-		this.column = column;
-	}
-
-	public int getLine() {
-		return line;
-	}
-	public int getColumn() {
-		return column;
-	}
 	public int getPos() {
 		return pos;
 	}
@@ -35,11 +24,13 @@ public class SourceBuffer implements Cloneable {
 		pos++;
 		column++;
 	}
+
 	public void next(int len) {
 		pos+=len;
 		column+=len;
 	}
-	public void nextLine() {
+
+	public void incLine() {
 		line++;
 		column=1;
 	}
@@ -53,11 +44,6 @@ public class SourceBuffer implements Cloneable {
 	
 	public String getSource() {
 		return src;
-	}
-	
-	@Override
-	public SourceBuffer clone() {
-		return new SourceBuffer(line, column);
 	}
 	
 	public boolean hasNext() {
@@ -77,5 +63,10 @@ public class SourceBuffer implements Cloneable {
 	@Override
 	public String toString() {
 		return "[" + line + ":" + column + "]";
+	}
+	
+	// Фиксируем текущую позицию в отдельный SourcePosition 
+	public SourcePosition snapSP() {
+		return new SourcePosition(line, column);
 	}
 }

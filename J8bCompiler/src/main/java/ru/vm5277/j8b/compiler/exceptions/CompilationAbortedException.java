@@ -1,29 +1,12 @@
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------
 Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-22.04.2025	konstantin@5277.ru		Начало
+02.05.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.j8b.compiler;
+package ru.vm5277.j8b.compiler.exceptions;
 
-public class ParseError extends RuntimeException {
-	private	final	SourcePosition	sp;
-
-	public ParseError(String message) {
-		super(message);
-		sp = null;
-	}
-
-	public ParseError(String message, SourceBuffer sb) {
-		super(message + " at " + sb.toString());
-		this.sp = sb.snapSP();
-	}
-	
-	public ParseError(String message, SourcePosition sp) {
-		super(message + " at " + sp.toString());
-		this.sp = sp;
-	}
-
-	public SourcePosition getSP() {
-		return sp;
+public class CompilationAbortedException extends RuntimeException {
+	public CompilationAbortedException(String text) {
+		super(text);
 	}
 }

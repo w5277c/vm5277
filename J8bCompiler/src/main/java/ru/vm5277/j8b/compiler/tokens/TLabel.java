@@ -11,6 +11,7 @@ import ru.vm5277.j8b.compiler.enums.TokenType;
 public class TLabel extends Token {
 	public TLabel(String keyword, SourceBuffer sb) {
 		super(sb);
+		
 		type = TokenType.LABEL;
 		sb.next();
 		value = keyword;

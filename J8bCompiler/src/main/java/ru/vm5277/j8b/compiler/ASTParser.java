@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Set;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.nodes.AstNode;
 import ru.vm5277.j8b.compiler.nodes.ClassNode;
 import ru.vm5277.j8b.compiler.nodes.ImportNode;
@@ -18,13 +19,15 @@ import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler.tokens.Token;
 
 public class ASTParser {
-	private final	List<Token>		tokens;
-	private			List<AstNode>	imports		= new ArrayList<>();
-	private			ClassNode		classNode;
+	private	final	MessageContainer	mc;
+	private final	List<Token>			tokens;
+	private			List<AstNode>		imports		= new ArrayList<>();
+	private			ClassNode			classNode;
 
-	public ASTParser(List<Token> tokens) throws IOException {
+	public ASTParser(List<Token> tokens, MessageContainer mc) throws IOException {
+		this.mc = mc;
 		this.tokens = tokens;
-
+		
 		if(tokens.isEmpty()) return;
 		
 		TokenBuffer tb = new TokenBuffer(tokens.iterator()); // Создаём корень AST

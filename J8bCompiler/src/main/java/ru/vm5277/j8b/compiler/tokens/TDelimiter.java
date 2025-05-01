@@ -6,20 +6,22 @@
 package ru.vm5277.j8b.compiler.tokens;
 
 import ru.vm5277.j8b.compiler.SourceBuffer;
+import ru.vm5277.j8b.compiler.SourcePosition;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 
 public class TDelimiter extends Token {
-	public TDelimiter(SourceBuffer sb, Delimiter value) {
-		super(sb);
+	public TDelimiter(SourceBuffer sb, SourcePosition sp, Delimiter value) {
+		super(sb, sp);
 		this.type = TokenType.DELIMITER;
 		this.value = value;
 	}
 
 	public static TDelimiter parse(SourceBuffer sb) {
+		SourcePosition sp = sb.snapSP();
 		Delimiter delimiter = Delimiter.matchLongestDelimiter(sb);
 		if (null!=delimiter) {
-			return new TDelimiter(sb, delimiter);
+			return new TDelimiter(sb, sp, delimiter);
 		}
 	    return null;
 	}

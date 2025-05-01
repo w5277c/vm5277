@@ -8,38 +8,40 @@ public class Main {
     // Главная функция
     void main() {
         // Вызов функции
-        base.getSystem().init();
-        
+        getSystem().init();
+
+        MathUtils.square(3);
+
         // Цикл while
         while (counter < 10) {
             // Условный оператор
             if (counter % 2 == 0) {
                 //print("Even: " + counter);
-            } else {
+            } el1se {
                 //print("Odd: " + counter);
             }
             counter = counter + 1;
         }
-        
+
         // Возврат из функции
         return;
     }
-    
+
     // Метод класса
     void initSystem() {
         // Вызов аппаратной функции
         timer.set(1000);
-        
+
         // Локальная переменная
         int localVar = 42+3;
-        
+
         // Блок кода
         {
             int innerVar = localVar * 2;
             //print(innerVar);
         }
     }
-    
+
     // Функция с параметрами
     int add(int a, int b) {
         int c =1;

@@ -9,9 +9,11 @@ import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.j8b.compiler.ParseError;
+import ru.vm5277.j8b.compiler.SourcePosition;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler.tokens.Token;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
+import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.Operator;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.nodes.AstNode;
@@ -106,7 +108,7 @@ public class ExpressionParser {
 					case GT:	return new LiteralExpression(tb, 0d < delta);
 					case LTE:	return new LiteralExpression(tb, 0d <= delta);
 					case GTE:	return new LiteralExpression(tb, 0d >= delta);
-					default: throw new ParseError("Invalid comparision operator: " + op, tb.getSB());
+					default: throw new ParseError("Invalid comparision operator: " + op);
 				}
 			}
 		}
@@ -474,6 +476,16 @@ public class ExpressionParser {
 	private ExpressionNode parsePrimary() {
 		Token token = tb.current();
         
+		if(tb.match(Keyword.NEW)) {
+			tb.consume(); // Пропускаем 'new'
+
+			// Парсим имя класса
+			String className = tb.consume(TokenType.ID).getValue().toString();
+
+			// Парсим аргументы конструктора
+			List<ExpressionNode> args = AstNode.parseArguments(tb);
+			return new NewExpression(tb, className, args);
+		}
 		if(tb.match(TokenType.NUMBER) || tb.match(TokenType.STRING) || tb.match(TokenType.CHAR) || tb.match(TokenType.LITERAL)) {
 			tb.consume();
 			return new LiteralExpression(tb, token.getValue());
@@ -492,7 +504,7 @@ public class ExpressionParser {
 			return new VariableExpression(tb, token.getValue().toString());
 		}
 		else {
-			throw new ParseError("Unexpected token in expression: " + token, tb.getSB());
+			throw new ParseError("Unexpected token in expression: " + token, tb.current().getSP());
         }
     }
 }
