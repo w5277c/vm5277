@@ -5,7 +5,6 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.tokens;
 
-import ru.vm5277.j8b.compiler.ParseError;
 import ru.vm5277.j8b.compiler.SourceBuffer;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
@@ -16,13 +15,18 @@ public class TChar extends Token {
 		super(sb);
 		type = TokenType.CHAR;
 
-		if (!sb.hasNext()) throw new ParseError("Unterminated ASCII char literal", sb);
+		if (!sb.hasNext()) {
+			setError("Unterminated ASCII char literal", mc);
+			value = '?';
+			return;
+		}
 		sb.next();
 		char ch = sb.getChar(); // Пропускаем открывающую кавычку
 		// Обработка экранированных символов (\n, \t, \', \\)
 		if ('\\'==ch) {
 			if (!sb.hasNext()) {
 				setError("Invalid escape sequence", mc);
+				value = '?';
 				return;
 			}
 			sb.next();
@@ -34,7 +38,8 @@ public class TChar extends Token {
 				case '\\':	ch = '\\';	break;
 				case '0':	ch = '\0';	break;
 				default:
-					throw new ParseError("Unknown escape: \\" + ch, sb);
+					setError("Unknown escape: \\" + ch, mc);
+					ch = '?';
 			}
 	    }
     
@@ -42,7 +47,6 @@ public class TChar extends Token {
 		sb.next();
 		if (!sb.hasNext() || '\'' != sb.getChar()) {
 			setError("Char literal must be 1 ASCII character", mc);
-			
 		}
 		else {
 			sb.next();

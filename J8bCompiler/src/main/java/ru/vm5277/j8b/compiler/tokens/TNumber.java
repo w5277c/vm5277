@@ -7,7 +7,6 @@ package ru.vm5277.j8b.compiler.tokens;
 
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import java.math.BigInteger;
-import ru.vm5277.j8b.compiler.ParseError;
 import ru.vm5277.j8b.compiler.SourceBuffer;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
 

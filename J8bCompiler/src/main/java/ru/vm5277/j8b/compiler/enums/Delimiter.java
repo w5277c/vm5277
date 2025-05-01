@@ -43,6 +43,11 @@ public enum Delimiter {
         return description;
     }
 
+	@Override
+	public String toString() {
+		return symbol;
+	}
+	
     public static Delimiter fromSymbol(String symbol) {
         // Сначала проверяем многозначные разделители
         for (Delimiter delim : values()) {

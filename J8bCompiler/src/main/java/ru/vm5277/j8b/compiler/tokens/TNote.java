@@ -8,7 +8,6 @@ package ru.vm5277.j8b.compiler.tokens;
 import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.j8b.compiler.enums.TokenType;
-import ru.vm5277.j8b.compiler.ParseError;
 import ru.vm5277.j8b.compiler.SourceBuffer;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
 
@@ -68,7 +67,10 @@ public class TNote extends Token {
 				char noteLower = Character.toLowerCase(ch);
 				int noteValue = "cdefgab".indexOf(noteLower);
 
-				if (noteValue == -1) throw new ParseError("Invalid note: " + ch, sb);
+				if (noteValue == -1) {
+					setErrorAndSkipToken("Invalid note: " + ch, mc);
+					return;
+				}
 				if(isSharp) {
 					if (noteLower == 'e') noteLower = 'f';
 					if (noteLower == 'b') noteLower = 'c';

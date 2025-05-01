@@ -17,7 +17,7 @@ public class Main {
             // Условный оператор
             if (counter % 2 == 0) {
                 //print("Even: " + counter);
-            } el1se {
+            } else {
                 //print("Odd: " + counter);
             }
             counter = counter + 1;
