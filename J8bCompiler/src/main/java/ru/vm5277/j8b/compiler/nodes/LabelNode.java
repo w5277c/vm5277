@@ -11,7 +11,7 @@ public class LabelNode extends AstNode {
 	public LabelNode(TokenBuffer tb) {
 		super(tb);
 
-		this.name = tb.consume().getStringValue();
+		this.name = consumeToken(tb).getStringValue(); // Гарантирован вызывающим
 	}
 
 	public String getName() {

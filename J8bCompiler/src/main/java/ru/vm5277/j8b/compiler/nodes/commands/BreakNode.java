@@ -5,11 +5,10 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes.commands;
 
-import ru.vm5277.j8b.compiler.ParseError;
+import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.nodes.*;
-import ru.vm5277.j8b.compiler.tokens.Token;
 
 public class BreakNode extends AstNode {
     private	String	label;
@@ -17,18 +16,17 @@ public class BreakNode extends AstNode {
 	public BreakNode(TokenBuffer tb) {
         super(tb);
         
-        tb.consume();
+        consumeToken(tb);
         
 		if(tb.match(TokenType.ID)) {
-			Token nameToken = tb.consume(TokenType.ID);
-			label = nameToken.toString();
+			try {label = consumeToken(tb, TokenType.ID).toString();}catch(ParseException e) {markFirstError(e);};
 		}
 		
-		tb.consume(Delimiter.SEMICOLON);
+		try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
         
 		AstNode node = tb.getLoopStack().peek();
 		if (null == node || !(node instanceof ForNode || node instanceof WhileNode || node instanceof DoWhileNode)) {
-            throw new ParseError("'break' can only be used inside loop statements", sp);
+			markFirstError(tb.error("'break' can only be used inside loop statements"));
         }
     }
 
@@ -38,6 +36,6 @@ public class BreakNode extends AstNode {
 	
 	@Override
     public String toString() {
-        return getClass().getSimpleName();
+        return "break" + (null!=label ? " " + label : "");
     }
 }

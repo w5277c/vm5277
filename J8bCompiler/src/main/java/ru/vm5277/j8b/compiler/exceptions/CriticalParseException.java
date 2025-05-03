@@ -3,27 +3,19 @@
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 22.04.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.j8b.compiler;
+package ru.vm5277.j8b.compiler.exceptions;
 
-public class ParseError extends RuntimeException {
-	private	final	SourcePosition	sp;
+import ru.vm5277.j8b.compiler.messages.ErrorMessage;
 
-	public ParseError(String message) {
-		super(message);
-		sp = null;
+public class CriticalParseException extends Exception {
+	private	final	ErrorMessage	message;
+
+	public CriticalParseException(ParseException exception) {
+		super(exception.getErrorMessage().getText() + " at " + exception.getErrorMessage().getSP());
+		this.message = exception.getErrorMessage();
 	}
 
-	public ParseError(String message, SourceBuffer sb) {
-		super(message + " at " + sb.toString());
-		this.sp = sb.snapSP();
-	}
-	
-	public ParseError(String message, SourcePosition sp) {
-		super(message + " at " + sp.toString());
-		this.sp = sp;
-	}
-
-	public SourcePosition getSP() {
-		return sp;
+	public ErrorMessage getErrorMessage() {
+		return message;
 	}
 }

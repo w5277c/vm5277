@@ -6,18 +6,18 @@
 package ru.vm5277.j8b.compiler.nodes;
 
 import ru.vm5277.j8b.compiler.enums.Delimiter;
+import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
 
 public class FreeNode extends AstNode {
-	private final ExpressionNode target;
+	private ExpressionNode target;
 
 	public FreeNode(TokenBuffer tb) {
 		super(tb);
 
-		tb.consume();
-		this.target = new ExpressionParser(tb).parse();
-		tb.consume(Delimiter.SEMICOLON);
+		consumeToken(tb); // Наличие гарантировано вызывающим
+		try {this.target = new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
+		try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
 	}
 
 	@Override

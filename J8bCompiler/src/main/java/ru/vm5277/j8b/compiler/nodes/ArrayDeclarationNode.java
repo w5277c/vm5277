@@ -10,15 +10,15 @@ import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.Operator;
 import ru.vm5277.j8b.compiler.enums.VarType;
+import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
 
 public class ArrayDeclarationNode extends AstNode {
     private	final	Set<Keyword>	modifiers;
 	private	final	VarType			elementType;
     private	final	String			name;
-	private	final	ExpressionNode	size;
-	private	final	ExpressionNode	initializer;
+	private			ExpressionNode	size;
+	private			ExpressionNode	initializer;
 
 	public ArrayDeclarationNode(TokenBuffer tb, Set<Keyword> modifiers, VarType type, String name) {
 		super(tb);
@@ -27,27 +27,22 @@ public class ArrayDeclarationNode extends AstNode {
 		this.elementType = type;
 		this.name = name;
 		
-		tb.consume(); // Пропускаем '['
+		consumeToken(tb); // Потребляем '['
         
         // Размер массива
-        size = new ExpressionParser(tb).parse();
+        try{size = new ExpressionNode(tb).parse();}  catch(ParseException e) {markFirstError(e);}
         
-        tb.consume(Delimiter.RIGHT_BRACKET); // Пропускаем ']'
+        try {consumeToken(tb, Delimiter.RIGHT_BRACKET);} catch(ParseException e) {markFirstError(e);} // Потребляем ']'
 
         // Инициализация (опционально)
         if (tb.match(Operator.ASSIGN)) {
-            tb.consume();
-            initializer = new ExpressionParser(tb).parse();
+            consumeToken(tb);
+            try {initializer = new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
         }
 		else {
 			initializer = null;
 		}
 		
-		tb.consume(Delimiter.SEMICOLON);
-	}
-	
-	@Override
-	public String toString() {
-		return getClass().getSimpleName();
+		try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
 	}
 }

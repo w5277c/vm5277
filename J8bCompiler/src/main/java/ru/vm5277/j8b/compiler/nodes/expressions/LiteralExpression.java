@@ -23,7 +23,7 @@ public class LiteralExpression extends ExpressionNode {
 	public VarType semanticAnalyze(SymbolTable symbolTable) {
 		if (value instanceof Integer) return VarType.INT;
 		if (value instanceof Boolean) return VarType.BOOL;
-		if (value instanceof String) return VarType.STRING;
+		if (value instanceof String) return VarType.CSTR;
 		return VarType.UNKNOWN;
 	}
 	
@@ -38,6 +38,10 @@ public class LiteralExpression extends ExpressionNode {
 	
 	public boolean isInteger() {
 		return value instanceof Integer || value instanceof Long || value instanceof BigInteger;
+	}
+	
+	public boolean isCstr() {
+		return value instanceof String;
 	}
 	
 	public long toLong() {

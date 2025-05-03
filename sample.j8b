@@ -16,9 +16,9 @@ public class Main {
         while (counter < 10) {
             // Условный оператор
             if (counter % 2 == 0) {
-                //print("Even: " + counter);
+                print("Even: " + counter);
             } else {
-                //print("Odd: " + counter);
+                print("Odd: " + counter);
             }
             counter = counter + 1;
         }
@@ -38,7 +38,7 @@ public class Main {
         // Блок кода
         {
             int innerVar = localVar * 2;
-            //print(innerVar);
+            print(innerVar);
         }
     }
 
@@ -48,11 +48,29 @@ public class Main {
         return a + b + c;
     }
 
+    // Блок кода
+    {
+        cstr test = "test string";
+        printStr(test);
+    }
+
 
     // Второй класс для проверки
     class MathUtils {
         static int square(int x) {
             return x * x;
         }
+    }
+
+    void print(cstr str) {
+        //TODO
+    }
+
+    void print(byte[] data) {
+        //TODO
+    }
+
+    void print(int integer) {
+        //TODO
     }
 }

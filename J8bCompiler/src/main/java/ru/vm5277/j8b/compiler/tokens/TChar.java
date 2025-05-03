@@ -21,7 +21,7 @@ public class TChar extends Token {
 			return;
 		}
 		sb.next();
-		char ch = sb.getChar(); // Пропускаем открывающую кавычку
+		char ch = sb.getChar(); // Пропускаем '''
 		// Обработка экранированных символов (\n, \t, \', \\)
 		if ('\\'==ch) {
 			if (!sb.hasNext()) {
@@ -43,7 +43,7 @@ public class TChar extends Token {
 			}
 	    }
     
-		// Пропускаем символ и проверяем закрывающую кавычку '
+		// Пропускаем символ и проверяем '''
 		sb.next();
 		if (!sb.hasNext() || '\'' != sb.getChar()) {
 			setError("Char literal must be 1 ASCII character", mc);

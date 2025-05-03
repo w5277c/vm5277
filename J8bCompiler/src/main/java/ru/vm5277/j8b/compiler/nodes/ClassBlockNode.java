@@ -5,27 +5,24 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
+import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.VarType;
 
 public class ClassBlockNode extends BlockNode {
-	private	List<AstNode>		declarations	= new ArrayList<>();
-	
-	public ClassBlockNode(TokenBuffer tb, String className) {
+	public ClassBlockNode(TokenBuffer tb, String className) throws ParseException {
 		this.tb = tb;
         
-		tb.consume(Delimiter.LEFT_BRACE);
+		consumeToken(tb, Delimiter.LEFT_BRACE); // в случае ошибки, останавливаем парсинг файла
 
 		while (!tb.match(TokenType.EOF) && !tb.match(Delimiter.RIGHT_BRACE)) {		
 			Set<Keyword> modifiers = collectModifiers(tb);
 
 			// Обработка классов с модификаторами
-			if (tb.match(TokenType.OOP) && Keyword.CLASS == tb.current().getValue()) {
+			if (tb.match(TokenType.OOP, Keyword.CLASS)) {
 				declarations.add(new ClassNode(tb, modifiers, null));
 				continue;
 			}
@@ -45,7 +42,7 @@ public class ClassBlockNode extends BlockNode {
 					isClassName = false;
 					type = VarType.fromClassName(className);
 				}
-				name = tb.consume().getStringValue();
+				name = consumeToken(tb).getStringValue();
 			}
 
 			if(tb.match(Delimiter.LEFT_PAREN)) { //'(' Это метод
@@ -58,25 +55,28 @@ public class ClassBlockNode extends BlockNode {
 				continue;
 			}
 
-			if (tb.match(Delimiter.LEFT_BRACKET)) { // Это объявление массива
-				declarations.add(new ArrayDeclarationNode(tb, modifiers, type, name));
-			}
-			else { // Поле
-				declarations.add(new FieldNode(tb, modifiers, type, name));
+			if(null != type) {
+				if (tb.match(Delimiter.LEFT_BRACKET)) { // Это объявление массива
+					declarations.add(new ArrayDeclarationNode(tb, modifiers, type, name));
+				}
+				else { // Поле
+					declarations.add(new FieldNode(tb, modifiers, type, name));
+				}
 			}
 
-			// todo обработать вложенных блоков, в том числе и static
+			if(tb.match(Delimiter.LEFT_BRACE)) {
+				tb.getLoopStack().add(this);
+				try {
+					BlockNode blockNode = new BlockNode(tb);
+					declarations.add(blockNode);
+					blocks.add(blockNode);
+				}
+				catch(ParseException e) {}
+				tb.getLoopStack().remove(this);
+			}
 		}
 		
-		tb.consume(Delimiter.RIGHT_BRACE);
+		//Попытка потребить '}'
+		try {consumeToken(tb, Delimiter.RIGHT_BRACE);}catch(ParseException e) {markFirstError(e);}
     }
-	
-	public List<AstNode> getDeclarations() {
-		return declarations;
-	}
-	
-	@Override
-	public String toString() {
-		return getClass().getSimpleName();
-	}
 }

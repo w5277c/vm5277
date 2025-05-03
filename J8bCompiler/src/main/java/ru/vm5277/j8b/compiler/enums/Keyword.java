@@ -9,7 +9,7 @@ public enum Keyword {
 	// Литералы
 	TRUE, FALSE, NULL,
 	// Типы примитив
-	VOID, BOOL, BYTE, SHORT, INT, FIXED,	
+	VOID, BOOL, BYTE, SHORT, INT, FIXED, CSTR,
 	// Команды
 	IF, DO, WHILE, FOR, RETURN, CONTINUE, BREAK, GOTO, SWITCH, FREE,
 	// Модификаторы
@@ -40,6 +40,7 @@ public enum Keyword {
 			case SHORT:
 			case INT:
 			case FIXED:
+			case CSTR:
 				return TokenType.TYPE;
 			case IF:
 			case DO:

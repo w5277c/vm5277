@@ -7,6 +7,7 @@ package ru.vm5277.j8b.compiler.nodes.commands;
 
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.nodes.*;
 
 public class GotoNode extends AstNode {
@@ -15,10 +16,9 @@ public class GotoNode extends AstNode {
 	public GotoNode(TokenBuffer tb) {
         super(tb);
         
-        tb.consume();
-        
-		label = tb.consume(TokenType.ID).toString();
-		tb.consume(Delimiter.SEMICOLON);
+        consumeToken(tb);
+		try {label = consumeToken(tb, TokenType.ID).toString();} catch(ParseException e) {markFirstError(e);}
+		try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
     }
 
 	public String getLabel() {

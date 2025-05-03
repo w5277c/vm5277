@@ -5,19 +5,19 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes;
 
-import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.VarType;
+import ru.vm5277.j8b.compiler.exceptions.ParseException;
 
 public class ParameterNode extends AstNode {
 	private	final	VarType	type;
     private	final	String	name;
 	
-	public ParameterNode(TokenBuffer tb) {
+	public ParameterNode(TokenBuffer tb) throws ParseException {
 		super(tb);
 		
-        this.type = VarType.fromKeyword((Keyword)tb.consume(TokenType.TYPE).getValue());
-        this.name = (String)tb.consume(TokenType.ID).getValue();
+		this.type = checkPrimtiveType();
+		this.name = (String)consumeToken(tb, TokenType.ID).getValue();
 	}
 	
 	public VarType getType() {

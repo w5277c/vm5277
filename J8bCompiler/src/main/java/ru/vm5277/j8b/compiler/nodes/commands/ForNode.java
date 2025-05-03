@@ -7,64 +7,69 @@ package ru.vm5277.j8b.compiler.nodes.commands;
 
 import ru.vm5277.j8b.compiler.nodes.*;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.VarType;
+import ru.vm5277.j8b.compiler.exceptions.ParseException;
 
 public class ForNode extends AstNode {
-    private final AstNode initialization;
-    private final ExpressionNode condition;
-    private final ExpressionNode iteration;
+    private AstNode initialization;
+    private ExpressionNode condition;
+    private ExpressionNode iteration;
     
     public ForNode(TokenBuffer tb) {
         super(tb);
         
-        tb.consume(); // Пропускаем "for"
-        tb.consume(Delimiter.LEFT_PAREN);
+        consumeToken(tb); // Потребляем "for"
+        try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(ParseException e) {markFirstError(e);}
         
         // Инициализация
         if(!tb.match(Delimiter.SEMICOLON)) {
-			VarType type = checkPrimtiveType();
-			if(null == type) type = checkClassType();
-			if(null != type) {
-				String name = tb.consume(TokenType.ID).getStringValue();
-				this.initialization = new FieldNode(tb, null, type, name);
+			try {
+				VarType type = checkPrimtiveType();
+				if(null == type) type = checkClassType();
+				if(null != type) {
+					String name = null;
+					try {name = consumeToken(tb, TokenType.ID).getStringValue();} catch(ParseException e) {markFirstError(e);}
+					this.initialization = new FieldNode(tb, null, type, name);
+				}
+				else {
+					this.initialization = new ExpressionNode(tb).parse();
+				}
 			}
-			else {
-				this.initialization = new ExpressionParser(tb).parse();
+			catch(ParseException e) {
+				markFirstError(e);
 			}
 		}
 		else {
 			this.initialization = null;
-			tb.consume(Delimiter.SEMICOLON);
+			try {consumeToken(tb, Delimiter.SEMICOLON);} catch(ParseException e) {markFirstError(e);}
 		}
         
         // Условие
-        this.condition = tb.match(Delimiter.SEMICOLON) ? null : new ExpressionParser(tb).parse();
-        tb.consume(Delimiter.SEMICOLON);
+        try {this.condition = tb.match(Delimiter.SEMICOLON) ? null : new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
+        try {consumeToken(tb, Delimiter.SEMICOLON);} catch(ParseException e) {markFirstError(e);}
         
         // Итерация
-        this.iteration = tb.match(Delimiter.RIGHT_PAREN) ? null : new ExpressionParser(tb).parse();
-        tb.consume(Delimiter.RIGHT_PAREN);
+        try {this.iteration = tb.match(Delimiter.RIGHT_PAREN) ? null : new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
+        try {consumeToken(tb, Delimiter.SEMICOLON);} catch(ParseException e) {markFirstError(e);}
         
+		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(ParseException e) {markFirstError(e);}
+		
         // Основной блок
-		if(tb.match(Delimiter.LEFT_BRACE)) {
-			try {
-				tb.getLoopStack().add(this);
-				blocks.add(new BlockNode(tb));
-			}
-			finally {
-				tb.getLoopStack().remove(this);
-			}
-		}
-		else blocks.add(new BlockNode(tb, parseStatement()));
+		tb.getLoopStack().add(this);
+		try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));}
+		catch(ParseException e) {markFirstError(e);}
+		tb.getLoopStack().remove(this);
        
         // Блок else (если есть)
         if (tb.match(Keyword.ELSE)) {
-			tb.consume();
-            blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));
+			consumeToken(tb);
+			tb.getLoopStack().add(this);
+			try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));}
+			catch(ParseException e) {markFirstError(e);}
+			tb.getLoopStack().remove(this);
         }
     }
     
@@ -82,7 +87,7 @@ public class ForNode extends AstNode {
     }
     
     public BlockNode getBody() {
-        return blocks.get(0);
+        return blocks.isEmpty() ? null : blocks.get(0);
     }
     
     public BlockNode getElseBlock() {

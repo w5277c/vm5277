@@ -7,12 +7,11 @@ package ru.vm5277.j8b.compiler.nodes.commands;
 
 import ru.vm5277.j8b.compiler.nodes.*;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import java.util.ArrayList;
 import java.util.List;
-import ru.vm5277.j8b.compiler.ParseError;
+import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.tokens.TNumber;
 import ru.vm5277.j8b.compiler.tokens.Token;
 
@@ -41,64 +40,71 @@ public class SwitchNode extends AstNode {
 		}
 	}
 
-	private	final	ExpressionNode	expression;
+	private	ExpressionNode	expression;
 	private	final	List<Case>		cases			= new ArrayList<>();
 	private			BlockNode		defaultBlock	= null;
 
 	public SwitchNode(TokenBuffer tb) {
 		super(tb);
 
-		tb.consume(); // Пропускаем "switch"
-		tb.consume(Delimiter.LEFT_PAREN);
-
+		consumeToken(tb); // Потребляем "switch"
 		// Парсим выражение switch
-		this.expression = new ExpressionParser(tb).parse();
-		tb.consume(Delimiter.RIGHT_PAREN);
-		tb.consume(Delimiter.LEFT_BRACE);
-
+		try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(ParseException e) {markFirstError(e);}
+		try {this.expression = new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
+		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(ParseException e) {markFirstError(e);}
+		
+		try {consumeToken(tb, Delimiter.LEFT_BRACE);} catch(ParseException e) {markFirstError(e);}
 		// Парсим case-блоки
 		while (!tb.match(Delimiter.RIGHT_BRACE)) {
 			if (tb.match(Keyword.CASE)) {
 				parseCase(tb);
 			}
 			else if (tb.match(Keyword.DEFAULT)) {
-				tb.consume(); // Пропускаем "default"
-				tb.consume(Delimiter.COLON);
-				defaultBlock = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement());
+				consumeToken(tb); // Потребляем "default"
+				try {consumeToken(tb, Delimiter.COLON);} catch(ParseException e) {markFirstError(e);}
+				tb.getLoopStack().add(this);
+				try {defaultBlock = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement());}
+				catch(ParseException e) {markFirstError(e);}
+				tb.getLoopStack().remove(this);
 			}
 			else {
-				throw new ParseError("Expected 'case' or 'default' in switch statement", sp);
+				markFirstError(tb.error("Expected 'case' or 'default' in switch statement"));
 			}
 		}
-		tb.consume(Delimiter.RIGHT_BRACE);
+		try {consumeToken(tb, Delimiter.RIGHT_BRACE);}catch(ParseException e) {markFirstError(e);}
 	}
 
 	private void parseCase(TokenBuffer tb) {
-		tb.consume(); // Пропускаем "case"
+		consumeToken(tb); // Потребляем "case"
 
 		// Парсим значение или диапазон
-		long from = parseNumber(tb);
+		long from = 0;
 		long to = -1;
 
+		try {from = parseNumber(tb);} catch(ParseException e) {markFirstError(e);}
 		if (tb.match(Delimiter.RANGE)) {
-			tb.consume(); // Пропускаем ".."
-			to = parseNumber(tb);
+			consumeToken(tb); // Потребляем ".."
+			try{to = parseNumber(tb);}catch(ParseException e) {to=0;markFirstError(e);}
 		}
 
-		tb.consume(Delimiter.COLON);
-
-		cases.add(new Case(from, to, tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement())));
+		try {consumeToken(tb, Delimiter.COLON);} catch(ParseException e) {markFirstError(e);}
+		BlockNode blockNode = null;
+		tb.getLoopStack().add(this);
+		try {blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement());}
+		catch(ParseException e) {markFirstError(e);}
+		tb.getLoopStack().remove(this);
+		cases.add(new Case(from, to, blockNode));
 	}
 
-	private long parseNumber(TokenBuffer tb) {
-		Token token = tb.consume();
+	private long parseNumber(TokenBuffer tb) throws ParseException {
+		Token token = consumeToken(tb);
 		if(token instanceof TNumber) {
 			Number number = (Number)token.getValue();
 			if(number instanceof Integer || number instanceof Long) {
 				return number.longValue();
 			}
 		}
-		throw new ParseError("Expected numeric value(or range) for 'case' in switch statement", sp);
+		throw tb.error("Expected numeric value(or range) for 'case' in switch statement");
 	}
 
 	public ExpressionNode getExpression() {

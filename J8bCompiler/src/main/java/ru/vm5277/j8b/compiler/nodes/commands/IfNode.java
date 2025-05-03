@@ -7,37 +7,44 @@ package ru.vm5277.j8b.compiler.nodes.commands;
 
 import ru.vm5277.j8b.compiler.nodes.*;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.exceptions.ParseException;
 
 public class IfNode extends AstNode {
-    private	final	ExpressionNode	condition;
+    private	ExpressionNode	condition;
 	
 	public IfNode(TokenBuffer tb) {
 		super(tb);
 		
-        tb.consume(); // Пропускаем "if"
-        tb.consume(Delimiter.LEFT_PAREN);
-        
+        consumeToken(tb); // Потребляем "if"
 		// Условие
-		this.condition = new ExpressionParser(tb).parse();
-        tb.consume(Delimiter.RIGHT_PAREN);
+		try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(ParseException e){markFirstError(e);}
+		try {this.condition = new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
+		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(ParseException e){markFirstError(e);}
 
 		// Then блок
-		blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));
+		tb.getLoopStack().add(this);
+		try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));}
+		catch(ParseException e) {markFirstError(e);}
+		tb.getLoopStack().remove(this);
 
 		// Else блок
         if (tb.match(Keyword.ELSE)) {
-			tb.consume();
+			consumeToken(tb);
         
 			if (tb.match(TokenType.COMMAND, Keyword.IF)) {
 				// Обработка else if
+				tb.getLoopStack().add(this);
 				blocks.add(new BlockNode(tb, new IfNode(tb)));
+				tb.getLoopStack().remove(this);
 			}
 			else {
-				blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));
+				tb.getLoopStack().add(this);
+				try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));}
+				catch(ParseException e) {markFirstError(e);}
+				tb.getLoopStack().remove(this);
 			}
 		}
 	}
@@ -54,4 +61,18 @@ public class IfNode extends AstNode {
     public BlockNode getElseBlock() {
         return (0x02 == blocks.size() ? blocks.get(1) : null);
     }
+	
+	@Override
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		sb.append("if (").append(condition.toString()).append(") ");
+		sb.append(getThenBlock().toString());
+
+		if (getElseBlock() != null) {
+			sb.append(" else ");
+			sb.append(getElseBlock().toString());
+		}
+
+		return sb.toString();
+	}
 }

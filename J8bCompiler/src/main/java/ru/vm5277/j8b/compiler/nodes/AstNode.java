@@ -9,14 +9,12 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import ru.vm5277.j8b.compiler.ParseError;
-import ru.vm5277.j8b.compiler.SourceBuffer;
+import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.SourcePosition;
 import ru.vm5277.j8b.compiler.nodes.commands.IfNode;
 import ru.vm5277.j8b.compiler.nodes.commands.ReturnNode;
 import ru.vm5277.j8b.compiler.nodes.commands.WhileNode;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
 import ru.vm5277.j8b.compiler.nodes.expressions.MethodCallExpression;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
@@ -32,16 +30,19 @@ import static ru.vm5277.j8b.compiler.enums.Keyword.WHILE;
 import ru.vm5277.j8b.compiler.enums.Operator;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.VarType;
+import ru.vm5277.j8b.compiler.messages.ErrorMessage;
 import ru.vm5277.j8b.compiler.nodes.commands.BreakNode;
 import ru.vm5277.j8b.compiler.nodes.commands.ContinueNode;
 import ru.vm5277.j8b.compiler.nodes.commands.DoWhileNode;
 import ru.vm5277.j8b.compiler.nodes.commands.ForNode;
 import ru.vm5277.j8b.compiler.nodes.commands.GotoNode;
 import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode;
+import ru.vm5277.j8b.compiler.tokens.Token;
 
 public abstract class AstNode {
 	protected			TokenBuffer				tb;
 	protected			SourcePosition			sp;
+	private				ErrorMessage			error;
 	protected	final	ArrayList<BlockNode>	blocks	= new ArrayList<>();
 	
 	protected AstNode() {
@@ -52,7 +53,7 @@ public abstract class AstNode {
 		this.sp = tb.current().getSP();
     }
 
-	protected AstNode parseCommand() {
+	protected AstNode parseCommand() throws ParseException {
 		Keyword keyword = (Keyword)tb.current().getValue();
 		switch(keyword) {
 			case IF:		return new IfNode(tb);
@@ -65,11 +66,12 @@ public abstract class AstNode {
 			case GOTO:		return new GotoNode(tb);
 			case SWITCH:	return new SwitchNode(tb);
 			default:
-				throw new ParseError("Unexpected command token " + tb.current(), sp);
+				markFirstError(error);
+				throw new ParseException("Unexpected command token " + tb.current(), sp);
 		}
 	}
 
-	protected AstNode parseStatement() {
+	protected AstNode parseStatement() throws ParseException {
 		if (tb.match(TokenType.COMMAND)) {
 			return parseCommand();
 		}
@@ -79,16 +81,16 @@ public abstract class AstNode {
 
 			// Если statement заканчивается точкой с запятой (но не в case-выражениях и т.д.)
 			if (tb.match(Delimiter.SEMICOLON)) {
-				tb.consume(Delimiter.SEMICOLON);
+				AstNode.this.consumeToken(tb, Delimiter.SEMICOLON);
 			}
 			else {
-				throw new ParseError("Expected ';' after statement", sp);
+				throw new ParseException("Expected ';' after statement", sp);
 			}
 			return expr;
 		}
 		else if (tb.match(Operator.INC) || tb.match(Operator.DEC)) {
-				ExpressionNode expr = new ExpressionParser(tb).parse();
-				tb.consume(Delimiter.SEMICOLON);
+				ExpressionNode expr = new ExpressionNode(tb).parse();
+				consumeToken(tb, Delimiter.SEMICOLON);
 				return expr;
 		}
 		else if (tb.match(Delimiter.LEFT_BRACE)) {
@@ -103,12 +105,14 @@ public abstract class AstNode {
 			}
 			throw new ParseError("Unexpected operator: " + operator, tb.current().getLine(), tb.current().getColumn());
 		}*/
-		throw new ParseError("Unexpected statement token: " + tb.current(), sp);
+		ParseException e = tb.error("Unexpected statement token: " + tb.current());
+		tb.skip(Delimiter.SEMICOLON, Delimiter.LEFT_BRACE);
+		throw e;
 	}
 
-	protected VarType checkPrimtiveType() {
+	protected VarType checkPrimtiveType() throws ParseException {
 		if(tb.match(TokenType.TYPE)) {
-			VarType type = VarType.fromKeyword((Keyword)tb.consume().getValue());
+			VarType type = VarType.fromKeyword((Keyword)consumeToken(tb).getValue());
 			if(null != type) return checkArrayType(type);
 		}
 		return null;
@@ -117,55 +121,55 @@ public abstract class AstNode {
 		if (tb.match(TokenType.ID)) {
 			String typeName = (String)tb.current().getValue();
 			if (typeName.equals(className)) {
-				tb.consume();
+				consumeToken(tb);
 				return true;
 			}
 		}
 		return false;
 	}
-	protected VarType checkClassType() {
+	protected VarType checkClassType() throws ParseException {
 		if (tb.match(TokenType.ID)) {
 			VarType type = VarType.fromClassName((String)tb.current().getValue());
 			if(null != type) {
-				tb.consume();
+				consumeToken(tb);
 				return checkArrayType(type);
 			}
 		}
 		return null;
 	}
-	protected VarType checkArrayType(VarType type) {
+	protected VarType checkArrayType(VarType type) throws ParseException {
 		// Обработка полей-массивов
 		if (null != type && tb.match(Delimiter.LEFT_BRACKET)) { //'['
 			while (tb.match(Delimiter.LEFT_BRACKET)) { //'['
-				tb.consume(); // Пропускаем '['
+				consumeToken(tb); // Потребляем '['
 
 				int depth = 0;
 				Integer size = null;
 				if(tb.match(TokenType.NUMBER)) {
 					depth++;
 					if (depth > 3) {
-						throw new ParseError("Maximum array nesting depth is 3", sp);
+						throw new ParseException("Maximum array nesting depth is 3", sp);
 					}
-					size = (Integer)tb.consume().getValue();
+					size = (Integer)consumeToken(tb).getValue();
 					if (size <= 0) {
-						throw new ParseError("Array size must be positive", sp);
+						throw new ParseException("Array size must be positive", sp);
 					}
 					type = VarType.arrayOf(type, size);
 				}
-				tb.consume(Delimiter.RIGHT_BRACKET);  // Пропускаем ']'
+				AstNode.this.consumeToken(tb, Delimiter.RIGHT_BRACKET);  // Потребляем ']'
 				type = size != null ? VarType.arrayOf(type, size) : VarType.arrayOf(type);
 			}
 		}
 		return type;
 	}
 
-	private static ExpressionNode parseFullQualifiedExpression(TokenBuffer tb) {
-		ExpressionNode parent = new ExpressionParser(tb).parse();
+	private ExpressionNode parseFullQualifiedExpression(TokenBuffer tb) throws ParseException {
+		ExpressionNode parent = new ExpressionNode(tb).parse();
 
 		// Обрабатываем цепочки вызовов через точку
 		while (tb.match(Delimiter.DOT)) {
-			tb.consume();
-			String methodName = (String)tb.consume(TokenType.ID).getValue();
+			consumeToken(tb);
+			String methodName = (String)AstNode.this.consumeToken(tb, TokenType.ID).getValue();
 
 			if (tb.match(Delimiter.LEFT_PAREN)) {
 				// Это вызов метода
@@ -173,15 +177,15 @@ public abstract class AstNode {
 			}
 			else {
 				// Доступ к полю (можно добавить FieldAccessNode)
-				throw new ParseError("Field access not implemented yet", tb.current().getSP());
+				throw new ParseException("Field access not implemented yet", tb.current().getSP());
 			}
 		}
 
 		return parent;
 	}
-	public static List<ExpressionNode> parseArguments(TokenBuffer tb) {
+	public List<ExpressionNode> parseArguments(TokenBuffer tb) throws ParseException {
 		List<ExpressionNode> args = new ArrayList<>();
-		tb.consume(Delimiter.LEFT_PAREN);
+		consumeToken(tb, Delimiter.LEFT_PAREN);
 
 		if (!tb.match(Delimiter.RIGHT_PAREN)) {
 			while(true) {
@@ -191,19 +195,19 @@ public abstract class AstNode {
 				// Если после выражения нет запятой - выходим из цикла
 				if (!tb.match(Delimiter.COMMA)) break;
             
-	            // Пропускаем запятую
-		        tb.consume(Delimiter.COMMA);
+	            // Потребляем запятую
+		        AstNode.this.consumeToken(tb, Delimiter.COMMA);
 			} 
 		}
 
-		tb.consume(Delimiter.RIGHT_PAREN);
+		AstNode.this.consumeToken(tb, Delimiter.RIGHT_PAREN);
 		return args;
 	}
 	
-	public static final Set<Keyword> collectModifiers(TokenBuffer tb) {
+	public final Set<Keyword> collectModifiers(TokenBuffer tb) {
         Set<Keyword> modifiers = new HashSet<>();
-        while (tb.current().getType() == TokenType.MODIFIER) {
-			modifiers.add((Keyword)tb.consume().getValue());
+        while (tb.match(TokenType.MODIFIER)) {
+			modifiers.add((Keyword)consumeToken(tb).getValue());
         }
         return modifiers;
     }
@@ -214,5 +218,42 @@ public abstract class AstNode {
 	
 	public SourcePosition getSP() {
 		return sp;
+	}
+	
+	public Token consumeToken(TokenBuffer tb) {
+		markFirstError(tb.current().getError());
+		return tb.consume();
+    }
+	public Token consumeToken(TokenBuffer tb, TokenType expectedType) throws ParseException {
+		if (tb.current().getType() == expectedType) return consumeToken(tb);
+		else throw tb.error("Expected " + expectedType + ", but got " + tb.current().getType());
+    }
+	public Token consumeToken(TokenBuffer tb, Operator op) throws ParseException {
+		if (TokenType.OPERATOR == tb.current().getType()) {
+            if(op == tb.current().getValue()) return consumeToken(tb);
+			else throw tb.error("Expected operator " + op + ", but got " + tb.current().getValue());
+        }
+		else throw tb.error("Expected " + TokenType.OPERATOR + ", but got " + tb.current().getType());
+    }
+	public Token consumeToken(TokenBuffer tb, Delimiter delimiter) throws ParseException {
+		if (TokenType.DELIMITER == tb.current().getType()) {
+            if(delimiter == tb.current().getValue()) return consumeToken(tb);
+			else throw tb.error("Expected delimiter " + delimiter + ", but got " + tb.current().getValue());
+        }
+		else throw tb.error("Expected " + TokenType.DELIMITER + ", but got " + tb.current().getType());
+    }
+	public Token consumeToken(TokenBuffer tb, TokenType type, Keyword keyword) throws ParseException {
+		if (type == tb.current().getType()) {
+            if(keyword == tb.current().getValue()) return consumeToken(tb);
+			else throw tb.error("Expected keyword " + keyword + ", but got " + tb.current().getValue());
+        }
+		else throw tb.error("Expected " + TokenType.KEYWORD + ", but got " + tb.current().getType());
+    }
+	
+	public void markFirstError(ParseException e) {
+		if(null != e && null == error) error = e.getErrorMessage();
+	}
+	public void markFirstError(ErrorMessage message) {
+		if(null != message && null == error) error = message;
 	}
 }

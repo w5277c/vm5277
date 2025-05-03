@@ -14,10 +14,12 @@ import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.VarType;
+import ru.vm5277.j8b.compiler.exceptions.ParseException;
 
 public class BlockNode extends AstNode {
 	protected	List<AstNode>			declarations	= new ArrayList<>();
 	protected	Map<String, LabelNode>	labels			= new HashMap<>();
+	
 	public BlockNode() {
 	}
 	
@@ -27,10 +29,10 @@ public class BlockNode extends AstNode {
 		declarations.add(singleStatement);
 	}
 
-	public BlockNode(TokenBuffer tb) {
+	public BlockNode(TokenBuffer tb) throws ParseException {
         super(tb);
         
-		tb.consume(Delimiter.LEFT_BRACE);
+		consumeToken(tb, Delimiter.LEFT_BRACE); //Наличие токена должно быть гарантировано вызывающим
 
 		while (!tb.match(TokenType.EOF) && !tb.match(Delimiter.RIGHT_BRACE)) {
 			if(tb.match(TokenType.LABEL)) {
@@ -39,7 +41,13 @@ public class BlockNode extends AstNode {
 				declarations.add(label);
 			}
 			if (tb.match(TokenType.COMMAND)) {
-				declarations.add(parseCommand());
+				try {
+					declarations.add(parseCommand());
+				}
+				catch(ParseException e) {
+					tb.addMessage(e.getErrorMessage());
+					markFirstError(e);
+				} // Фиксируем ошибку(Unexpected command token)
 				continue;
 			}
 			if(tb.match(Keyword.FREE)) {
@@ -55,32 +63,45 @@ public class BlockNode extends AstNode {
 				continue;
 			}
 
-			// Определение типа (примитив или класс)
-			VarType type = checkPrimtiveType();
-			if (null == type) type = checkClassType();
+			try {
+				// Определение типа (примитив или класс)
+				VarType type = checkPrimtiveType();
+				if (null == type) type = checkClassType();
 
 
-			if(null != type) {
-				// Получаем имя метода/конструктора
-				String name = tb.consume(TokenType.ID).getStringValue();
+				if(null != type) {
+					// Получаем имя метода/конструктора
+					String name = null;
+					try {name = consumeToken(tb, TokenType.ID).getStringValue();}catch(ParseException e) {markFirstError(e);} // Нет имени сущности, пытаемся парсить дальше
 
-				if (tb.match(Delimiter.LEFT_BRACKET)) { // Это объявление массива
-					declarations.add(new ArrayDeclarationNode(tb, modifiers, type, name));
+					if (tb.match(Delimiter.LEFT_BRACKET)) { // Это объявление массива
+						ArrayDeclarationNode node = new ArrayDeclarationNode(tb, modifiers, type, name);
+						if(null != name) declarations.add(node);
+					}
+					else { // Переменная
+						FieldNode node = new FieldNode(tb, modifiers, type, name);
+						if(null != name) declarations.add(node);
+					}
+					continue;
 				}
-				else { // Переменная
-					declarations.add(new FieldNode(tb, modifiers, type, name));
-				}
-				continue;
+			}
+			catch(ParseException e) {
+				markFirstError(e);
 			}
 
 			// 4. Обработка остальных statement (if, while, вызовы и т.д.)
-			AstNode statement = parseStatement();
-			declarations.add(statement);
-			if(statement instanceof BlockNode) {
-				blocks.add((BlockNode)statement);
+			try {
+				AstNode statement = parseStatement();
+				declarations.add(statement);
+				if(statement instanceof BlockNode) {
+					blocks.add((BlockNode)statement);
+				}
+			}
+			catch(ParseException e) {
+				markFirstError(e);
 			}
 		}
-		tb.consume(Delimiter.RIGHT_BRACE);
+		consumeToken(tb, Delimiter.RIGHT_BRACE);
     }
 	
 	public List<AstNode> getDeclarations() {

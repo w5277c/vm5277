@@ -12,7 +12,7 @@ import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.messages.MessageOwner;
 
 public class Main {
-    public	final	static	String	VERSION	= "0.0.7";
+    public	final	static	String	VERSION	= "0.0.8";
 	
 	public static void main(String[] args) throws IOException {
 		MessageContainer mc = new MessageContainer(8, true, false);

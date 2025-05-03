@@ -21,9 +21,9 @@ public class VarType {
 		@Override
 		public boolean isFixedPoint() { return true; }
 	};
-
+	public	static	final	VarType	CSTR		= new VarType("cstr");
+	
 	// Ссылочные типы
-	public	static	final	VarType	STRING		= new VarType("string");
 	public	static	final	VarType	CLASS		= new VarType("class");
 
 	// Специальные типы
@@ -96,6 +96,7 @@ public class VarType {
 			case SHORT: return SHORT;
 			case INT: return INT;
 			case FIXED: return FIXED;
+			case CSTR: return CSTR;
 			case CLASS: return CLASS;
 			default: return UNKNOWN;
 		}
@@ -134,7 +135,7 @@ public class VarType {
 	}
 
 	public boolean isPrimitive() {
-		return this == BOOL || this == BYTE || this == SHORT || this == INT || this == FIXED;
+		return this == BOOL || this == BYTE || this == SHORT || this == INT || this == FIXED || this == CSTR;
 	}
 
 	public boolean isNumeric() {
@@ -193,6 +194,6 @@ public class VarType {
 	
 	@Override
 	public String toString() {
-		return getName();
+		return isArray ? getElementType() + "[]" : getName();
 	}
 }

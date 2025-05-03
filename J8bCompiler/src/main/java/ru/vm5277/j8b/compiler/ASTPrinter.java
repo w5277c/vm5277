@@ -83,11 +83,14 @@ public class ASTPrinter {
 				else if(node instanceof MethodNode) {
 					printMethod((MethodNode)node);
 				}
-				else if(node instanceof ArrayDeclarationNode) {
-					//printArray((ArrayDeclarationNode)node);
-				}
+//				else if(node instanceof ArrayDeclarationNode) {
+//					//printArray((ArrayDeclarationNode)node);
+//				}
 				else if(node instanceof FieldNode) {
-					//printFields((FieldNode)node);
+					printField((FieldNode)node);; out.put(";");out.print();
+				}
+				else if(node instanceof BlockNode) {
+					printBody((BlockNode)node); out.print();
 				}
 				else {
 					out.put("!unknown node:" + node); out.print();
@@ -165,12 +168,7 @@ public class ASTPrinter {
 				printBody(dwn.getBody());
 				out.put(" while(");
 				printExpr(dwn.getCondition());
-				out.put(")");
-				if(null != dwn.getElseBlock()) {
-					out.put(" else ");
-					printBody(dwn.getBody());
-				}
-				out.put(";"); out.print();
+				out.put(");"); out.print();
 			}
 			else if(node instanceof ForNode) {
 				ForNode fn = (ForNode)node;
@@ -230,10 +228,6 @@ public class ASTPrinter {
 				out.put(") ");
 				printBody(wn.getBody());
 				out.print();
-				if(null != wn.getElseBlock()) {
-					out.put(" else ");
-					printBody(wn.getElseBlock());
-				}
 			}
 			else if(node instanceof ClassNode) {
 				printClass((ClassNode)node);
@@ -251,6 +245,7 @@ public class ASTPrinter {
 			}
 			else if(node instanceof BlockNode) {
 				printBody((BlockNode)node);
+				out.print();
 			}
 			else {
 				out.put("!unknown node:" + node); out.print();
@@ -280,7 +275,7 @@ public class ASTPrinter {
 		}
 		else if (expr instanceof LiteralExpression) {
 			LiteralExpression le = (LiteralExpression)expr;
-			out.put(Token.toStringValue(le.getValue()));
+			out.put(le.isCstr() ? "\"" + Token.toStringValue(le.getValue()) + "\"" : Token.toStringValue(le.getValue()));
 		}
 		else if(expr instanceof MethodCallExpression) {
 			MethodCallExpression mce = (MethodCallExpression)expr;

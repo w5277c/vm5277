@@ -3,29 +3,25 @@
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 22.04.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.j8b.compiler.tokens;
+package ru.vm5277.j8b.compiler.exceptions;
 
-import ru.vm5277.j8b.compiler.SourceBuffer;
-import ru.vm5277.j8b.compiler.enums.TokenType;
-import ru.vm5277.j8b.compiler.messages.MessageContainer;
+import ru.vm5277.j8b.compiler.SourcePosition;
+import ru.vm5277.j8b.compiler.messages.ErrorMessage;
 
-public class TString extends Token {
-	public TString(SourceBuffer sb, MessageContainer mc) {
-		super(sb);
-		type = TokenType.STRING;
-		
-		StringBuilder str = new StringBuilder();
-		sb.next(); // Пропускаем '"'
-		while (sb.hasNext() && '"'!=sb.getChar()) {
-			str.append(sb.getChar());
-			sb.next();			
-        }
-		if (!sb.hasNext()) {
-			setError("Unterminated string literal", mc);
-		}
-		else {
-			sb.next();
-		}
-        value = str.toString();
+public class ParseException extends Exception {
+	private	final	ErrorMessage	message;
+
+	public ParseException(ErrorMessage message) {
+		super(message.getText() + " at " + message.getSP());
+		this.message = message;
+	}
+
+	public ParseException(String text, SourcePosition sp) {
+		super(text + " at " + sp);
+		this.message = new ErrorMessage(text, sp);
+	}
+
+	public ErrorMessage getErrorMessage() {
+		return message;
 	}
 }

@@ -16,10 +16,10 @@ public class LexerTests {
 
     @Test
     public void testBasicTypesAndKeywords() throws Exception {
-        assertEquals(35, Keyword.values().length);
+        assertEquals(36, Keyword.values().length);
 		
 		String source = "true false null " + 
-						"void bool byte short int fixed " +
+						"void bool byte short int fixed cstr " +
 						"if do while for return continue break goto switch free " +
 						"static final private public native atomic " +
 						"class interface implements this " +
@@ -28,89 +28,92 @@ public class LexerTests {
 		Lexer lexer = new Lexer(new StringReader(source), mc);
         List<Token> tokens = lexer.getTokens();
         
-        assertEquals(35, tokens.size() - 1); // -1 для EOF
+        assertEquals(36, tokens.size() - 1); // -1 для EOF
         
+		int pos=0;
 		// Проверка литералов
-		assertEquals(TokenType.LITERAL, tokens.get(0).getType());
-		assertEquals(true, tokens.get(0).getValue());
-		assertEquals(TokenType.LITERAL, tokens.get(1).getType());
-		assertEquals(false, tokens.get(1).getValue());
-		assertEquals(TokenType.LITERAL, tokens.get(2).getType());
-		assertEquals(null, tokens.get(2).getValue());
+		assertEquals(TokenType.LITERAL, tokens.get(pos).getType());
+		assertEquals(true, tokens.get(pos++).getValue());
+		assertEquals(TokenType.LITERAL, tokens.get(pos).getType());
+		assertEquals(false, tokens.get(pos++).getValue());
+		assertEquals(TokenType.LITERAL, tokens.get(pos).getType());
+		assertEquals(null, tokens.get(pos++).getValue());
 
 		// Проверка типов
-		assertEquals(TokenType.TYPE, tokens.get(3).getType());
-		assertEquals(Keyword.VOID, tokens.get(3).getValue());
-		assertEquals(TokenType.TYPE, tokens.get(4).getType());
-		assertEquals(Keyword.BOOL, tokens.get(4).getValue());
-		assertEquals(TokenType.TYPE, tokens.get(5).getType());
-		assertEquals(Keyword.BYTE, tokens.get(5).getValue());
-		assertEquals(TokenType.TYPE, tokens.get(6).getType());
-		assertEquals(Keyword.SHORT, tokens.get(6).getValue());
-		assertEquals(TokenType.TYPE, tokens.get(7).getType());
-		assertEquals(Keyword.INT, tokens.get(7).getValue());
-		assertEquals(TokenType.TYPE, tokens.get(8).getType());
-		assertEquals(Keyword.FIXED, tokens.get(8).getValue());
+		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
+		assertEquals(Keyword.VOID, tokens.get(pos++).getValue());
+		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
+		assertEquals(Keyword.BOOL, tokens.get(pos++).getValue());
+		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
+		assertEquals(Keyword.BYTE, tokens.get(pos++).getValue());
+		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
+		assertEquals(Keyword.SHORT, tokens.get(pos++).getValue());
+		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
+		assertEquals(Keyword.INT, tokens.get(pos++).getValue());
+		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
+		assertEquals(Keyword.FIXED, tokens.get(pos++).getValue());
+		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
+		assertEquals(Keyword.CSTR, tokens.get(pos++).getValue());
 
 		// Проверка комманд
-		assertEquals(TokenType.COMMAND, tokens.get(9).getType());
-		assertEquals(Keyword.IF, tokens.get(9).getValue());
-		assertEquals(TokenType.COMMAND, tokens.get(10).getType());
-		assertEquals(Keyword.DO, tokens.get(10).getValue());
-		assertEquals(TokenType.COMMAND, tokens.get(11).getType());
-		assertEquals(Keyword.WHILE, tokens.get(11).getValue());
-		assertEquals(TokenType.COMMAND, tokens.get(12).getType());
-		assertEquals(Keyword.FOR, tokens.get(12).getValue());
-		assertEquals(TokenType.COMMAND, tokens.get(13).getType());
-		assertEquals(Keyword.RETURN, tokens.get(13).getValue());
-		assertEquals(TokenType.COMMAND, tokens.get(14).getType());
-		assertEquals(Keyword.CONTINUE, tokens.get(14).getValue());
-		assertEquals(TokenType.COMMAND, tokens.get(15).getType());
-		assertEquals(Keyword.BREAK, tokens.get(15).getValue());
-		assertEquals(TokenType.COMMAND, tokens.get(16).getType());
-		assertEquals(Keyword.GOTO, tokens.get(16).getValue());
-		assertEquals(TokenType.COMMAND, tokens.get(17).getType());
-		assertEquals(Keyword.SWITCH, tokens.get(17).getValue());
-		assertEquals(TokenType.COMMAND, tokens.get(18).getType());
-		assertEquals(Keyword.FREE, tokens.get(18).getValue());
+		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
+		assertEquals(Keyword.IF, tokens.get(pos++).getValue());
+		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
+		assertEquals(Keyword.DO, tokens.get(pos++).getValue());
+		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
+		assertEquals(Keyword.WHILE, tokens.get(pos++).getValue());
+		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
+		assertEquals(Keyword.FOR, tokens.get(pos++).getValue());
+		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
+		assertEquals(Keyword.RETURN, tokens.get(pos++).getValue());
+		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
+		assertEquals(Keyword.CONTINUE, tokens.get(pos++).getValue());
+		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
+		assertEquals(Keyword.BREAK, tokens.get(pos++).getValue());
+		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
+		assertEquals(Keyword.GOTO, tokens.get(pos++).getValue());
+		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
+		assertEquals(Keyword.SWITCH, tokens.get(pos++).getValue());
+		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
+		assertEquals(Keyword.FREE, tokens.get(pos++).getValue());
 
 		// Проверка модификаторов
-		assertEquals(TokenType.MODIFIER, tokens.get(19).getType());
-		assertEquals(Keyword.STATIC, tokens.get(19).getValue());
-		assertEquals(TokenType.MODIFIER, tokens.get(20).getType());
-		assertEquals(Keyword.FINAL, tokens.get(20).getValue());
-		assertEquals(TokenType.MODIFIER, tokens.get(21).getType());
-		assertEquals(Keyword.PRIVATE, tokens.get(21).getValue());
-		assertEquals(TokenType.MODIFIER, tokens.get(22).getType());
-		assertEquals(Keyword.PUBLIC, tokens.get(22).getValue());
-		assertEquals(TokenType.MODIFIER, tokens.get(23).getType());
-		assertEquals(Keyword.NATIVE, tokens.get(23).getValue());
-		assertEquals(TokenType.MODIFIER, tokens.get(24).getType());
-		assertEquals(Keyword.ATOMIC, tokens.get(24).getValue());
+		assertEquals(TokenType.MODIFIER, tokens.get(pos).getType());
+		assertEquals(Keyword.STATIC, tokens.get(pos++).getValue());
+		assertEquals(TokenType.MODIFIER, tokens.get(pos).getType());
+		assertEquals(Keyword.FINAL, tokens.get(pos++).getValue());
+		assertEquals(TokenType.MODIFIER, tokens.get(pos).getType());
+		assertEquals(Keyword.PRIVATE, tokens.get(pos++).getValue());
+		assertEquals(TokenType.MODIFIER, tokens.get(pos).getType());
+		assertEquals(Keyword.PUBLIC, tokens.get(pos++).getValue());
+		assertEquals(TokenType.MODIFIER, tokens.get(pos).getType());
+		assertEquals(Keyword.NATIVE, tokens.get(pos++).getValue());
+		assertEquals(TokenType.MODIFIER, tokens.get(pos).getType());
+		assertEquals(Keyword.ATOMIC, tokens.get(pos++).getValue());
 
 		// Проверка ключевых слов ООП
-		assertEquals(TokenType.OOP, tokens.get(25).getType());
-		assertEquals(Keyword.CLASS, tokens.get(25).getValue());
-		assertEquals(TokenType.OOP, tokens.get(26).getType());
-		assertEquals(Keyword.INTERFACE, tokens.get(26).getValue());
-		assertEquals(TokenType.OOP, tokens.get(27).getType());
-		assertEquals(Keyword.IMPLEMENTS, tokens.get(27).getValue());
-		assertEquals(TokenType.OOP, tokens.get(28).getType());
-		assertEquals(Keyword.THIS, tokens.get(28).getValue());
+		assertEquals(TokenType.OOP, tokens.get(pos).getType());
+		assertEquals(Keyword.CLASS, tokens.get(pos++).getValue());
+		assertEquals(TokenType.OOP, tokens.get(pos).getType());
+		assertEquals(Keyword.INTERFACE, tokens.get(pos++).getValue());
+		assertEquals(TokenType.OOP, tokens.get(pos).getType());
+		assertEquals(Keyword.IMPLEMENTS, tokens.get(pos++).getValue());
+		assertEquals(TokenType.OOP, tokens.get(pos).getType());
+		assertEquals(Keyword.THIS, tokens.get(pos++).getValue());
 		
 		// Остальное
-		assertEquals(TokenType.KEYWORD, tokens.get(29).getType());
-		assertEquals(Keyword.IMPORT, tokens.get(29).getValue());
-		assertEquals(TokenType.KEYWORD, tokens.get(30).getType());
-		assertEquals(Keyword.AS, tokens.get(30).getValue());
-		assertEquals(TokenType.KEYWORD, tokens.get(31).getType());
-		assertEquals(Keyword.ELSE, tokens.get(31).getValue());
-		assertEquals(TokenType.KEYWORD, tokens.get(32).getType());
-		assertEquals(Keyword.CASE, tokens.get(32).getValue());
-		assertEquals(TokenType.KEYWORD, tokens.get(33).getType());
-		assertEquals(Keyword.DEFAULT, tokens.get(33).getValue());
-		assertEquals(TokenType.KEYWORD, tokens.get(34).getType());
-		assertEquals(Keyword.NEW, tokens.get(34).getValue());
+		assertEquals(TokenType.KEYWORD, tokens.get(pos).getType());
+		assertEquals(Keyword.IMPORT, tokens.get(pos++).getValue());
+		assertEquals(TokenType.KEYWORD, tokens.get(pos).getType());
+		assertEquals(Keyword.AS, tokens.get(pos++).getValue());
+		assertEquals(TokenType.KEYWORD, tokens.get(pos).getType());
+		assertEquals(Keyword.ELSE, tokens.get(pos++).getValue());
+		assertEquals(TokenType.KEYWORD, tokens.get(pos).getType());
+		assertEquals(Keyword.CASE, tokens.get(pos++).getValue());
+		assertEquals(TokenType.KEYWORD, tokens.get(pos).getType());
+		assertEquals(Keyword.DEFAULT, tokens.get(pos++).getValue());
+		assertEquals(TokenType.KEYWORD, tokens.get(pos).getType());
+		assertEquals(Keyword.NEW, tokens.get(pos++).getValue());
 
 	}
 

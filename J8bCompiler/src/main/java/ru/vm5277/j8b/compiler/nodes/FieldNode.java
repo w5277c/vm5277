@@ -7,17 +7,17 @@ package ru.vm5277.j8b.compiler.nodes;
 
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
 import java.util.Set;
-import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.Operator;
 import ru.vm5277.j8b.compiler.enums.VarType;
+import ru.vm5277.j8b.compiler.exceptions.ParseException;
 
 public class FieldNode extends AstNode {
 	private	final	Set<Keyword>	modifiers;
 	private			VarType			returnType;
 	private			String			name;
-	private	final	ExpressionNode	initializer;
+	private			ExpressionNode	initializer;
 	
 	public FieldNode(TokenBuffer tb, Set<Keyword> modifiers, VarType returnType, String name) {
 		super(tb);
@@ -30,10 +30,10 @@ public class FieldNode extends AstNode {
             initializer = null;
         }
 		else {
-			tb.consume();
-			initializer = new ExpressionParser(tb).parse();
+			consumeToken(tb);
+			try {initializer = new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
 		}
-        tb.consume(Delimiter.SEMICOLON);
+        try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
 	}
 	
 	public Set<Keyword> getModifiers() {

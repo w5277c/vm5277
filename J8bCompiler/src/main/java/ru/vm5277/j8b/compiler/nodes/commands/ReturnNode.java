@@ -7,21 +7,21 @@ package ru.vm5277.j8b.compiler.nodes.commands;
 
 import ru.vm5277.j8b.compiler.nodes.*;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
+import ru.vm5277.j8b.compiler.exceptions.ParseException;
 
 public class ReturnNode extends AstNode {
-	private	final	ExpressionNode	expression;
+	private	ExpressionNode	expression;
 	
 	public ReturnNode(TokenBuffer tb) {
 		super(tb);
 		
-		tb.consume(); // Пропускаем "return"
-        
-		this.expression = tb.match(Delimiter.SEMICOLON) ? null : new ExpressionParser(tb).parse();
+		consumeToken(tb); // Потребляем "return"
+		
+		try {this.expression = tb.match(Delimiter.SEMICOLON) ? null : new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
         
         // Обязательно потребляем точку с запятой
-        tb.consume(Delimiter.SEMICOLON);
+        try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
     }
 
     public ExpressionNode getExpression() {
@@ -31,4 +31,9 @@ public class ReturnNode extends AstNode {
     public boolean returnsValue() {
         return expression != null;
     }
+	
+	@Override
+	public String toString() {
+		return "return" + (null != expression ? " " + expression : "");
+	}
 }

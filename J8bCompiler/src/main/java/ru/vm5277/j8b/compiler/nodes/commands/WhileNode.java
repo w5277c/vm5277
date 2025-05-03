@@ -8,36 +8,24 @@ package ru.vm5277.j8b.compiler.nodes.commands;
 
 import ru.vm5277.j8b.compiler.nodes.*;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
-import ru.vm5277.j8b.compiler.enums.Keyword;
+import ru.vm5277.j8b.compiler.exceptions.ParseException;
 
 public class WhileNode extends AstNode {
-	private	final	ExpressionNode	condition;
+	private	ExpressionNode	condition;
 
 	public WhileNode(TokenBuffer tb) {
 		super(tb);
 
-		tb.consume(); // Пропускаем "while"
-		tb.consume(Delimiter.LEFT_PAREN);
-		this.condition = new ExpressionParser(tb).parse();
-		tb.consume(Delimiter.RIGHT_PAREN);
+		consumeToken(tb); // Потребляем "while"
+		try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(ParseException e) {markFirstError(e);}
+		try {this.condition = new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
+		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(ParseException e) {markFirstError(e);}
 
-		if(tb.match(Delimiter.LEFT_BRACE)) {
-			try {
-				tb.getLoopStack().add(this);
-				blocks.add(new BlockNode(tb));
-			}
-			finally {
-				tb.getLoopStack().remove(this);
-			}
-		}
-		else blocks.add(new BlockNode(tb, parseStatement()));
-
-		if (tb.match(Keyword.ELSE)) {
-			tb.consume();
-			blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));
-		}
+		tb.getLoopStack().add(this);
+		try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));}
+		catch(ParseException e) {markFirstError(e);}
+		tb.getLoopStack().remove(this);
 	}
 
 	public ExpressionNode getCondition() {
@@ -45,11 +33,7 @@ public class WhileNode extends AstNode {
 	}
 
 	public BlockNode getBody() {
-		return blocks.get(0);
-	}
-
-	public BlockNode getElseBlock() {
-		return blocks.size() > 1 ? blocks.get(1) : null;
+		return blocks.isEmpty() ? null : blocks.get(0);
 	}
 
 	@Override
@@ -58,11 +42,6 @@ public class WhileNode extends AstNode {
 		sb.append(condition);
 		sb.append(") ");
 		sb.append(getBody());
-
-		if (getElseBlock() != null) {
-			sb.append(" else ").append(getElseBlock());
-		}
-
 		return sb.toString();
 	}
 }
