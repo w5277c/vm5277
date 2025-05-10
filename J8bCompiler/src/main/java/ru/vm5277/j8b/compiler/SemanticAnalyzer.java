@@ -18,17 +18,14 @@ import ru.vm5277.j8b.compiler.semantic.Scope;
 
 public abstract class SemanticAnalyzer {
 	protected			TokenBuffer	tb;
-	private				Scope		scope;
 	
 	protected SemanticAnalyzer() {
 	}
 
 	public SemanticAnalyzer(ClassNode clazz) throws SemanticException {
-		scope = new ClassScope(null, null);
-		
 		if(clazz.preAnalyze()) {
-			if(clazz.declare(scope)) {
-				clazz.postAnalyze(scope);
+			if(clazz.declare(null)) {
+				clazz.postAnalyze(null);
 			}
 		}
 	}
@@ -74,9 +71,5 @@ public abstract class SemanticAnalyzer {
 			scope = scope.getParent();
 		}
 		return null;
-	}
-	
-	public Scope getGlobalScope() {
-		return scope;
 	}
 }

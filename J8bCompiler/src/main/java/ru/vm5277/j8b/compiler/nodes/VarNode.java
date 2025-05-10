@@ -1,11 +1,10 @@
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------
 Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-23.04.2025	konstantin@5277.ru		Начало
+10.05.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes;
 
-import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
 import java.util.Set;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
@@ -14,21 +13,22 @@ import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler.messages.WarningMessage;
-import ru.vm5277.j8b.compiler.semantic.ClassScope;
+import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
+import ru.vm5277.j8b.compiler.semantic.BlockScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 import ru.vm5277.j8b.compiler.semantic.Symbol;
 
-public class FieldNode extends AstNode {
+public class VarNode extends AstNode {
 	private	final	Set<Keyword>	modifiers;
-	private			VarType			returnType;
-	private			String			name;
+	private	final	VarType			type;
+	private	final	String			name;
 	private			ExpressionNode	initializer;
 
-	public FieldNode(TokenBuffer tb, Set<Keyword> modifiers, VarType returnType, String name) {
+	public VarNode(TokenBuffer tb, Set<Keyword> modifiers, VarType type, String name) {
 		super(tb);
-
+		
 		this.modifiers = modifiers;
-		this.returnType = returnType;
+		this.type = type;
 		this.name = name;
 
 		if (!tb.match(Operator.ASSIGN)) {
@@ -40,13 +40,9 @@ public class FieldNode extends AstNode {
 		}
         try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
 	}
-	
-	public Set<Keyword> getModifiers() {
-		return modifiers;
-	}
-	
+
 	public VarType getType() {
-		return returnType;
+		return type;
 	}
 	
 	public String getName() {
@@ -60,40 +56,37 @@ public class FieldNode extends AstNode {
 	public boolean isFinal() {
 		return modifiers.contains(Keyword.FINAL);
 	}
-	public boolean isPublic() {
-		return modifiers.contains(Keyword.PUBLIC);
-	}
 
 	@Override
 	public String getNodeType() {
-		return "field";
+		return "var";
 	}
 
 	@Override
 	public String toString() {
-		return getClass().getSimpleName() + ": " + modifiers + ", " + returnType + ", " + name;
+		return getClass().getSimpleName() + ": " + modifiers + ", " + type + ", " + name;
 	}
 
 	@Override
 	public boolean preAnalyze() {
-		if(Character.isUpperCase(name.charAt(0))) tb.addMessage(new WarningMessage("Field name should start with lowercase letter:" + name, tb.getSP()));
+		if(Character.isUpperCase(name.charAt(0))) tb.addMessage(new WarningMessage("Variable name should start with lowercase letter:" + name, tb.getSP()));
 
 		return true;
 	}
 
+	
 	@Override
 	public boolean declare(Scope scope) {
-		ClassScope classScope = (ClassScope)scope;
+		BlockScope blockScope = (BlockScope)scope;
 
-		try{classScope.addField(new Symbol(name, returnType, modifiers.contains(Keyword.FINAL)));} catch(SemanticException e) {markError(e);}
-
+		try {blockScope.addLocal(new Symbol(name, type, modifiers.contains(Keyword.FINAL)));} catch(SemanticException e) {markError(e);}
 		return true;
 	}
 
 	@Override
 	public boolean postAnalyze(Scope scope) {
 		// Проверка инициализации final-полей
-		if (isFinal() && initializer == null) markError("Final field '" + name + "' must be initialized");
+		if (isFinal() && initializer == null) markError("Final variable  '" + name + "' must be initialized");
 
 		// Анализ инициализатора, если есть
 		if (initializer != null) initializer.postAnalyze(scope);
@@ -101,7 +94,7 @@ public class FieldNode extends AstNode {
 		// Проверка совместимости типов
 		try {
 			VarType initType = initializer.getType(scope);
-			if (!returnType.isCompatibleWith(initType)) markError("Type mismatch: cannot assign " + initType + " to " + returnType);
+			if (!type.isCompatibleWith(initType)) markError("Type mismatch: cannot assign " + initType + " to " + type);
 		}
 		catch (SemanticException e) {markError(e);}
 		

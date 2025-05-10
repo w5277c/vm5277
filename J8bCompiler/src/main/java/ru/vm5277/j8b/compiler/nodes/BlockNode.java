@@ -93,9 +93,9 @@ public class BlockNode extends AstNode {
 						ArrayDeclarationNode node = new ArrayDeclarationNode(tb, modifiers, type, name);
 						if(null != name) declarations.add(node);
 					}
-					else { // Переменная
-						FieldNode node = new FieldNode(tb, modifiers, type, name);
-						if(null != name) declarations.add(node);
+					else { // Метод или переменная
+						VarNode varNode = new VarNode(tb, modifiers, type, name);
+						if(null != name) declarations.add(varNode);
 					}
 					continue;
 				}

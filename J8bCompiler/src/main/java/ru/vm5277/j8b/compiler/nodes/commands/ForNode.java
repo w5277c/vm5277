@@ -39,7 +39,7 @@ public class ForNode extends CommandNode {
 				if(null != type) {
 					String name = null;
 					try {name = consumeToken(tb, TokenType.ID).getStringValue();} catch(ParseException e) {markFirstError(e);}
-					this.initialization = new FieldNode(tb, null, type, name);
+					this.initialization = new VarNode(tb, null, type, name);
 				}
 				else {
 					this.initialization = new ExpressionNode(tb).parse();

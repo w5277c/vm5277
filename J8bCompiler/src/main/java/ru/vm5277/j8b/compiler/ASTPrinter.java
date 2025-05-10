@@ -18,6 +18,7 @@ import ru.vm5277.j8b.compiler.nodes.FieldNode;
 import ru.vm5277.j8b.compiler.nodes.LabelNode;
 import ru.vm5277.j8b.compiler.nodes.MethodNode;
 import ru.vm5277.j8b.compiler.nodes.ParameterNode;
+import ru.vm5277.j8b.compiler.nodes.VarNode;
 import ru.vm5277.j8b.compiler.nodes.commands.BreakNode;
 import ru.vm5277.j8b.compiler.nodes.commands.ContinueNode;
 import ru.vm5277.j8b.compiler.nodes.commands.DoWhileNode;
@@ -86,7 +87,10 @@ public class ASTPrinter {
 //					//printArray((ArrayDeclarationNode)node);
 //				}
 				else if(node instanceof FieldNode) {
-					printField((FieldNode)node);; out.put(";");out.print();
+					printField((FieldNode)node); out.put(";");out.print();
+				}
+				else if(node instanceof VarNode) {
+					printVar((VarNode)node); out.put(";");out.print();
 				}
 				else if(node instanceof BlockNode) {
 					printBody((BlockNode)node); out.print();
@@ -235,6 +239,10 @@ public class ASTPrinter {
 				printField((FieldNode)node);
 				out.put(";");
 			}
+			else if(node instanceof VarNode) {
+				printVar((VarNode)node);
+				out.put(";");
+			}
 			else if(node instanceof ExpressionNode) {
 				printExpr((ExpressionNode)node);
 				out.put(";");
@@ -262,6 +270,17 @@ public class ASTPrinter {
 		}
 	}
 	
+	void printVar(VarNode node) {
+		if(null != node.getType()) {
+			out.put(node.getType() + " ");
+		}
+		out.put(node.getName());
+		if(null != node.getInitializer()) {
+			out.put(" = ");
+			printExpr(node.getInitializer());
+		}
+	}
+
 	void printExpr(ExpressionNode expr) {
 		if(expr instanceof BinaryExpression) {
 			BinaryExpression be = (BinaryExpression)expr;
