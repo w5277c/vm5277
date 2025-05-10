@@ -6,34 +6,56 @@
 package ru.vm5277.j8b.compiler.nodes.expressions;
 
 import ru.vm5277.j8b.compiler.enums.VarType;
+import ru.vm5277.j8b.compiler.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
-import ru.vm5277.j8b.compiler.semantic.SymbolTable;
+import ru.vm5277.j8b.compiler.semantic.Scope;
+import ru.vm5277.j8b.compiler.semantic.Symbol;
 
 public class VariableExpression extends ExpressionNode {
-    private final String name;
-    
-    public VariableExpression(TokenBuffer tb, String name) {
+    private final	String	value;
+    private			Symbol	resolvedSymbol;
+	
+    public VariableExpression(TokenBuffer tb, String value) {
         super(tb);
         
-		this.name = name;
+		this.value = value;
     }
     
-	@Override
-	public VarType semanticAnalyze(SymbolTable symbolTable) {
-	    return symbolTable.lookup(name).getType();
+	public String getValue() {
+		return value;
 	}
 	
-    @Override
-    public <T> T accept(ExpressionVisitor<T> visitor) {
-        return visitor.visit(this);
-    }
-	
-	public String getName() {
-		return name;
+	@Override
+	public VarType getType(Scope scope) throws SemanticException {
+		if (resolvedSymbol == null) {
+            resolvedSymbol = scope.resolve(value);
+        }
+        return resolvedSymbol.getType();
 	}
 	
 	@Override
 	public String toString() {
-		return getClass().getSimpleName() + ": " + name;
+		return getClass().getSimpleName() + ": " + value;
+	}
+	
+	@Override
+	public boolean preAnalyze() {
+		if (null == value || value.isEmpty()) {
+			markError("Variable name cannot be empty");
+			return false;
+		}
+		return true;
+	}
+
+	@Override
+	public boolean postAnalyze(Scope scope) {
+		if (resolvedSymbol == null) {
+            resolvedSymbol = scope.resolve(value);
+        }
+		if (null == resolvedSymbol) {
+			markError("Variable '" + value + "' is not declared");
+			return false;
+		}
+		return true;
 	}
 }

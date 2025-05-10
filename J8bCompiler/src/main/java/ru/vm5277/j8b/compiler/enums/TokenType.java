@@ -15,7 +15,9 @@ public enum TokenType {
 	KEYWORD,	//Остальные ключевые слова
 	
 	ID,
+	LABEL,
 	NUMBER,
+	NOTE,
 	OPERATOR,
 	DELIMITER,
 	STRING,

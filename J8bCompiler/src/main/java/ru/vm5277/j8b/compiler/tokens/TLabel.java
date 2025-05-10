@@ -1,30 +1,19 @@
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------
 Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-23.04.2025	konstantin@5277.ru		Начало
+30.04.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.j8b.compiler;
+package ru.vm5277.j8b.compiler.tokens;
 
-import java.io.IOException;
-import java.util.List;
-import ru.vm5277.j8b.compiler.nodes.ProgramNode;
-import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
-import ru.vm5277.j8b.compiler.tokens.Token;
+import ru.vm5277.j8b.compiler.SourceBuffer;
+import ru.vm5277.j8b.compiler.enums.TokenType;
 
-public class Parser {
-	private final	List<Token>		tokens;
-	private			ProgramNode		ast;
-	
-	public Parser(List<Token> tokens) throws IOException {
-		this.tokens = tokens;
-
-		if(tokens.isEmpty()) return;
+public class TLabel extends Token {
+	public TLabel(String keyword, SourceBuffer sb) {
+		super(sb);
 		
-		ast = new ProgramNode(new TokenBuffer(tokens.iterator())); // Создаём корень AST
-	}
-	
-	public ProgramNode getAst() {
-		return ast;
+		type = TokenType.LABEL;
+		sb.next();
+		value = keyword;
 	}
 }
-

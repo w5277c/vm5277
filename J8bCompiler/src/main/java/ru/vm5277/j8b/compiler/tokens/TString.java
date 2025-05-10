@@ -5,29 +5,27 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.tokens;
 
-import ru.vm5277.j8b.compiler.ParseError;
+import ru.vm5277.j8b.compiler.SourceBuffer;
 import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 
 public class TString extends Token {
-	public TString(String src, int pos, int line, int column) {
+	public TString(SourceBuffer sb, MessageContainer mc) {
+		super(sb);
 		type = TokenType.STRING;
 		
-		endPos = pos;
-		this.line = line;
-		this.column = column;
-		
 		StringBuilder str = new StringBuilder();
-		endPos++; // Пропускаем открывающую кавычку
-		column++;
-		while (endPos<src.length() && '"'!=src.charAt(endPos)) {
-			str.append(src.charAt(endPos));
-			endPos++;
-			column++;
+		sb.next(); // Пропускаем '"'
+		while (sb.hasNext() && '"'!=sb.getChar()) {
+			str.append(sb.getChar());
+			sb.next();			
         }
-		if (endPos>=src.length()) {
-            throw new ParseError("Unterminated string literal", line, this.column);
+		if (!sb.hasNext()) {
+			setError("Unterminated string literal", mc);
 		}
-		endPos++; // Пропускаем закрывающую кавычку
+		else {
+			sb.next();
+		}
         value = str.toString();
 	}
 }

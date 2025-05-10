@@ -2,8 +2,11 @@
 Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 22.04.2025	konstantin@5277.ru		Начало
+28.04.2025	konstantin@5277.ru		Добавлен RANGE
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.enums;
+
+import ru.vm5277.j8b.compiler.SourceBuffer;
 
 public enum Delimiter {
     // Группировка
@@ -21,8 +24,8 @@ public enum Delimiter {
 
     // Специальные
     DOT(".", "Доступ к полям/методам"),
-    ELLIPSIS("...", "Varargs"),
-    AT("@", "Аннотации");
+    RANGE("..", "Диапазон"),
+	ELLIPSIS("...", "Varargs");
     
 	private final String symbol;
 	private final String description;
@@ -40,6 +43,11 @@ public enum Delimiter {
         return description;
     }
 
+	@Override
+	public String toString() {
+		return symbol;
+	}
+	
     public static Delimiter fromSymbol(String symbol) {
         // Сначала проверяем многозначные разделители
         for (Delimiter delim : values()) {
@@ -50,9 +58,7 @@ public enum Delimiter {
         return null;
     }
 
-    /**
-     * Проверка, является ли символ началом разделителя
-     */
+    // Проверка, является ли символ началом разделителя
     public static boolean isDelimiterStart(char ch) {
         return ch == '(' || ch == '{' || ch == '[' ||
                ch == ')' || ch == '}' || ch == ']' ||
@@ -60,20 +66,28 @@ public enum Delimiter {
                ch == '.' || ch == '@';
     }
 
-    /**
-     * Получить самый длинный возможный разделитель с текущей позиции
-     */
-    public static Delimiter matchLongestDelimiter(String input, int pos) {
+    // Получить самый длинный возможный разделитель с текущей позиции
+    public static Delimiter matchLongestDelimiter(SourceBuffer sb) {
         // Проверяем трехсимвольные (только ELLIPSIS)
-        if (pos + 2 < input.length()) {
-            String threeChar = input.substring(pos, pos + 3);
+        if (sb.hasNext(2)) {
+            String threeChar = sb.getSource().substring(sb.getPos(), sb.getPos()+3);
             if (threeChar.equals(ELLIPSIS.symbol)) {
-                return ELLIPSIS;
+                sb.next(3);
+				return ELLIPSIS;
             }
         }
-
+		// Проверяем двухсимвольные (только RANGE)
+        if (sb.hasNext(1)) {
+            String twoChar = sb.getSource().substring(sb.getPos(), sb.getPos()+2);
+            if (twoChar.equals(RANGE.symbol)) {
+                sb.next(2);
+				return RANGE;
+            }
+        }
         // Проверяем односимвольные
-        String singleChar = input.substring(pos, pos + 1);
-        return fromSymbol(singleChar);
+        String singleChar = sb.getSource().substring(sb.getPos(), sb.getPos()+1);
+		Delimiter result = fromSymbol(singleChar);
+		if(null != result) sb.next();
+		return result;
     }
 }

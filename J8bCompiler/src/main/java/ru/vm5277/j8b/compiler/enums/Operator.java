@@ -11,6 +11,8 @@ import java.util.Map;
 public enum Operator {
 	// Базовые арифметические
 	PLUS("+"), MINUS("-"), MULT("*"), DIV("/"), MOD("%"),
+    // Инкремент/декремент
+    INC("++"), DEC("--"), PRE_INC("++"), PRE_DEC("--"),	POST_INC("++"), POST_DEC("--"), //Лексер выберет первые два, а парсер PRE или POST
 	// Сравнения
 	EQ("=="), NEQ("!="), LT("<"), GT(">"), LTE("<="), GTE(">="),
 	// Логические
@@ -19,11 +21,16 @@ public enum Operator {
 	BIT_AND("&"), BIT_OR("|"), BIT_XOR("^"), BIT_NOT("~"), SHL("<<"), SHR(">>"),
 	// Присваивание (простое и составное)
 	ASSIGN("="), PLUS_ASSIGN("+="), MINUS_ASSIGN("-="), MULT_ASSIGN("*="), DIV_ASSIGN("/="), MOD_ASSIGN("%="), AND_ASSIGN("&="), OR_ASSIGN("|="),
-	XOR_ASSIGN("^="), SHL_ASSIGN("<<="), SHR_ASSIGN(">>=");
+	XOR_ASSIGN("^="), SHL_ASSIGN("<<="), SHR_ASSIGN(">>="),
+	//Тернарный
+	TERNARY("?");
 
+	
 	public static final Map<Operator, Integer> PRECEDENCE = new HashMap<>();
 	static {
-	    // 1. Присваивание (низший приоритет)
+	    // 0. Тенарный оператор
+		PRECEDENCE.put(Operator.TERNARY, 0);
+		// 1. Присваивание (низший приоритет)
 		PRECEDENCE.put(Operator.ASSIGN, 1);
 		PRECEDENCE.put(Operator.PLUS_ASSIGN, 1);
 		PRECEDENCE.put(Operator.MINUS_ASSIGN, 1);
@@ -35,7 +42,7 @@ public enum Operator {
 		PRECEDENCE.put(Operator.XOR_ASSIGN, 1);
 		PRECEDENCE.put(Operator.SHL_ASSIGN, 1);
 		PRECEDENCE.put(Operator.SHR_ASSIGN, 1);
-	    // 2. Логическое ИЛИ
+		// 2. Логическое ИЛИ
 		PRECEDENCE.put(Operator.OR, 2);
 	    // 3. Логическое И
 		PRECEDENCE.put(Operator.AND, 3);
@@ -66,6 +73,14 @@ public enum Operator {
 		// 12. Унарные операторы (высший приоритет)
 		PRECEDENCE.put(Operator.NOT, 12);
 		PRECEDENCE.put(Operator.BIT_NOT, 12);
+		PRECEDENCE.put(Operator.PRE_INC, 12);
+		PRECEDENCE.put(Operator.PRE_DEC, 12);
+        // 13. Постфиксные операторы (наивысший приоритет)
+        PRECEDENCE.put(Operator.INC, 13);
+        PRECEDENCE.put(Operator.DEC, 13);
+		PRECEDENCE.put(Operator.POST_INC, 13);
+		PRECEDENCE.put(Operator.POST_DEC, 13);
+
 		// Унарные + и - обрабатываются в parseUnary()
 	};
 	
@@ -81,7 +96,7 @@ public enum Operator {
 
 	public static Operator fromSymbol(String symbol) {
 		for (Operator op : values()) {
-			if (op.symbol.equals(symbol)) {
+			if (op.symbol.equals(symbol) && Operator.PRE_DEC != op && Operator.PRE_INC != op && Operator.POST_DEC != op && Operator.POST_INC != op) {
 				return op;
 			}
 		}
@@ -105,7 +120,8 @@ public enum Operator {
 
 	// Проверяет, является ли оператор арифметическим
 	public boolean isArithmetic() {
-		return this == PLUS || this == MINUS || this == MULT || this == DIV || this == MOD;
+		return	this == PLUS || this == MINUS || this == MULT || this == DIV || this == MOD || this == INC || this == DEC ||
+				this == PRE_INC || this == PRE_DEC || this == POST_INC || this == POST_DEC;
 	}
 
 	// Проверяет, является ли оператор присваиванием
@@ -116,8 +132,13 @@ public enum Operator {
 
 	// Проверяет, является ли оператор унарным
 	public boolean isUnary() {
-		return this == NOT || this == BIT_NOT || this == PLUS || this == MINUS;
+		return this == NOT || this == BIT_NOT || this == PLUS || this == MINUS || this == PRE_INC || this == PRE_DEC;
 	}
+
+	// Проверяет, является ли оператор постфиксным
+    public boolean isPostfix() {
+        return this == POST_INC || this == POST_DEC;
+    }
 
 	// Проверяет, можно ли применять оператор к boolean
 	public boolean isBooleanOperator() {
@@ -126,6 +147,7 @@ public enum Operator {
 
 	// Проверяет, можно ли применять оператор к числам
 	public boolean isNumericOperator() {
-		return isArithmetic() || isBitwise() || this == PLUS || this == MINUS; // Унарные + и -
+		return	isArithmetic() || isBitwise() || this == PLUS || this == MINUS || this == INC || this == DEC || this == PRE_INC || this == PRE_DEC ||
+				this == POST_INC || this == POST_DEC;
 	}
 }

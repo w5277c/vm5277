@@ -1,32 +1,12 @@
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------
 Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-24.04.2025	konstantin@5277.ru		Начало
+02.05.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.j8b.compiler.semantic;
+package ru.vm5277.j8b.compiler.exceptions;
 
-import ru.vm5277.j8b.compiler.enums.VarType;
-
-public class SymbolEntry {
-	final	VarType	type;
-	final	boolean	isMutable;
-	final	int		line;
-
-	SymbolEntry(VarType type, boolean isMutable, int line) {
-		this.type = type;
-		this.isMutable = isMutable;
-		this.line = line;
-	}
-
-	public VarType getType() {
-		return type;
-	}
-
-	public boolean isMutable() {
-		return isMutable;
-	}
-
-	public int getLine() {
-		return line;
+public class MessageContainerIsFullException extends RuntimeException {
+	public MessageContainerIsFullException(String text) {
+		super(text);
 	}
 }

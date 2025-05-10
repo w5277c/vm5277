@@ -9,180 +9,326 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import ru.vm5277.j8b.compiler.ParseError;
+import ru.vm5277.j8b.compiler.exceptions.ParseException;
+import ru.vm5277.j8b.compiler.SourcePosition;
 import ru.vm5277.j8b.compiler.nodes.commands.IfNode;
 import ru.vm5277.j8b.compiler.nodes.commands.ReturnNode;
 import ru.vm5277.j8b.compiler.nodes.commands.WhileNode;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
 import ru.vm5277.j8b.compiler.nodes.expressions.MethodCallExpression;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
+import static ru.vm5277.j8b.compiler.enums.Keyword.BREAK;
+import static ru.vm5277.j8b.compiler.enums.Keyword.CONTINUE;
+import static ru.vm5277.j8b.compiler.enums.Keyword.DO;
+import static ru.vm5277.j8b.compiler.enums.Keyword.FOR;
+import static ru.vm5277.j8b.compiler.enums.Keyword.IF;
+import static ru.vm5277.j8b.compiler.enums.Keyword.RETURN;
+import static ru.vm5277.j8b.compiler.enums.Keyword.SWITCH;
+import static ru.vm5277.j8b.compiler.enums.Keyword.WHILE;
+import ru.vm5277.j8b.compiler.enums.Operator;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.VarType;
+import ru.vm5277.j8b.compiler.messages.ErrorMessage;
+import ru.vm5277.j8b.compiler.nodes.commands.BreakNode;
+import ru.vm5277.j8b.compiler.nodes.commands.ContinueNode;
+import ru.vm5277.j8b.compiler.nodes.commands.DoWhileNode;
+import ru.vm5277.j8b.compiler.nodes.commands.ForNode;
+import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode;
 import ru.vm5277.j8b.compiler.tokens.Token;
+import ru.vm5277.j8b.compiler.SemanticAnalyzer;
+import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.WarningMessage;
+import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode.Case;
 
-public abstract class AstNode {
-	protected			TokenBuffer				tb;
-	protected			int						line;
-	protected			int						column;
+public abstract class AstNode extends SemanticAnalyzer {
+	protected			SourcePosition			sp;
+	private				ErrorMessage			error;
 	protected	final	ArrayList<BlockNode>	blocks	= new ArrayList<>();
+	
+	protected AstNode() {
+	}
 	
 	protected AstNode(TokenBuffer tb) {
         this.tb = tb;
-		this.line = tb.current().getLine();
-		this.column = tb.current().getColumn();
+		this.sp = tb.current().getSP();
     }
 
-	protected AstNode parseStatement() {
-		if (tb.match(TokenType.COMMAND)) {
-			Keyword keyword = (Keyword)tb.current().getValue();
+	protected AstNode parseCommand() throws ParseException {
+		Keyword keyword = (Keyword)tb.current().getValue();
+		switch(keyword) {
+			case IF:		return new IfNode(tb);
+			case FOR:		return new ForNode(tb);
+			case DO:		return new DoWhileNode(tb);
+			case WHILE:		return new WhileNode(tb);
+			case CONTINUE:	return new ContinueNode(tb);
+			case BREAK:		return new BreakNode(tb);
+			case RETURN:	return new ReturnNode(tb);
+			case SWITCH:	return new SwitchNode(tb);
+			default:
+				markFirstError(error);
+				throw new ParseException("Unexpected command token " + tb.current(), sp);
+		}
+	}
 
-			switch(keyword) {
-				case IF: return new IfNode(tb);
-				case WHILE:	return new WhileNode(tb);
-				case RETURN: return new ReturnNode(tb);
-				default:
-					throw new ParseError("Unexpected command token " + tb.current(), tb.current().getLine(), tb.current().getColumn());
-			}
+	protected AstNode parseStatement() throws ParseException {
+		if (tb.match(TokenType.COMMAND)) {
+			return parseCommand();
 		}
 		else if (tb.match(TokenType.ID)) {
 			// Парсим цепочку выражений (включая вызовы методов)
-			ExpressionNode expr = parseFullQualifiedExpression();			
+			ExpressionNode expr = parseFullQualifiedExpression(tb);			
 
 			// Если statement заканчивается точкой с запятой (но не в case-выражениях и т.д.)
 			if (tb.match(Delimiter.SEMICOLON)) {
-				tb.consume(Delimiter.SEMICOLON);
+				AstNode.this.consumeToken(tb, Delimiter.SEMICOLON);
 			}
 			else {
-				throw new ParseError("Expected ';' after statement", tb.current().getLine(), tb.current().getColumn());
+				throw new ParseException("Expected ';' after statement", sp);
 			}
 			return expr;
 		}
-		else if (tb.match(Delimiter.LEFT_BRACE)) {
-			
-			return new BlockNode(tb, "");
+		else if (tb.match(Operator.INC) || tb.match(Operator.DEC)) {
+				ExpressionNode expr = new ExpressionNode(tb).parse();
+				consumeToken(tb, Delimiter.SEMICOLON);
+				return expr;
 		}
-		throw new ParseError("Unexpected statement token: " + tb.current(),	tb.current().getLine(),	tb.current().getColumn());
+		else if (tb.match(Delimiter.LEFT_BRACE)) {
+			return new BlockNode(tb);
+		}
+/*		else if(tb.match(TokenType.OPERATOR)) {
+			Operator operator = (Operator)tb.current().getValue();
+			if (Operator.INC == operator || Operator.DEC == operator || operator.isAssignment()) {
+				ExpressionNode expr = new ExpressionParser(tb).parse();
+				tb.consume(Delimiter.SEMICOLON);
+				return expr;
+			}
+			throw new ParseError("Unexpected operator: " + operator, tb.current().getLine(), tb.current().getColumn());
+		}*/
+		ParseException e = tb.parseError("Unexpected statement token: " + tb.current());
+		tb.skip(Delimiter.SEMICOLON, Delimiter.LEFT_BRACE);
+		throw e;
 	}
 
-	private ExpressionNode parseFullQualifiedExpression() {
-		ExpressionNode base = new ExpressionParser(tb).parse();
+	protected VarType checkPrimtiveType() throws ParseException {
+		if(tb.match(TokenType.TYPE)) {
+			VarType type = VarType.fromKeyword((Keyword)consumeToken(tb).getValue());
+			if(null != type) return checkArrayType(type);
+		}
+		return null;
+	}
+	protected boolean checkClassName(String className) {
+		if (tb.match(TokenType.ID)) {
+			String typeName = (String)tb.current().getValue();
+			if (typeName.equals(className)) {
+				consumeToken(tb);
+				return true;
+			}
+		}
+		return false;
+	}
+	protected VarType checkClassType() throws ParseException {
+		if (tb.match(TokenType.ID)) {
+			VarType type = VarType.fromClassName((String)tb.current().getValue());
+			if(null != type) {
+				consumeToken(tb);
+				return checkArrayType(type);
+			}
+		}
+		return null;
+	}
+	protected VarType checkArrayType(VarType type) throws ParseException {
+		// Обработка полей-массивов
+		if (null != type && tb.match(Delimiter.LEFT_BRACKET)) { //'['
+			while (tb.match(Delimiter.LEFT_BRACKET)) { //'['
+				consumeToken(tb); // Потребляем '['
+
+				int depth = 0;
+				Integer size = null;
+				if(tb.match(TokenType.NUMBER)) {
+					depth++;
+					if (depth > 3) {
+						throw new ParseException("Maximum array nesting depth is 3", sp);
+					}
+					size = (Integer)consumeToken(tb).getValue();
+					if (size <= 0) {
+						throw new ParseException("Array size must be positive", sp);
+					}
+					type = VarType.arrayOf(type, size);
+				}
+				AstNode.this.consumeToken(tb, Delimiter.RIGHT_BRACKET);  // Потребляем ']'
+				type = size != null ? VarType.arrayOf(type, size) : VarType.arrayOf(type);
+			}
+		}
+		return type;
+	}
+
+	private ExpressionNode parseFullQualifiedExpression(TokenBuffer tb) throws ParseException {
+		ExpressionNode parent = new ExpressionNode(tb).parse();
 
 		// Обрабатываем цепочки вызовов через точку
 		while (tb.match(Delimiter.DOT)) {
-			tb.consume();
-			String methodName = (String)tb.consume(TokenType.ID).getValue();
+			consumeToken(tb);
+			String methodName = (String)AstNode.this.consumeToken(tb, TokenType.ID).getValue();
 
 			if (tb.match(Delimiter.LEFT_PAREN)) {
 				// Это вызов метода
-				base = new MethodCallExpression(tb, base, methodName, parseArguments());
+				parent = new MethodCallExpression(tb, parent, methodName, parseArguments(tb));
 			}
 			else {
 				// Доступ к полю (можно добавить FieldAccessNode)
-				throw new ParseError("Field access not implemented yet", tb.current().getLine(), tb.current().getColumn());
+				throw new ParseException("Field access not implemented yet", tb.current().getSP());
 			}
 		}
 
-		return base;
+		return parent;
 	}
-	public List<ExpressionNode> parseArguments() {
+	public List<ExpressionNode> parseArguments(TokenBuffer tb) throws ParseException {
 		List<ExpressionNode> args = new ArrayList<>();
-		tb.consume(Delimiter.LEFT_PAREN);
+		consumeToken(tb, Delimiter.LEFT_PAREN);
 
 		if (!tb.match(Delimiter.RIGHT_PAREN)) {
 			while(true) {
 				// Парсим выражение-аргумент
-				args.add(parseFullQualifiedExpression());
+				args.add(parseFullQualifiedExpression(tb));
 				
 				// Если после выражения нет запятой - выходим из цикла
 				if (!tb.match(Delimiter.COMMA)) break;
             
-	            // Пропускаем запятую
-		        tb.consume(Delimiter.COMMA);
+	            // Потребляем запятую
+		        AstNode.this.consumeToken(tb, Delimiter.COMMA);
 			} 
 		}
 
-		tb.consume(Delimiter.RIGHT_PAREN);
+		AstNode.this.consumeToken(tb, Delimiter.RIGHT_PAREN);
 		return args;
 	}
 	
-	protected void parseBody(List<AstNode> declarations, String className) {
-		while (!tb.match(TokenType.EOF) && !tb.match(Delimiter.RIGHT_BRACE)) {		
-			Set<Keyword> modifiers = collectModifiers();
-
-			// 2. Обработка классов с модификаторами
-			if (tb.match(TokenType.OOP) && Keyword.CLASS == tb.current().getValue()) {
-				declarations.add(new ClassNode(tb, modifiers, null));
-				continue;
-			}
-
-			// Обработка функций и глобальных переменных
-			if (tb.match(TokenType.TYPE)) {
-				VarType type = VarType.fromKeyword((Keyword)tb.current().getValue());
-				tb.consume();
-
-				// Обработка массива (int[10])
-				while (tb.match(Delimiter.LEFT_BRACKET)) {
-					tb.consume(); // Пропускаем '['
-
-					int depth = 0;
-					Integer size = null;
-					if(tb.match(TokenType.NUMBER)) {
-						depth++;
-						if (depth > 3) {
-							throw new ParseError("Maximum array nesting depth is 3", tb.current().getLine(), tb.current().getColumn());
-						}
-						size = (Integer)tb.consume().getValue();
-						if (size <= 0) {
-							throw new ParseError("Array size must be positive", tb.current().getLine(), tb.current().getColumn());
-						}
-						type = VarType.arrayOf(type, size);
-					}
-					tb.consume(Delimiter.RIGHT_BRACKET);  // Пропускаем ']'
-					type = size != null ? VarType.arrayOf(type, size) : VarType.arrayOf(type);
-				}
-
-				Token nameToken = tb.consume(TokenType.ID);
-
-				if(tb.match(TokenType.DELIMITER) && Delimiter.LEFT_PAREN == tb.current().getValue()) { // Это функция
-					declarations.add(new MethodNode(tb, modifiers, type, (String)nameToken.getValue()));
-				}
-				else if (tb.match(TokenType.DELIMITER) && Delimiter.LEFT_BRACKET == tb.current().getValue()) { // Это объявление массива
-					declarations.add(new ArrayDeclarationNode(tb, modifiers, type, (String)nameToken.getValue()));
-				}
-				else { // Глобальная переменная
-					declarations.add(new FieldNode(tb, modifiers, type, (String)nameToken.getValue()));
-				}
-				continue;
-			}
-
-			// 4. Обработка остальных statement (if, while, вызовы и т.д.)
-			AstNode statement = parseStatement();
-			declarations.add(statement);
-			if(statement instanceof BlockNode) {
-				blocks.add((BlockNode)statement);
-			}
-		}
-	}
-
-	protected final Set<Keyword> collectModifiers() {
+	public final Set<Keyword> collectModifiers(TokenBuffer tb) {
         Set<Keyword> modifiers = new HashSet<>();
-        while (tb.current().getType() == TokenType.MODIFIER) {
-			modifiers.add((Keyword)tb.consume().getValue());
+        while (tb.match(TokenType.MODIFIER)) {
+			Keyword modifier = (Keyword)consumeToken(tb).getValue();
+			if(!modifiers.add(modifier)) markError("Duplicate modifier: " + modifier);
         }
         return modifiers;
     }
 	
-	public int getLine() {
-		return line;
+	protected boolean isControlFlowInterrupted(AstNode node) {
+		if (null == node) return false;
+
+		// Проверяем явные прерывания потока
+		if (node instanceof ReturnNode || node instanceof BreakNode || node instanceof ContinueNode) {
+			return true;
+		}
+
+		// Для блоков проверяем последнюю инструкцию
+		if (node instanceof BlockNode) {
+			List<AstNode> declarations = ((BlockNode)node).getDeclarations();
+			if (!declarations.isEmpty()) {
+				return isControlFlowInterrupted(declarations.get(declarations.size() - 1));
+			}
+		}
+
+		// Для условных конструкций
+		if (node instanceof IfNode) {
+			IfNode ifNode = (IfNode)node;
+			return hasAllBranchesReturn(ifNode.getThenBlock(), ifNode.getElseBlock());
+		}
+
+		// Для циклов
+		if (node instanceof WhileNode || node instanceof DoWhileNode || node instanceof ForNode) {
+			// Циклы могут быть бесконечными, поэтому не прерывают поток
+			return false;
+		}
+
+		// Для switch
+		if (node instanceof SwitchNode) {
+			SwitchNode switchNode = (SwitchNode)node;
+			for (Case c : switchNode.getCases()) {
+				if (!isControlFlowInterrupted(c.getBlock())) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		return false;
 	}
-	
-	public int getColumn() {
-		return column;
+
+	private boolean hasAllBranchesReturn(AstNode thenBranch, AstNode elseBranch) {
+		boolean thenReturns = isControlFlowInterrupted(thenBranch);
+		boolean elseReturns = elseBranch != null && isControlFlowInterrupted(elseBranch);
+		return thenReturns && elseReturns;
 	}
 	
 	public List<BlockNode> getBlocks() {
 		return blocks;
+	}
+	
+	public SourcePosition getSP() {
+		return sp;
+	}
+	
+	public abstract String getNodeType();
+	
+	public Token consumeToken(TokenBuffer tb) {
+		markFirstError(tb.current().getError());
+		return tb.consume();
+    }
+	public Token consumeToken(TokenBuffer tb, TokenType expectedType) throws ParseException {
+		if (tb.current().getType() == expectedType) return consumeToken(tb);
+		else throw tb.parseError("Expected " + expectedType + ", but got " + tb.current().getType());
+    }
+	public Token consumeToken(TokenBuffer tb, Operator op) throws ParseException {
+		if (TokenType.OPERATOR == tb.current().getType()) {
+            if(op == tb.current().getValue()) return consumeToken(tb);
+			else throw tb.parseError("Expected operator " + op + ", but got " + tb.current().getValue());
+        }
+		else throw tb.parseError("Expected " + TokenType.OPERATOR + ", but got " + tb.current().getType());
+    }
+	public Token consumeToken(TokenBuffer tb, Delimiter delimiter) throws ParseException {
+		if (TokenType.DELIMITER == tb.current().getType()) {
+            if(delimiter == tb.current().getValue()) return consumeToken(tb);
+			else throw tb.parseError("Expected delimiter " + delimiter + ", but got " + tb.current().getValue());
+        }
+		else throw tb.parseError("Expected " + TokenType.DELIMITER + ", but got " + tb.current().getType());
+    }
+	public Token consumeToken(TokenBuffer tb, TokenType type, Keyword keyword) throws ParseException {
+		if (type == tb.current().getType()) {
+            if(keyword == tb.current().getValue()) return consumeToken(tb);
+			else throw tb.parseError("Expected keyword " + keyword + ", but got " + tb.current().getValue());
+        }
+		else throw tb.parseError("Expected " + TokenType.KEYWORD + ", but got " + tb.current().getType());
+    }
+	
+	public void markFirstError(ParseException e) {
+		if(null != e && null == error) error = e.getErrorMessage();
+	}
+	public void markFirstError(ErrorMessage message) {
+		if(null != message && null == error) error = message;
+	}
+	
+	
+	// должно вызываться из текущей ноды, ее мы помеим как содержащую ошибку.
+	public ErrorMessage markError(SemanticException e) {
+		ErrorMessage message = new ErrorMessage(e.getMessage(), tb.getSP());
+		if(null == error) error = message;
+		tb.addMessage(message);
+		return message;
+	}
+	public ErrorMessage markError(String text) {
+		ErrorMessage message = new ErrorMessage(text, tb.getSP());
+		if(null == error) error = message;
+		tb.addMessage(message);
+		return message;
+	}
+	public WarningMessage markWarning(String text) {
+		WarningMessage message = new WarningMessage(text, tb.getSP());
+		tb.addMessage(message);
+		return message;
+	}
+	
+	public void setError(ErrorMessage message) {
+		if(null != message && null == error) error = message;
 	}
 }

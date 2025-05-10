@@ -7,17 +7,23 @@ package ru.vm5277.j8b.compiler.nodes;
 
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
 import java.util.Set;
-import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.Operator;
 import ru.vm5277.j8b.compiler.enums.VarType;
+import ru.vm5277.j8b.compiler.exceptions.ParseException;
+import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.WarningMessage;
+import ru.vm5277.j8b.compiler.semantic.BlockScope;
+import ru.vm5277.j8b.compiler.semantic.ClassScope;
+import ru.vm5277.j8b.compiler.semantic.Scope;
+import ru.vm5277.j8b.compiler.semantic.Symbol;
 
 public class FieldNode extends AstNode {
 	private	final	Set<Keyword>	modifiers;
 	private			VarType			returnType;
 	private			String			name;
-	private	final	ExpressionNode	initializer;
+	private			ExpressionNode	initializer;
 	
 	public FieldNode(TokenBuffer tb, Set<Keyword> modifiers, VarType returnType, String name) {
 		super(tb);
@@ -30,10 +36,10 @@ public class FieldNode extends AstNode {
             initializer = null;
         }
 		else {
-			tb.consume();
-			initializer = new ExpressionParser(tb).parse();
+			consumeToken(tb);
+			try {initializer = new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
 		}
-        tb.consume(Delimiter.SEMICOLON);
+        try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
 	}
 	
 	public Set<Keyword> getModifiers() {
@@ -52,8 +58,60 @@ public class FieldNode extends AstNode {
 		return initializer;
 	}
 	
+	public boolean isFinal() {
+		return modifiers.contains(Keyword.FINAL);
+	}
+	public boolean isPublic() {
+		return modifiers.contains(Keyword.PUBLIC);
+	}
+
+	@Override
+	public String getNodeType() {
+		return "field";
+	}
+
 	@Override
 	public String toString() {
 		return getClass().getSimpleName() + ": " + modifiers + ", " + returnType + ", " + name;
+	}
+
+	@Override
+	public boolean preAnalyze() {
+		if(Character.isUpperCase(name.charAt(0))) tb.addMessage(new WarningMessage("Field name should start with lowercase letter:" + name, tb.getSP()));
+
+		return true;
+	}
+
+	@Override
+	public boolean declare(Scope scope) {
+		if(scope instanceof BlockScope) {
+			int t=343;
+		}
+		else {
+			ClassScope classScope = (ClassScope)scope;
+
+			try{classScope.addField(new Symbol(name, returnType, modifiers.contains(Keyword.FINAL)));} catch(SemanticException e) {markError(e);}
+
+		}
+
+		return true;
+	}
+
+	@Override
+	public boolean postAnalyze(Scope scope) {
+		// Проверка инициализации final-полей
+		if (isFinal() && initializer == null) markError("Final field '" + name + "' must be initialized");
+
+		// Анализ инициализатора, если есть
+		if (initializer != null) initializer.postAnalyze(scope);
+
+		// Проверка совместимости типов
+		try {
+			VarType initType = initializer.getType(scope);
+			if (!returnType.isCompatibleWith(initType)) markError("Type mismatch: cannot assign " + initType + " to " + returnType);
+		}
+		catch (SemanticException e) {markError(e);}
+		
+		return true;
 	}
 }

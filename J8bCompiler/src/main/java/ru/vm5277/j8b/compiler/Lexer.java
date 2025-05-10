@@ -5,10 +5,12 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler;
 
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.ArrayList;
 import java.util.List;
+import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.tokens.TChar;
 import ru.vm5277.j8b.compiler.tokens.TDelimiter;
 import ru.vm5277.j8b.compiler.tokens.TKeyword;
@@ -17,163 +19,109 @@ import ru.vm5277.j8b.compiler.tokens.TOpearator;
 import ru.vm5277.j8b.compiler.tokens.TString;
 import ru.vm5277.j8b.compiler.tokens.Token;
 import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.messages.ErrorMessage;
+import ru.vm5277.j8b.compiler.tokens.TLabel;
+import ru.vm5277.j8b.compiler.tokens.TNote;
 
 public class Lexer {
-	private	final	String			src;
-	private			int				pos				= 0;
-	private			int				line			= 1;
-	private			int				column			= 1;
-	private final	List<Token>		tokens			= new ArrayList<>();
+	private	final	MessageContainer	mc;
+	private			SourceBuffer		sb;
+	private final	List<Token>			tokens	= new ArrayList<>();
 	
-	public Lexer(Reader reader) throws IOException {
-		StringBuilder sb = new StringBuilder();
+	public Lexer(Reader reader, MessageContainer mc) throws IOException {
+		StringBuilder stringBuilder = new StringBuilder();
 		char[] buffer = new char[4*1024];
 		for (int length; (length = reader.read(buffer)) != -1;) {
-			sb.append(buffer, 0, length);
+			stringBuilder.append(buffer, 0, length);
 		}
-		src = sb.toString();
+		sb = new SourceBuffer(stringBuilder.toString());
 
-		while (pos<src.length()) {
-            char ch = src.charAt(pos);
-            
-			// Пропускаем пробелы (кроме \n)
-			if (Character.isWhitespace(ch)) {
-				if ('\n'==ch) {
-					//tokens.add(new Token(TokenType.NEWLINE, "\\n", line, column));
-					line++;
-					column = 1;
-				}
-				else if ('\r'==ch) {
-					if ((pos+1)<src.length() && '\n'==src.charAt(pos+1)) {
-						pos++;
+		this.mc = mc;
+
+		while (sb.hasNext()) {
+			// Пропускаем пробелы
+			if(skipWhiteSpaces(sb)) continue;
+			// Пропускаем комментарии
+			if(skipComment(sb, mc)) continue;
+			
+			char ch = sb.getChar();			
+			//Блок данных
+			if(sb.hasNext(1) && '#'==ch) {
+				sb.next();
+				SourcePosition sp = sb.snapSP();
+				char type = sb.getChar();
+				sb.next();
+				
+				switch(type) {
+					case 'p':
+						tokens.add(new TNote(sb, mc));
+						continue;
+					case ';':
+						mc.add(new ErrorMessage("Empty #block", sp));
+						continue;
+					default: {
+						mc.add(new ErrorMessage("Unsupported #block: '" + type + "'", sp));
+						TNote.skipToken(sb, mc);
 					}
-					line++;						
-					column = 1;
-		        }
-				else {
-					column++;
 				}
-				pos++;
 				continue;
-			}
-            
-			// 2. Пропускаем комментарии
-			if ('/'==ch && pos+1 < src.length()) {
-				if ('/'==src.charAt(pos+1)) {
-				    while (pos<src.length() && '\n'!=src.charAt(pos)) {
-						pos++;
-						column++;
-					}
-					continue;
-				}
-				else if ('*'==src.charAt(pos+1)) {
-					pos += 2;
-					column += 2;
-
-					while (pos < src.length()) {
-						ch = src.charAt(pos);
-
-						if ('*'==ch && pos+1 < src.length() && '/'==src.charAt(pos + 1)) {
-							// Конец комментария
-							pos += 2;
-							column += 2;
-							continue;
-						}
-
-						if ('\n'==ch) {
-							line++;
-							column = 1;
-						}
-						else {
-							column++;
-						}
-						pos++;
-					}
-
-					//add new ParseError("Unterminated block comment", startLine, startColumn);
-					continue;
-				}
 			}
 			
 			// Символ
 			if ('\''==ch) {
-				try {
-					Token token = new TChar(src, pos, line, column);
-					tokens.add(token);
-					column += (token.getEndPos()-pos);
-					pos=token.getEndPos();
-				}
-				catch(ParseError e) {
-					tokens.add(new Token(TokenType.CHAR, "?", e));
-					pos = e.getColumn()-column;
-					column = e.getColumn();
-				}
+				tokens.add(new TChar(sb, mc));
 				continue;
 			}
 			
 			// Строки
 			if ('"'==ch) {
-				try {
-					Token token = new TString(src, pos, line, column);
-					tokens.add(token);
-					column += (token.getEndPos()-pos);
-					pos=token.getEndPos();
-				}
-				catch(ParseError e) {
-					tokens.add(new Token(TokenType.STRING, "????", e));
-					pos = e.getColumn()-column;
-					column = e.getColumn();
-				}
+				tokens.add(new TString(sb, mc));
 				continue;
 			}
 			
             // Числа
             if (Character.isDigit(ch)) {
-                try {
-					Token token = new TNumber(src, pos, line, column);
-					tokens.add(token);
-					column += (token.getEndPos()-pos);
-					pos=token.getEndPos();
-				}
-				catch(ParseError e) {
-					tokens.add(new Token(TokenType.NUMBER, 0, e));
-					pos = e.getColumn()-column;
-					column = e.getColumn();
-				}
+				tokens.add(new TNumber(sb, mc));
 				continue;
             }
             
 			// Идентификаторы и ключевые слова
 			if (Character.isLetter(ch) || '_'==ch) {
-				Token token = new TKeyword(src, pos, line, column);
+				Token token = new TKeyword(sb);
+
+				// Добавляем проверку на метку
+				if (!(token.getValue() instanceof Keyword) && sb.hasNext() && ':'==sb.getChar()) {
+					token = new TLabel(token.getStringValue(), sb);
+				}
 				tokens.add(token);
-				column += (token.getEndPos()-pos);
-				pos=token.getEndPos();
 				continue;
 			}
 			
 			// Операторы
-			Token token = TOpearator.parse(src, pos, line, column);
+			Token token = TOpearator.parse(sb);
             if (null != token) {
                 tokens.add(token);
-				column += (token.getEndPos()-pos);
-				pos=token.getEndPos();
                 continue;
             }
                     
 			// Разделители
-			token = TDelimiter.parse(src, pos, line, column);
+			token = TDelimiter.parse(sb);
             if (null != token) {
                 tokens.add(token);
-				column += (token.getEndPos()-pos);
-				pos=token.getEndPos();
                 continue;
             }
-        
-			throw new ParseError("Unexpected character: '" + ch + "'", line, column);
+			SourcePosition sp = sb.snapSP();
+			sb.next();
+			mc.add(new ErrorMessage("Unexpected character: '" + ch + "'", sp));
         }
-        tokens.add(new Token(TokenType.EOF, "", line, column));
-		
+        tokens.add(new Token(sb, TokenType.EOF, null));
+	}
+
+	public List<Token> getTokens() {
+		return tokens;
+	}
+	
+	public void print() {
 		for(Token token : tokens) {
 			System.out.print(token.toString());
 			if(TokenType.NEWLINE == token.getType()) {
@@ -183,7 +131,59 @@ public class Lexer {
 		System.out.println();
 	}
 
-	public List<Token> getTokens() {
-		return tokens;
+	public static boolean skipWhiteSpaces(SourceBuffer sb) {
+		char ch = sb.getChar();
+		if (Character.isWhitespace(ch)) {
+			if ('\n'==ch) {
+				sb.incLine();
+			}
+			else if ('\r'==ch) {
+				if (sb.hasNext(1) && '\n'==sb.getChar(1)) {
+					sb.next();
+				}
+				sb.incLine();
+			}
+			else {
+				sb.incColumn();
+			}
+			sb.incPos();
+			return true;
+		}
+		return false;
+	}
+	
+	public static boolean skipComment(SourceBuffer sb, MessageContainer mc) {
+		char ch = sb.getChar();
+		if ('/'==ch && sb.hasNext(1)) {
+			if ('/'==sb.getChar(1)) {
+				while (sb.hasNext() && '\n'!=sb.getChar()) {
+					sb.next();
+				}
+				return true;
+			}
+			else if ('*'==sb.getChar(1)) {
+				sb.next(2);
+				while (sb.hasNext()) {
+					ch = sb.getChar();
+					if ('*'==ch && sb.hasNext(1) && '/'==sb.getChar(1)) {
+						// Конец комментария
+						sb.next(2);
+						return true;
+					}
+
+					if ('\n'==ch) {
+						sb.incLine();
+					}
+					else {
+						sb.incColumn();
+					}
+					sb.incPos();
+				}
+
+				mc.add(new ErrorMessage("Unterminated block comment", sb));
+				return true;
+			}
+		}
+		return false;
 	}
 }

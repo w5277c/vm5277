@@ -1,27 +1,23 @@
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------
 Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-25.04.2025	konstantin@5277.ru		Начало
+02.05.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.j8b.compiler.semantic;
+package ru.vm5277.j8b.compiler.messages;
 
-import java.util.List;
-import ru.vm5277.j8b.compiler.enums.VarType;
+import ru.vm5277.j8b.compiler.SourceBuffer;
+import ru.vm5277.j8b.compiler.SourcePosition;
 
-public class MethodInfo {
-	private	final	VarType			returnType;
-	private	final	List<VarType>	parameters;
-
-	public MethodInfo(VarType returnType, List<VarType> parameters) {
-		this.returnType = returnType;
-		this.parameters = parameters;
+public class ErrorMessage extends Message {
+	public ErrorMessage(MessageOwner owner, String text, SourcePosition sp) {
+		super(owner, text, sp);
 	}
 
-	public VarType getReturnType() {
-		return returnType;
+	public ErrorMessage(String text, SourceBuffer sb) {
+		super(text, sb.snapSP());
 	}
-	
-	public List<VarType> getParameters() {
-		return parameters;
+
+	public ErrorMessage(String text, SourcePosition sp) {
+		super(text, sp);
 	}
 }

@@ -5,75 +5,90 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes.expressions;
 
-import ru.vm5277.j8b.compiler.SemanticError;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.VarType;
+import ru.vm5277.j8b.compiler.exceptions.ParseException;
+import ru.vm5277.j8b.compiler.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
-import ru.vm5277.j8b.compiler.semantic.SymbolTable;
+import ru.vm5277.j8b.compiler.semantic.Scope;
 
 public class ArrayExpression extends ExpressionNode {
     private	final	ExpressionNode	array;
-    private	final	ExpressionNode	index;
+    private			ExpressionNode	index;
 
 	public ArrayExpression(TokenBuffer tb, ExpressionNode expr) {
 		super(tb);
 
 		this.array = expr;
 		
-		tb.consume(Delimiter.LEFT_BRACKET); // Пропускаем '['
-		index = new ExpressionParser(tb).parse(); // Парсим выражение-индекс
-		tb.consume(Delimiter.RIGHT_BRACKET); // Пропускаем ']'
+		try {consumeToken(tb, Delimiter.LEFT_BRACKET);} catch(ParseException e){markFirstError(e);} // Потребляем '['
+		try {index = new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);} // Парсим выражение-индекс
+		try {consumeToken(tb, Delimiter.RIGHT_BRACKET);} catch(ParseException e){markFirstError(e);} // Потребляем ']'
 	}
 
-	@Override
-	public VarType semanticAnalyze(SymbolTable symbolTable) throws SemanticError {
-		// 1. Проверяем, что array — действительно массив
-		VarType arrayType = array.semanticAnalyze(symbolTable);
+   @Override
+	public VarType getType(Scope scope) throws SemanticException {
+		// Получаем тип массива
+		VarType arrayType = array.getType(scope);
 
-		// Проверка на null
-		if (arrayType == VarType.NULL) {
-			throw new SemanticError("Null pointer array access", line, column);
-		}
+		// Проверяем что это действительно массив
+		if (!arrayType.isArray()) throw new SemanticException("Array access on non-array type: " + arrayType);
 
-		if (!arrayType.isArray()) {
-			throw new SemanticError(String.format("Array access on non-array type '%s'", arrayType.getName()), line, column);
-		}
-
-		// 2. Проверка глубины вложенности (максимум 3 уровня)
-		int depth = 1;
-		VarType currentType = arrayType;
-		while (currentType.isArray()) {
-			depth++;
-			currentType = currentType.getElementType();
-			if (depth > 3) {
-				throw new SemanticError("Array nesting depth exceeds maximum allowed (3 levels)", getLine(), getColumn());
-			}
-		}
-
-		// 3. Проверяем индекс (должен быть целочисленным)
-		VarType indexType = index.semanticAnalyze(symbolTable);
-		if (!indexType.isInteger()) {
-			throw new SemanticError("Array index must be integer type, got '" + indexType.getName() + "'", index.getLine(), index.getColumn());
-		}
-
-		// 4. Проверка границ для статических массивов
-		if (arrayType.getArraySize() != null) {
-			if (index instanceof LiteralExpression) {
-				int idxValue = (int)((LiteralExpression)index).getValue();
-				if (idxValue < 0 || idxValue >= arrayType.getArraySize()) {
-					throw new SemanticError(String.format("Array index out of bounds [0..%d]", arrayType.getArraySize()-1), index.getLine(), index.getColumn());
-				}
-			}
-		}
-
-		// TODO добавить проверку изменяемости для операций записи
-
-		// Возвращаем тип элемента массива
+		// Возвращаем тип элементов массива
 		return arrayType.getElementType();
 	}
-	
+
 	@Override
-	public <T> T accept(ExpressionVisitor<T> visitor) {
-		return visitor.visit(this);
+	public boolean preAnalyze() {
+		if (null == array) {
+			markError("Array expression is missing");
+			return false;
+		}
+
+		if (null == index) {
+			markError("Index expression is missing");
+			return false;
+		}
+
+		return array.preAnalyze() && index.preAnalyze();
+	}
+
+	@Override
+	public boolean postAnalyze(Scope scope) {
+		try {
+			// Проверяем подвыражения
+			if (!array.postAnalyze(scope) || !index.postAnalyze(scope)) {
+				return false;
+			}
+
+			// Проверяем тип массива
+			VarType arrayType = array.getType(scope);
+			if (!arrayType.isArray()) {
+				markError("Cannot index non-array type: " + arrayType);
+				return false;
+			}
+
+			// Проверяем тип индекса
+			VarType indexType = index.getType(scope);
+			if (!indexType.isInteger()) {
+				markError("Array index must be integer, got: " + indexType);
+				return false;
+			}
+
+			// Проверка границ для статических массивов
+			if (arrayType.getArraySize() != null && index instanceof LiteralExpression) {
+				int idx = ((Number)((LiteralExpression)index).getValue()).intValue();
+				if (idx < 0 || idx >= arrayType.getArraySize()) {
+					markError("Array index out of bounds [0.." + (arrayType.getArraySize()-1) + "]");
+					return false;
+				}
+			}
+
+			return true;
+		}
+		catch (SemanticException e) {
+			markError(e.getMessage());
+			return false;
+		}
 	}
 }

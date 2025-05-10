@@ -5,84 +5,96 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.tokens;
 
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.util.Locale;
+import javax.xml.bind.DatatypeConverter;
+import ru.vm5277.j8b.compiler.Lexer;
 import ru.vm5277.j8b.compiler.enums.TokenType;
-import java.math.BigDecimal;
-import ru.vm5277.j8b.compiler.ParseError;
+import ru.vm5277.j8b.compiler.SourceBuffer;
+import ru.vm5277.j8b.compiler.SourcePosition;
+import ru.vm5277.j8b.compiler.enums.Keyword;
+import ru.vm5277.j8b.compiler.messages.ErrorMessage;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 
 public class Token {
-	protected	TokenType	type;
-	protected	Object		value;
-	protected	int			line;
-	protected	int			column;
-	protected	int			endPos;
-	private		ParseError	error;
+	private		final	static	DecimalFormat	df	= new DecimalFormat("0.####################", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
+	protected					TokenType		type;
+	protected					Object			value;
+	protected					SourceBuffer	sb;
+	protected					SourcePosition	sp;
+	private						ErrorMessage	error;
 	
-	public Token() {
+	public Token(SourceBuffer sb) {
+		this.sb = sb;
+		this.sp = sb.snapSP();
+	}
+	public Token(SourceBuffer sb, SourcePosition sp) {
+		this.sb = sb;
+		this.sp = sp;
 	}
 	
-	public Token(TokenType type, Object value, ParseError error) {
+	public Token(SourceBuffer sb, TokenType type, Object value) {
+		this.sb = sb;
+		this.sp = sb.snapSP();
 		this.type = type;
 		this.value = value;
-		this.line = error.getLine();
-		this.column = error.getColumn();
-		this.error = error;
 	}
 
-	public Token(TokenType type, Object value, int line, int column) {
-		this.type = type;
-		this.value = value;
-		this.line = line;
-		this.column = column;
-	}
-
-	// Вспомогательные методы для доступа к значениям
-	public Integer intValue() {
-		return (Integer)value;
-	}
-    
-	public BigDecimal decimalValue() {
-		return (BigDecimal)value;
-	}
-
-	public Boolean booleanValue() {
-		return (Boolean)value;
-	}
-
-	public String stringValue() {
-		return (String)value;
-	}
-	
-	
-	public int getEndPos() {
-		return endPos;
-	}
-	
 	public Object getValue() {
+		if(TokenType.LITERAL == type) {
+			switch((Keyword)value) {
+				case TRUE: return true;
+				case FALSE: return false;
+				case NULL: return null;
+			}
+		}
 		return value;
 	}
 	
+	public String getStringValue() {
+		return toStringValue(value);
+	}
+	
+	public static String toStringValue(Object value) {
+		if(value instanceof Double) return Token.df.format((Double)value);
+		if(value instanceof Number) return ((Number)value).toString();
+		if(value instanceof Boolean) return ((Boolean)value).toString();
+		if(value instanceof byte[]) return "0x" + DatatypeConverter.printHexBinary((byte[])value);
+		return (String)value;
+	}
+
 	public TokenType getType() {
 		return type;
 	}
 	
-	public int getLine() {
-		return line;
+	public SourcePosition getSP() {
+		return sp;
 	}
 	
-	public int getColumn() {
-		return column;
-	}
-	
-	public ParseError getError() {
+	public ErrorMessage getError() {
 		return error;
+	}
+
+
+	public void setErrorAndSkipToken(String text, MessageContainer mc) {
+		setError(text, mc);
+		skipToken(sb, mc);
+	}
+	public void setError(String text, MessageContainer mc) {
+		error = new ErrorMessage(text, sb);
+		mc.add(error);
+	}
+	public static void skipToken(SourceBuffer sb, MessageContainer mc) {
+		while(sb.hasNext() && ';'!=sb.getChar()) {
+			if(Lexer.skipWhiteSpaces(sb)) continue;
+			if(Lexer.skipComment(sb, mc)) continue;
+			sb.next();
+		}
 	}
 	
 	@Override
 	public String toString() {
-		return type + "(" + value + ")[" + line + ":" + column + "]";
+		return type + "(" + value + ")" + sb;
 	}
-	
-	public static Token parse() {
-		return null;
-	};
 }

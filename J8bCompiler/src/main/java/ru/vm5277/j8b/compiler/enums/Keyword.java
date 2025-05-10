@@ -9,15 +9,15 @@ public enum Keyword {
 	// Литералы
 	TRUE, FALSE, NULL,
 	// Типы примитив
-	VOID, BOOL, BYTE, SHORT, INT, FIXED,
+	VOID, BOOL, BYTE, SHORT, INT, FIXED, CSTR,
 	// Команды
-	IF, ELSE, WHILE, FOR, RETURN,
+	IF, DO, WHILE, FOR, RETURN, CONTINUE, BREAK, SWITCH, FREE,
 	// Модификаторы
-	STATIC, FINAL, PRIVATE, PUBLIC, NATIVE, ATOMIC,
+	STATIC, FINAL, PRIVATE, PUBLIC, NATIVE, ATOMIC, //TODO SYNCHRONIZED
 	// Ключевые слова ООП
 	CLASS, INTERFACE, IMPLEMENTS, THIS,
 	//Остальное
-	IMPORT, AS;
+	IMPORT, AS, ELSE, CASE, DEFAULT, NEW;
 	
 	public static Keyword fromString(String str) {
 		try {
@@ -40,12 +40,17 @@ public enum Keyword {
 			case SHORT:
 			case INT:
 			case FIXED:
+			case CSTR:
 				return TokenType.TYPE;
 			case IF:
-			case ELSE:
+			case DO:
 			case WHILE:
 			case FOR:
 			case RETURN:
+			case CONTINUE:
+			case BREAK:
+			case SWITCH:
+			case FREE:
 				return TokenType.COMMAND;
 			case STATIC:
 			case FINAL:

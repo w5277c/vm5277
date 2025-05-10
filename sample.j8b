@@ -1,0 +1,76 @@
+// Тестовая программа для компилятора
+import hardware.timer;  // Проверка импортов
+
+public class Main {
+    // Глобальная переменная
+    int counter = 0;
+
+    // Главная функция
+    void main() {
+        // Вызов функции
+        getSystem().init();
+
+        MathUtils.square(3);
+
+        // Цикл while
+        while (counter < 10) {
+            // Условный оператор
+            if (counter % 2 == 0) {
+                print("Even: " + counter);
+            } else {
+                print("Odd: " + counter);
+            }
+            counter = counter + 1;
+        }
+
+        // Возврат из функции
+        return;
+    }
+
+    // Метод класса
+    void initSystem() {
+        // Вызов аппаратной функции
+        timer.set(1000);
+
+        // Локальная переменная
+        int localVar = 42+3;
+
+        // Блок кода
+        {
+            int innerVar = localVar * 2;
+            print(innerVar);
+        }
+    }
+
+    // Функция с параметрами
+    int add(int a, int b) {
+        int c =1;
+        return a + b + c;
+    }
+
+    // Блок кода
+    {
+        cstr test = "test string";
+        printStr(test);
+    }
+
+
+    // Второй класс для проверки
+    class MathUtils {
+        static int square(int x) {
+            return x * x;
+        }
+    }
+
+    void print(cstr str) {
+        //TODO
+    }
+
+    void print(byte[] data) {
+        //TODO
+    }
+
+    void print(int integer) {
+        //TODO
+    }
+}

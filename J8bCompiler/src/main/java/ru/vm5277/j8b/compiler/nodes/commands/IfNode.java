@@ -5,40 +5,52 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes.commands;
 
-import java.util.ArrayList;
 import ru.vm5277.j8b.compiler.nodes.*;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionParser;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.VarType;
+import ru.vm5277.j8b.compiler.exceptions.ParseException;
+import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.semantic.BlockScope;
+import ru.vm5277.j8b.compiler.semantic.Scope;
 
-public class IfNode extends AstNode {
-    private	final	ExpressionNode	condition;
+public class IfNode extends CommandNode {
+    private	ExpressionNode	condition;
+	private	BlockScope		thenScope;
+	private	BlockScope		elseScope;
 	
 	public IfNode(TokenBuffer tb) {
 		super(tb);
 		
-        tb.consume(); // Пропускаем "if"
-        tb.consume(Delimiter.LEFT_PAREN);
-        
+        consumeToken(tb); // Потребляем "if"
 		// Условие
-		this.condition = new ExpressionParser(tb).parse();
-        tb.consume(Delimiter.RIGHT_PAREN);
+		try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(ParseException e){markFirstError(e);}
+		try {this.condition = new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
+		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(ParseException e){markFirstError(e);}
 
 		// Then блок
-		blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, "") : new BlockNode(tb, parseStatement()));
+		tb.getLoopStack().add(this);
+		try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));}
+		catch(ParseException e) {markFirstError(e);}
+		tb.getLoopStack().remove(this);
 
 		// Else блок
-        if (tb.match(TokenType.COMMAND, Keyword.ELSE)) {
-			tb.consume();
+        if (tb.match(Keyword.ELSE)) {
+			consumeToken(tb);
         
 			if (tb.match(TokenType.COMMAND, Keyword.IF)) {
 				// Обработка else if
+				tb.getLoopStack().add(this);
 				blocks.add(new BlockNode(tb, new IfNode(tb)));
+				tb.getLoopStack().remove(this);
 			}
 			else {
-				blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, "") : new BlockNode(tb, parseStatement()));
+				tb.getLoopStack().add(this);
+				try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));}
+				catch(ParseException e) {markFirstError(e);}
+				tb.getLoopStack().remove(this);
 			}
 		}
 	}
@@ -55,4 +67,87 @@ public class IfNode extends AstNode {
     public BlockNode getElseBlock() {
         return (0x02 == blocks.size() ? blocks.get(1) : null);
     }
+	
+	@Override
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		sb.append("if (").append(condition.toString()).append(") ");
+		sb.append(getThenBlock().toString());
+
+		if (getElseBlock() != null) {
+			sb.append(" else ");
+			sb.append(getElseBlock().toString());
+		}
+
+		return sb.toString();
+	}
+
+	@Override
+	public String getNodeType() {
+		return "if condition";
+	}
+
+	@Override
+	public boolean preAnalyze() {
+		if (condition != null) condition.preAnalyze();
+		else markError("If condition cannot be null");
+
+		// Проверка что есть хотя бы один блок
+		if (null == getThenBlock() && null == getElseBlock()) markError("If statement must have at least one block (then or else)");
+		
+		// Проверка then-блока
+		if (null != getThenBlock()) getThenBlock().preAnalyze();
+
+		// Проверка else-блока (если есть)
+		if (null != getElseBlock()) getElseBlock().preAnalyze();
+		
+		return true;
+	}
+
+	@Override
+	public boolean declare(Scope scope) {
+		// Объявление переменных условия
+		if (null != condition) condition.declare(scope);
+
+		// Объявление then-блока в новой области видимости
+		if (null != getThenBlock()) {
+			thenScope = new BlockScope(scope);
+			getThenBlock().declare(thenScope);
+		}
+
+		// Объявление else-блока в новой области видимости
+		if (null != getElseBlock()) {
+			elseScope = new BlockScope(scope);
+			getElseBlock().declare(elseScope);
+		}
+		
+		return true;
+	}
+
+	@Override
+	public boolean postAnalyze(Scope scope) {
+		// Проверка типа условия
+		if (null != condition) {
+			if (condition.postAnalyze(scope)) {
+				try {
+					VarType condType = condition.getType(scope);
+					if (VarType.BOOL != condType) markError("If condition must be boolean, got: " + condType);
+				}
+				catch (SemanticException e) {markError(e);}
+			}
+		}
+
+		// Анализ then-блока
+		if (null != getThenBlock()) getThenBlock().postAnalyze(thenScope);
+
+		// Анализ else-блока
+		if (null != getElseBlock()) getElseBlock().postAnalyze(elseScope);
+		
+		// Проверяем недостижимый код после if с возвратом во всех ветках
+        if (null != getElseBlock() && isControlFlowInterrupted(getThenBlock()) && isControlFlowInterrupted(getElseBlock())) {
+            markWarning("Code after if statement may be unreachable");
+        }
+		
+		return true;
+	}
 }

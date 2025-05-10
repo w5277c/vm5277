@@ -5,34 +5,32 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.tokens;
 
-import ru.vm5277.j8b.compiler.ParseError;
+import ru.vm5277.j8b.compiler.SourceBuffer;
 import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 
 public class TChar extends Token {
-	public TChar(String src, int pos, int line, int column) {
+	
+	public TChar(SourceBuffer sb, MessageContainer mc) {
+		super(sb);
 		type = TokenType.CHAR;
-		
-		endPos = pos;
-		this.line = line;
-		this.column = column;
 
-		endPos++; // Пропускаем открывающую кавычку
-		column++;
-		if (endPos >= src.length()) {
-			throw new ParseError("Unterminated ASCII char literal", line, column);
+		if (!sb.hasNext()) {
+			setError("Unterminated ASCII char literal", mc);
+			value = '?';
+			return;
 		}
-    
-		char ch = src.charAt(endPos);
-    
+		sb.next();
+		char ch = sb.getChar(); // Пропускаем '''
 		// Обработка экранированных символов (\n, \t, \', \\)
 		if ('\\'==ch) {
-			endPos++;
-			column++;
-			if (endPos >= src.length()) {
-				throw new ParseError("Invalid escape sequence", line, column);
+			if (!sb.hasNext()) {
+				setError("Invalid escape sequence", mc);
+				value = '?';
+				return;
 			}
-			
-			ch = src.charAt(endPos);
+			sb.next();
+			ch = sb.getChar();
 			switch (ch) {
 				case 'n':	ch = '\n';	break;
 				case 't':	ch = '\t';	break;
@@ -40,19 +38,19 @@ public class TChar extends Token {
 				case '\\':	ch = '\\';	break;
 				case '0':	ch = '\0';	break;
 				default:
-					throw new ParseError("Unknown escape: \\" + ch, line, column);
+					setError("Unknown escape: \\" + ch, mc);
+					ch = '?';
 			}
 	    }
     
-		// Пропускаем символ и проверяем закрывающую кавычку '
-		endPos++;
-		column++;
-		if (endPos >= src.length() || '\'' != src.charAt(endPos)) {
-	        throw new ParseError("Char literal must be 1 ASCII character", line, column);
+		// Пропускаем символ и проверяем '''
+		sb.next();
+		if (!sb.hasNext() || '\'' != sb.getChar()) {
+			setError("Char literal must be 1 ASCII character", mc);
 		}
-		endPos++;
-		column++;
-    
-		value = ch;
+		else {
+			sb.next();
+		}
+		value = String.valueOf(ch);
 	}
 }

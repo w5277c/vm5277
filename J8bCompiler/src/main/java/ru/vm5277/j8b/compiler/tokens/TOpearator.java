@@ -5,41 +5,48 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.tokens;
 
+import ru.vm5277.j8b.compiler.SourceBuffer;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.Operator;
 
 public class TOpearator extends Token {
-	public TOpearator(Operator value, int endPos, int line, int column) {
+	private TOpearator(SourceBuffer sb, Operator op) {
+		super(sb);
 		this.type = TokenType.OPERATOR;
-		this.value = value;
-		this.endPos = endPos;
-		this.line = line;
-		this.column = column;
+		this.value = op;
 	}
 
-	public static TOpearator parse(String src, int pos, int line, int column) {
+	public static TOpearator parse(SourceBuffer sb) {
 		
 		// Проверяем трехсимвольные операторы (если есть)
-        if (pos+2 < src.length()) {
-            Operator op = Operator.fromSymbol(src.substring(pos, pos+3));
+        if (sb.hasNext(2)) {
+            Operator op = Operator.fromSymbol(sb.getSource().substring(sb.getPos(), sb.getPos()+3));
             if (null != op) {
-				return new TOpearator(op, pos+3, line, column);
+				TOpearator result = new TOpearator(sb, op);
+				sb.next(3);
+				return result;
 			}
         }
         
         // Проверяем двухсимвольные операторы
-        if (pos+1 < src.length()) {
-            Operator op = Operator.fromSymbol(src.substring(pos, pos+2));
+        if (sb.hasNext(1)) {
+            Operator op = Operator.fromSymbol(sb.getSource().substring(sb.getPos(), sb.getPos()+2));
             if (null != op) {
-				return new TOpearator(op, pos+2, line, column);
+				TOpearator result = new TOpearator(sb, op);
+				sb.next(2);
+				return result;
 			}
         }
         
-        // Проверяем односимвольные операторы
-        Operator op = Operator.fromSymbol(src.substring(pos, pos+1));
-		if (null != op) {
-			return new TOpearator(op, pos+1, line, column);
-		}
+		// Проверяем односимвольные операторы
+        if (sb.hasNext()) {
+            Operator op = Operator.fromSymbol(sb.getSource().substring(sb.getPos(), sb.getPos()+1));
+            if (null != op) {
+				TOpearator result = new TOpearator(sb, op);
+				sb.next();
+				return result;
+			}
+        }
 		return null;
 	}
 }
