@@ -5,13 +5,13 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes.expressions;
 
-import java.math.BigInteger;
 import ru.vm5277.j8b.compiler.enums.VarType;
+import ru.vm5277.j8b.compiler.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
-import ru.vm5277.j8b.compiler.semantic.SymbolTable;
+import ru.vm5277.j8b.compiler.semantic.Scope;
 
 public class LiteralExpression extends ExpressionNode {
-    private final Object value;
+    private Object value;
     
     public LiteralExpression(TokenBuffer tb, Object value) {
         super(tb);
@@ -20,24 +20,28 @@ public class LiteralExpression extends ExpressionNode {
     }
     
 	@Override
-	public VarType semanticAnalyze(SymbolTable symbolTable) {
-		if (value instanceof Integer) return VarType.INT;
+	public VarType getType(Scope scope) {
+		if (value == null) return VarType.NULL;
 		if (value instanceof Boolean) return VarType.BOOL;
+		if (value instanceof Number)  {
+			if(value instanceof Double) return VarType.FIXED;
+			
+			long l = ((Number)value).longValue();
+			if(l<0) return VarType.FIXED;
+			if(l<=255) return VarType.BYTE;
+			if(l<=65535) return VarType.SHORT;
+			return VarType.INT;
+		}
 		if (value instanceof String) return VarType.CSTR;
 		return VarType.UNKNOWN;
-	}
-	
-    @Override
-    public <T> T accept(ExpressionVisitor<T> visitor) {
-        return visitor.visit(this);
-    }
-    
-    public Object getValue() {
+	}	
+
+	public Object getValue() {
 		return value;
 	}
 	
 	public boolean isInteger() {
-		return value instanceof Integer || value instanceof Long || value instanceof BigInteger;
+		return value instanceof Integer || value instanceof Long;
 	}
 	
 	public boolean isCstr() {
@@ -56,4 +60,33 @@ public class LiteralExpression extends ExpressionNode {
 		if(value instanceof String) return getClass().getSimpleName() + ":" + ((String)value);
 		return getClass().getSimpleName() + ":" + value;
     }
+	
+	@Override
+	public boolean preAnalyze() {
+		if (value == null) {
+			markError("Literal value cannot be null");
+			return false;
+		}
+		return true;
+	}
+	
+	@Override
+	public boolean postAnalyze(Scope scope) {
+		try {
+			if (value instanceof Number) {
+				VarType type = getType(scope);
+				if (type == VarType.UNKNOWN) {
+					markError("Unsupported numeric literal type");
+					return false;
+				}
+				// Проверка диапазона через VarType.checkRange
+				type.checkRange((Number)value);
+			}
+			return true;
+		} 
+		catch (SemanticException e) {
+			markError(e.getMessage());
+			return false;
+		}
+	}
 }

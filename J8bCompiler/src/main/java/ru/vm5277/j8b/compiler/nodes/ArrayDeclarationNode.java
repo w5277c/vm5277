@@ -11,7 +11,14 @@ import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.Operator;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
+import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.WarningMessage;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
+import ru.vm5277.j8b.compiler.nodes.expressions.LiteralExpression;
+import ru.vm5277.j8b.compiler.semantic.BlockScope;
+import ru.vm5277.j8b.compiler.semantic.ClassScope;
+import ru.vm5277.j8b.compiler.semantic.Scope;
+import ru.vm5277.j8b.compiler.semantic.Symbol;
 
 public class ArrayDeclarationNode extends AstNode {
     private	final	Set<Keyword>	modifiers;
@@ -19,6 +26,7 @@ public class ArrayDeclarationNode extends AstNode {
     private	final	String			name;
 	private			ExpressionNode	size;
 	private			ExpressionNode	initializer;
+	private			Symbol			symbol;
 
 	public ArrayDeclarationNode(TokenBuffer tb, Set<Keyword> modifiers, VarType type, String name) {
 		super(tb);
@@ -44,5 +52,105 @@ public class ArrayDeclarationNode extends AstNode {
 		}
 		
 		try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
+	}
+
+	@Override
+	public String getNodeType() {
+		return "array declaration";
+	}
+	
+	@Override
+	public boolean preAnalyze() {
+		if(Character.isUpperCase(name.charAt(0))) tb.addMessage(new WarningMessage("Array name should start with lowercase letter:" + name, tb.getSP()));
+		
+		// Проверка типа элементов
+		if (null == elementType || VarType.VOID == elementType || VarType.UNKNOWN == elementType) markError("Invalid array element type: " + elementType);
+
+		return true;
+	}
+
+	@Override
+	public boolean declare(Scope scope) {
+		try {
+			// Создаем базовый тип массива без указания размера, конкретный размер будет проверяться в postAnalyze
+			VarType arrayType = VarType.arrayOf(elementType);
+			
+			// Проверяем конфликты имён и регистрируем переменную
+			symbol = new Symbol(name, arrayType, modifiers.contains(Keyword.FINAL));
+			if (scope instanceof ClassScope) {
+				((ClassScope)scope).addField(symbol);
+			}
+			else if (scope instanceof BlockScope) {
+				((BlockScope)scope).addLocal(symbol);
+			}
+			else markError("Arrays can only be declared in class or block scope");
+		}
+		catch (SemanticException e) {markError(e);}
+		
+		return true;
+	}
+	
+	@Override
+	public boolean postAnalyze(Scope scope) {
+		// Проверка размера массива (если указан)
+		Integer declaredSize = null;
+		if (size != null) {
+			if (size.postAnalyze(scope)) {
+				// Проверяем, что размер - целочисленная константа
+				if (!(size instanceof LiteralExpression) || VarType.INT != ((LiteralExpression)size).getType(scope)) {
+					markError("Array size must be a constant expression");
+				}
+				else {
+					Number sizeValue = (Number)((LiteralExpression)size).getValue();
+					if (sizeValue.intValue() <= 0) {
+						markError("Array size must be positive, got: " + sizeValue);
+					}
+					else {
+						declaredSize = sizeValue.intValue();						
+						//Обновляем тип массива с учетом размера
+						if(null != symbol) symbol.setType(VarType.arrayOf(elementType, sizeValue.intValue()));
+					}
+				}
+			}
+		}
+
+		// Проверка инициализатора (если есть)
+		if (initializer != null) {
+			if (initializer.postAnalyze(scope)) {
+				// Проверка совместимости типов
+				try {
+					VarType initType = initializer.getType(scope);
+					if (!initType.isArray()) markError("Array initializer must be an array");
+					else if (!initType.getElementType().isCompatibleWith(elementType)) {
+						markError(String.format("Type mismatch: cannot initialize %s[] with %s[]", elementType, initType.getElementType()));
+					}
+					
+					// Проверка размера, если массив с фиксированным размером
+					else if (declaredSize != null) {
+						// Для литеральных массивов
+						if (initializer instanceof LiteralExpression) {
+							Object value = ((LiteralExpression)initializer).getValue();
+							if (value instanceof Object[]) {
+								int actualSize = ((Object[])value).length;
+								if (actualSize != declaredSize) {
+									markError("Array size mismatch: declared " + declaredSize + ", initializer has " + actualSize);
+								}
+							}
+						}
+						// Для других выражений (например, вызовов методов, возвращающих массивы)
+						// Можно добавить дополнительную проверку во время выполнения
+						else {
+							markWarning("Array size will be checked at runtime");
+						}
+					}
+				}
+				catch (SemanticException e) {markError(e);}
+			}
+		}
+
+		// 3. Проверка final-массивов
+		if (modifiers.contains(Keyword.FINAL) && null == initializer) markError("Final array must be initialized");
+
+		return true;
 	}
 }

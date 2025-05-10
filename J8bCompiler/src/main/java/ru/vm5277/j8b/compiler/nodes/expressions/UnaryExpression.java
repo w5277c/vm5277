@@ -5,11 +5,13 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes.expressions;
 
-import ru.vm5277.j8b.compiler.SemanticError;
+import ru.vm5277.j8b.compiler.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler.enums.Operator;
+import static ru.vm5277.j8b.compiler.enums.Operator.PLUS;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
-import ru.vm5277.j8b.compiler.semantic.SymbolTable;
+import ru.vm5277.j8b.compiler.semantic.Scope;
+import ru.vm5277.j8b.compiler.semantic.Symbol;
 
 public class UnaryExpression extends ExpressionNode {
     private final Operator		 operator;
@@ -22,21 +24,98 @@ public class UnaryExpression extends ExpressionNode {
     }
     
 	@Override
-	public VarType semanticAnalyze(SymbolTable symbolTable) {
-		VarType operandType = operand.semanticAnalyze(symbolTable);
+	public VarType getType(Scope scope) throws SemanticException {
+		VarType operandType = operand.getType(scope);
 
-		// Проверка допустимости операции для типа
-		if (!isUnaryOperationValid(operandType, operator)) {
-			throw new SemanticError(String.format("Invalid unary operation %s for type %s", operator, operandType));
+		switch (operator) {
+			case NOT: return VarType.BOOL;
+			case PRE_INC:
+			case PRE_DEC:
+			case POST_INC:
+			case POST_DEC:
+			case PLUS:
+			case MINUS:
+			case BIT_NOT:
+			default: return operandType;
 		}
-
-		return operandType; // Для большинства унарных операций тип сохраняется
 	}
-    
+
 	@Override
-    public <T> T accept(ExpressionVisitor<T> visitor) {
-        return visitor.visit(this);
-    }
+	public boolean postAnalyze(Scope scope) {
+		try {
+			// Проверяем операнд
+			if (!operand.postAnalyze(scope)) {
+				return false;
+			}
+
+			VarType operandType = operand.getType(scope);
+
+			// Проверяем допустимость оператора для типа
+			switch (operator) {
+				case PLUS:
+					if (!operandType.isNumeric() && VarType.CSTR != operandType) {
+						markError("Unary " + operator + " requires numeric or string type");
+						return false;
+					}
+					break;
+					
+				case MINUS:
+					if (!operandType.isNumeric()) {
+						markError("Unary " + operator + " requires numeric type");
+						return false;
+					}
+					break;
+
+				case BIT_NOT:
+					if (!operandType.isInteger()) {
+						markError("Bitwise ~ requires integer type");
+						return false;
+					}
+					break;
+
+				case NOT:
+					if (operandType != VarType.BOOL) {
+						markError("Logical ! requires boolean type");
+						return false;
+					}
+					break;
+
+				case PRE_INC:
+				case PRE_DEC:
+				case POST_INC:
+				case POST_DEC:
+					if (!operandType.isNumeric()) {
+						markError("Increment/decrement requires numeric type");
+						return false;
+					}
+					if (!(operand instanceof VariableExpression)) {
+						markError("Can only increment/decrement variables");
+						return false;
+					}
+					// Дополнительная проверка на изменяемость переменной
+					if (isFinalVariable((VariableExpression)operand, scope)) {
+						markError("Cannot modify final variable");
+						return false;
+					}
+					break;
+
+				default:
+					markError("Unsupported unary operator: " + operator);
+					return false;
+			}
+
+			return true;
+		} catch (SemanticException e) {
+			markError(e.getMessage());
+			return false;
+		}
+	}
+	
+	private boolean isFinalVariable(VariableExpression var, Scope scope) {
+		Symbol symbol = scope.resolve(var.getValue());
+		return symbol != null && symbol.isFinal();
+	}
+	
 	
 	public Operator getOperator() {
 		return operator;

@@ -14,6 +14,7 @@ import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.Operator;
 import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler.messages.ErrorMessage;
 import ru.vm5277.j8b.compiler.messages.Message;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
@@ -68,21 +69,31 @@ public class TokenBuffer {
 		return current.getSP();
 	}
 	
-	public ParseException error(String text) {
+	public ParseException parseError(String text) {
 		ErrorMessage message = new ErrorMessage(text, current.getSP());
 		addMessage(message);
 		return new ParseException(message);
 	}
+	public SemanticException semanticError(String text) {
+		ErrorMessage message = new ErrorMessage(text, current.getSP());
+		addMessage(message);
+		return new SemanticException(text);
+	}
+
 	public void addMessage(Message message) {
 		mc.add(message);
 	}
+	public void addMessage(Exception e) {
+		mc.add(new ErrorMessage(e.getMessage(), current.getSP()));
+	}
 	
-	public void skip(Delimiter... delimiters) {
+	public Delimiter skip(Delimiter... delimiters) {
 		while(!match(TokenType.EOF)) {
 			Token token = consume();
 			for(Delimiter delimiter : delimiters) {
-				if(TokenType.DELIMITER == token.getType() && token.getValue() == delimiter) return;
+				if(TokenType.DELIMITER == token.getType() && token.getValue() == delimiter) return (Delimiter)token.getValue();
 			}
 		}
+		return null;
 	}
 }

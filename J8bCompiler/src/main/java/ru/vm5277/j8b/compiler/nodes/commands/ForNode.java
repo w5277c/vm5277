@@ -12,12 +12,19 @@ import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
+import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.nodes.expressions.LiteralExpression;
+import ru.vm5277.j8b.compiler.semantic.BlockScope;
+import ru.vm5277.j8b.compiler.semantic.Scope;
 
-public class ForNode extends AstNode {
-    private AstNode initialization;
-    private ExpressionNode condition;
-    private ExpressionNode iteration;
-    
+public class ForNode extends CommandNode {
+    private	AstNode			initialization;
+    private	ExpressionNode	condition;
+    private	ExpressionNode	iteration;
+    private	BlockScope		forScope;
+	private	BlockScope		bodyScope;
+	private	BlockScope		elseScope;
+	
     public ForNode(TokenBuffer tb) {
         super(tb);
         
@@ -109,4 +116,95 @@ public class ForNode extends AstNode {
         
         return sb.toString();
     }
+
+	@Override
+	public String getNodeType() {
+		return "for loop";
+	}
+
+	@Override
+	public boolean preAnalyze() {
+		// Проверка блока инициализации
+		if (null != initialization) initialization.preAnalyze();
+
+		// Проверка условия цикла
+		if (null != condition) condition.preAnalyze();
+
+		// Проверка блока итерации
+		if (null != iteration) iteration.preAnalyze();
+
+		// Проверка основного тела цикла
+		if (null != getBody()) getBody().preAnalyze();
+
+		// Проверка else-блока (если есть)
+		if (null != getElseBlock()) getElseBlock().preAnalyze();
+		
+		return  true;
+	}
+
+	@Override
+	public boolean declare(Scope scope) {
+		// Создаем новую область видимости для всего цикла
+		forScope = new BlockScope(scope);
+
+		// Объявление блока инициализации
+		if (null != initialization) initialization.declare(forScope);
+
+		// Объявление условия
+		if (null != condition) condition.declare(forScope);
+
+		// Объявление блока итерации
+		if (null != iteration) iteration.declare(forScope);
+
+		// Объявление тела цикла
+		if (null != getBody()) {
+			bodyScope = new BlockScope(forScope);
+			getBody().declare(bodyScope);
+		}
+		
+		// Объявление else-блока (если есть)
+		if (null != getElseBlock()) {
+			elseScope = new BlockScope(forScope);
+			getElseBlock().declare(elseScope);
+		}
+		
+		return true;
+	}
+
+	@Override
+	public boolean postAnalyze(Scope scope) {
+		// Анализ блока инициализации
+		if (initialization != null) initialization.postAnalyze(forScope);
+
+		// Проверка типа условия
+		if (condition != null) {
+			if (condition.postAnalyze(forScope)) {
+				try {
+					VarType condType = condition.getType(forScope);
+					if (VarType.BOOL != condType && condType != null) markError("For loop condition must be boolean, got: " + condType);
+				}
+				catch (SemanticException e) {markError(e);}
+			}
+		}
+
+		// Анализ блока итерации
+		if (null != iteration) iteration.postAnalyze(forScope);
+
+		// Анализ тела цикла
+		if (null != getBody()) {
+			getBody().postAnalyze(bodyScope);
+		}
+		
+		// Анализ else-блока
+		if (null != getElseBlock()) {
+			getElseBlock().postAnalyze(elseScope);
+		}
+		
+		// Проверяем бесконечный цикл с возвратом
+		if (condition instanceof LiteralExpression && Boolean.TRUE.equals(((LiteralExpression)condition).getValue()) &&	isControlFlowInterrupted(getBody())) {
+			markWarning("Code after infinite while loop is unreachable");
+		}
+
+		return true;
+	}
 }

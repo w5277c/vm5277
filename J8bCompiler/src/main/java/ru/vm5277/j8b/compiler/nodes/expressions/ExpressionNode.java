@@ -5,7 +5,6 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes.expressions;
 
-import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
@@ -30,9 +29,10 @@ import static ru.vm5277.j8b.compiler.enums.Operator.PLUS;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
+import ru.vm5277.j8b.compiler.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler.nodes.AstNode;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
-import ru.vm5277.j8b.compiler.semantic.SymbolTable;
+import ru.vm5277.j8b.compiler.semantic.Scope;
 import ru.vm5277.j8b.compiler.tokens.Token;
 
 public class ExpressionNode extends AstNode {
@@ -51,10 +51,10 @@ public class ExpressionNode extends AstNode {
             Operator operator = ((Operator)consumeToken(tb).getValue());
             ExpressionNode right = parseAssignment();
 			
-			return optimizeExpression(new BinaryExpression(tb, left, operator, right));
+			return new BinaryExpression(tb, left, operator, right);
         }
         
-        return optimizeExpression(left);
+        return left;
     }    
 	
 	private ExpressionNode parseBinary(int minPrecedence) throws ParseException {
@@ -88,12 +88,12 @@ public class ExpressionNode extends AstNode {
             consumeToken(tb);
 			
 			ExpressionNode right = parseBinary(precedence + (operator.isAssignment() ? 0 : 1));
-			left = optimizeOperationChain(left, operator, right, precedence);
+			left = new BinaryExpression(tb, left, operator, right);
 		}
         return left;
     }
 	
-	// Агрессивная оптимизация
+/*	// Агрессивная оптимизация
 	private ExpressionNode optimizeOperationChain(ExpressionNode left, Operator op, ExpressionNode right, int precedence) throws ParseException {
 		// Оптимизация унарных операций (если левая часть - унарный оператор)
 		if (right instanceof UnaryExpression) {
@@ -123,7 +123,7 @@ public class ExpressionNode extends AstNode {
 					case GT:	return new LiteralExpression(tb, 0d < delta);
 					case LTE:	return new LiteralExpression(tb, 0d <= delta);
 					case GTE:	return new LiteralExpression(tb, 0d >= delta);
-					default: throw tb.error("Invalid comparision operator: " + op);
+					default: throw tb.parseError("Invalid comparision operator: " + op);
 				}
 			}
 		}
@@ -403,7 +403,6 @@ public class ExpressionNode extends AstNode {
 			if (Operator.MINUS == op  && value instanceof Number) {
 				if(value instanceof Integer) return new LiteralExpression(tb, -(Integer)value);
 				else if(value instanceof Long) return new LiteralExpression(tb, -(Long)value);
-				else if(value instanceof BigInteger) return new LiteralExpression(tb, ((BigInteger)value).negate());
 				else if(value instanceof Double) return new LiteralExpression(tb, -(Double)value);
 			}
 			else if (Operator.NOT == op && value instanceof Boolean) {
@@ -444,7 +443,7 @@ public class ExpressionNode extends AstNode {
 		}
 		terms.add(new Term(isPositive ? Operator.MULT : Operator.DIV, node, isPositive));
 	}
-	
+	*/
 	private ExpressionNode parseUnary() throws ParseException {
 		if (tb.match(TokenType.OPERATOR)) {
 			Operator operator = ((Operator)tb.current().getValue()); //TODO check it
@@ -523,15 +522,6 @@ public class ExpressionNode extends AstNode {
         }
     }
 
-	
-	public VarType semanticAnalyze(SymbolTable symbolTable) {
-		return null;
-	}
-	
-    public <T> T accept(ExpressionVisitor<T> visitor) {
-        return visitor.visit(this);
-    }
-
 	protected boolean isUnaryOperationValid(VarType type, Operator op) {
 		switch (op) {
 			case NOT: return VarType.BOOL == type;
@@ -540,5 +530,30 @@ public class ExpressionNode extends AstNode {
 			case MINUS: return type.isNumeric();
 			default: return false;
 		}
+	}
+
+	@Override
+	public String getNodeType() {
+		return "expression";
+	}
+
+	public VarType getType(Scope scope) throws SemanticException {
+		throw new SemanticException("Not supported here.");
+	}
+//	public abstract VarType getType(Scope scope) throws SemanticException;
+	
+	@Override
+	public boolean preAnalyze() {
+		return false;
+	}
+
+	@Override
+	public boolean declare(Scope scope) {
+		return true;
+	}
+
+	@Override
+	public boolean postAnalyze(Scope scope) {
+		return false;
 	}
 }

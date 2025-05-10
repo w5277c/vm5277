@@ -15,10 +15,20 @@ import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
+import ru.vm5277.j8b.compiler.nodes.commands.DoWhileNode;
+import ru.vm5277.j8b.compiler.nodes.commands.ForNode;
+import ru.vm5277.j8b.compiler.nodes.commands.IfNode;
+import ru.vm5277.j8b.compiler.nodes.commands.ReturnNode;
+import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode;
+import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode.Case;
+import ru.vm5277.j8b.compiler.nodes.commands.WhileNode;
+import ru.vm5277.j8b.compiler.semantic.BlockScope;
+import ru.vm5277.j8b.compiler.semantic.Scope;
 
 public class BlockNode extends AstNode {
-	protected	List<AstNode>			declarations	= new ArrayList<>();
-	protected	Map<String, LabelNode>	labels			= new HashMap<>();
+	private	List<AstNode>			declarations	= new ArrayList<>();
+	private	Map<String, LabelNode>	labels			= new HashMap<>();
+	private	BlockScope				blockScope;
 	
 	public BlockNode() {
 	}
@@ -62,6 +72,11 @@ public class BlockNode extends AstNode {
 				declarations.add(new ClassNode(tb, modifiers, null));
 				continue;
 			}
+			// Обработка интерфейсов с модификаторами
+			if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
+				declarations.add(new InterfaceNode(tb, modifiers, null));
+				continue;
+			}
 
 			try {
 				// Определение типа (примитив или класс)
@@ -89,7 +104,7 @@ public class BlockNode extends AstNode {
 				markFirstError(e);
 			}
 
-			// 4. Обработка остальных statement (if, while, вызовы и т.д.)
+			// Обработка остальных statement (if, while, вызовы и т.д.)
 			try {
 				AstNode statement = parseStatement();
 				declarations.add(statement);
@@ -104,6 +119,61 @@ public class BlockNode extends AstNode {
 		consumeToken(tb, Delimiter.RIGHT_BRACE);
     }
 	
+	public static  boolean hasReturnStatement(AstNode node) {
+		if (null == node) return false;
+
+		// Если это return-выражение
+		if (node instanceof ReturnNode) return true;
+
+		// Если это блок, проверяем все его декларации
+		if (node instanceof BlockNode) {
+			BlockNode block = (BlockNode)node;
+			for (AstNode declaration : block.getDeclarations()) {
+				if (hasReturnStatement(declaration)) {
+					return true;
+				}
+			}
+		}
+		// Для других узлов проверяем их дочерние блоки
+		else {
+			for (BlockNode block : node.getBlocks()) {
+				if (hasReturnStatement(block)) {
+					return true;
+				}
+			}
+		}
+
+		// Особые случаи для управляющих конструкций
+		if (node instanceof IfNode) {
+			IfNode ifNode = (IfNode)node;
+			// Проверяем обе ветки if
+			return hasReturnStatement(ifNode.getThenBlock()) && (ifNode.getElseBlock() == null || hasReturnStatement(ifNode.getElseBlock()));
+		}
+		else if (node instanceof SwitchNode) {
+			// Для switch нужно проверить все case-блоки
+			SwitchNode switchNode = (SwitchNode)node;
+			for (Case c : switchNode.getCases()) {
+				if (!hasReturnStatement(c.getBlock())) {
+					return false;
+				}
+			}
+			return true;
+		}
+		else if(node instanceof DoWhileNode) {
+			DoWhileNode dowhileNode = (DoWhileNode)node;
+			return hasReturnStatement(dowhileNode.getBody());
+		}
+		else if(node instanceof WhileNode) {
+			WhileNode whileNode = (WhileNode)node;
+			return hasReturnStatement(whileNode.getBody());
+		}
+		else if(node instanceof ForNode) {
+			ForNode forNode = (ForNode)node;
+			return hasReturnStatement(forNode.getBody()) && (forNode.getElseBlock() == null || hasReturnStatement(forNode.getElseBlock()));
+		}
+		return false;
+	}
+	
 	public List<AstNode> getDeclarations() {
 		return declarations;
 	}
@@ -112,6 +182,51 @@ public class BlockNode extends AstNode {
 		return labels;
 	}
 	
+	@Override
+	public String getNodeType() {
+		return "code block";
+	}
+	
+	@Override
+	public boolean preAnalyze() {
+		// Проверка всех объявлений в блоке
+		for (AstNode declaration : declarations) {
+			declaration.preAnalyze(); // Не реагируем на критические ошибки
+		}
+		return true;
+	}
+
+	@Override
+	public boolean declare(Scope scope) {
+		// Создаем новую область видимости для блока
+		blockScope = new BlockScope(scope);
+
+		// Объявляем все элементы в блоке
+		for (AstNode declaration : declarations) {
+			declaration.declare(blockScope);
+		}
+
+		return true;
+	}
+	
+	@Override
+	public boolean postAnalyze(Scope scope) {
+		for (int i = 0; i < declarations.size(); i++) {
+			AstNode declaration = declarations.get(i);
+
+			// Анализируем текущую ноду
+			declaration.postAnalyze(blockScope);
+
+			// Проверяем недостижимый код после прерывающих инструкций
+			if (i > 0 && isControlFlowInterrupted(declarations.get(i - 1))) {
+				markError("Unreachable code after " + declarations.get(i - 1).getClass().getSimpleName());
+				// Можно пропустить анализ остального кода, так как он недостижим
+				break;
+			}
+		}
+		return true;
+	}
+
 	@Override
 	public String toString() {
 		return getClass().getSimpleName();

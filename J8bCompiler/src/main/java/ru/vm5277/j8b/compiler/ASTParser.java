@@ -17,16 +17,17 @@ import ru.vm5277.j8b.compiler.nodes.AstNode;
 import ru.vm5277.j8b.compiler.nodes.ClassNode;
 import ru.vm5277.j8b.compiler.nodes.ImportNode;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
+import ru.vm5277.j8b.compiler.semantic.Scope;
 import ru.vm5277.j8b.compiler.tokens.Token;
 
 public class ASTParser extends AstNode {
 	private			List<AstNode>		imports		= new ArrayList<>();
 	private			ClassNode			classNode;
-
+	private			TokenBuffer			tb;
 	public ASTParser(List<Token> tokens, MessageContainer mc) throws IOException {
 		if(tokens.isEmpty()) return;
 		
-		TokenBuffer tb = new TokenBuffer(tokens.iterator(), mc);
+		tb = new TokenBuffer(tokens.iterator(), mc);
 		// Обработка импортов		
 		while (tb.match(Keyword.IMPORT) && !tb.match(TokenType.EOF)) {
 			imports.add(new ImportNode(tb));
@@ -49,6 +50,22 @@ public class ASTParser extends AstNode {
 	
 	public ClassNode getClazz() {
 		return classNode;
+	}
+
+	@Override
+	public boolean preAnalyze() {return true;}
+	@Override
+	public boolean declare(Scope scope) {return true;}
+	@Override
+	public boolean postAnalyze(Scope scope) {return true;}
+
+	@Override
+	public String getNodeType() {
+		return "root";
+	}
+	
+	public TokenBuffer getTB() {
+		return tb;
 	}
 }
 

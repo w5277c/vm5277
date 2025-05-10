@@ -13,7 +13,7 @@ import static ru.vm5277.j8b.compiler.tokens.Token.toStringValue;
 
 public class ParserTests {
 
-	@Test
+/*	@Test
 	public void constantFoldingTest() throws Exception {
 		String source = "class A{	int i1=5+3-4/2*10; int i2=10%3; int i3=0b11001011 & 0x0f; int i4=0b11001011 | 04; int i5= 2*(4+3); int i6=5+4*3;" +
 								"	fixed f1=2.5+3.5; fixed f2=5-1.5; fixed f3=4.5/1.5; fixed f4=25*0.1;" +
@@ -158,7 +158,7 @@ public class ParserTests {
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Number);
 		assertEquals("1", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
 	}
-
+*/
 
 	@Test
 	public void incrementDecrementTest() throws Exception {

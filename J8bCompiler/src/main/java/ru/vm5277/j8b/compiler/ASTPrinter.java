@@ -22,7 +22,6 @@ import ru.vm5277.j8b.compiler.nodes.commands.BreakNode;
 import ru.vm5277.j8b.compiler.nodes.commands.ContinueNode;
 import ru.vm5277.j8b.compiler.nodes.commands.DoWhileNode;
 import ru.vm5277.j8b.compiler.nodes.commands.ForNode;
-import ru.vm5277.j8b.compiler.nodes.commands.GotoNode;
 import ru.vm5277.j8b.compiler.nodes.commands.IfNode;
 import ru.vm5277.j8b.compiler.nodes.commands.ReturnNode;
 import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode;
@@ -111,7 +110,7 @@ public class ASTPrinter {
 	
 	void printMethod(MethodNode method) {
 		printModifiers(method.getModifiers());
-		out.put(method.getType() + " ");
+		out.put(method.getReturnType() + " ");
 		out.put(method.getName() + "(");
 		printParameters(method.getParameters());
 		out.put(") ");
@@ -179,9 +178,6 @@ public class ASTPrinter {
 				else {
 					printExpr((ExpressionNode)fn.getInitialization());
 				}
-			}
-			else if(node instanceof GotoNode) {
-				out.put("goto " + ((GotoNode)node).getLabel() + ";");
 			}
 			else if(node instanceof IfNode) {
 				IfNode in = (IfNode)node;

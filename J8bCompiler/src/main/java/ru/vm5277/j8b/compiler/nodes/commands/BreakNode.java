@@ -9,9 +9,13 @@ import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.nodes.*;
+import ru.vm5277.j8b.compiler.semantic.BlockScope;
+import ru.vm5277.j8b.compiler.semantic.LabelSymbol;
+import ru.vm5277.j8b.compiler.semantic.Scope;
 
-public class BreakNode extends AstNode {
-    private	String	label;
+public class BreakNode extends CommandNode {
+    private	String		label;
+	private LabelSymbol symbol;
 	
 	public BreakNode(TokenBuffer tb) {
         super(tb);
@@ -26,16 +30,62 @@ public class BreakNode extends AstNode {
         
 		AstNode node = tb.getLoopStack().peek();
 		if (null == node || !(node instanceof ForNode || node instanceof WhileNode || node instanceof DoWhileNode)) {
-			markFirstError(tb.error("'break' can only be used inside loop statements"));
+			markFirstError(tb.parseError("'break' can only be used inside loop statements"));
         }
     }
 
 	public String getLabel() {
 		return label;
 	}
+
+	@Override
+	public String getNodeType() {
+		return "break command";
+	}
 	
 	@Override
     public String toString() {
-        return "break" + (null!=label ? " " + label : "");
+        return "break" + (null != label ? " " + label : "");
     }
+
+	@Override
+	public boolean preAnalyze() {
+		// Проверка наличия метки (если указана)
+		if (label != null) markError("Break label cannot be empty");
+
+		// Базовая проверка - команда break должна быть внутри цикла
+        if (tb.getLoopStack().isEmpty()) markError("'break' outside of loop");
+
+		return true;
+	}
+
+	@Override
+	public boolean declare(Scope scope) {
+		if (label != null) {
+			if (!(scope instanceof BlockScope)) markError("Labeled break must be inside block scope");
+			else {
+				// Разрешаем метку
+				symbol = ((BlockScope)scope).resolveLabel(label);
+				if (null == symbol) markError("Undefined label: " + label);
+
+				// Регистрируем использование метки
+				symbol.addReference(this);
+			}
+		}
+		return true;
+	}
+
+	@Override
+	public boolean postAnalyze(Scope scope) {
+		// Проверка для break с меткой
+        if (null != symbol) {
+
+			// Метка должна быть на цикле или switch
+            if (!isLoopOrSwitch((CommandNode)tb.getLoopStack().peek())) markError("Break label must be on loop or switch statement");
+            
+            // Проверка видимости
+            if (!isLabelInCurrentMethod(symbol, scope)) markError("Cannot break to label in different method");
+        }
+		return true;
+	}
 }

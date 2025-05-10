@@ -16,11 +16,11 @@ public class LexerTests {
 
     @Test
     public void testBasicTypesAndKeywords() throws Exception {
-        assertEquals(36, Keyword.values().length);
+        assertEquals(35, Keyword.values().length);
 		
 		String source = "true false null " + 
 						"void bool byte short int fixed cstr " +
-						"if do while for return continue break goto switch free " +
+						"if do while for return continue break switch free " +
 						"static final private public native atomic " +
 						"class interface implements this " +
 						"import as else case default new";
@@ -28,7 +28,7 @@ public class LexerTests {
 		Lexer lexer = new Lexer(new StringReader(source), mc);
         List<Token> tokens = lexer.getTokens();
         
-        assertEquals(36, tokens.size() - 1); // -1 для EOF
+        assertEquals(35, tokens.size() - 1); // -1 для EOF
         
 		int pos=0;
 		// Проверка литералов
@@ -70,8 +70,6 @@ public class LexerTests {
 		assertEquals(Keyword.CONTINUE, tokens.get(pos++).getValue());
 		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
 		assertEquals(Keyword.BREAK, tokens.get(pos++).getValue());
-		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
-		assertEquals(Keyword.GOTO, tokens.get(pos++).getValue());
 		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
 		assertEquals(Keyword.SWITCH, tokens.get(pos++).getValue());
 		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
@@ -119,8 +117,11 @@ public class LexerTests {
 
     @Test
     public void testIntegerLiterals() throws Exception {
-        String source = "42 0x12fA 0b1010 05277 1 256 65536 4294967296 18446744073709551616 0";
-        MessageContainer mc = new MessageContainer(100, true, false);
+        String source = "42 0x12fA 0b1010 05277 1 256 65536 4294967296 0x7fffffffffffffff 0";
+        //String source = "0x7fffffffffffffff";
+        
+		
+		MessageContainer mc = new MessageContainer(100, true, false);
 		Lexer lexer = new Lexer(new StringReader(source), mc);
         List<Token> tokens = lexer.getTokens();
         
@@ -154,9 +155,9 @@ public class LexerTests {
 		assertEquals(TokenType.NUMBER, tokens.get(7).getType());
         assertEquals(4294967296l, tokens.get(7).getValue());
         
-		//BigInteger
+		//Long
 		assertEquals(TokenType.NUMBER, tokens.get(8).getType());
-        assertEquals("18446744073709551616", tokens.get(8).getStringValue());
+        assertEquals("9223372036854775807", tokens.get(8).getStringValue());
 
 		//Zero
 		assertEquals(TokenType.NUMBER, tokens.get(9).getType());

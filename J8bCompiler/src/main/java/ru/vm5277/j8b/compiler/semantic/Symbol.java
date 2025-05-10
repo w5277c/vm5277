@@ -1,27 +1,44 @@
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------
 Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-25.04.2025	konstantin@5277.ru		Начало
+06.05.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.semantic;
 
-import java.util.List;
 import ru.vm5277.j8b.compiler.enums.VarType;
 
-public class MethodInfo {
-	private	final	VarType			returnType;
-	private	final	List<VarType>	parameters;
+public class Symbol {
+	protected	String	name;
+	protected	VarType	type;
+	protected	boolean	isFinal;
 
-	public MethodInfo(VarType returnType, List<VarType> parameters) {
-		this.returnType = returnType;
-		this.parameters = parameters;
-	}
-
-	public VarType getReturnType() {
-		return returnType;
+	protected Symbol(String name) {
+		this.name = name;
 	}
 	
-	public List<VarType> getParameters() {
-		return parameters;
+	public Symbol(String name, VarType type) {
+		this.name = name;
+		this.type = type;
+	}
+
+	public Symbol(String name, VarType type, boolean isFinal) {
+		this.name = name;
+		this.type = type;
+		this.isFinal = isFinal;
+	}
+
+	public String getName() {
+		return name;
+	}
+	
+	public VarType getType() {
+		return type;
+	}
+	public void setType(VarType type) {
+		this.type = type;
+	}
+	
+	public boolean isFinal() {
+		return isFinal;
 	}
 }

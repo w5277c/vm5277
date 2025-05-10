@@ -11,9 +11,9 @@ public enum Keyword {
 	// Типы примитив
 	VOID, BOOL, BYTE, SHORT, INT, FIXED, CSTR,
 	// Команды
-	IF, DO, WHILE, FOR, RETURN, CONTINUE, BREAK, GOTO, SWITCH, FREE,
+	IF, DO, WHILE, FOR, RETURN, CONTINUE, BREAK, SWITCH, FREE,
 	// Модификаторы
-	STATIC, FINAL, PRIVATE, PUBLIC, NATIVE, ATOMIC,
+	STATIC, FINAL, PRIVATE, PUBLIC, NATIVE, ATOMIC, //TODO SYNCHRONIZED
 	// Ключевые слова ООП
 	CLASS, INTERFACE, IMPLEMENTS, THIS,
 	//Остальное
@@ -49,7 +49,6 @@ public enum Keyword {
 			case RETURN:
 			case CONTINUE:
 			case BREAK:
-			case GOTO:
 			case SWITCH:
 			case FREE:
 				return TokenType.COMMAND;

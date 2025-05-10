@@ -10,10 +10,16 @@ import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
+import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.nodes.expressions.LiteralExpression;
+import ru.vm5277.j8b.compiler.semantic.BlockScope;
+import ru.vm5277.j8b.compiler.semantic.Scope;
 
-public class DoWhileNode extends AstNode {
+public class DoWhileNode extends CommandNode {
 	private	ExpressionNode	condition;
+	private	BlockScope		blockScope;
 
 	public DoWhileNode(TokenBuffer tb) {
 		super(tb);
@@ -54,5 +60,62 @@ public class DoWhileNode extends AstNode {
 		sb.append(condition);
 		sb.append(");");
 		return sb.toString();
+	}
+
+	@Override
+	public String getNodeType() {
+		return "do-while loop";
+	}
+
+	@Override
+	public boolean preAnalyze() {
+		// Проверка тела цикла (выполняется всегда хотя бы один раз)
+		if (null != getBody()) getBody().preAnalyze();
+		else markError("Do-while body cannot be null");
+
+		// Проверка условия цикла
+		if (null != condition) condition.preAnalyze();
+		else markError("Do-while condition cannot be null");
+
+		return true;
+	}
+
+	@Override
+	public boolean declare(Scope scope) {
+		// Создаем новую область видимости для тела цикла
+		blockScope = new BlockScope(scope);
+
+		// Объявляем элементы тела цикла
+		if (null != getBody()) getBody().declare(blockScope);
+
+		// Объявляем переменные условия (в той же области, что и тело)
+		if (null != condition) condition.declare(blockScope);
+
+		return true;
+	}
+
+	@Override
+	public boolean postAnalyze(Scope scope) {
+		// Анализ тела цикла
+		if (null != getBody()) getBody().postAnalyze(blockScope);
+
+		// Проверка типа условия
+		if (null != condition) {
+			if(condition.postAnalyze(scope)) {
+				try {
+					VarType condType = condition.getType(scope);
+					if (VarType.BOOL != condType) markError("While condition must be boolean, got: " + condType);
+				}
+				catch (SemanticException e) {markError(e);}
+			}
+			
+			// Проверяем бесконечный цикл с возвратом
+			if (	condition instanceof LiteralExpression && Boolean.TRUE.equals(((LiteralExpression)condition).getValue()) &&
+					isControlFlowInterrupted(getBody())) {
+				
+				markWarning("Code after infinite while loop is unreachable");
+			}
+		}
+		return true;
 	}
 }

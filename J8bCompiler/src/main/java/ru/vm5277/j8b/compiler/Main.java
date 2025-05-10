@@ -10,9 +10,10 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.messages.MessageOwner;
+import ru.vm5277.j8b.compiler.semantic.Scope;
 
 public class Main {
-    public	final	static	String	VERSION	= "0.0.8";
+    public	final	static	String	VERSION	= "0.0.9";
 	
 	public static void main(String[] args) throws IOException {
 		MessageContainer mc = new MessageContainer(8, true, false);
@@ -28,7 +29,15 @@ public class Main {
 			new ASTPrinter(parser.getClazz());
 			
 			mc.setOwner(MessageOwner.SEMANTIC);
-			//SemanticAnalyzer analyzer = new SemanticAnalyzer(parser.getClazz());
+			
+			new SemanticAnalyzer(parser.getClazz()) {
+				@Override
+				public boolean preAnalyze() {return true;}
+				@Override
+				public boolean declare(Scope scope) {return true;}
+				@Override
+				public boolean postAnalyze(Scope scope) {return true;}
+			};
 		}
 		catch(Exception ex) {
 			ex.printStackTrace();

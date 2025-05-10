@@ -22,7 +22,6 @@ import static ru.vm5277.j8b.compiler.enums.Keyword.BREAK;
 import static ru.vm5277.j8b.compiler.enums.Keyword.CONTINUE;
 import static ru.vm5277.j8b.compiler.enums.Keyword.DO;
 import static ru.vm5277.j8b.compiler.enums.Keyword.FOR;
-import static ru.vm5277.j8b.compiler.enums.Keyword.GOTO;
 import static ru.vm5277.j8b.compiler.enums.Keyword.IF;
 import static ru.vm5277.j8b.compiler.enums.Keyword.RETURN;
 import static ru.vm5277.j8b.compiler.enums.Keyword.SWITCH;
@@ -35,12 +34,14 @@ import ru.vm5277.j8b.compiler.nodes.commands.BreakNode;
 import ru.vm5277.j8b.compiler.nodes.commands.ContinueNode;
 import ru.vm5277.j8b.compiler.nodes.commands.DoWhileNode;
 import ru.vm5277.j8b.compiler.nodes.commands.ForNode;
-import ru.vm5277.j8b.compiler.nodes.commands.GotoNode;
 import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode;
 import ru.vm5277.j8b.compiler.tokens.Token;
+import ru.vm5277.j8b.compiler.SemanticAnalyzer;
+import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.WarningMessage;
+import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode.Case;
 
-public abstract class AstNode {
-	protected			TokenBuffer				tb;
+public abstract class AstNode extends SemanticAnalyzer {
 	protected			SourcePosition			sp;
 	private				ErrorMessage			error;
 	protected	final	ArrayList<BlockNode>	blocks	= new ArrayList<>();
@@ -63,7 +64,6 @@ public abstract class AstNode {
 			case CONTINUE:	return new ContinueNode(tb);
 			case BREAK:		return new BreakNode(tb);
 			case RETURN:	return new ReturnNode(tb);
-			case GOTO:		return new GotoNode(tb);
 			case SWITCH:	return new SwitchNode(tb);
 			default:
 				markFirstError(error);
@@ -105,7 +105,7 @@ public abstract class AstNode {
 			}
 			throw new ParseError("Unexpected operator: " + operator, tb.current().getLine(), tb.current().getColumn());
 		}*/
-		ParseException e = tb.error("Unexpected statement token: " + tb.current());
+		ParseException e = tb.parseError("Unexpected statement token: " + tb.current());
 		tb.skip(Delimiter.SEMICOLON, Delimiter.LEFT_BRACE);
 		throw e;
 	}
@@ -207,10 +207,59 @@ public abstract class AstNode {
 	public final Set<Keyword> collectModifiers(TokenBuffer tb) {
         Set<Keyword> modifiers = new HashSet<>();
         while (tb.match(TokenType.MODIFIER)) {
-			modifiers.add((Keyword)consumeToken(tb).getValue());
+			Keyword modifier = (Keyword)consumeToken(tb).getValue();
+			if(!modifiers.add(modifier)) markError("Duplicate modifier: " + modifier);
         }
         return modifiers;
     }
+	
+	protected boolean isControlFlowInterrupted(AstNode node) {
+		if (null == node) return false;
+
+		// Проверяем явные прерывания потока
+		if (node instanceof ReturnNode || node instanceof BreakNode || node instanceof ContinueNode) {
+			return true;
+		}
+
+		// Для блоков проверяем последнюю инструкцию
+		if (node instanceof BlockNode) {
+			List<AstNode> declarations = ((BlockNode)node).getDeclarations();
+			if (!declarations.isEmpty()) {
+				return isControlFlowInterrupted(declarations.get(declarations.size() - 1));
+			}
+		}
+
+		// Для условных конструкций
+		if (node instanceof IfNode) {
+			IfNode ifNode = (IfNode)node;
+			return hasAllBranchesReturn(ifNode.getThenBlock(), ifNode.getElseBlock());
+		}
+
+		// Для циклов
+		if (node instanceof WhileNode || node instanceof DoWhileNode || node instanceof ForNode) {
+			// Циклы могут быть бесконечными, поэтому не прерывают поток
+			return false;
+		}
+
+		// Для switch
+		if (node instanceof SwitchNode) {
+			SwitchNode switchNode = (SwitchNode)node;
+			for (Case c : switchNode.getCases()) {
+				if (!isControlFlowInterrupted(c.getBlock())) {
+					return false;
+				}
+			}
+			return true;
+		}
+
+		return false;
+	}
+
+	private boolean hasAllBranchesReturn(AstNode thenBranch, AstNode elseBranch) {
+		boolean thenReturns = isControlFlowInterrupted(thenBranch);
+		boolean elseReturns = elseBranch != null && isControlFlowInterrupted(elseBranch);
+		return thenReturns && elseReturns;
+	}
 	
 	public List<BlockNode> getBlocks() {
 		return blocks;
@@ -220,40 +269,66 @@ public abstract class AstNode {
 		return sp;
 	}
 	
+	public abstract String getNodeType();
+	
 	public Token consumeToken(TokenBuffer tb) {
 		markFirstError(tb.current().getError());
 		return tb.consume();
     }
 	public Token consumeToken(TokenBuffer tb, TokenType expectedType) throws ParseException {
 		if (tb.current().getType() == expectedType) return consumeToken(tb);
-		else throw tb.error("Expected " + expectedType + ", but got " + tb.current().getType());
+		else throw tb.parseError("Expected " + expectedType + ", but got " + tb.current().getType());
     }
 	public Token consumeToken(TokenBuffer tb, Operator op) throws ParseException {
 		if (TokenType.OPERATOR == tb.current().getType()) {
             if(op == tb.current().getValue()) return consumeToken(tb);
-			else throw tb.error("Expected operator " + op + ", but got " + tb.current().getValue());
+			else throw tb.parseError("Expected operator " + op + ", but got " + tb.current().getValue());
         }
-		else throw tb.error("Expected " + TokenType.OPERATOR + ", but got " + tb.current().getType());
+		else throw tb.parseError("Expected " + TokenType.OPERATOR + ", but got " + tb.current().getType());
     }
 	public Token consumeToken(TokenBuffer tb, Delimiter delimiter) throws ParseException {
 		if (TokenType.DELIMITER == tb.current().getType()) {
             if(delimiter == tb.current().getValue()) return consumeToken(tb);
-			else throw tb.error("Expected delimiter " + delimiter + ", but got " + tb.current().getValue());
+			else throw tb.parseError("Expected delimiter " + delimiter + ", but got " + tb.current().getValue());
         }
-		else throw tb.error("Expected " + TokenType.DELIMITER + ", but got " + tb.current().getType());
+		else throw tb.parseError("Expected " + TokenType.DELIMITER + ", but got " + tb.current().getType());
     }
 	public Token consumeToken(TokenBuffer tb, TokenType type, Keyword keyword) throws ParseException {
 		if (type == tb.current().getType()) {
             if(keyword == tb.current().getValue()) return consumeToken(tb);
-			else throw tb.error("Expected keyword " + keyword + ", but got " + tb.current().getValue());
+			else throw tb.parseError("Expected keyword " + keyword + ", but got " + tb.current().getValue());
         }
-		else throw tb.error("Expected " + TokenType.KEYWORD + ", but got " + tb.current().getType());
+		else throw tb.parseError("Expected " + TokenType.KEYWORD + ", but got " + tb.current().getType());
     }
 	
 	public void markFirstError(ParseException e) {
 		if(null != e && null == error) error = e.getErrorMessage();
 	}
 	public void markFirstError(ErrorMessage message) {
+		if(null != message && null == error) error = message;
+	}
+	
+	
+	// должно вызываться из текущей ноды, ее мы помеим как содержащую ошибку.
+	public ErrorMessage markError(SemanticException e) {
+		ErrorMessage message = new ErrorMessage(e.getMessage(), tb.getSP());
+		if(null == error) error = message;
+		tb.addMessage(message);
+		return message;
+	}
+	public ErrorMessage markError(String text) {
+		ErrorMessage message = new ErrorMessage(text, tb.getSP());
+		if(null == error) error = message;
+		tb.addMessage(message);
+		return message;
+	}
+	public WarningMessage markWarning(String text) {
+		WarningMessage message = new WarningMessage(text, tb.getSP());
+		tb.addMessage(message);
+		return message;
+	}
+	
+	public void setError(ErrorMessage message) {
 		if(null != message && null == error) error = message;
 	}
 }

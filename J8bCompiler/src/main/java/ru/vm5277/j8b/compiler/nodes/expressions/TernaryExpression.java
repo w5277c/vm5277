@@ -6,8 +6,9 @@
 package ru.vm5277.j8b.compiler.nodes.expressions;
 
 import ru.vm5277.j8b.compiler.enums.VarType;
+import ru.vm5277.j8b.compiler.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
-import ru.vm5277.j8b.compiler.semantic.SymbolTable;
+import ru.vm5277.j8b.compiler.semantic.Scope;
 
 public class TernaryExpression extends ExpressionNode {
 	private final ExpressionNode condition;
@@ -22,6 +23,61 @@ public class TernaryExpression extends ExpressionNode {
 		this.falseExpr = falseExpr;
 	}
 
+	@Override
+	public VarType getType(Scope scope) throws SemanticException {
+		VarType trueType = trueExpr.getType(scope);
+		VarType falseType = falseExpr.getType(scope);
+
+		// Возвращаем более общий тип
+		return trueType.getSize() >= falseType.getSize() ? trueType : falseType;
+	}
+	
+	@Override
+	public boolean preAnalyze() {
+		if (null== condition || null == trueExpr || null == falseExpr) {
+			markError("All parts of ternary expression must be non-null");
+			return false;
+		}
+
+		if (!condition.preAnalyze()) return false;
+		if (!trueExpr.preAnalyze()) return false;
+		if (!falseExpr.preAnalyze()) return false;
+
+		return true;
+	}
+	
+	@Override
+	public boolean postAnalyze(Scope scope) {
+		try {
+			// Проверяем условие и ветки
+			if (!condition.postAnalyze(scope)) return false;
+			if (!trueExpr.postAnalyze(scope)) return false;
+			if (!falseExpr.postAnalyze(scope)) return false;
+
+			// Проверяем тип условия
+			VarType condType = condition.getType(scope);
+			if (VarType.BOOL != condType) {
+				markError("Condition must be boolean, got: " + condType);
+				return false;
+			}
+
+			// Проверяем совместимость типов веток
+			VarType trueType = trueExpr.getType(scope);
+			VarType falseType = falseExpr.getType(scope);
+
+			if (!trueType.isCompatibleWith(falseType)) {
+				markError("Incompatible types in branches: " + trueType + " and " + falseType);
+				return false;
+			}
+
+			return true;
+		}
+		catch (SemanticException e) {
+			markError(e.getMessage());
+			return false;
+		}
+	}
+	
 	// Геттеры
 	public ExpressionNode getCondition() {
 		return condition;
@@ -38,15 +94,5 @@ public class TernaryExpression extends ExpressionNode {
 	@Override
 	public String toString() {
 		return condition + " ? " + trueExpr + " : " + falseExpr;
-	}
-
-	@Override
-	public VarType semanticAnalyze(SymbolTable symbolTable) {
-		throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
-	}
-
-	@Override
-	public <T> T accept(ExpressionVisitor<T> visitor) {
-		throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
 	}
 }

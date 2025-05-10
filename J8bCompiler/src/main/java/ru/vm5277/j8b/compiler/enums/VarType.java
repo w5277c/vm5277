@@ -7,6 +7,7 @@ package ru.vm5277.j8b.compiler.enums;
 
 import java.util.HashMap;
 import java.util.Map;
+import ru.vm5277.j8b.compiler.exceptions.SemanticException;
 
 public class VarType {
 	private	static	final	Map<String, VarType>	CLASS_TYPES = new HashMap<>();
@@ -30,11 +31,11 @@ public class VarType {
 	public	static	final	VarType	NULL		= new VarType("null");
 	public	static	final	VarType	UNKNOWN		= new VarType("?");
 
-	private	final	String	name;
-	private	final	String	className; // Для классовых типов
-	private			boolean	isArray;
-    private			VarType	elementType; // Для массивов: тип элементов
-	private			int		arraySize;
+	private			final	String	name;
+	private			final	String	className; // Для классовых типов
+	private					boolean	isArray;
+    private					VarType	elementType; // Для массивов: тип элементов
+	private					int		arraySize;
 
 	// Конструктор для ссылочных типов
 	private VarType(String name) {
@@ -102,26 +103,6 @@ public class VarType {
 		}
 	}
 	
-/*	
-	// Преобразует строку в VarType.
-	public static VarType fromString(String typeName) {
-		// Проверяем примитивные типы
-		Keyword kw = Keyword.fromString(typeName);
-		if (null != kw) {
-			VarType fromKw = fromKeyword(kw);
-			if (UNKNOWN != fromKw) return fromKw;
-		}
-
-		// Специальные случаи
-		if (typeName.equalsIgnoreCase("string")) return STRING;
-
-		// Классовые типы (начинаются с "class:")
-		if (typeName.startsWith("class:")) {
-			return forClassName(typeName.substring(6));
-		}
-		return UNKNOWN;
-	}
-*/
 	public String getName() {
 		return className != null ? className : name;
 	}
@@ -134,6 +115,10 @@ public class VarType {
 		return this == FIXED;
 	}
 
+	public boolean isBoolean() {
+		return this == BOOL;
+	}
+	
 	public boolean isPrimitive() {
 		return this == BOOL || this == BYTE || this == SHORT || this == INT || this == FIXED || this == CSTR;
 	}
@@ -150,32 +135,56 @@ public class VarType {
 		return this == VOID;
 	}
 	
+	public boolean isReferenceType() {
+		return this == VarType.CLASS || this.isArray() || this == VarType.CSTR;
+	}
+
 	public boolean isCompatibleWith(VarType other) {
+		// Проверка одинаковых типов
 		if (this == other) return true;
 
-		// Неявное приведение целочисленных типов
-		if (this.isInteger() && other.isInteger()) {
-			return this.getSize() >= other.getSize();
-		}
+		// Специальные случаи для NULL
+		if (VarType.NULL == this || VarType.NULL == other) return this.isReferenceType() || other.isReferenceType();
 
-		// fixed может принимать целочисленные значения
-		if (this == FIXED && other.isInteger()) {
-			return true;
+		// Проверка числовых типов
+		if (this.isNumeric() && other.isNumeric()) {
+			// Разрешаем смешивание целочисленных типов
+			if (this.isInteger() && other.isInteger()) return true;
+			// FIXED совместим только с FIXED
+			if (this == VarType.FIXED || other == VarType.FIXED) return this == VarType.FIXED && other == VarType.FIXED;
+			return false;
 		}
 
 		// Проверка классовых типов
 		if (this.isClassType() && other.isClassType()) {
-			if (this.className == null || other.className == null) {
-				return false;
-			}
-			return this.className.equals(other.className);
+			return this.className != null && this.className.equals(other.className);
 		}
+
+		// Проверка массивов
+		if (this.isArray() && other.isArray()) return this.elementType.isCompatibleWith(other.elementType);
+    
 		return false;
 	}
-
+	
+	public void checkRange(Number num) throws SemanticException {
+		if (null == num) throw new SemanticException("Value cannot be null");
+		
+		if(isInteger()) {
+			long l = num.longValue();
+			if(this == BYTE && (l < 0 || l > 0xff)) throw new SemanticException("byte value out of range (0..255). Given:" + l);
+			if(this == SHORT && (l < 0 || l > 0xffff)) throw new SemanticException("short value out of range (0..65535). Given: " + l);
+			if(this == INT && (l < 0 || l > 0xffffffffl)) throw new SemanticException("int value out of range (0..4294967295). Given: " + l);
+		}
+		else if(this == FIXED) {
+			double d = ((Double)num);
+			if(d<-128.0 || d > 127.99609375d) throw new SemanticException(String.format("fixed value out of range (-128.0..127.99609375). Given: %.8f", d));
+		}
+	}
+	
 	public int getSize() {
 		if (this == BYTE) return 1;
 		if (this == SHORT) return 2;
+		if (this == FIXED) return 2;
 		if (this == INT) return 4;
 		return 0;
 	}

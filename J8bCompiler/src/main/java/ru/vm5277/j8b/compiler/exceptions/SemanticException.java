@@ -3,20 +3,10 @@
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 24.04.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.j8b.compiler;
+package ru.vm5277.j8b.compiler.exceptions;
 
-public class SemanticError extends RuntimeException {
-    private	final	SourcePosition	sp;
-
-    public SemanticError(String message) {
-        super("[Semantic Error] " + message);
-        
-		this.sp = null;
-    }
-
-	public SemanticError(String message, SourcePosition sp) {
-        super("[Semantic Error] " + message + " at " + sp.toString());
-        
-		this.sp = sp;
-    }
+public class SemanticException extends Exception {
+	public SemanticException(String text) {
+		super(text);
+	}
 }

@@ -11,16 +11,21 @@ import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import java.util.ArrayList;
 import java.util.List;
+import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
+import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.semantic.BlockScope;
+import ru.vm5277.j8b.compiler.semantic.Scope;
 import ru.vm5277.j8b.compiler.tokens.TNumber;
 import ru.vm5277.j8b.compiler.tokens.Token;
 
-public class SwitchNode extends AstNode {
+public class SwitchNode extends CommandNode {
 	public static class Case {
 		private	final	long		from;
 		private	final	long		to;
 		private	final	BlockNode	block;
-
+		private			BlockScope	scope;
+		
 		public Case(long from, long to, BlockNode block) {
 			this.from = from;
 			this.to = to;
@@ -38,12 +43,21 @@ public class SwitchNode extends AstNode {
 		public BlockNode getBlock() {
 			return block;
 		}
+		
+		public BlockScope getScope() {
+			return scope;
+		}
+		public void setScope(BlockScope scope) {
+			this.scope = scope;
+		}
 	}
 
 	private	ExpressionNode	expression;
-	private	final	List<Case>		cases			= new ArrayList<>();
-	private			BlockNode		defaultBlock	= null;
-
+	private	final	List<Case>				cases			= new ArrayList<>();
+	private			BlockNode				defaultBlock	= null;
+	private			BlockScope				switchScope;
+	private			BlockScope				defaultScope;
+	
 	public SwitchNode(TokenBuffer tb) {
 		super(tb);
 
@@ -68,7 +82,7 @@ public class SwitchNode extends AstNode {
 				tb.getLoopStack().remove(this);
 			}
 			else {
-				markFirstError(tb.error("Expected 'case' or 'default' in switch statement"));
+				markFirstError(tb.parseError("Expected 'case' or 'default' in switch statement"));
 			}
 		}
 		try {consumeToken(tb, Delimiter.RIGHT_BRACE);}catch(ParseException e) {markFirstError(e);}
@@ -104,7 +118,7 @@ public class SwitchNode extends AstNode {
 				return number.longValue();
 			}
 		}
-		throw tb.error("Expected numeric value(or range) for 'case' in switch statement");
+		throw tb.parseError("Expected numeric value(or range) for 'case' in switch statement");
 	}
 
 	public ExpressionNode getExpression() {
@@ -138,5 +152,109 @@ public class SwitchNode extends AstNode {
 
 		sb.append("}");
 		return sb.toString();
+	}
+	
+	@Override
+	public String getNodeType() {
+		return "switch command";
+	}
+
+	@Override
+	public boolean preAnalyze() {
+		// Проверка выражения switch
+		if (null != expression) expression.preAnalyze();
+		else markError("Switch expression cannot be null");
+
+		// Проверка всех case-блоков
+		for (Case c : cases) {
+			if (null != c.getBlock()) c.getBlock().preAnalyze();
+		}
+
+		// Проверка default-блока
+		if (null != defaultBlock) defaultBlock.preAnalyze();
+		
+		return true;
+	}
+
+	@Override
+	public boolean declare(Scope scope) {
+		// Объявление выражения switch
+		if (expression != null) expression.declare(scope);
+
+		// Создаем новую область видимости для switch
+		switchScope = new BlockScope(scope);
+
+		// Объявление всех case-блоков
+		for (Case c : cases) {
+			if (null != c.getBlock()) {
+				BlockScope caseScope = new BlockScope(switchScope);
+				c.getBlock().declare(caseScope);
+				c.setScope(caseScope);
+			}
+		}
+
+		// Объявление default-блока
+		if (null != defaultBlock) {
+			defaultScope = new BlockScope(switchScope);
+			defaultBlock.declare(defaultScope);
+		}
+		
+		return true;
+	}
+
+	@Override
+	public boolean postAnalyze(Scope scope) {
+		boolean allCasesReturn = true;		
+		
+		// Проверка типа выражения switch
+		if (expression != null) {
+			if (expression.postAnalyze(scope)) {
+				try {
+					VarType exprType = expression.getType(scope);
+					if (!exprType.isInteger() && VarType.BYTE != exprType && VarType.SHORT != exprType) {
+						markError("Switch expression must be integer type, got: " + exprType);
+					}
+				}
+				catch (SemanticException e) {markError(e);}
+			}
+		}
+
+		// Проверка case-значений на уникальность
+		List<Long> caseValues = new ArrayList<>();
+		for (Case c : cases) {
+			// Проверка диапазона
+			if (-1 != c.getTo() && c.getFrom() > c.getTo()) {
+				markError("Invalid case range: " + c.getFrom() + ".." + c.getTo());
+			}
+
+			// Проверка на дубликаты
+			if (c.getTo() == -1) {
+				if (caseValues.contains(c.getFrom())) markError("Duplicate case value: " + c.getFrom());
+				else caseValues.add(c.getFrom());
+			}
+			else {
+				for (long i = c.getFrom(); i <= c.getTo(); i++) {
+					if (caseValues.contains(i)) markError("Duplicate case value in range: " + i);
+					else caseValues.add(i);
+				}
+			}
+
+			// Анализ блока case
+			if (null != c.getBlock()) {
+				c.getBlock().postAnalyze(c.getScope());
+				if (!isControlFlowInterrupted(c.getBlock())) {
+					allCasesReturn = false;
+				}
+			}
+		}
+
+		// Анализ default-блока (если есть)
+		if (null != defaultBlock) defaultBlock.postAnalyze(defaultScope);
+
+		if (allCasesReturn && !cases.isEmpty()) {
+			markWarning("Code after switch statement may be unreachable");
+		}
+		
+		return true;
 	}
 }

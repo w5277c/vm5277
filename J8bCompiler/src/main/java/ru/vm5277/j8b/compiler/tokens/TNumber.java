@@ -6,7 +6,6 @@
 package ru.vm5277.j8b.compiler.tokens;
 
 import ru.vm5277.j8b.compiler.enums.TokenType;
-import java.math.BigInteger;
 import ru.vm5277.j8b.compiler.SourceBuffer;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
 
@@ -29,7 +28,7 @@ public class TNumber extends Token {
 			}
 			else {
 				try {
-					value = Integer.parseInt(hex.toString(), 0x10);
+					try {value = Integer.parseInt(hex.toString(), 0x10);} catch (NumberFormatException e) {value = Long.parseLong(hex.toString(), 0x10);}
 				}
 				catch (NumberFormatException e) {
 					setError("Hexadecimal number too large", mc);
@@ -51,7 +50,7 @@ public class TNumber extends Token {
 			}
 			else {
 				try {
-					value = Integer.parseInt(bin.toString(), 0b10);
+					try {value = Integer.parseInt(bin.toString(), 0b10);} catch (NumberFormatException e) {value = Long.parseLong(bin.toString(), 0b10);}
 				}
 				catch (NumberFormatException e) {
 					setError("Binary number too large", mc);
@@ -72,7 +71,7 @@ public class TNumber extends Token {
 			if (oct.length() == 1) value = 0;
 			else {
 				try {
-					value = Integer.parseInt(oct.toString(), 010);
+					try {value = Integer.parseInt(oct.toString(), 010);} catch (NumberFormatException e) {value = Long.parseLong(oct.toString(), 010);}
 				}
 				catch (NumberFormatException e) {
 					setError("Octal number too large", mc);
@@ -122,20 +121,7 @@ public class TNumber extends Token {
 				}
 				else {
 					String numStr = dec.toString();
-		            // Пробуем распарсить как int
-				    try {
-						value = Integer.parseInt(numStr);
-					}
-					catch (NumberFormatException e) {
-						// Если не влезает в int, пробуем long
-						try {
-							value = Long.parseLong(numStr);
-		                }
-						catch (NumberFormatException e2) {
-							// Если не влезает даже в long, используем BigInteger
-							value =  new BigInteger(numStr);
-						}
-					}
+		            try {value = Integer.parseInt(numStr);} catch (NumberFormatException e) {value = Long.parseLong(numStr);}
 				}
 			}
 			catch (NumberFormatException e) {

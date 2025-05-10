@@ -10,6 +10,9 @@ import ru.vm5277.j8b.compiler.tokens.Token;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.semantic.ClassScope;
+import ru.vm5277.j8b.compiler.semantic.Scope;
 
 public class ImportNode extends AstNode {
 	private	boolean	isStatic;
@@ -78,7 +81,65 @@ public class ImportNode extends AstNode {
     }
 
 	@Override
+	public String getNodeType() {
+		return "import";
+	}
+
+	@Override
 	public String toString() {
 		return getClass().getSimpleName() + ": " + importPath;
+	}
+
+	@Override
+	public boolean preAnalyze() {
+		if (importPath == null || importPath.isEmpty()) markError("Import path cannot be empty");
+		else {
+			// Проверяем статический импорт
+			if (isStatic) {
+				// Можно добавить дополнительные проверки для статического импорта
+				if (!importPath.contains(".")) 	markError("Static import must specify full class path and member");
+			}
+		}
+		return true;
+	}
+
+	@Override
+	public boolean declare(Scope scope) {
+		if (scope instanceof ClassScope) {
+			ClassScope classScope = (ClassScope) scope;
+
+			// Регистрируем импорт в классе
+			try {
+				if (isStatic) {
+					classScope.addStaticImport(importPath, alias);
+				}
+				else {
+					classScope.addImport(importPath, alias);
+				}
+			}
+			catch(SemanticException e) {markError(e);}
+			return true;
+		}
+		markError("Import declarations must be at the beginning of the file, before any class members");
+		return true;
+	}
+
+	@Override
+	public boolean postAnalyze(Scope scope) {
+		if (scope instanceof ClassScope) {
+			ClassScope classScope = (ClassScope)scope;
+			if (isStatic) {
+				// Проверяем существование статического члена
+				if (!classScope.checkStaticImportExists(importPath)) {
+					markError("Static import not found: " + importPath);
+				}
+			} else {
+				// Проверяем существование класса
+				if (classScope.resolveClass(importPath) == null) {
+					markError("Imported class not found: " + importPath);
+				}
+			}
+		}
+		return true;
 	}
 }
