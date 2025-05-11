@@ -15,6 +15,7 @@ import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.messages.WarningMessage;
 import ru.vm5277.j8b.compiler.semantic.ClassScope;
 import ru.vm5277.j8b.compiler.semantic.InterfaceSymbol;
@@ -27,9 +28,10 @@ public class ClassNode extends AstNode {
 	private			String			parentClassName;
 	private			List<String>	interfaces	= new ArrayList<>();
 	private			ClassBlockNode	blockNode;
+	private			ClassScope		classScope;
 	
-	public ClassNode(TokenBuffer tb, Set<Keyword> modifiers, String parentClassName) throws ParseException {
-		super(tb);
+	public ClassNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, String parentClassName) throws ParseException {
+		super(tb, mc);
 		
 		this.modifiers = modifiers;
 		this.parentClassName = parentClassName;
@@ -55,7 +57,15 @@ public class ClassNode extends AstNode {
 			}
 		}
         // Парсинг тела класса
-		blockNode = new ClassBlockNode(tb, name);
+		blockNode = new ClassBlockNode(tb, mc, name);
+	}
+	
+	public ClassNode(MessageContainer mc, Set<Keyword> modifiers, String parentClassName, List<String> interfaces) throws ParseException {
+		super(null, mc);
+		
+		this.modifiers = modifiers;
+		this.name = parentClassName;
+		this.interfaces = interfaces;
 	}
 	
 	public String getName() {
@@ -68,6 +78,9 @@ public class ClassNode extends AstNode {
 	
 	public ClassBlockNode getBody() {
 		return blockNode;
+	}
+	public void setBody(ClassBlockNode body) {
+		blockNode = body;
 	}
 	
 	public Set<Keyword> getModifiers() {
@@ -86,28 +99,27 @@ public class ClassNode extends AstNode {
 
 	@Override
 	public boolean preAnalyze() {
-		try {validateName(name);} catch(SemanticException e) {tb.addMessage(e);	return false;}
+		try {validateName(name);} catch(SemanticException e) {addMessage(e);	return false;}
 
 		if(Character.isLowerCase(name.charAt(0))) {
-			tb.addMessage(new WarningMessage("Class name should start with uppercase letter:" + name, tb.getSP()));
+			addMessage(new WarningMessage("Class name should start with uppercase letter:" + name, sp));
 		}
 		
-		try{validateModifiers(modifiers, Keyword.PUBLIC, Keyword.PRIVATE, Keyword.STATIC);} catch(SemanticException e) {tb.addMessage(e);}
+		try{validateModifiers(modifiers, Keyword.PUBLIC, Keyword.PRIVATE, Keyword.STATIC);} catch(SemanticException e) {addMessage(e);}
 		
 		// Анализ тела класса
-		for (BlockNode block : blocks) {
-			block.preAnalyze();
-		}
+		blockNode.preAnalyze();
+
 		return true;
 	}
 	
 	@Override
 	public boolean declare(Scope parentScope) {
 		try {
-			ClassScope classScope = new ClassScope(name, parentScope);
+			classScope = new ClassScope(name, parentScope);
 			if(null != parentScope) ((ClassScope)parentScope).addClass(classScope);
 			
-			getBody().declare(classScope);
+			blockNode.declare(classScope);
 		}
 		catch(SemanticException e) {markError(e); return false;}
 
@@ -117,8 +129,6 @@ public class ClassNode extends AstNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope) {
-		ClassScope classScope = (ClassScope)scope;
-		
 		for (String interfaceName : interfaces) {
 			// Проверяем существование интерфейса
 			InterfaceSymbol interfaceSymbol = classScope.getInterface(interfaceName);
@@ -127,9 +137,8 @@ public class ClassNode extends AstNode {
 			checkInterfaceImplementation(classScope, interfaceSymbol);
 		}
 		
-		for (BlockNode block : blocks) {
-			block.postAnalyze(classScope);
-		}
+		blockNode.postAnalyze(classScope);
+
 		return true;
 	}
 	

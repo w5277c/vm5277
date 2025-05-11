@@ -12,8 +12,14 @@ import ru.vm5277.j8b.compiler.enums.VarType;
 public class VarTypeTest {
     @Test
     void numericTypesCompatibility() {
-        assertTrue(VarType.INT.isCompatibleWith(VarType.SHORT));
+        assertTrue(VarType.SHORT.isCompatibleWith(VarType.BYTE));
+		assertTrue(VarType.INT.isCompatibleWith(VarType.BYTE));
+		assertTrue(VarType.INT.isCompatibleWith(VarType.SHORT));
+		
         assertFalse(VarType.FIXED.isCompatibleWith(VarType.BOOL));
+		assertFalse(VarType.FIXED.isCompatibleWith(VarType.BOOL));
+		assertFalse(VarType.FIXED.isCompatibleWith(VarType.BOOL));
+		assertFalse(VarType.FIXED.isCompatibleWith(VarType.BOOL));
     }
 
     @Test

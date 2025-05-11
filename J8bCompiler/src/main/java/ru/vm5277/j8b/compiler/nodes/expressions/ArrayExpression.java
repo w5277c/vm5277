@@ -9,6 +9,7 @@ import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 
@@ -16,13 +17,13 @@ public class ArrayExpression extends ExpressionNode {
     private	final	ExpressionNode	array;
     private			ExpressionNode	index;
 
-	public ArrayExpression(TokenBuffer tb, ExpressionNode expr) {
-		super(tb);
+	public ArrayExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode expr) {
+		super(tb, mc);
 
 		this.array = expr;
 		
 		try {consumeToken(tb, Delimiter.LEFT_BRACKET);} catch(ParseException e){markFirstError(e);} // Потребляем '['
-		try {index = new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);} // Парсим выражение-индекс
+		try {index = new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);} // Парсим выражение-индекс
 		try {consumeToken(tb, Delimiter.RIGHT_BRACKET);} catch(ParseException e){markFirstError(e);} // Потребляем ']'
 	}
 

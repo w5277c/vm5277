@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler.semantic.ClassScope;
 import ru.vm5277.j8b.compiler.semantic.MethodSymbol;
@@ -18,8 +19,8 @@ public class NewExpression extends ExpressionNode {
 	private	String					className;
 	private	List<ExpressionNode>	args;
 	
-	public NewExpression(TokenBuffer tb, String className, List<ExpressionNode> args) {
-        super(tb);
+	public NewExpression(TokenBuffer tb, MessageContainer mc, String className, List<ExpressionNode> args) {
+        super(tb, mc);
         
 		this.className = className;
 		this.args = args;

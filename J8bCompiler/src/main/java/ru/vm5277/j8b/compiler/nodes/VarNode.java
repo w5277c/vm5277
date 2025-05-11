@@ -12,6 +12,7 @@ import ru.vm5277.j8b.compiler.enums.Operator;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.messages.WarningMessage;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.j8b.compiler.semantic.BlockScope;
@@ -24,8 +25,8 @@ public class VarNode extends AstNode {
 	private	final	String			name;
 	private			ExpressionNode	initializer;
 
-	public VarNode(TokenBuffer tb, Set<Keyword> modifiers, VarType type, String name) {
-		super(tb);
+	public VarNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType type, String name) {
+		super(tb, mc);
 		
 		this.modifiers = modifiers;
 		this.type = type;
@@ -36,11 +37,19 @@ public class VarNode extends AstNode {
         }
 		else {
 			consumeToken(tb);
-			try {initializer = new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
+			try {initializer = new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
 		}
         try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
 	}
 
+	public VarNode(MessageContainer mc, Set<Keyword> modifiers, VarType type, String name) {
+		super(null, mc);
+		
+		this.modifiers = modifiers;
+		this.type = type;
+		this.name = name;
+	}
+	
 	public VarType getType() {
 		return type;
 	}
@@ -69,7 +78,7 @@ public class VarNode extends AstNode {
 
 	@Override
 	public boolean preAnalyze() {
-		if(Character.isUpperCase(name.charAt(0))) tb.addMessage(new WarningMessage("Variable name should start with lowercase letter:" + name, tb.getSP()));
+		if(Character.isUpperCase(name.charAt(0))) addMessage(new WarningMessage("Variable name should start with lowercase letter:" + name, sp));
 
 		return true;
 	}
@@ -77,9 +86,13 @@ public class VarNode extends AstNode {
 	
 	@Override
 	public boolean declare(Scope scope) {
-		BlockScope blockScope = (BlockScope)scope;
+		if(scope instanceof BlockScope) {
+			BlockScope blockScope = (BlockScope)scope;
 
-		try {blockScope.addLocal(new Symbol(name, type, modifiers.contains(Keyword.FINAL)));} catch(SemanticException e) {markError(e);}
+			try {blockScope.addLocal(new Symbol(name, type, modifiers.contains(Keyword.FINAL)));} catch(SemanticException e) {markError(e);}
+		}
+		else markError("Unexpected scope:" + scope.getClass().getSimpleName() + " in var:" + name);
+
 		return true;
 	}
 
@@ -94,7 +107,9 @@ public class VarNode extends AstNode {
 		// Проверка совместимости типов
 		try {
 			VarType initType = initializer.getType(scope);
-			if (!type.isCompatibleWith(initType)) markError("Type mismatch: cannot assign " + initType + " to " + type);
+			if (!type.isCompatibleWith(initType)) {
+				markError("Type mismatch: cannot assign " + initType + " to " + type);
+			}
 		}
 		catch (SemanticException e) {markError(e);}
 		

@@ -9,6 +9,7 @@ import ru.vm5277.j8b.compiler.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler.enums.Operator;
 import static ru.vm5277.j8b.compiler.enums.Operator.PLUS;
 import ru.vm5277.j8b.compiler.enums.VarType;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 import ru.vm5277.j8b.compiler.semantic.Symbol;
@@ -17,9 +18,10 @@ public class UnaryExpression extends ExpressionNode {
     private final Operator		 operator;
     private final ExpressionNode operand;
     
-    public UnaryExpression(TokenBuffer tb, Operator operator, ExpressionNode operand) {
-        super(tb);
-        this.operator = operator;
+    public UnaryExpression(TokenBuffer tb, MessageContainer mc, Operator operator, ExpressionNode operand) {
+        super(tb, mc);
+        
+		this.operator = operator;
         this.operand = operand;
     }
     
@@ -34,7 +36,7 @@ public class UnaryExpression extends ExpressionNode {
 			case POST_INC:
 			case POST_DEC:
 			case PLUS:
-			case MINUS:
+			case MINUS: return VarType.FIXED;
 			case BIT_NOT:
 			default: return operandType;
 		}

@@ -8,6 +8,7 @@ package ru.vm5277.j8b.compiler.nodes.commands;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.nodes.*;
 import ru.vm5277.j8b.compiler.semantic.BlockScope;
 import ru.vm5277.j8b.compiler.semantic.LabelSymbol;
@@ -17,8 +18,8 @@ public class ContinueNode extends CommandNode {
 	private String		label;
 	private	LabelSymbol	symbol;
 	
-	public ContinueNode(TokenBuffer tb) {
-        super(tb);
+	public ContinueNode(TokenBuffer tb, MessageContainer mc) {
+        super(tb, mc);
         
         consumeToken(tb);
 		if(tb.match(TokenType.ID)) {
@@ -70,7 +71,7 @@ public class ContinueNode extends CommandNode {
 	public boolean postAnalyze(Scope scope) {
 		AstNode node = tb.getLoopStack().peek();
 		if (null == node || !(node instanceof ForNode || node instanceof WhileNode || node instanceof DoWhileNode)) {
-            markFirstError(tb.parseError("'continue' can only be used inside loop statements"));
+            markFirstError(parserError("'continue' can only be used inside loop statements"));
         }
 
 		// Проверка видимости

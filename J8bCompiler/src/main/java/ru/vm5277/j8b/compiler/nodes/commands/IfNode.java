@@ -13,6 +13,7 @@ import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.semantic.BlockScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 
@@ -21,18 +22,18 @@ public class IfNode extends CommandNode {
 	private	BlockScope		thenScope;
 	private	BlockScope		elseScope;
 	
-	public IfNode(TokenBuffer tb) {
-		super(tb);
+	public IfNode(TokenBuffer tb, MessageContainer mc) {
+		super(tb, mc);
 		
         consumeToken(tb); // Потребляем "if"
 		// Условие
 		try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(ParseException e){markFirstError(e);}
-		try {this.condition = new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
+		try {this.condition = new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
 		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(ParseException e){markFirstError(e);}
 
 		// Then блок
 		tb.getLoopStack().add(this);
-		try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));}
+		try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement()));}
 		catch(ParseException e) {markFirstError(e);}
 		tb.getLoopStack().remove(this);
 
@@ -43,12 +44,12 @@ public class IfNode extends CommandNode {
 			if (tb.match(TokenType.COMMAND, Keyword.IF)) {
 				// Обработка else if
 				tb.getLoopStack().add(this);
-				blocks.add(new BlockNode(tb, new IfNode(tb)));
+				blocks.add(new BlockNode(tb, mc, new IfNode(tb, mc)));
 				tb.getLoopStack().remove(this);
 			}
 			else {
 				tb.getLoopStack().add(this);
-				try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));}
+				try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement()));}
 				catch(ParseException e) {markFirstError(e);}
 				tb.getLoopStack().remove(this);
 			}

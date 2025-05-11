@@ -12,6 +12,7 @@ import ru.vm5277.j8b.compiler.enums.Operator;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.messages.WarningMessage;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.j8b.compiler.nodes.expressions.LiteralExpression;
@@ -28,8 +29,8 @@ public class ArrayDeclarationNode extends AstNode {
 	private			ExpressionNode	initializer;
 	private			Symbol			symbol;
 
-	public ArrayDeclarationNode(TokenBuffer tb, Set<Keyword> modifiers, VarType type, String name) {
-		super(tb);
+	public ArrayDeclarationNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType type, String name) {
+		super(tb, mc);
 		
 		this.modifiers = modifiers;
 		this.elementType = type;
@@ -38,14 +39,14 @@ public class ArrayDeclarationNode extends AstNode {
 		consumeToken(tb); // Потребляем '['
         
         // Размер массива
-        try{size = new ExpressionNode(tb).parse();}  catch(ParseException e) {markFirstError(e);}
+        try{size = new ExpressionNode(tb, mc).parse();}  catch(ParseException e) {markFirstError(e);}
         
         try {consumeToken(tb, Delimiter.RIGHT_BRACKET);} catch(ParseException e) {markFirstError(e);} // Потребляем ']'
 
         // Инициализация (опционально)
         if (tb.match(Operator.ASSIGN)) {
             consumeToken(tb);
-            try {initializer = new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
+            try {initializer = new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
         }
 		else {
 			initializer = null;
@@ -61,7 +62,7 @@ public class ArrayDeclarationNode extends AstNode {
 	
 	@Override
 	public boolean preAnalyze() {
-		if(Character.isUpperCase(name.charAt(0))) tb.addMessage(new WarningMessage("Array name should start with lowercase letter:" + name, tb.getSP()));
+		if(Character.isUpperCase(name.charAt(0))) addMessage(new WarningMessage("Array name should start with lowercase letter:" + name, sp));
 		
 		// Проверка типа элементов
 		if (null == elementType || VarType.VOID == elementType || VarType.UNKNOWN == elementType) markError("Invalid array element type: " + elementType);

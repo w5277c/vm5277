@@ -15,6 +15,7 @@ import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.nodes.commands.DoWhileNode;
 import ru.vm5277.j8b.compiler.nodes.commands.ForNode;
 import ru.vm5277.j8b.compiler.nodes.commands.IfNode;
@@ -33,20 +34,20 @@ public class BlockNode extends AstNode {
 	public BlockNode() {
 	}
 	
-	public BlockNode(TokenBuffer tb, AstNode singleStatement) {
-		super(tb);
+	public BlockNode(TokenBuffer tb, MessageContainer mc, AstNode singleStatement) {
+		super(tb, mc);
 		
 		declarations.add(singleStatement);
 	}
 
-	public BlockNode(TokenBuffer tb) throws ParseException {
-        super(tb);
+	public BlockNode(TokenBuffer tb, MessageContainer mc) throws ParseException {
+        super(tb, mc);
         
 		consumeToken(tb, Delimiter.LEFT_BRACE); //Наличие токена должно быть гарантировано вызывающим
 
 		while (!tb.match(TokenType.EOF) && !tb.match(Delimiter.RIGHT_BRACE)) {
 			if(tb.match(TokenType.LABEL)) {
-				LabelNode label = new LabelNode(tb);
+				LabelNode label = new LabelNode(tb, mc);
 				labels.put(label.getName(), label);
 				declarations.add(label);
 			}
@@ -55,13 +56,13 @@ public class BlockNode extends AstNode {
 					declarations.add(parseCommand());
 				}
 				catch(ParseException e) {
-					tb.addMessage(e.getErrorMessage());
+					addMessage(e.getErrorMessage());
 					markFirstError(e);
 				} // Фиксируем ошибку(Unexpected command token)
 				continue;
 			}
 			if(tb.match(Keyword.FREE)) {
-				declarations.add(new FreeNode(tb));
+				declarations.add(new FreeNode(tb, mc));
 				continue;
 			}
 			
@@ -69,12 +70,12 @@ public class BlockNode extends AstNode {
 
 			// Обработка классов с модификаторами
 			if (tb.match(TokenType.OOP) && Keyword.CLASS == tb.current().getValue()) {
-				declarations.add(new ClassNode(tb, modifiers, null));
+				declarations.add(new ClassNode(tb, mc, modifiers, null));
 				continue;
 			}
 			// Обработка интерфейсов с модификаторами
 			if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
-				declarations.add(new InterfaceNode(tb, modifiers, null));
+				declarations.add(new InterfaceNode(tb, mc, modifiers, null));
 				continue;
 			}
 
@@ -90,11 +91,11 @@ public class BlockNode extends AstNode {
 					try {name = consumeToken(tb, TokenType.ID).getStringValue();}catch(ParseException e) {markFirstError(e);} // Нет имени сущности, пытаемся парсить дальше
 
 					if (tb.match(Delimiter.LEFT_BRACKET)) { // Это объявление массива
-						ArrayDeclarationNode node = new ArrayDeclarationNode(tb, modifiers, type, name);
+						ArrayDeclarationNode node = new ArrayDeclarationNode(tb, mc, modifiers, type, name);
 						if(null != name) declarations.add(node);
 					}
 					else { // Метод или переменная
-						VarNode varNode = new VarNode(tb, modifiers, type, name);
+						VarNode varNode = new VarNode(tb, mc, modifiers, type, name);
 						if(null != name) declarations.add(varNode);
 					}
 					continue;
@@ -118,6 +119,10 @@ public class BlockNode extends AstNode {
 		}
 		consumeToken(tb, Delimiter.RIGHT_BRACE);
     }
+
+	public BlockNode(MessageContainer mc) throws ParseException {
+        super(null, mc);
+	}
 	
 	public static  boolean hasReturnStatement(AstNode node) {
 		if (null == node) return false;

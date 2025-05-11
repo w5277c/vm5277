@@ -7,6 +7,7 @@ package ru.vm5277.j8b.compiler.nodes.expressions;
 
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 
@@ -15,8 +16,8 @@ public class TernaryExpression extends ExpressionNode {
 	private final ExpressionNode trueExpr;
 	private final ExpressionNode falseExpr;
 
-	public TernaryExpression(TokenBuffer tb, ExpressionNode condition, ExpressionNode trueExpr, ExpressionNode falseExpr) {
-		super(tb);
+	public TernaryExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode condition, ExpressionNode trueExpr, ExpressionNode falseExpr) {
+		super(tb, mc);
 
 		this.condition = condition;
 		this.trueExpr = trueExpr;

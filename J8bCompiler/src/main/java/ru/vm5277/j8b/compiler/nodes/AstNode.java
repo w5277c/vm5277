@@ -38,33 +38,38 @@ import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode;
 import ru.vm5277.j8b.compiler.tokens.Token;
 import ru.vm5277.j8b.compiler.SemanticAnalyzer;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.Message;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.messages.WarningMessage;
 import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode.Case;
 
 public abstract class AstNode extends SemanticAnalyzer {
+	protected			TokenBuffer				tb;
 	protected			SourcePosition			sp;
 	private				ErrorMessage			error;
 	protected	final	ArrayList<BlockNode>	blocks	= new ArrayList<>();
+	protected			MessageContainer		mc;
 	
 	protected AstNode() {
 	}
 	
-	protected AstNode(TokenBuffer tb) {
+	protected AstNode(TokenBuffer tb, MessageContainer mc) {
         this.tb = tb;
-		this.sp = tb.current().getSP();
+		this.sp = null == tb ? null : tb.current().getSP();
+		this.mc = mc;
     }
 
 	protected AstNode parseCommand() throws ParseException {
 		Keyword keyword = (Keyword)tb.current().getValue();
 		switch(keyword) {
-			case IF:		return new IfNode(tb);
-			case FOR:		return new ForNode(tb);
-			case DO:		return new DoWhileNode(tb);
-			case WHILE:		return new WhileNode(tb);
-			case CONTINUE:	return new ContinueNode(tb);
-			case BREAK:		return new BreakNode(tb);
-			case RETURN:	return new ReturnNode(tb);
-			case SWITCH:	return new SwitchNode(tb);
+			case IF:		return new IfNode(tb, mc);
+			case FOR:		return new ForNode(tb, mc);
+			case DO:		return new DoWhileNode(tb, mc);
+			case WHILE:		return new WhileNode(tb, mc);
+			case CONTINUE:	return new ContinueNode(tb, mc);
+			case BREAK:		return new BreakNode(tb, mc);
+			case RETURN:	return new ReturnNode(tb, mc);
+			case SWITCH:	return new SwitchNode(tb, mc);
 			default:
 				markFirstError(error);
 				throw new ParseException("Unexpected command token " + tb.current(), sp);
@@ -89,12 +94,12 @@ public abstract class AstNode extends SemanticAnalyzer {
 			return expr;
 		}
 		else if (tb.match(Operator.INC) || tb.match(Operator.DEC)) {
-				ExpressionNode expr = new ExpressionNode(tb).parse();
+				ExpressionNode expr = new ExpressionNode(tb, mc).parse();
 				consumeToken(tb, Delimiter.SEMICOLON);
 				return expr;
 		}
 		else if (tb.match(Delimiter.LEFT_BRACE)) {
-			return new BlockNode(tb);
+			return new BlockNode(tb, mc);
 		}
 /*		else if(tb.match(TokenType.OPERATOR)) {
 			Operator operator = (Operator)tb.current().getValue();
@@ -105,7 +110,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 			}
 			throw new ParseError("Unexpected operator: " + operator, tb.current().getLine(), tb.current().getColumn());
 		}*/
-		ParseException e = tb.parseError("Unexpected statement token: " + tb.current());
+		ParseException e = parserError("Unexpected statement token: " + tb.current());
 		tb.skip(Delimiter.SEMICOLON, Delimiter.LEFT_BRACE);
 		throw e;
 	}
@@ -164,7 +169,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 	}
 
 	private ExpressionNode parseFullQualifiedExpression(TokenBuffer tb) throws ParseException {
-		ExpressionNode parent = new ExpressionNode(tb).parse();
+		ExpressionNode parent = new ExpressionNode(tb, mc).parse();
 
 		// Обрабатываем цепочки вызовов через точку
 		while (tb.match(Delimiter.DOT)) {
@@ -173,7 +178,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 
 			if (tb.match(Delimiter.LEFT_PAREN)) {
 				// Это вызов метода
-				parent = new MethodCallExpression(tb, parent, methodName, parseArguments(tb));
+				parent = new MethodCallExpression(tb, mc, parent, methodName, parseArguments(tb));
 			}
 			else {
 				// Доступ к полю (можно добавить FieldAccessNode)
@@ -277,29 +282,48 @@ public abstract class AstNode extends SemanticAnalyzer {
     }
 	public Token consumeToken(TokenBuffer tb, TokenType expectedType) throws ParseException {
 		if (tb.current().getType() == expectedType) return consumeToken(tb);
-		else throw tb.parseError("Expected " + expectedType + ", but got " + tb.current().getType());
+		else throw parserError("Expected " + expectedType + ", but got " + tb.current().getType());
     }
 	public Token consumeToken(TokenBuffer tb, Operator op) throws ParseException {
 		if (TokenType.OPERATOR == tb.current().getType()) {
             if(op == tb.current().getValue()) return consumeToken(tb);
-			else throw tb.parseError("Expected operator " + op + ", but got " + tb.current().getValue());
+			else throw parserError("Expected operator " + op + ", but got " + tb.current().getValue());
         }
-		else throw tb.parseError("Expected " + TokenType.OPERATOR + ", but got " + tb.current().getType());
+		else throw parserError("Expected " + TokenType.OPERATOR + ", but got " + tb.current().getType());
     }
 	public Token consumeToken(TokenBuffer tb, Delimiter delimiter) throws ParseException {
 		if (TokenType.DELIMITER == tb.current().getType()) {
             if(delimiter == tb.current().getValue()) return consumeToken(tb);
-			else throw tb.parseError("Expected delimiter " + delimiter + ", but got " + tb.current().getValue());
+			else throw parserError("Expected delimiter " + delimiter + ", but got " + tb.current().getValue());
         }
-		else throw tb.parseError("Expected " + TokenType.DELIMITER + ", but got " + tb.current().getType());
+		else throw parserError("Expected " + TokenType.DELIMITER + ", but got " + tb.current().getType());
     }
 	public Token consumeToken(TokenBuffer tb, TokenType type, Keyword keyword) throws ParseException {
 		if (type == tb.current().getType()) {
             if(keyword == tb.current().getValue()) return consumeToken(tb);
-			else throw tb.parseError("Expected keyword " + keyword + ", but got " + tb.current().getValue());
+			else throw parserError("Expected keyword " + keyword + ", but got " + tb.current().getValue());
         }
-		else throw tb.parseError("Expected " + TokenType.KEYWORD + ", but got " + tb.current().getType());
+		else throw parserError("Expected " + TokenType.KEYWORD + ", but got " + tb.current().getType());
     }
+	
+	
+	public ParseException parserError(String text) {
+		ErrorMessage message = new ErrorMessage(text, sp);
+		addMessage(message);
+		return new ParseException(message);
+	}
+	public SemanticException semanticError(String text) {
+		ErrorMessage message = new ErrorMessage(text, sp);
+		addMessage(message);
+		return new SemanticException(text);
+	}
+
+	public void addMessage(Message message) {
+		mc.add(message);
+	}
+	public void addMessage(Exception e) {
+		mc.add(new ErrorMessage(e.getMessage(), sp));
+	}
 	
 	public void markFirstError(ParseException e) {
 		if(null != e && null == error) error = e.getErrorMessage();
@@ -311,24 +335,28 @@ public abstract class AstNode extends SemanticAnalyzer {
 	
 	// должно вызываться из текущей ноды, ее мы помеим как содержащую ошибку.
 	public ErrorMessage markError(SemanticException e) {
-		ErrorMessage message = new ErrorMessage(e.getMessage(), tb.getSP());
+		ErrorMessage message = new ErrorMessage(e.getMessage(), sp);
 		if(null == error) error = message;
-		tb.addMessage(message);
+		addMessage(message);
 		return message;
 	}
 	public ErrorMessage markError(String text) {
-		ErrorMessage message = new ErrorMessage(text, tb.getSP());
+		ErrorMessage message = new ErrorMessage(text, sp);
 		if(null == error) error = message;
-		tb.addMessage(message);
+		addMessage(message);
 		return message;
 	}
 	public WarningMessage markWarning(String text) {
-		WarningMessage message = new WarningMessage(text, tb.getSP());
-		tb.addMessage(message);
+		WarningMessage message = new WarningMessage(text, sp);
+		addMessage(message);
 		return message;
 	}
 	
 	public void setError(ErrorMessage message) {
 		if(null != message && null == error) error = message;
+	}
+	
+	public MessageContainer getMessageContainer() {
+		return mc;
 	}
 }

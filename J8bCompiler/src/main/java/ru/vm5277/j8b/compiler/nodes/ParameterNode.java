@@ -9,6 +9,7 @@ import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.semantic.MethodScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 import ru.vm5277.j8b.compiler.semantic.Symbol;
@@ -18,8 +19,8 @@ public class ParameterNode extends AstNode {
     private	final	String	name;
 	private	final	boolean	isFinal;
 	
-	public ParameterNode(TokenBuffer tb) throws ParseException {
-		super(tb);
+	public ParameterNode(TokenBuffer tb, MessageContainer mc) throws ParseException {
+		super(tb, mc);
 		
 		this.isFinal = tb.match(Keyword.FINAL);
 		if (this.isFinal) {
@@ -28,6 +29,14 @@ public class ParameterNode extends AstNode {
 		
 		this.type = checkPrimtiveType();
 		this.name = (String)consumeToken(tb, TokenType.ID).getValue();
+	}
+
+	public ParameterNode(MessageContainer mc, boolean isFinal, VarType type, String name) throws ParseException {
+		super(null, mc);
+		
+		this.isFinal = isFinal;
+		this.type = type;
+		this.name = name;
 	}
 	
 	public boolean isFinal() {
@@ -47,48 +56,6 @@ public class ParameterNode extends AstNode {
 		return "parameter";
 	}
 
-/*	@Override
-	public boolean preAnalyze(SymbolTable symbolTable) {
-		if(Character.isUpperCase(name.charAt(0))) {
-			tb.addMessage(new WarningMessage("Parameter name should start with lowercase letter:" + name, tb.getSP()));
-		}
-
-		return true;
-	}
-
-	@Override
-	public boolean declare(SymbolTable symbolTable) {
-		try {
-			// Регистрируем параметр в текущей области видимости
-			symbolTable.addSymbol(name, type, !isFinal);
-			return true;
-		} catch (SemanticException e) {
-			markError(e);
-			return false;
-		}
-	}
-	
-	@Override
-	public boolean postAnalyze(SymbolTable symbolTable) {
-		// Проверка типа параметра
-		if (type == VarType.UNKNOWN || type == VarType.NULL) tb.addMessage(new ErrorMessage("Invalid parameter type: " + type, getSP()));
-
-		// Дополнительные проверки для массивов
-		if (type.isArray()) {
-			// Проверяем тип элементов массива
-			VarType elementType = type.getElementType();
-			if (VarType.UNKNOWN == elementType || VarType.NULL == elementType) markError("Array element type cannot be UNKNOWN or NULL");
-
-			// Проверяем вложенность массивов
-			if (type.getArrayDepth() > 3) markError("Array nesting depth exceeds maximum allowed (3)");
-
-			// Проверяем размер массива (если указан)
-			if (type.getArraySize() != null && type.getArraySize() <= 0) markError("Array size must be positive");
-		}
-
-		return true;
-	}*/
-	
 	@Override
 	public String toString() {
 		return getClass().getSimpleName() + ": " + type + ", " + name;
@@ -102,7 +69,7 @@ public class ParameterNode extends AstNode {
 		}
 
 		// Проверка корректности типа
-		if (null == type || VarType.UNKNOWN == VarType.UNKNOWN) {
+		if (null == type || VarType.UNKNOWN == type) {
 			markError("Invalid parameter type: " + type);
 			return false;
 		}

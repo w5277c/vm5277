@@ -38,6 +38,6 @@ public class Message {
 	}
 	
 	public String toStrig() {
-		return getClass().getSimpleName() + " " + owner + ":" + text + " at " + sp;
+		return getClass().getSimpleName() + " " + owner + ":" + text + (null == sp ? "" : " at " + sp);
 	}
 }

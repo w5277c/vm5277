@@ -6,6 +6,7 @@
 package ru.vm5277.j8b.compiler.nodes.commands;
 
 import ru.vm5277.j8b.compiler.enums.ReturnStatus;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.nodes.AstNode;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler.semantic.LabelSymbol;
@@ -13,8 +14,8 @@ import ru.vm5277.j8b.compiler.semantic.MethodScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 
 public abstract class CommandNode extends AstNode {
-	public CommandNode(TokenBuffer tb) {
-		super(tb);
+	public CommandNode(TokenBuffer tb, MessageContainer mc) {
+		super(tb, mc);
 	}
 	
 	protected boolean isLoopOrSwitch(CommandNode node) {

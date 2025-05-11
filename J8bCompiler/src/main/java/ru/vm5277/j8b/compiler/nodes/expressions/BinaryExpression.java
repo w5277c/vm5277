@@ -14,6 +14,7 @@ import static ru.vm5277.j8b.compiler.enums.Operator.MOD;
 import static ru.vm5277.j8b.compiler.enums.Operator.MULT;
 import static ru.vm5277.j8b.compiler.enums.Operator.PLUS;
 import ru.vm5277.j8b.compiler.enums.VarType;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 
 public class BinaryExpression extends ExpressionNode {
@@ -21,8 +22,8 @@ public class BinaryExpression extends ExpressionNode {
     private final Operator			operator;
     private final ExpressionNode	right;
     
-    public BinaryExpression(TokenBuffer tb, ExpressionNode left, Operator operator, ExpressionNode right) {
-        super(tb);
+    public BinaryExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode left, Operator operator, ExpressionNode right) {
+        super(tb, mc);
         
 		this.left = left;
         this.operator = operator;
@@ -52,6 +53,10 @@ public class BinaryExpression extends ExpressionNode {
 			throw new SemanticException("Type mismatch in binary operation: " + leftType + " " + operator + " " + rightType);
 		}
 
+		if (Operator.PLUS == operator && VarType.CSTR == leftType) {
+			return VarType.CSTR;
+		}
+		
 		// Определяем тип результата операции
 		if (operator.isComparison()) {
 			return VarType.BOOL; // Результат сравнения - всегда boolean
@@ -201,7 +206,7 @@ public class BinaryExpression extends ExpressionNode {
 					}
 				}
 				
-				if(leftType.getSize() < rightType.getSize()) {
+				if(VarType.CSTR != leftType && leftType.getSize() < rightType.getSize()) {
 					markError(	"Implicit type conversion from " + leftType.getName() + " to " + rightType.getName() + " is prohibited. Use explicit cast.");
 					return false;
 				}

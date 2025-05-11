@@ -20,6 +20,7 @@ import ru.vm5277.j8b.compiler.tokens.TString;
 import ru.vm5277.j8b.compiler.tokens.Token;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.messages.ErrorMessage;
+import ru.vm5277.j8b.compiler.messages.MessageOwner;
 import ru.vm5277.j8b.compiler.tokens.TLabel;
 import ru.vm5277.j8b.compiler.tokens.TNote;
 
@@ -29,6 +30,8 @@ public class Lexer {
 	private final	List<Token>			tokens	= new ArrayList<>();
 	
 	public Lexer(Reader reader, MessageContainer mc) throws IOException {
+		mc.setOwner(MessageOwner.LEXER);
+		
 		StringBuilder stringBuilder = new StringBuilder();
 		char[] buffer = new char[4*1024];
 		for (int length; (length = reader.read(buffer)) != -1;) {

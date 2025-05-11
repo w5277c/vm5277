@@ -7,13 +7,13 @@ package ru.vm5277.j8b.compiler.nodes;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.messages.WarningMessage;
 import ru.vm5277.j8b.compiler.semantic.ClassScope;
 import ru.vm5277.j8b.compiler.semantic.InterfaceSymbol;
@@ -26,8 +26,8 @@ public class InterfaceNode extends AstNode {
 	private			List<String>		interfaces		= new ArrayList<>();
 	private			InterfaceBodyNode	blockNode;
 
-	public InterfaceNode(TokenBuffer tb, Set<Keyword> modifiers, String parentClassName) throws ParseException {
-		super(tb);
+	public InterfaceNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, String parentClassName) throws ParseException {
+		super(tb, mc);
 		
 		this.modifiers = modifiers;
 		this.parentClassName = parentClassName;
@@ -50,7 +50,7 @@ public class InterfaceNode extends AstNode {
 			}
 		}
         // Парсинг тела интерфейса
-		blockNode = new InterfaceBodyNode(tb, name);
+		blockNode = new InterfaceBodyNode(tb, mc, name);
 	}
 	
 	public String getName() {
@@ -77,13 +77,13 @@ public class InterfaceNode extends AstNode {
 
 	@Override
 	public boolean preAnalyze() {
-		try {validateName(name);} catch(SemanticException e) {tb.addMessage(e);	return false;}
+		try {validateName(name);} catch(SemanticException e) {addMessage(e);	return false;}
 
 		if(Character.isLowerCase(name.charAt(0))) {
-			tb.addMessage(new WarningMessage("Interface name should start with uppercase letter:" + name, tb.getSP()));
+			addMessage(new WarningMessage("Interface name should start with uppercase letter:" + name, sp));
 		}
 		
-		try{validateModifiers(modifiers, Keyword.PUBLIC);} catch(SemanticException e) {tb.addMessage(e);}
+		try{validateModifiers(modifiers, Keyword.PUBLIC);} catch(SemanticException e) {addMessage(e);}
 		
 		// Анализ тела интерфейса
 		blockNode.preAnalyze();

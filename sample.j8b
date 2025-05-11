@@ -5,6 +5,10 @@ public class Main {
     // Глобальная переменная
     int counter = 0;
 
+    public Main() {
+
+    }
+
     // Главная функция
     void main() {
         // Вызов функции

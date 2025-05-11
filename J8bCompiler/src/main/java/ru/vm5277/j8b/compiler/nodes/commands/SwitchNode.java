@@ -14,6 +14,7 @@ import java.util.List;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.semantic.BlockScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 import ru.vm5277.j8b.compiler.tokens.TNumber;
@@ -58,37 +59,37 @@ public class SwitchNode extends CommandNode {
 	private			BlockScope				switchScope;
 	private			BlockScope				defaultScope;
 	
-	public SwitchNode(TokenBuffer tb) {
-		super(tb);
+	public SwitchNode(TokenBuffer tb, MessageContainer mc) {
+		super(tb, mc);
 
 		consumeToken(tb); // Потребляем "switch"
 		// Парсим выражение switch
 		try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(ParseException e) {markFirstError(e);}
-		try {this.expression = new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
+		try {this.expression = new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
 		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(ParseException e) {markFirstError(e);}
 		
 		try {consumeToken(tb, Delimiter.LEFT_BRACE);} catch(ParseException e) {markFirstError(e);}
 		// Парсим case-блоки
 		while (!tb.match(Delimiter.RIGHT_BRACE)) {
 			if (tb.match(Keyword.CASE)) {
-				parseCase(tb);
+				parseCase(tb, mc);
 			}
 			else if (tb.match(Keyword.DEFAULT)) {
 				consumeToken(tb); // Потребляем "default"
 				try {consumeToken(tb, Delimiter.COLON);} catch(ParseException e) {markFirstError(e);}
 				tb.getLoopStack().add(this);
-				try {defaultBlock = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement());}
+				try {defaultBlock = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());}
 				catch(ParseException e) {markFirstError(e);}
 				tb.getLoopStack().remove(this);
 			}
 			else {
-				markFirstError(tb.parseError("Expected 'case' or 'default' in switch statement"));
+				markFirstError(parserError("Expected 'case' or 'default' in switch statement"));
 			}
 		}
 		try {consumeToken(tb, Delimiter.RIGHT_BRACE);}catch(ParseException e) {markFirstError(e);}
 	}
 
-	private void parseCase(TokenBuffer tb) {
+	private void parseCase(TokenBuffer tb, MessageContainer mc) {
 		consumeToken(tb); // Потребляем "case"
 
 		// Парсим значение или диапазон
@@ -104,7 +105,7 @@ public class SwitchNode extends CommandNode {
 		try {consumeToken(tb, Delimiter.COLON);} catch(ParseException e) {markFirstError(e);}
 		BlockNode blockNode = null;
 		tb.getLoopStack().add(this);
-		try {blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement());}
+		try {blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());}
 		catch(ParseException e) {markFirstError(e);}
 		tb.getLoopStack().remove(this);
 		cases.add(new Case(from, to, blockNode));
@@ -118,7 +119,7 @@ public class SwitchNode extends CommandNode {
 				return number.longValue();
 			}
 		}
-		throw tb.parseError("Expected numeric value(or range) for 'case' in switch statement");
+		throw parserError("Expected numeric value(or range) for 'case' in switch statement");
 	}
 
 	public ExpressionNode getExpression() {

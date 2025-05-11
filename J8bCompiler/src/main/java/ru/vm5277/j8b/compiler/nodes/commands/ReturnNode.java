@@ -11,23 +11,30 @@ import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.semantic.MethodScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 
 public class ReturnNode extends CommandNode {
 	private	ExpressionNode	expression;
 	
-	public ReturnNode(TokenBuffer tb) {
-		super(tb);
+	public ReturnNode(TokenBuffer tb, MessageContainer mc) {
+		super(tb, mc);
 		
 		consumeToken(tb); // Потребляем "return"
 		
-		try {this.expression = tb.match(Delimiter.SEMICOLON) ? null : new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
+		try {this.expression = tb.match(Delimiter.SEMICOLON) ? null : new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
         
         // Обязательно потребляем точку с запятой
         try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
     }
 
+	public ReturnNode(MessageContainer mc, ExpressionNode expression) {
+		super(null, mc);
+		
+		this.expression = expression;
+	}
+	
     public ExpressionNode getExpression() {
         return expression;
     }

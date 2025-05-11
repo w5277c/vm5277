@@ -9,17 +9,18 @@ import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 
 public class FreeNode extends AstNode {
 	private ExpressionNode target;
 
-	public FreeNode(TokenBuffer tb) {
-		super(tb);
+	public FreeNode(TokenBuffer tb, MessageContainer mc) {
+		super(tb, mc);
 
 		consumeToken(tb); // Наличие гарантировано вызывающим
-		try {this.target = new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
+		try {this.target = new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
 		try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
 	}
 

@@ -13,6 +13,7 @@ import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.j8b.compiler.semantic.BlockScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
@@ -25,8 +26,8 @@ public class ForNode extends CommandNode {
 	private	BlockScope		bodyScope;
 	private	BlockScope		elseScope;
 	
-    public ForNode(TokenBuffer tb) {
-        super(tb);
+    public ForNode(TokenBuffer tb, MessageContainer mc) {
+        super(tb, mc);
         
         consumeToken(tb); // Потребляем "for"
         try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(ParseException e) {markFirstError(e);}
@@ -39,10 +40,10 @@ public class ForNode extends CommandNode {
 				if(null != type) {
 					String name = null;
 					try {name = consumeToken(tb, TokenType.ID).getStringValue();} catch(ParseException e) {markFirstError(e);}
-					this.initialization = new VarNode(tb, null, type, name);
+					this.initialization = new VarNode(tb, mc, null, type, name);
 				}
 				else {
-					this.initialization = new ExpressionNode(tb).parse();
+					this.initialization = new ExpressionNode(tb, mc).parse();
 				}
 			}
 			catch(ParseException e) {
@@ -55,18 +56,18 @@ public class ForNode extends CommandNode {
 		}
         
         // Условие
-        try {this.condition = tb.match(Delimiter.SEMICOLON) ? null : new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
+        try {this.condition = tb.match(Delimiter.SEMICOLON) ? null : new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
         try {consumeToken(tb, Delimiter.SEMICOLON);} catch(ParseException e) {markFirstError(e);}
         
         // Итерация
-        try {this.iteration = tb.match(Delimiter.RIGHT_PAREN) ? null : new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
+        try {this.iteration = tb.match(Delimiter.RIGHT_PAREN) ? null : new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
         try {consumeToken(tb, Delimiter.SEMICOLON);} catch(ParseException e) {markFirstError(e);}
         
 		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(ParseException e) {markFirstError(e);}
 		
         // Основной блок
 		tb.getLoopStack().add(this);
-		try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));}
+		try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement()));}
 		catch(ParseException e) {markFirstError(e);}
 		tb.getLoopStack().remove(this);
        
@@ -74,7 +75,7 @@ public class ForNode extends CommandNode {
         if (tb.match(Keyword.ELSE)) {
 			consumeToken(tb);
 			tb.getLoopStack().add(this);
-			try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));}
+			try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement()));}
 			catch(ParseException e) {markFirstError(e);}
 			tb.getLoopStack().remove(this);
         }

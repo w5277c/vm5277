@@ -13,6 +13,7 @@ import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.j8b.compiler.semantic.BlockScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
@@ -21,20 +22,20 @@ public class DoWhileNode extends CommandNode {
 	private	ExpressionNode	condition;
 	private	BlockScope		blockScope;
 
-	public DoWhileNode(TokenBuffer tb) {
-		super(tb);
+	public DoWhileNode(TokenBuffer tb, MessageContainer mc) {
+		super(tb, mc);
 
 		consumeToken(tb);
 		// Тело цикла
 		tb.getLoopStack().add(this);
-		try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));}
+		try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement()));}
 		catch(ParseException e) {markFirstError(e);}
 		tb.getLoopStack().remove(this);
 
 		try {
 			consumeToken(tb, TokenType.COMMAND, Keyword.WHILE);
 			consumeToken(tb, Delimiter.LEFT_PAREN);
-			this.condition = new ExpressionNode(tb).parse();
+			this.condition = new ExpressionNode(tb, mc).parse();
 			consumeToken(tb, Delimiter.RIGHT_PAREN);
 		}
 		catch(ParseException e) {

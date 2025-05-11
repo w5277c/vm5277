@@ -6,6 +6,7 @@
 package ru.vm5277.j8b.compiler.nodes;
 
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.messages.WarningMessage;
 import ru.vm5277.j8b.compiler.semantic.BlockScope;
 import ru.vm5277.j8b.compiler.semantic.LabelSymbol;
@@ -15,8 +16,8 @@ public class LabelNode extends AstNode {
 	private	final	String	name;
 	private			boolean	used	= false;
 
-	public LabelNode(TokenBuffer tb) {
-		super(tb);
+	public LabelNode(TokenBuffer tb, MessageContainer mc) {
+		super(tb, mc);
 
 		this.name = consumeToken(tb).getStringValue(); // Гарантирован вызывающим
 	}
@@ -52,7 +53,7 @@ public class LabelNode extends AstNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope) {
-		if (!used) tb.addMessage(new WarningMessage("Unused label '" + name + "'", tb.getSP()));		
+		if (!used) addMessage(new WarningMessage("Unused label '" + name + "'", sp));
 
 		// TODO Контроль достижимости кода после return/break/continue
 		return true;

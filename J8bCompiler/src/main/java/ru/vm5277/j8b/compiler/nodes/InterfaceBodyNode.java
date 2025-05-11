@@ -6,13 +6,14 @@
 package ru.vm5277.j8b.compiler.nodes;
 
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.messages.WarningMessage;
 import ru.vm5277.j8b.compiler.semantic.ClassScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 
 public class InterfaceBodyNode extends ClassBlockNode {
-	public InterfaceBodyNode(TokenBuffer tb, String className) throws ParseException {
-		super(tb, className);
+	public InterfaceBodyNode(TokenBuffer tb, MessageContainer mc, String className) throws ParseException {
+		super(tb, mc, className);
 	}
 	
 	@Override
@@ -30,14 +31,14 @@ public class InterfaceBodyNode extends ClassBlockNode {
 			else if(declaration instanceof FieldNode) {
 				FieldNode fieldNode = (FieldNode)declaration;
 				if(!fieldNode.getModifiers().isEmpty()) {
-					tb.addMessage(new WarningMessage("Modifiers not allowed for interface fields (already public static final)", tb.getSP()));
+					addMessage(new WarningMessage("Modifiers not allowed for interface fields (already public static final)", sp));
 				}
 				declaration.preAnalyze();
 			}
 			else if(declaration instanceof MethodNode) {
 				MethodNode methoddNode = (MethodNode)declaration;
 				if(!methoddNode.getModifiers().isEmpty()) {
-					tb.addMessage(new WarningMessage("Modifiers not allowed for interface methods (already public abstract)", tb.getSP()));
+					addMessage(new WarningMessage("Modifiers not allowed for interface methods (already public abstract)", sp));
 				}
 				declaration.preAnalyze();
 			}

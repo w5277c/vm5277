@@ -7,27 +7,20 @@ package ru.vm5277.j8b.compiler.nodes;
 
 import java.util.Iterator;
 import java.util.Stack;
-import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.SourcePosition;
 import ru.vm5277.j8b.compiler.tokens.Token;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.Operator;
 import ru.vm5277.j8b.compiler.enums.TokenType;
-import ru.vm5277.j8b.compiler.exceptions.SemanticException;
-import ru.vm5277.j8b.compiler.messages.ErrorMessage;
-import ru.vm5277.j8b.compiler.messages.Message;
-import ru.vm5277.j8b.compiler.messages.MessageContainer;
 
 public class TokenBuffer {
 	private	Token	current;
 	private	final	Iterator<Token>		iterator;
-	private	final	MessageContainer	mc;
 	private	final	Stack<AstNode>		loopStack	= new Stack<>();
 	
-	public TokenBuffer(Iterator<Token> iterator, MessageContainer mc) {
+	public TokenBuffer(Iterator<Token> iterator) {
 		this.iterator = iterator;
-		this.mc = mc;
 		this.current = iterator.hasNext() ? iterator.next() : new Token(null, TokenType.EOF, (Object)null);
 	}
 	
@@ -67,24 +60,6 @@ public class TokenBuffer {
 	
 	public SourcePosition getSP() {
 		return current.getSP();
-	}
-	
-	public ParseException parseError(String text) {
-		ErrorMessage message = new ErrorMessage(text, current.getSP());
-		addMessage(message);
-		return new ParseException(message);
-	}
-	public SemanticException semanticError(String text) {
-		ErrorMessage message = new ErrorMessage(text, current.getSP());
-		addMessage(message);
-		return new SemanticException(text);
-	}
-
-	public void addMessage(Message message) {
-		mc.add(message);
-	}
-	public void addMessage(Exception e) {
-		mc.add(new ErrorMessage(e.getMessage(), current.getSP()));
 	}
 	
 	public Delimiter skip(Delimiter... delimiters) {

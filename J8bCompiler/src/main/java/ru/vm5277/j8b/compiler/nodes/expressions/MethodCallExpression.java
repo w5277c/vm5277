@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler.semantic.ClassScope;
 import ru.vm5277.j8b.compiler.semantic.InterfaceSymbol;
@@ -20,8 +21,8 @@ public class MethodCallExpression extends ExpressionNode {
 	private	final	String					methodName;
 	private	final	List<ExpressionNode>	arguments;
     
-    public MethodCallExpression(TokenBuffer tb, ExpressionNode parent, String methodName, List<ExpressionNode> arguments) {
-        super(tb);
+    public MethodCallExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode parent, String methodName, List<ExpressionNode> arguments) {
+        super(tb, mc);
         
 		this.parent = parent;
 		this.methodName = methodName;

@@ -12,6 +12,7 @@ import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.j8b.compiler.semantic.BlockScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
@@ -20,16 +21,16 @@ public class WhileNode extends CommandNode {
 	private	ExpressionNode	condition;
 	private	BlockScope		blockScope;
 	
-	public WhileNode(TokenBuffer tb) {
-		super(tb);
+	public WhileNode(TokenBuffer tb, MessageContainer mc) {
+		super(tb, mc);
 
 		consumeToken(tb); // Потребляем "while"
 		try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(ParseException e) {markFirstError(e);}
-		try {this.condition = new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
+		try {this.condition = new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
 		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(ParseException e) {markFirstError(e);}
 
 		tb.getLoopStack().add(this);
-		try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb) : new BlockNode(tb, parseStatement()));}
+		try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement()));}
 		catch(ParseException e) {markFirstError(e);}
 		tb.getLoopStack().remove(this);
 	}

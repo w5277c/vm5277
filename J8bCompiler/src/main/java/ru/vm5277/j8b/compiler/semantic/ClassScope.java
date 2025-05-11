@@ -12,9 +12,8 @@ import java.util.Map;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
 
-public class ClassScope implements Scope {
-	private	final	ClassScope						parent;
-	private	final	String							name;
+public class ClassScope extends Symbol implements Scope {
+	private			ClassScope						parent;
 
 	private final	Map<String, String>				imports			= new HashMap<>();
 	private final	Map<String, String>				staticImports	= new HashMap<>();
@@ -24,7 +23,13 @@ public class ClassScope implements Scope {
 	private	final	Map<String, List<MethodSymbol>>	methods			= new HashMap<>();
 	private	final	List<MethodSymbol>				constructors	= new ArrayList<>();
 
+	public ClassScope() {
+		super("", VarType.CLASS, false);
+	}
+	
 	public ClassScope(String name, Scope parentScope) throws SemanticException {
+		super(name, VarType.CLASS, false);
+		
 		if (null != parentScope && !(parentScope instanceof ClassScope)) throw new SemanticException("Сlass " + name + " can only be declared within a class.");
 		if (name == null || name.isEmpty()) throw new SemanticException("Class name cannot be empty");
 
@@ -139,12 +144,23 @@ public class ClassScope implements Scope {
 
 
 	@Override
-	public Symbol resolve(String name) {	// Методы из-за перегрузок нужно искать другим методом, аналогичто и для классов
+	public Symbol resolve(String name) {
 		// Поиск в полях текущего класса
 		if (fileds.containsKey(name)) {
 			return fileds.get(name);
 		}
 
+		// Поиск методов (без параметров - для простых случаев)
+		if (methods.containsKey(name) && !methods.get(name).isEmpty()) {
+			// Возвращаем первый метод с таким именем (для точного поиска нужно использовать resolveMethod)
+			return methods.get(name).get(0);
+		}
+
+		// Поиск вложенных классов
+		if (classes.containsKey(name)) {
+			return classes.get(name);
+		}
+		
 		// Поиск в интерфейсах
 		if (interfaces.containsKey(name)) {
 			return interfaces.get(name);

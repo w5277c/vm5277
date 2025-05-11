@@ -146,12 +146,23 @@ public class VarType {
 		// Специальные случаи для NULL
 		if (VarType.NULL == this || VarType.NULL == other) return this.isReferenceType() || other.isReferenceType();
 
+		// Большинство типов можно объединить со строковой константой
+		if(VarType.CSTR == this && VarType.VOID != other) return true;
+
 		// Проверка числовых типов
 		if (this.isNumeric() && other.isNumeric()) {
-			// Разрешаем смешивание целочисленных типов
-			if (this.isInteger() && other.isInteger()) return true;
 			// FIXED совместим только с FIXED
 			if (this == VarType.FIXED || other == VarType.FIXED) return this == VarType.FIXED && other == VarType.FIXED;
+
+			// Разрешаем смешивание целочисленных типов
+			if (this.isInteger() && other.isInteger()) {
+				// Разрешено: byte → short, byte → int, short → int
+				if (this == SHORT && other == BYTE) return true;
+				if (this == INT && (other == SHORT || other == BYTE)) return true;
+				
+				// В остальных случаях — запрещено
+				return false;
+			}
 			return false;
 		}
 
@@ -176,7 +187,7 @@ public class VarType {
 			if(this == INT && (l < 0 || l > 0xffffffffl)) throw new SemanticException("int value out of range (0..4294967295). Given: " + l);
 		}
 		else if(this == FIXED) {
-			double d = ((Double)num);
+			double d = (num instanceof Double ? ((Double)num) : (num.doubleValue()));
 			if(d<-128.0 || d > 127.99609375d) throw new SemanticException(String.format("fixed value out of range (-128.0..127.99609375). Given: %.8f", d));
 		}
 	}

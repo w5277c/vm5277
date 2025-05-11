@@ -13,6 +13,7 @@ import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
+import ru.vm5277.j8b.compiler.messages.MessageOwner;
 import ru.vm5277.j8b.compiler.nodes.AstNode;
 import ru.vm5277.j8b.compiler.nodes.ClassNode;
 import ru.vm5277.j8b.compiler.nodes.ImportNode;
@@ -23,20 +24,23 @@ import ru.vm5277.j8b.compiler.tokens.Token;
 public class ASTParser extends AstNode {
 	private			List<AstNode>		imports		= new ArrayList<>();
 	private			ClassNode			classNode;
-	private			TokenBuffer			tb;
+
 	public ASTParser(List<Token> tokens, MessageContainer mc) throws IOException {
+		this.mc = mc;
+		mc.setOwner(MessageOwner.AST);
+		
 		if(tokens.isEmpty()) return;
 		
-		tb = new TokenBuffer(tokens.iterator(), mc);
+		tb = new TokenBuffer(tokens.iterator());
 		// Обработка импортов		
 		while (tb.match(Keyword.IMPORT) && !tb.match(TokenType.EOF)) {
-			imports.add(new ImportNode(tb));
+			imports.add(new ImportNode(tb, mc));
 		}
 		
 		Set<Keyword> modifiers = collectModifiers(tb);
 		if(tb.match(TokenType.OOP, Keyword.CLASS)) {
 			try {
-				classNode = new ClassNode(tb, modifiers, null);
+				classNode = new ClassNode(tb, mc, modifiers, null);
 			}
 			catch(ParseException e) {
 				// Парсинг прерван (дальнейший парсинг файла бессмыслен)

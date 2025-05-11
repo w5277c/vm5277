@@ -7,6 +7,7 @@ package ru.vm5277.j8b.compiler.nodes.expressions;
 
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 import ru.vm5277.j8b.compiler.semantic.Symbol;
@@ -15,8 +16,8 @@ public class VariableExpression extends ExpressionNode {
     private final	String	value;
     private			Symbol	resolvedSymbol;
 	
-    public VariableExpression(TokenBuffer tb, String value) {
-        super(tb);
+    public VariableExpression(TokenBuffer tb, MessageContainer mc, String value) {
+        super(tb, mc);
         
 		this.value = value;
     }

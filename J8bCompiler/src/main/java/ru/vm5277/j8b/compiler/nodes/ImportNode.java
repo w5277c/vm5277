@@ -11,6 +11,7 @@ import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.semantic.ClassScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 
@@ -19,8 +20,8 @@ public class ImportNode extends AstNode {
 	private	String	importPath;
 	private	String	alias;
 
-	public ImportNode(TokenBuffer tb) {
-        super(tb);
+	public ImportNode(TokenBuffer tb, MessageContainer mc) {
+        super(tb, mc);
 		
 		try {
 			// Пропуск import токена

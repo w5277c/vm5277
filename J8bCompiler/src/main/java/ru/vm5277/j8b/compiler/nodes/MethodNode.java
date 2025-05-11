@@ -15,6 +15,7 @@ import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler.messages.ErrorMessage;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.messages.WarningMessage;
 import ru.vm5277.j8b.compiler.semantic.ClassScope;
 import ru.vm5277.j8b.compiler.semantic.MethodScope;
@@ -29,33 +30,44 @@ public class MethodNode extends AstNode {
 	private			List<ParameterNode>	parameters;
 	private			MethodScope			methodScope; // Добавляем поле для хранения области видимости
 	
-	public MethodNode(TokenBuffer tb, Set<Keyword> modifiers, VarType returnType, String name) throws ParseException {
-		super(tb);
+	public MethodNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType returnType, String name) throws ParseException {
+		super(tb, mc);
 		
 		this.modifiers = modifiers;
 		this.returnType = returnType;
 		this.name = name;
 
         consumeToken(tb); // Потребляем '('
-		this.parameters = parseParameters();
+		this.parameters = parseParameters(mc);
         consumeToken(tb); // Потребляем ')'
 		
 		if(tb.match(Delimiter.LEFT_BRACE)) {
 			tb.getLoopStack().add(this);
-			try {blocks.add(new BlockNode(tb));}catch(ParseException e) {}
+			try {blocks.add(new BlockNode(tb, mc));}catch(ParseException e) {}
 			tb.getLoopStack().remove(this);
 		}
 		else {
-			markFirstError(tb.parseError("Method '" + name + "' must contain a body"));
+			markFirstError(parserError("Method '" + name + "' must contain a body"));
 		}
 	}
 	
-	private List<ParameterNode> parseParameters() {
+	public MethodNode(MessageContainer mc, Set<Keyword> modifiers, VarType returnType, String name, List<ParameterNode> parameters, BlockNode body) {
+		super(null, mc);
+		
+		this.modifiers = modifiers;
+		this.returnType = returnType;
+		this.name = name;
+		this.parameters = parameters;
+		
+		blocks.add(body);
+	}
+	
+	private List<ParameterNode> parseParameters(MessageContainer mc) {
         List<ParameterNode> params = new ArrayList<>();
         
 		while(!tb.match(TokenType.EOF) && !tb.match(Delimiter.RIGHT_PAREN)) {
 			try {
-				params.add(new ParameterNode(tb));
+				params.add(new ParameterNode(tb, mc));
 				if (tb.match(Delimiter.COMMA)) {
 					consumeToken(tb); // Потребляем ','
 					continue;
@@ -64,7 +76,7 @@ public class MethodNode extends AstNode {
 					break;
 				}
 				ErrorMessage message = new ErrorMessage("Expected " + Delimiter.RIGHT_PAREN + ", but got " + tb.current().getType(), tb.current().getSP());
-				tb.addMessage(message);
+				addMessage(message);
 				markFirstError(message);
 				break;
 			}
@@ -109,15 +121,18 @@ public class MethodNode extends AstNode {
 
 	@Override
 	public boolean preAnalyze() {
-		try{validateModifiers(modifiers, Keyword.PUBLIC, Keyword.PRIVATE, Keyword.STATIC, Keyword.NATIVE);} catch(SemanticException e) {tb.addMessage(e);}
+		try{validateModifiers(modifiers, Keyword.PUBLIC, Keyword.PRIVATE, Keyword.STATIC, Keyword.NATIVE);} catch(SemanticException e) {addMessage(e);}
 		
 		if(!isConstructor() && Character.isUpperCase(name.charAt(0))) {
-			tb.addMessage(new WarningMessage("Method name should start with lowercase letter:" + name, tb.getSP()));
+			addMessage(new WarningMessage("Method name should start with uppercase letter:" + name, sp));
 		}
 
 		for (ParameterNode parameter : parameters) {
 			parameter.preAnalyze();
 		}
+		
+		getBody().preAnalyze();
+		
 		return true;
 	}
 
@@ -152,6 +167,8 @@ public class MethodNode extends AstNode {
 			}
 		}
 		catch(SemanticException e) {markError(e);}
+		
+		getBody().declare(classScope);
 		
 		return true;
 	}

@@ -7,14 +7,15 @@ package ru.vm5277.j8b.compiler.nodes.expressions;
 
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 
 public class LiteralExpression extends ExpressionNode {
     private Object value;
     
-    public LiteralExpression(TokenBuffer tb, Object value) {
-        super(tb);
+    public LiteralExpression(TokenBuffer tb, MessageContainer mc, Object value) {
+        super(tb, mc);
         
 		this.value = value;
     }

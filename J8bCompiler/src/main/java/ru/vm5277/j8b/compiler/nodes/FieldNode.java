@@ -13,6 +13,7 @@ import ru.vm5277.j8b.compiler.enums.Operator;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.messages.WarningMessage;
 import ru.vm5277.j8b.compiler.semantic.ClassScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
@@ -24,8 +25,8 @@ public class FieldNode extends AstNode {
 	private			String			name;
 	private			ExpressionNode	initializer;
 
-	public FieldNode(TokenBuffer tb, Set<Keyword> modifiers, VarType returnType, String name) {
-		super(tb);
+	public FieldNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType returnType, String name) {
+		super(tb, mc);
 
 		this.modifiers = modifiers;
 		this.returnType = returnType;
@@ -36,9 +37,17 @@ public class FieldNode extends AstNode {
         }
 		else {
 			consumeToken(tb);
-			try {initializer = new ExpressionNode(tb).parse();} catch(ParseException e) {markFirstError(e);}
+			try {initializer = new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
 		}
         try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
+	}
+
+	public FieldNode(MessageContainer mc, Set<Keyword> modifiers, VarType returnType, String name) {
+		super(null, mc);
+		
+		this.modifiers = modifiers;
+		this.returnType = returnType;
+		this.name = name;
 	}
 	
 	public Set<Keyword> getModifiers() {
@@ -76,16 +85,19 @@ public class FieldNode extends AstNode {
 
 	@Override
 	public boolean preAnalyze() {
-		if(Character.isUpperCase(name.charAt(0))) tb.addMessage(new WarningMessage("Field name should start with lowercase letter:" + name, tb.getSP()));
+		if(Character.isUpperCase(name.charAt(0))) addMessage(new WarningMessage("Field name should start with lowercase letter:" + name, sp));
 
 		return true;
 	}
 
 	@Override
 	public boolean declare(Scope scope) {
-		ClassScope classScope = (ClassScope)scope;
+		if(scope instanceof ClassScope) {
+			ClassScope classScope = (ClassScope)scope;
 
-		try{classScope.addField(new Symbol(name, returnType, modifiers.contains(Keyword.FINAL)));} catch(SemanticException e) {markError(e);}
+			try{classScope.addField(new Symbol(name, returnType, modifiers.contains(Keyword.FINAL)));} catch(SemanticException e) {markError(e);}
+		}
+		else markError("Unexpected scope:" + scope.getClass().getSimpleName() + " in filed:" + name);
 
 		return true;
 	}
@@ -101,7 +113,9 @@ public class FieldNode extends AstNode {
 		// Проверка совместимости типов
 		try {
 			VarType initType = initializer.getType(scope);
-			if (!returnType.isCompatibleWith(initType)) markError("Type mismatch: cannot assign " + initType + " to " + returnType);
+			if (!returnType.isCompatibleWith(initType)) {
+				markError("Type mismatch: cannot assign " + initType + " to " + returnType);
+			}
 		}
 		catch (SemanticException e) {markError(e);}
 		

@@ -10,34 +10,37 @@ import java.util.HashSet;
 import java.util.Set;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.messages.MessageOwner;
 import ru.vm5277.j8b.compiler.nodes.ClassNode;
-import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler.semantic.ClassScope;
 import ru.vm5277.j8b.compiler.semantic.MethodScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 
-public abstract class SemanticAnalyzer {
-	protected			TokenBuffer	tb;
+public class SemanticAnalyzer {
+	private	ClassScope	globalScope;
 	
 	protected SemanticAnalyzer() {
 	}
 
-	public SemanticAnalyzer(ClassNode clazz) throws SemanticException {
+	public SemanticAnalyzer(ClassNode clazz) {
+		clazz.getMessageContainer().setOwner(MessageOwner.SEMANTIC);
+		globalScope = new ClassScope();
+		
 		if(clazz.preAnalyze()) {
-			if(clazz.declare(null)) {
-				clazz.postAnalyze(null);
+			if(clazz.declare(globalScope)) {
+				clazz.postAnalyze(globalScope);
 			}
 		}
 	}
 
-	public abstract boolean preAnalyze();
-	public abstract boolean declare(Scope scope);
-	public abstract boolean postAnalyze(Scope scope);
+	public boolean preAnalyze() {return false;}
+	public boolean declare(Scope scope)  {return false;}
+	public boolean postAnalyze(Scope scope)  {return false;}
 	
 	
 	public void validateName(String name) throws SemanticException {
-        if (name == null || name.isEmpty()) throw tb.semanticError("Name cannot be empty");
-        if (null != Keyword.fromString(name)) throw tb.semanticError("Name cannot be a keyword");
+        if (name == null || name.isEmpty()) throw new SemanticException("Name cannot be empty");
+        if (null != Keyword.fromString(name)) throw new SemanticException("Name cannot be a keyword");
     }
 	
 	protected void validateModifiers(Set<Keyword> modifiers, Keyword... allowedModifiers) throws SemanticException {
@@ -71,5 +74,9 @@ public abstract class SemanticAnalyzer {
 			scope = scope.getParent();
 		}
 		return null;
+	}
+	
+	public ClassScope getGlobalScope() {
+		return globalScope;
 	}
 }
