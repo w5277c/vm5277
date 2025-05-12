@@ -86,7 +86,7 @@ public class ParameterNode extends AstNode {
 
 		try {
 			// Создаем символ параметра и добавляем его в область видимости метода
-			Symbol paramSymbol = new Symbol(name, type, isFinal);
+			Symbol paramSymbol = new Symbol(name, type, isFinal, false);
 			((MethodScope)scope).getSymbol().getParameters().add(paramSymbol);
 		}
 		catch (Exception e) {
@@ -116,9 +116,9 @@ public class ParameterNode extends AstNode {
 				markError("Array nesting depth exceeds maximum allowed (3)");
 			}
 
-			// Проверяем размер массива (если указан)
-			if (type.getArraySize() != null && type.getArraySize() <= 0) {
-				markError("Array size must be positive");
+			// Проверяем размер массива не должен быть указан
+			if (null != type.getArraySize() && 0 != type.getArraySize()) {
+				markError("Array size can't be initialized");
 			}
 		}
 

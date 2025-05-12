@@ -142,13 +142,14 @@ public class MethodNode extends AstNode {
 		
 		List<Symbol> paramSymbols = new ArrayList<>();
 		for (ParameterNode param : parameters) {
-			paramSymbols.add(new Symbol(param.getName(), param.getType(), param.isFinal()));
+			paramSymbols.add(new Symbol(param.getName(), param.getType(), param.isFinal(), false));
 		}
 
 		// Создаем MethodSymbol
 		try {
 			methodScope = new MethodScope(null, classScope);
-			MethodSymbol methodSymbol = new MethodSymbol(name, returnType, paramSymbols, modifiers.contains(Keyword.FINAL), methodScope);
+			MethodSymbol methodSymbol = new MethodSymbol(	name, returnType, paramSymbols, modifiers.contains(Keyword.FINAL),
+															modifiers.contains(Keyword.STATIC),	methodScope);
 			// Устанавливаем обратную ссылку
 			methodScope.setSymbol(methodSymbol);
 
@@ -168,7 +169,7 @@ public class MethodNode extends AstNode {
 		}
 		catch(SemanticException e) {markError(e);}
 		
-		getBody().declare(classScope);
+		getBody().declare(methodScope);
 		
 		return true;
 	}

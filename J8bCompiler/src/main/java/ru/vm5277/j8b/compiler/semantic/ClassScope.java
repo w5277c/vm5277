@@ -12,24 +12,22 @@ import java.util.Map;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
 
-public class ClassScope extends Symbol implements Scope {
+public class ClassScope implements Scope { // Плохая идея, область видимости класса не является символом... сделать отдельный метод для поиска классов
 	private			ClassScope						parent;
-
+	private			String							name;
+	
 	private final	Map<String, String>				imports			= new HashMap<>();
 	private final	Map<String, String>				staticImports	= new HashMap<>();
-	private	final	Map<String, Symbol>				fileds			= new HashMap<>();
+	private	final	Map<String, Symbol>				fields			= new HashMap<>();
 	private	final	Map<String, ClassScope>			classes			= new HashMap<>();
 	private	final	Map<String, InterfaceSymbol>	interfaces		= new HashMap<>();
 	private	final	Map<String, List<MethodSymbol>>	methods			= new HashMap<>();
 	private	final	List<MethodSymbol>				constructors	= new ArrayList<>();
 
 	public ClassScope() {
-		super("", VarType.CLASS, false);
 	}
 	
 	public ClassScope(String name, Scope parentScope) throws SemanticException {
-		super(name, VarType.CLASS, false);
-		
 		if (null != parentScope && !(parentScope instanceof ClassScope)) throw new SemanticException("Сlass " + name + " can only be declared within a class.");
 		if (name == null || name.isEmpty()) throw new SemanticException("Class name cannot be empty");
 
@@ -84,7 +82,7 @@ public class ClassScope extends Symbol implements Scope {
 		
         if (imports.containsKey(name)) throw new SemanticException("Method '" + symbolName + "' conflicts with import");
         if (staticImports.containsKey(name)) throw new SemanticException("Method '" + symbolName + "' conflicts with static import");
-		if (fileds.containsKey(symbolName)) throw new SemanticException("Method name '" + symbolName + "' conflicts with field name");
+		if (fields.containsKey(symbolName)) throw new SemanticException("Method name '" + symbolName + "' conflicts with field name");
 		if (classes.containsKey(symbolName)) throw new SemanticException("Method name '" + symbolName + "' conflicts with class name");
 		if (interfaces.containsKey(symbolName)) throw new SemanticException("Method name '" + symbolName + "' conflicts with interface name");
 
@@ -118,10 +116,13 @@ public class ClassScope extends Symbol implements Scope {
         if (staticImports.containsKey(symbolName)) throw new SemanticException("Field '" + symbolName + "' conflicts with static import");
 		if (classes.containsKey(symbolName)) throw new SemanticException("Field name " + symbolName + " conflicts with class name");
 		if (interfaces.containsKey(symbolName)) throw new SemanticException("Field name " + symbolName + " conflicts with interface name");
-		if (fileds.containsKey(symbolName)) throw new SemanticException("Duplicate field: " + symbolName);
-		fileds.put(symbolName, symbol);
+		if (fields.containsKey(symbolName)) throw new SemanticException("Duplicate field: " + symbolName);
+		fields.put(symbolName, symbol);
 	}
 	
+	protected ClassScope getClass(String className) {
+		return classes.get(className);
+	}
 	
 	public InterfaceSymbol getInterface(String interfaceName) {
 		return interfaces.get(interfaceName);
@@ -138,6 +139,14 @@ public class ClassScope extends Symbol implements Scope {
 		return methods.get(methodName);
 	}
 	
+	public Map<String, List<MethodSymbol>> getMethods() {
+		return methods;
+	}
+	
+	public Map<String, Symbol> getFields() {
+		return fields;
+	}
+
 	public List<MethodSymbol> getConstructors() {
 		return constructors;
 	}
@@ -146,8 +155,8 @@ public class ClassScope extends Symbol implements Scope {
 	@Override
 	public Symbol resolve(String name) {
 		// Поиск в полях текущего класса
-		if (fileds.containsKey(name)) {
-			return fileds.get(name);
+		if (fields.containsKey(name)) {
+			return fields.get(name);
 		}
 
 		// Поиск методов (без параметров - для простых случаев)
@@ -156,11 +165,6 @@ public class ClassScope extends Symbol implements Scope {
 			return methods.get(name).get(0);
 		}
 
-		// Поиск вложенных классов
-		if (classes.containsKey(name)) {
-			return classes.get(name);
-		}
-		
 		// Поиск в интерфейсах
 		if (interfaces.containsKey(name)) {
 			return interfaces.get(name);
@@ -236,5 +240,10 @@ public class ClassScope extends Symbol implements Scope {
 	@Override
 	public Scope getParent() {
 		return parent;
+	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + "[" + name + "]";
 	}
 }

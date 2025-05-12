@@ -95,7 +95,8 @@ public class FieldNode extends AstNode {
 		if(scope instanceof ClassScope) {
 			ClassScope classScope = (ClassScope)scope;
 
-			try{classScope.addField(new Symbol(name, returnType, modifiers.contains(Keyword.FINAL)));} catch(SemanticException e) {markError(e);}
+			try{classScope.addField(new Symbol(name, returnType, modifiers.contains(Keyword.FINAL), modifiers.contains(Keyword.STATIC)));}
+			catch(SemanticException e) {markError(e);}
 		}
 		else markError("Unexpected scope:" + scope.getClass().getSimpleName() + " in filed:" + name);
 
@@ -115,6 +116,10 @@ public class FieldNode extends AstNode {
 			VarType initType = initializer.getType(scope);
 			if (!returnType.isCompatibleWith(initType)) {
 				markError("Type mismatch: cannot assign " + initType + " to " + returnType);
+			}
+			// Дополнительная проверка на сужающее преобразование
+			if (returnType.isNumeric() && initType.isNumeric() && returnType.getSize() < initType.getSize()) {
+				markError("Narrowing conversion from " + initType + " to " + returnType + " requires explicit cast");
 			}
 		}
 		catch (SemanticException e) {markError(e);}

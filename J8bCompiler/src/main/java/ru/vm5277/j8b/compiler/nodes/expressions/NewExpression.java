@@ -32,6 +32,13 @@ public class NewExpression extends ExpressionNode {
 		return VarType.fromClassName(className);
 	}
 	
+	public String getName() {
+		return className;
+	}
+	
+	public List<ExpressionNode> getArgs() {
+		return args;
+	}
 	
 	@Override
 	public boolean preAnalyze() {

@@ -68,4 +68,9 @@ public class MethodScope implements Scope {
 	public Scope getParent() {
 		return parent;
 	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName();
+	}
 }

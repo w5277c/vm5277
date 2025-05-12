@@ -25,7 +25,7 @@ public class ScopeTest {
 
     @Test
     void resolveFieldFromParentScope() throws SemanticException {
-        globalScope.addField(new Symbol("x", VarType.INT, false));
+        globalScope.addField(new Symbol("x", VarType.INT, false, false));
         Symbol resolved = childScope.resolve("x");
         assertNotNull(resolved);
         assertEquals(VarType.INT, resolved.getType());
@@ -33,11 +33,11 @@ public class ScopeTest {
 
     @Test
     void duplicateFieldThrowsException() throws SemanticException {
-        globalScope.addField(new Symbol("x", VarType.INT, false));
+        globalScope.addField(new Symbol("x", VarType.INT, false, false));
         assertThrows(SemanticException.class, new Executable() {
 			@Override
 			public void execute() throws Throwable {
-				globalScope.addField(new Symbol("x", VarType.CSTR, false));
+				globalScope.addField(new Symbol("x", VarType.CSTR, false, false));
 			}
 		});
     }

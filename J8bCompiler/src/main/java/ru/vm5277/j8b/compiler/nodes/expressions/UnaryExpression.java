@@ -11,6 +11,7 @@ import static ru.vm5277.j8b.compiler.enums.Operator.PLUS;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
+import ru.vm5277.j8b.compiler.semantic.ClassScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 import ru.vm5277.j8b.compiler.semantic.Symbol;
 
@@ -115,6 +116,12 @@ public class UnaryExpression extends ExpressionNode {
 	
 	private boolean isFinalVariable(VariableExpression var, Scope scope) {
 		Symbol symbol = scope.resolve(var.getValue());
+		if(null == symbol) {
+			ClassScope classScope = scope.resolveClass(var.getValue());
+			if(null != classScope) {
+				symbol = new Symbol(var.getValue(), VarType.CLASS, false, false);
+			}
+		}
 		return symbol != null && symbol.isFinal();
 	}
 	

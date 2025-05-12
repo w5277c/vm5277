@@ -86,8 +86,15 @@ public class ReturnNode extends CommandNode {
 					// Проверяем тип выражения
 					try {
 						VarType exprType = expression.getType(scope);
-						if (!exprType.isCompatibleWith(methodReturnType)) markError(String.format("Return type mismatch: expected %s, got %s",
-																					methodReturnType, exprType));
+						if (!exprType.isCompatibleWith(methodReturnType)) {
+							markError(String.format("Return type mismatch: expected " + methodReturnType + ", got " + exprType));
+						}
+						
+						// Дополнительная проверка на сужающее преобразование
+						if (exprType.isNumeric() && methodReturnType.isNumeric() && exprType.getSize() < methodReturnType.getSize()) {
+							markError("Narrowing conversion from " + methodReturnType + " to " + exprType + " requires explicit cast");
+						}
+
 					}
 					catch (SemanticException e) {markError(e);}
 				}

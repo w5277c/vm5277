@@ -89,7 +89,8 @@ public class VarNode extends AstNode {
 		if(scope instanceof BlockScope) {
 			BlockScope blockScope = (BlockScope)scope;
 
-			try {blockScope.addLocal(new Symbol(name, type, modifiers.contains(Keyword.FINAL)));} catch(SemanticException e) {markError(e);}
+			try {blockScope.addLocal(new Symbol(name, type, modifiers.contains(Keyword.FINAL), modifiers.contains(Keyword.STATIC)));}
+			catch(SemanticException e) {markError(e);}
 		}
 		else markError("Unexpected scope:" + scope.getClass().getSimpleName() + " in var:" + name);
 
@@ -109,6 +110,11 @@ public class VarNode extends AstNode {
 			VarType initType = initializer.getType(scope);
 			if (!type.isCompatibleWith(initType)) {
 				markError("Type mismatch: cannot assign " + initType + " to " + type);
+			}
+			
+			// Дополнительная проверка на сужающее преобразование
+			if (type.isNumeric() && initType.isNumeric() && type.getSize() < initType.getSize()) { //TODO верятно нужно и в других местах
+				markError("Narrowing conversion from " + initType + " to " + type + " requires explicit cast"); 
 			}
 		}
 		catch (SemanticException e) {markError(e);}

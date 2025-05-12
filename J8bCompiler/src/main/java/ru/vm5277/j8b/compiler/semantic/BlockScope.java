@@ -60,4 +60,9 @@ public class BlockScope implements Scope {
 	public ClassScope resolveClass(String className) {
 		return Scope.resolveClass(this, className);
 	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName();
+	}
 }

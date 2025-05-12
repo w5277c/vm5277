@@ -17,6 +17,7 @@ import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.semantic.ClassScope;
 import ru.vm5277.j8b.compiler.semantic.MethodSymbol;
 import ru.vm5277.j8b.compiler.semantic.Scope;
+import ru.vm5277.j8b.compiler.semantic.Symbol;
 
 public class ClassBlockNode extends AstNode {
 	protected	List<AstNode>			declarations	= new ArrayList<>();
@@ -129,14 +130,32 @@ public class ClassBlockNode extends AstNode {
 		ClassScope classScope = (ClassScope)scope;
 		
 		// Проверка наличия конструктора
-		List<MethodSymbol> constructors = classScope.getConstructors();
-		if(null == constructors || constructors.isEmpty()) {
-			markError("Class must have at least one constructor");
+		if (checkNonStaticMembers(classScope)) {
+			List<MethodSymbol> constructors = classScope.getConstructors();
+			if(null == constructors || constructors.isEmpty()) {
+				markError("Class must have at least one constructor");
+			}
 		}
 		
 		for (AstNode node : declarations) {
 			node.postAnalyze(scope);
 		}
 		return true;
+	}
+	
+	private boolean checkNonStaticMembers(ClassScope classScope) {
+		// Проверка полей
+		for (Symbol field : classScope.getFields().values()) {
+			if (!field.isStatic()) return true;
+		}
+
+		// Проверка методов
+		for (List<MethodSymbol> methodGroup : classScope.getMethods().values()) {
+			for (MethodSymbol method : methodGroup) {
+				if (!method.isStatic()) return true;
+			}
+		}
+
+		return false;
 	}
 }

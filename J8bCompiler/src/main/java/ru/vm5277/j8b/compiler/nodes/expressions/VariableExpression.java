@@ -9,6 +9,7 @@ import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
+import ru.vm5277.j8b.compiler.semantic.ClassScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 import ru.vm5277.j8b.compiler.semantic.Symbol;
 
@@ -30,6 +31,12 @@ public class VariableExpression extends ExpressionNode {
 	public VarType getType(Scope scope) throws SemanticException {
 		if (resolvedSymbol == null) {
             resolvedSymbol = scope.resolve(value);
+			if(null == resolvedSymbol) {
+				ClassScope classScope = scope.resolveClass(value);
+				if(null != classScope) {
+					resolvedSymbol = new Symbol(value, VarType.CLASS, false, false);
+				}
+			}
         }
         return resolvedSymbol.getType();
 	}
@@ -52,6 +59,12 @@ public class VariableExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope) {
 		if (resolvedSymbol == null) {
             resolvedSymbol = scope.resolve(value);
+			if(null == resolvedSymbol) {
+				ClassScope classScope = scope.resolveClass(value);
+				if(null != classScope) {
+					resolvedSymbol = new Symbol(value, VarType.CLASS, false, false);
+				}
+			}
         }
 		if (null == resolvedSymbol) {
 			markError("Variable '" + value + "' is not declared");

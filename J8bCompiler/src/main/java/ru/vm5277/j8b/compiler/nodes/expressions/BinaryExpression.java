@@ -206,11 +206,6 @@ public class BinaryExpression extends ExpressionNode {
 					}
 				}
 				
-				if(VarType.CSTR != leftType && leftType.getSize() < rightType.getSize()) {
-					markError(	"Implicit type conversion from " + leftType.getName() + " to " + rightType.getName() + " is prohibited. Use explicit cast.");
-					return false;
-				}
-
 				// Особые проверки для fixed-point
 				if (leftType == VarType.FIXED || rightType == VarType.FIXED) {
 					if (operator == Operator.MOD) {

@@ -5,6 +5,17 @@ public class Main {
     // Глобальная переменная
     int counter = 0;
 
+    class Timer {
+        public Timer() {
+        }
+
+        void set(short value) {
+            //TODO
+        }
+    }
+
+    Timer timer = new Timer();
+
     public Main() {
 
     }

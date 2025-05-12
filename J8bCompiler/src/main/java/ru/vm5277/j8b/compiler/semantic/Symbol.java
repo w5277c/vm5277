@@ -10,6 +10,7 @@ import ru.vm5277.j8b.compiler.enums.VarType;
 public class Symbol {
 	protected	String	name;
 	protected	VarType	type;
+	protected	boolean	isStatic;
 	protected	boolean	isFinal;
 
 	protected Symbol(String name) {
@@ -21,10 +22,11 @@ public class Symbol {
 		this.type = type;
 	}
 
-	public Symbol(String name, VarType type, boolean isFinal) {
+	public Symbol(String name, VarType type, boolean isFinal, boolean isStatic) {
 		this.name = name;
 		this.type = type;
 		this.isFinal = isFinal;
+		this.isStatic = isStatic;
 	}
 
 	public String getName() {
@@ -40,5 +42,9 @@ public class Symbol {
 	
 	public boolean isFinal() {
 		return isFinal;
+	}
+	
+	public boolean isStatic() {
+		return isStatic;
 	}
 }

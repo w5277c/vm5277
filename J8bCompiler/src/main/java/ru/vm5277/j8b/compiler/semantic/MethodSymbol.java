@@ -14,8 +14,8 @@ public class MethodSymbol extends Symbol {
 	private			String			signature;
 	private	final	MethodScope		scope;
 
-	public MethodSymbol(String name, VarType returnType, List<Symbol> parameters, boolean isFinal, MethodScope scope) {
-		super(name, returnType, isFinal);
+	public MethodSymbol(String name, VarType returnType, List<Symbol> parameters, boolean isFinal, boolean isStatic, MethodScope scope) {
+		super(name, returnType, isFinal, isStatic);
 		
 		this.parameters = parameters;
 		this.scope = scope;

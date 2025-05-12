@@ -154,16 +154,8 @@ public class VarType {
 			// FIXED совместим только с FIXED
 			if (this == VarType.FIXED || other == VarType.FIXED) return this == VarType.FIXED && other == VarType.FIXED;
 
-			// Разрешаем смешивание целочисленных типов
-			if (this.isInteger() && other.isInteger()) {
-				// Разрешено: byte → short, byte → int, short → int
-				if (this == SHORT && other == BYTE) return true;
-				if (this == INT && (other == SHORT || other == BYTE)) return true;
-				
-				// В остальных случаях — запрещено
-				return false;
-			}
-			return false;
+			// Для арифметических операций разрешаем смешивание любых целочисленных типов
+			return true;
 		}
 
 		// Проверка классовых типов

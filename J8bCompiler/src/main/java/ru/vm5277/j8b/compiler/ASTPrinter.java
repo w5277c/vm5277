@@ -31,6 +31,7 @@ import ru.vm5277.j8b.compiler.nodes.expressions.BinaryExpression;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.j8b.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.j8b.compiler.nodes.expressions.MethodCallExpression;
+import ru.vm5277.j8b.compiler.nodes.expressions.NewExpression;
 import ru.vm5277.j8b.compiler.nodes.expressions.TernaryExpression;
 import ru.vm5277.j8b.compiler.nodes.expressions.UnaryExpression;
 import ru.vm5277.j8b.compiler.nodes.expressions.VariableExpression;
@@ -114,7 +115,9 @@ public class ASTPrinter {
 	
 	void printMethod(MethodNode method) {
 		printModifiers(method.getModifiers());
-		out.put(method.getReturnType() + " ");
+		if(!method.isConstructor()) {
+			out.put(method.getReturnType() + " ");
+		}
 		out.put(method.getName() + "(");
 		printParameters(method.getParameters());
 		out.put(") ");
@@ -328,6 +331,14 @@ public class ASTPrinter {
 			printExpr(te.getTrueExpr());
 			out.put(" : ");
 			printExpr(te.getFalseExpr());
+		}
+		else if(expr instanceof NewExpression) {
+			NewExpression ne = (NewExpression)expr;
+			out.put("new ");
+			out.put(ne.getName());
+			out.put("(");
+			printArguments(ne.getArgs());
+			out.put(")");
 		}
 		else {
 			out.put("!unknown expr:" + expr); out.print();

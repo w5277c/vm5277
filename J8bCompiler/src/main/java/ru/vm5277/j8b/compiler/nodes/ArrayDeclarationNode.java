@@ -77,7 +77,7 @@ public class ArrayDeclarationNode extends AstNode {
 			VarType arrayType = VarType.arrayOf(elementType);
 			
 			// Проверяем конфликты имён и регистрируем переменную
-			symbol = new Symbol(name, arrayType, modifiers.contains(Keyword.FINAL));
+			symbol = new Symbol(name, arrayType, modifiers.contains(Keyword.FINAL), modifiers.contains(Keyword.STATIC));
 			if (scope instanceof ClassScope) {
 				((ClassScope)scope).addField(symbol);
 			}
@@ -125,7 +125,10 @@ public class ArrayDeclarationNode extends AstNode {
 					else if (!initType.getElementType().isCompatibleWith(elementType)) {
 						markError(String.format("Type mismatch: cannot initialize %s[] with %s[]", elementType, initType.getElementType()));
 					}
-					
+					// Дополнительная проверка на сужающее преобразование
+					else if (elementType.isNumeric() && initType.isNumeric() && elementType.getSize() < initType.getSize()) {
+						markError("Narrowing conversion from " + initType + " to " + elementType + " requires explicit cast");
+					}
 					// Проверка размера, если массив с фиксированным размером
 					else if (declaredSize != null) {
 						// Для литеральных массивов

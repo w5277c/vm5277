@@ -11,18 +11,15 @@ public interface Scope {
 	public Scope getParent();
 	
 	public ClassScope resolveClass(String className);
-	
+
 	public static ClassScope resolveClass(Scope scope, String className) {
-        // Ищем класс в текущей и родительских областях видимости
-        while (scope != null) {
-            if (scope instanceof ClassScope) {
-                ClassScope classScope = (ClassScope) scope;
-                if (className.equals(classScope.getName())) {
-                    return classScope;
-                }
-            }
-            scope = scope.getParent();
-        }
-        return null;
-    }
+		while(true) {
+			if(scope instanceof ClassScope) {
+				ClassScope result = ((ClassScope)scope).getClass(className);
+				if(null != result) return result;
+			}
+			if(null == scope.getParent()) return null;
+			scope = scope.getParent();
+		}
+	}
 }
