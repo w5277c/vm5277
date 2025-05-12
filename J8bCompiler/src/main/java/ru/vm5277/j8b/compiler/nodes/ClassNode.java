@@ -23,6 +23,7 @@ import ru.vm5277.j8b.compiler.semantic.MethodSymbol;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 
 public class ClassNode extends AstNode {
+	private	final	List<ClassNode>	importedClasses;
 	private	final	Set<Keyword>	modifiers;
 	private			String			name;
 	private			String			parentClassName;
@@ -30,9 +31,11 @@ public class ClassNode extends AstNode {
 	private			ClassBlockNode	blockNode;
 	private			ClassScope		classScope;
 	
-	public ClassNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, String parentClassName) throws ParseException {
+	public ClassNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, String parentClassName, List<ClassNode> importedClasses)
+																																		throws ParseException {
 		super(tb, mc);
 		
+		this.importedClasses = importedClasses;
 		this.modifiers = modifiers;
 		this.parentClassName = parentClassName;
 		
@@ -63,6 +66,7 @@ public class ClassNode extends AstNode {
 	public ClassNode(MessageContainer mc, Set<Keyword> modifiers, String parentClassName, List<String> interfaces) throws ParseException {
 		super(null, mc);
 		
+		this.importedClasses = null;
 		this.modifiers = modifiers;
 		this.name = parentClassName;
 		this.interfaces = interfaces;
@@ -115,6 +119,12 @@ public class ClassNode extends AstNode {
 	
 	@Override
 	public boolean declare(Scope parentScope) {
+		if(null != importedClasses) {
+			for (ClassNode imported : importedClasses) {
+				imported.declare(parentScope);
+			}
+		}
+		
 		try {
 			classScope = new ClassScope(name, parentScope);
 			if(null != parentScope) ((ClassScope)parentScope).addClass(classScope);

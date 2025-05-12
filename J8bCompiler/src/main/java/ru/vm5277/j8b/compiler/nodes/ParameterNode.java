@@ -84,14 +84,15 @@ public class ParameterNode extends AstNode {
 			return false;
 		}
 
-		try {
+		// Уже сделано уровнем выше
+/*		try {
 			// Создаем символ параметра и добавляем его в область видимости метода
 			Symbol paramSymbol = new Symbol(name, type, isFinal, false);
 			((MethodScope)scope).getSymbol().getParameters().add(paramSymbol);
 		}
 		catch (Exception e) {
 			markError("Failed to declare parameter: " + e.getMessage());
-		}
+		}*/
 		
 		return true;
 	}
@@ -118,7 +119,7 @@ public class ParameterNode extends AstNode {
 
 			// Проверяем размер массива не должен быть указан
 			if (null != type.getArraySize() && 0 != type.getArraySize()) {
-				markError("Array size can't be initialized");
+				markError("Array size cannot be specified in parameter declaration");
 			}
 		}
 

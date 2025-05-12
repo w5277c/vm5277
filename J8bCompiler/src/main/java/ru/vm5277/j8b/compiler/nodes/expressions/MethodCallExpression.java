@@ -43,32 +43,66 @@ public class MethodCallExpression extends ExpressionNode {
 	
 	@Override
 	public VarType getType(Scope scope) throws SemanticException {
-		if (!(scope instanceof ClassScope)) throw new SemanticException("Method call outside class scope");
-    	
-		ClassScope classScope = (ClassScope)scope;		
 		// Получаем типы аргументов
-        List<VarType> argTypes = new ArrayList<>();
-        for (ExpressionNode arg : arguments) {
-            argTypes.add(arg.getType(scope));
-        }
-		
-		// Ищем метод в scope или классе
-		MethodSymbol method = classScope.resolveMethod(methodName, argTypes);
-		if (null != method) return method.getType();
+		List<VarType> argTypes = new ArrayList<>();
+		for (ExpressionNode arg : arguments) {
+			argTypes.add(arg.getType(scope));
+		}
 
-		// Поиск в реализованных интерфейсах
-		for (InterfaceSymbol interfaceSym : classScope.getInterfaces().values()) {
-			List<MethodSymbol> methods = interfaceSym.getMethods(methodName);
-			if (null != methods) {
-				for (MethodSymbol interfaceMethod : methods) {
-					if (isArgumentsMatch(interfaceMethod, argTypes)) {
-						return interfaceMethod.getType();
+		// Если есть parent (вызов через объект или класс)
+		if (null != parent) {
+			VarType parentType = parent.getType(scope);
+
+			// Если parent - класс (статический вызов)
+			if (parentType.isClassType()) {
+				ClassScope classScope = scope.resolveClass(parentType.getName());
+				if (null == classScope) throw new SemanticException("Class '" + parentType.getName() + "' not found");
+
+				MethodSymbol method = classScope.resolveMethod(methodName, argTypes);
+				if (method != null) return method.getType();
+			}
+
+			// Если parent - объект (вызов метода экземпляра)
+			else {
+				// Получаем класс объекта
+				ClassScope classScope = scope.resolveClass(parentType.getName());
+				if (null == classScope) throw new SemanticException("Class '" + parentType.getName() + "' not found");
+
+				MethodSymbol method = classScope.resolveMethod(methodName, argTypes);
+				if (null != method && !method.isStatic()) return method.getType();
+			}
+
+			throw new SemanticException("Method '" + methodName + "' not found in " + parentType);
+		}
+
+		// Вызов метода текущего класса (без parent)
+		if (scope instanceof ClassScope) {
+			MethodSymbol method = ((ClassScope)scope).resolveMethod(methodName, argTypes);
+			if (null != method) return method.getType();
+		}
+
+		// TODO Проверка статических импортов
+/*		if (scope instanceof ClassScope) {
+			MethodSymbol method = ((ClassScope)scope).resolveStaticImport(methodName, argTypes);
+			if (null != method) return method.getType();
+		}
+*/
+		// Проверка интерфейсов (если scope - класс)
+		if (scope instanceof ClassScope) {
+			ClassScope classScope = (ClassScope)scope;
+			for (InterfaceSymbol interfaceSym : classScope.getInterfaces().values()) {
+				List<MethodSymbol> methods = interfaceSym.getMethods(methodName);
+				if (null != methods) {
+					for (MethodSymbol interfaceMethod : methods) {
+						if (isArgumentsMatch(interfaceMethod, argTypes)) {
+							return interfaceMethod.getType();
+						}
 					}
 				}
 			}
 		}
 
-		throw new SemanticException("Method '" + methodName + "' not found in class or interfaces");
+		throw new SemanticException("Method '" + methodName + "' not found");
 	}
 	
 	private boolean isArgumentsMatch(MethodSymbol method, List<VarType> argTypes) {

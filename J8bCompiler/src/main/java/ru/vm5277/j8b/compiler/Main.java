@@ -5,20 +5,23 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
 
 public class Main {
-    public	final	static	String	VERSION	= "0.0.11";
+    public	final	static	String	VERSION	= "0.0.12";
 	
 	public static void main(String[] args) throws IOException {
 		MessageContainer mc = new MessageContainer(8, true, false);
+		File inputFile = new File(args[0]);
+		String basePath = inputFile.getParent();
 		
-		try (InputStreamReader isr = new InputStreamReader(new FileInputStream(args[0x00]))) {
+		try (InputStreamReader isr = new InputStreamReader(new FileInputStream(inputFile))) {
 			Lexer lexer = new Lexer(isr, mc);
-			ASTParser parser = new ASTParser(lexer.getTokens(), mc);
+			ASTParser parser = new ASTParser(basePath, lexer.getTokens(), mc);
 			new ASTPrinter(parser.getClazz());
 			new SemanticAnalyzer(parser.getClazz());
 		}

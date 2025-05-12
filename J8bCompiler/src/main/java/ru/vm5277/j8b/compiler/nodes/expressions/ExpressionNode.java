@@ -514,17 +514,56 @@ public class ExpressionNode extends AstNode {
 			return expr;
 		}
 		else if(tb.match(TokenType.ID)) {
-			consumeToken(tb);
+			// Парсим цепочку идентификаторов через точки
+			ExpressionNode expr = parseQualifiedName();
+			
+			// Если после цепочки идет '(', то это вызов метода
 			if(tb.match(Delimiter.LEFT_PAREN)) {
-				return new MethodCallExpression(tb, mc, null, token.getValue().toString(), parseArguments(tb));
+				return parseMethodCall(expr);
 			}
-			return new VariableExpression(tb, mc, token.getValue().toString());
+			return expr;
 		}
 		else {
 			throw new ParseException("Unexpected token in expression: " + token, tb.current().getSP());
         }
     }
+	
+	private ExpressionNode parseQualifiedName() throws ParseException {
+		// Парсим первый идентификатор
+		Token firstToken = consumeToken(tb, TokenType.ID);
+		ExpressionNode expr = new VariableExpression(tb, mc, firstToken.getValue().toString());
 
+		// Парсим остальные части через точки
+		while(tb.match(Delimiter.DOT)) {
+			consumeToken(tb); // Потребляем точку
+			String name = consumeToken(tb, TokenType.ID).getValue().toString();
+
+			// Создаем цепочку доступов
+			expr = new MemberAccessExpression(tb, mc, expr, name);
+		}
+
+		return expr;
+	}
+
+	private ExpressionNode parseMethodCall(ExpressionNode target) throws ParseException {
+		// Проверяем, является ли target MemberAccessExpression или VariableExpression
+		String methodName;
+		if(target instanceof MemberAccessExpression) {
+			methodName = ((MemberAccessExpression)target).getMemberName();
+			target = ((MemberAccessExpression)target).getTarget();
+		}
+		else if(target instanceof VariableExpression) {
+			methodName = ((VariableExpression)target).getValue();
+			target = null; // Статический вызов
+		}
+		else {
+			throw new ParseException("Invalid method call target", tb.current().getSP());
+		}
+
+		List<ExpressionNode> args = parseArguments(tb);
+		return new MethodCallExpression(tb, mc, target, methodName, args);
+	}
+	
 	protected boolean isUnaryOperationValid(VarType type, Operator op) {
 		switch (op) {
 			case NOT: return VarType.BOOL == type;

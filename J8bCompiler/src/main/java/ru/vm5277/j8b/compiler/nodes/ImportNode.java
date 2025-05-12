@@ -5,6 +5,7 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes;
 
+import java.io.File;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.tokens.Token;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
@@ -68,6 +69,10 @@ public class ImportNode extends AstNode {
 		}
     }
 
+	public String getImportFilePath() {
+		return importPath.replace(".", File.separator) + ".j8b";
+	}
+	
     // Геттеры
     public String getImportPath() {
         return importPath;

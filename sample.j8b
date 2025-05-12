@@ -1,5 +1,5 @@
 // Тестовая программа для компилятора
-import hardware.timer;  // Проверка импортов
+import math;  // Проверка импортов
 
 public class Main {
     // Глобальная переменная
@@ -26,6 +26,7 @@ public class Main {
         getSystem().init();
 
         MathUtils.square(3);
+        int sum = Math.add(4, 3);
 
         // Цикл while
         while (counter < 10) {

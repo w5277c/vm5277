@@ -70,7 +70,7 @@ public class BlockNode extends AstNode {
 
 			// Обработка классов с модификаторами
 			if (tb.match(TokenType.OOP) && Keyword.CLASS == tb.current().getValue()) {
-				declarations.add(new ClassNode(tb, mc, modifiers, null));
+				declarations.add(new ClassNode(tb, mc, modifiers, null, null));
 				continue;
 			}
 			// Обработка интерфейсов с модификаторами
@@ -94,7 +94,7 @@ public class BlockNode extends AstNode {
 						ArrayDeclarationNode node = new ArrayDeclarationNode(tb, mc, modifiers, type, name);
 						if(null != name) declarations.add(node);
 					}
-					else { // Метод или переменная
+					else { // Переменная
 						VarNode varNode = new VarNode(tb, mc, modifiers, type, name);
 						if(null != name) declarations.add(varNode);
 					}

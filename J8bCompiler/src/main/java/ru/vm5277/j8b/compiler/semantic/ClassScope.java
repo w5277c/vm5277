@@ -195,6 +195,14 @@ public class ClassScope implements Scope { // Плохая идея, облас�
 		}
 		return null;
 	}
+/*TODO	
+	public MethodSymbol resolveStaticImport(String methodName, List<VarType> argTypes) {
+		for (MethodSymbol method : staticImports.values()) {
+			if (method.getName().equals(methodName) && isArgumentsMatch(method, argTypes)) return method;
+		}
+		return null;
+	}
+*/
 	
 	public InterfaceSymbol resolveInterface(String interfaceName) {
 		// Поиск в текущем классе

@@ -22,10 +22,13 @@ import ru.vm5277.j8b.compiler.semantic.Scope;
 import ru.vm5277.j8b.compiler.tokens.Token;
 
 public class ASTParser extends AstNode {
-	private			List<AstNode>		imports		= new ArrayList<>();
+	private	final	FileImporter		fileImporter;
+	private			List<AstNode>		imports			= new ArrayList<>();
+	private			List<ClassNode>		importedClasses	= new ArrayList<>();
 	private			ClassNode			classNode;
 
-	public ASTParser(List<Token> tokens, MessageContainer mc) throws IOException {
+	public ASTParser(String basePath, List<Token> tokens, MessageContainer mc) throws IOException {
+		this.fileImporter = new FileImporter(basePath, mc);
 		this.mc = mc;
 		mc.setOwner(MessageOwner.AST);
 		
@@ -34,13 +37,24 @@ public class ASTParser extends AstNode {
 		tb = new TokenBuffer(tokens.iterator());
 		// Обработка импортов		
 		while (tb.match(Keyword.IMPORT) && !tb.match(TokenType.EOF)) {
-			imports.add(new ImportNode(tb, mc));
+			ImportNode importNode = new ImportNode(tb, mc);
+			imports.add(importNode);
+			
+			// Загрузка импортируемого файла
+			List<Token> importedTokens = fileImporter.importFile(importNode.getImportPath());
+			if (!importedTokens.isEmpty()) {
+				// Рекурсивный парсинг импортированного файла
+				ASTParser importedParser = new ASTParser(basePath, importedTokens, mc);
+				if (null != importedParser.getClazz()) {
+					importedClasses.add(importedParser.getClazz());
+				}
+			}
 		}
 		
 		Set<Keyword> modifiers = collectModifiers(tb);
 		if(tb.match(TokenType.OOP, Keyword.CLASS)) {
 			try {
-				classNode = new ClassNode(tb, mc, modifiers, null);
+				classNode = new ClassNode(tb, mc, modifiers, null, importedClasses);
 			}
 			catch(ParseException e) {
 				// Парсинг прерван (дальнейший парсинг файла бессмыслен)
@@ -51,18 +65,15 @@ public class ASTParser extends AstNode {
 	public List<AstNode> getImports() {
 		return imports;
 	}
-	
+
 	public ClassNode getClazz() {
 		return classNode;
 	}
 
-	@Override
-	public boolean preAnalyze() {return true;}
-	@Override
-	public boolean declare(Scope scope) {return true;}
-	@Override
-	public boolean postAnalyze(Scope scope) {return true;}
-
+	public List<ClassNode> getImportedClasses() {
+		return importedClasses;
+	}
+	
 	@Override
 	public String getNodeType() {
 		return "root";

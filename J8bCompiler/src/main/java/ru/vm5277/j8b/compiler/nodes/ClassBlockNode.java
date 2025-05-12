@@ -32,7 +32,7 @@ public class ClassBlockNode extends AstNode {
 
 			// Обработка классов с модификаторами
 			if (tb.match(TokenType.OOP, Keyword.CLASS)) {
-				declarations.add(new ClassNode(tb, mc, modifiers, null));
+				declarations.add(new ClassNode(tb, mc, modifiers, null, null));
 				continue;
 			}
 			// Обработка интерфейсов с модификаторами
