@@ -21,6 +21,13 @@ public class MethodSymbol extends Symbol {
 		this.scope = scope;
 	}
 
+	public MethodSymbol(String name, VarType returnType, List<Symbol> parameters, boolean isFinal, boolean isStatic, boolean isNative, MethodScope scope) {
+		super(name, returnType, isFinal, isStatic, isNative);
+		
+		this.parameters = parameters;
+		this.scope = scope;
+	}
+
 	public MethodScope getScope() {
 		return scope;
 	}

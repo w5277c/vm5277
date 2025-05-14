@@ -44,6 +44,7 @@ import ru.vm5277.j8b.compiler.messages.WarningMessage;
 import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode.Case;
 import ru.vm5277.j8b.compiler.nodes.expressions.InstanceOfExpression;
 import ru.vm5277.j8b.compiler.nodes.expressions.TypeReferenceExpression;
+import ru.vm5277.j8b.compiler.semantic.InterfaceSymbol;
 
 public abstract class AstNode extends SemanticAnalyzer {
 	protected			TokenBuffer				tb;

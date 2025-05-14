@@ -18,6 +18,7 @@ import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.Operator;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
+import ru.vm5277.j8b.compiler.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.nodes.BlockNode;
 import ru.vm5277.j8b.compiler.nodes.ClassBlockNode;
@@ -62,10 +63,10 @@ public class Test {
 
 
     @org.junit.jupiter.api.Test
-    void test2() throws ParseException, IOException {
+    void test2() throws ParseException, IOException, SemanticException {
 		MessageContainer mc = new MessageContainer(100, true, false);
 		Lexer lexer = new Lexer(new StringReader("class Clazz{ void method() { byte b1 = -1; byte b2=0; byte b3=255; byte b4 = 256; byte B5=128; }}"), mc);
 		ASTParser parser = new ASTParser("", lexer.getTokens(), mc);
-		new SemanticAnalyzer(parser.getClazz());
+		new SemanticAnalyzer(null, parser.getClazz());
 	}
 }

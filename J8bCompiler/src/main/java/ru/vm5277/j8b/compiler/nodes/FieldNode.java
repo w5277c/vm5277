@@ -117,7 +117,7 @@ public class FieldNode extends AstNode {
 		// Проверка совместимости типов
 		try {
 			VarType initType = initializer.getType(scope);
-			if (!returnType.isCompatibleWith(initType)) {
+			if (!returnType.isCompatibleWith(scope, initType)) {
 				markError("Type mismatch: cannot assign " + initType + " to " + returnType);
 			}
 			// Дополнительная проверка на сужающее преобразование

@@ -12,6 +12,7 @@ public class Symbol {
 	protected	VarType	type;
 	protected	boolean	isStatic;
 	protected	boolean	isFinal;
+	protected	boolean	isNative;
 
 	protected Symbol(String name) {
 		this.name = name;
@@ -27,6 +28,14 @@ public class Symbol {
 		this.type = type;
 		this.isFinal = isFinal;
 		this.isStatic = isStatic;
+	}
+
+	public Symbol(String name, VarType type, boolean isFinal, boolean isStatic, boolean isNative) {
+		this.name = name;
+		this.type = type;
+		this.isFinal = isFinal;
+		this.isStatic = isStatic;
+		this.isNative = isNative;
 	}
 
 	public String getName() {

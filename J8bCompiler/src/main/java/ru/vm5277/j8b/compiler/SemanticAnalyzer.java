@@ -9,10 +9,12 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import ru.vm5277.j8b.compiler.enums.Keyword;
+import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler.messages.MessageOwner;
 import ru.vm5277.j8b.compiler.nodes.ClassNode;
 import ru.vm5277.j8b.compiler.semantic.ClassScope;
+import ru.vm5277.j8b.compiler.semantic.InterfaceSymbol;
 import ru.vm5277.j8b.compiler.semantic.MethodScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 
@@ -22,9 +24,12 @@ public class SemanticAnalyzer {
 	protected SemanticAnalyzer() {
 	}
 
-	public SemanticAnalyzer(ClassNode clazz) {
+	public SemanticAnalyzer(String runtimePath, ClassNode clazz) throws SemanticException {
 		clazz.getMessageContainer().setOwner(MessageOwner.SEMANTIC);
 		globalScope = new ClassScope();
+		
+		//TODO runtime
+		globalScope.addInterface(new InterfaceSymbol("Object"));
 		
 		if(clazz.preAnalyze()) {
 			if(clazz.declare(globalScope)) {

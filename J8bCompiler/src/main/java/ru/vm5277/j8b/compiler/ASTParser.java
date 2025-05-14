@@ -18,7 +18,6 @@ import ru.vm5277.j8b.compiler.nodes.AstNode;
 import ru.vm5277.j8b.compiler.nodes.ClassNode;
 import ru.vm5277.j8b.compiler.nodes.ImportNode;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
-import ru.vm5277.j8b.compiler.semantic.Scope;
 import ru.vm5277.j8b.compiler.tokens.Token;
 
 public class ASTParser extends AstNode {

@@ -49,7 +49,7 @@ public class BinaryExpression extends ExpressionNode {
 		VarType rightType = right.getType(scope);
 
 		// Проверяем совместимость типов
-		if (!leftType.isCompatibleWith(rightType)) {
+		if (!leftType.isCompatibleWith(scope, rightType)) {
 			throw new SemanticException("Type mismatch in binary operation: " + leftType + " " + operator + " " + rightType);
 		}
 
@@ -109,7 +109,7 @@ public class BinaryExpression extends ExpressionNode {
 			
 			
 			// Проверка совместимости типов
-			if (!leftType.isCompatibleWith(rightType)) {
+			if (!leftType.isCompatibleWith(scope, rightType)) {
 				markError("Type mismatch: " + leftType.getName() + " " + operator + " " + rightType.getName());
 				return false;
 			}

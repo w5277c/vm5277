@@ -12,18 +12,19 @@ import java.io.InputStreamReader;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
 
 public class Main {
-    public	final	static	String	VERSION	= "0.0.13";
+    public	final	static	String	VERSION	= "0.0.14";
 	
 	public static void main(String[] args) throws IOException {
 		MessageContainer mc = new MessageContainer(8, true, false);
-		File inputFile = new File(args[0]);
+		String runtimePath = args[0];
+		File inputFile = new File(args[1]);
 		String basePath = inputFile.getParent();
 		
 		try (InputStreamReader isr = new InputStreamReader(new FileInputStream(inputFile))) {
 			Lexer lexer = new Lexer(isr, mc);
 			ASTParser parser = new ASTParser(basePath, lexer.getTokens(), mc);
 			new ASTPrinter(parser.getClazz());
-			new SemanticAnalyzer(parser.getClazz());
+			new SemanticAnalyzer(runtimePath, parser.getClazz());
 		}
 		catch(Exception ex) {
 			ex.printStackTrace();

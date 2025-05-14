@@ -14,13 +14,16 @@ import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
+import ru.vm5277.j8b.compiler.nodes.expressions.InstanceOfExpression;
 import ru.vm5277.j8b.compiler.semantic.BlockScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
+import ru.vm5277.j8b.compiler.semantic.Symbol;
 
 public class IfNode extends CommandNode {
     private	ExpressionNode	condition;
 	private	BlockScope		thenScope;
 	private	BlockScope		elseScope;
+	private	String			varName;
 	
 	public IfNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
@@ -29,6 +32,17 @@ public class IfNode extends CommandNode {
 		// Условие
 		try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(ParseException e){markFirstError(e);}
 		try {this.condition = new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
+		// Парсинг условия (обычное или pattern matching)
+		if (tb.match(Keyword.AS)) {
+			tb.consume(); // Потребляем "as"
+			// Проверяем, что после типа идет идентификатор
+			if (tb.match(TokenType.ID)) {
+				this.varName = consumeToken(tb).getStringValue();
+			}
+			else {
+				markError("Expected variable name after type in pattern matching");
+			}
+		}
 		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(ParseException e){markFirstError(e);}
 
 		// Then блок
@@ -68,6 +82,10 @@ public class IfNode extends CommandNode {
     public BlockNode getElseBlock() {
         return (0x02 == blocks.size() ? blocks.get(1) : null);
     }
+	
+	public String getVarName() {
+		return varName;
+	}
 	
 	@Override
 	public String toString() {
@@ -109,10 +127,31 @@ public class IfNode extends CommandNode {
 	public boolean declare(Scope scope) {
 		// Объявление переменных условия
 		if (null != condition) condition.declare(scope);
-
+		
 		// Объявление then-блока в новой области видимости
 		if (null != getThenBlock()) {
 			thenScope = new BlockScope(scope);
+		}
+		
+		// Для pattern matching: объявляем новую переменную в then-блоке
+		if (null != varName) {
+			if(condition instanceof InstanceOfExpression) {
+				InstanceOfExpression instanceOf = (InstanceOfExpression) condition;
+				try {
+					VarType type = instanceOf.getTypeExpr().getType(scope);
+					if (null != type && null != thenScope) {
+						thenScope.addLocal(new Symbol(varName, type, false, false));
+					}
+				}
+				catch (SemanticException e) {markError(e);
+				}
+			}
+			else {
+				markError("Pattern matching requires 'is' check before 'as'");
+			}
+		}		
+
+		if(null != thenScope) {
 			getThenBlock().declare(thenScope);
 		}
 

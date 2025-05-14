@@ -54,6 +54,14 @@ public class ClassScope implements Scope { // Плохая идея, облас�
         if (staticImports.containsKey(name)) throw new SemanticException("Class '" + scopeName + "' conflicts with static import");
 		if (classes.containsKey(classScope.getName())) throw new SemanticException("Duplicate class: " + scopeName);
 		if (interfaces.containsKey(classScope.getName())) throw new SemanticException("Class: " + scopeName + " already defined as interface");
+		
+		// Получаем символ Object из родительской области
+		InterfaceSymbol objectInterface = resolveInterface("Object");
+		if (null == objectInterface) throw new SemanticException("Base interface 'Object' not found");
+		if (!"Object".equals(scopeName)) {
+			classScope.addInterface(objectInterface); // Добавляем существующий символ
+		}
+		
 		classes.put(scopeName, classScope);
 	}
 	
@@ -213,11 +221,11 @@ public class ClassScope implements Scope { // Плохая идея, облас�
 		String importedName = imports.get(interfaceName);
 		if (null != importedName && interfaces.containsKey(importedName)) return interfaces.get(importedName);
 
-		// Поиск во вложенных классах
-		for (ClassScope innerClass : classes.values()) {
-			InterfaceSymbol innerInterface = innerClass.resolveInterface(interfaceName);
-			if (innerInterface != null) return innerInterface;
-		}
+		// Поиск во вложенных классах TODO это не поиск во вложенных классах!
+		//for (ClassScope innerClass : classes.values()) {
+		//	InterfaceSymbol innerInterface = innerClass.resolveInterface(interfaceName);
+		//	if (innerInterface != null) return innerInterface;
+		//}
 
 		// Поиск в родительской области видимости (если есть)
 		if (parent != null) {
@@ -235,7 +243,7 @@ public class ClassScope implements Scope { // Плохая идея, облас�
 		}
 
 		for (int i = 0; i < paramTypes.size(); i++) {
-			if (!argTypes.get(i).isCompatibleWith(paramTypes.get(i))) {
+			if (!argTypes.get(i).isCompatibleWith(this, paramTypes.get(i))) {
 				return false;
 			}
 		}

@@ -122,7 +122,7 @@ public class ArrayDeclarationNode extends AstNode {
 				try {
 					VarType initType = initializer.getType(scope);
 					if (!initType.isArray()) markError("Array initializer must be an array");
-					else if (!initType.getElementType().isCompatibleWith(elementType)) {
+					else if (!initType.getElementType().isCompatibleWith(scope, elementType)) {
 						markError(String.format("Type mismatch: cannot initialize %s[] with %s[]", elementType, initType.getElementType()));
 					}
 					// Дополнительная проверка на сужающее преобразование

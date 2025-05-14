@@ -8,10 +8,13 @@ package ru.vm5277.j8b.compiler.enums;
 import java.util.HashMap;
 import java.util.Map;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
+import ru.vm5277.j8b.compiler.semantic.Scope;
 
 public class VarType {
 	private	static	final	Map<String, VarType>	CLASS_TYPES = new HashMap<>();
-	
+	static {
+		CLASS_TYPES.put("Object", new VarType("class:Object", "Object"));
+	}
 	// Примитивные типы
 	public	static	final	VarType	VOID		= new VarType("void");
 	public	static	final	VarType	BOOL		= new VarType("bool");
@@ -141,7 +144,7 @@ public class VarType {
 		return this == VarType.CLASS || this.isArray() || this == VarType.CSTR;
 	}
 
-	public boolean isCompatibleWith(VarType other) {
+	public boolean isCompatibleWith(Scope scope, VarType other) {
 		// Проверка одинаковых типов
 		if (this == other) return true;
 
@@ -162,11 +165,13 @@ public class VarType {
 
 		// Проверка классовых типов
 		if (this.isClassType() && other.isClassType()) {
-			return this.className != null && this.className.equals(other.className);
+			if(null == this.className) return false;
+			if(this.className.equals(other.className)) return true;
+			return null != scope.resolveInterface(this.getName());
 		}
-
+		
 		// Проверка массивов
-		if (this.isArray() && other.isArray()) return this.elementType.isCompatibleWith(other.elementType);
+		if (this.isArray() && other.isArray()) return this.elementType.isCompatibleWith(scope, other.elementType);
     
 		return false;
 	}

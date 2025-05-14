@@ -108,7 +108,7 @@ public class VarNode extends AstNode {
 		// Проверка совместимости типов
 		try {
 			VarType initType = initializer.getType(scope);
-			if (!type.isCompatibleWith(initType)) {
+			if (!type.isCompatibleWith(scope, initType)) {
 				markError("Type mismatch: cannot assign " + initType + " to " + type);
 			}
 			

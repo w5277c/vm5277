@@ -226,6 +226,9 @@ public class ASTPrinter {
 				IfNode in = (IfNode)node;
 				out.put("if (");
 				printExpr(in.getCondition());
+				if(null != in.getVarName()) {
+					out.put(" as " + in.getVarName());
+				}
 				out.put(") ");
 				printBody(in.getThenBlock());
 				if(null != in.getElseBlock()) {

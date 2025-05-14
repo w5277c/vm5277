@@ -11,7 +11,7 @@ public class Main {
 
 
 
-    class CustTimer implements Async {
+    class CustTimer implements Object, Async {
         public CustTimer() {
         }
 
@@ -27,7 +27,11 @@ public class Main {
     CustTimer timer = new CustTimer();
 
     public Main() {
-
+        Object obj = timer;
+//        CustTimer ct = obj;
+        if(obj is CustTimer as custTimer) {
+            custTimer.set(123);
+        }
     }
 
     // Главная функция
@@ -47,6 +51,7 @@ public class Main {
         if(timer is CustTimer) {
             test3 = true;
         }
+
 
         MathUtils.square(3);
         int sum = Math.add(4, 3);

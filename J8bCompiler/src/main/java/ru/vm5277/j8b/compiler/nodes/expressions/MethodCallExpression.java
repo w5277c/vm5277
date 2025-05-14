@@ -94,7 +94,7 @@ public class MethodCallExpression extends ExpressionNode {
 				List<MethodSymbol> methods = interfaceSym.getMethods(methodName);
 				if (null != methods) {
 					for (MethodSymbol interfaceMethod : methods) {
-						if (isArgumentsMatch(interfaceMethod, argTypes)) {
+						if (isArgumentsMatch(scope, interfaceMethod, argTypes)) {
 							return interfaceMethod.getType();
 						}
 					}
@@ -105,12 +105,12 @@ public class MethodCallExpression extends ExpressionNode {
 		throw new SemanticException("Method '" + methodName + "' not found");
 	}
 	
-	private boolean isArgumentsMatch(MethodSymbol method, List<VarType> argTypes) {
+	private boolean isArgumentsMatch(Scope scope, MethodSymbol method, List<VarType> argTypes) {
 		List<VarType> paramTypes = method.getParameterTypes();
 		if (paramTypes.size() != argTypes.size()) return false;
 
 		for (int i = 0; i < paramTypes.size(); i++) {
-			if (!argTypes.get(i).isCompatibleWith(paramTypes.get(i))) {
+			if (!argTypes.get(i).isCompatibleWith(scope, paramTypes.get(i))) {
 				return false;
 			}
 		}

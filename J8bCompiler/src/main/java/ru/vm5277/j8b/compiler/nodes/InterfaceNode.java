@@ -12,6 +12,7 @@ import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
 import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.messages.WarningMessage;
@@ -34,7 +35,10 @@ public class InterfaceNode extends AstNode {
 		
 		// Парсинг заголовка класса
         consumeToken(tb);	// Пропуск interface токена
-		try {this.name = (String)consumeToken(tb, TokenType.ID).getValue();}
+		try {
+			this.name = (String)consumeToken(tb, TokenType.ID).getValue();
+			VarType.addClassName(this.name);
+		}
 		catch(ParseException e) {markFirstError(e);} // ошибка в имени, оставляем null
 		
         // Парсинг интерфейсов (если есть)

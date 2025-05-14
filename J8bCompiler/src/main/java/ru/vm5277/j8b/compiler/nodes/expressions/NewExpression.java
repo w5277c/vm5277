@@ -82,7 +82,7 @@ public class NewExpression extends ExpressionNode {
 					argTypes.add(arg.getType(scope));
 				}
 
-				if (findMatchingConstructor(constructors, argTypes) == null) {
+				if (findMatchingConstructor(scope, constructors, argTypes) == null) {
 					markError("No valid constructor for class '" + className + "' with arguments: " + argTypes);
 					return false;
 				}
@@ -96,23 +96,23 @@ public class NewExpression extends ExpressionNode {
 		}
 	}
 	
-	private MethodSymbol findMatchingConstructor(List<MethodSymbol> constructors, List<VarType> argTypes) {
+	private MethodSymbol findMatchingConstructor(Scope scope, List<MethodSymbol> constructors, List<VarType> argTypes) {
 		for (MethodSymbol constructor : constructors) {
-			if (isArgumentsMatch(constructor, argTypes)) {
+			if (isArgumentsMatch(scope, constructor, argTypes)) {
 				return constructor;
 			}
 		}
 		return null;
 	}
-
-	private boolean isArgumentsMatch(MethodSymbol constructor, List<VarType> argTypes) {
+//TODO дубликат в MethodCallExpression
+	private boolean isArgumentsMatch(Scope scope, MethodSymbol constructor, List<VarType> argTypes) {
 		List<VarType> paramTypes = constructor.getParameterTypes();
 		if (paramTypes.size() != argTypes.size()) {
 			return false;
 		}
 
 		for (int i = 0; i < paramTypes.size(); i++) {
-			if (!argTypes.get(i).isCompatibleWith(paramTypes.get(i))) {
+			if (!argTypes.get(i).isCompatibleWith(scope, paramTypes.get(i))) {
 				return false;
 			}
 		}

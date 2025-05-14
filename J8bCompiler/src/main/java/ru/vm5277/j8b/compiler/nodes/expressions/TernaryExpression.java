@@ -66,7 +66,7 @@ public class TernaryExpression extends ExpressionNode {
 			VarType trueType = trueExpr.getType(scope);
 			VarType falseType = falseExpr.getType(scope);
 
-			if (!trueType.isCompatibleWith(falseType)) {
+			if (!trueType.isCompatibleWith(scope, falseType)) {
 				markError("Incompatible types in branches: " + trueType + " and " + falseType);
 				return false;
 			}

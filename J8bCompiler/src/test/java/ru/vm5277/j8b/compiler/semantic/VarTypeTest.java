@@ -12,20 +12,20 @@ import ru.vm5277.j8b.compiler.enums.VarType;
 public class VarTypeTest {
     @Test
     void numericTypesCompatibility() {
-        assertTrue(VarType.SHORT.isCompatibleWith(VarType.BYTE));
-		assertTrue(VarType.INT.isCompatibleWith(VarType.BYTE));
-		assertTrue(VarType.INT.isCompatibleWith(VarType.SHORT));
+        assertTrue(VarType.SHORT.isCompatibleWith(null, VarType.BYTE));
+		assertTrue(VarType.INT.isCompatibleWith(null, VarType.BYTE));
+		assertTrue(VarType.INT.isCompatibleWith(null, VarType.SHORT));
 		
-        assertFalse(VarType.FIXED.isCompatibleWith(VarType.BOOL));
-		assertFalse(VarType.FIXED.isCompatibleWith(VarType.BOOL));
-		assertFalse(VarType.FIXED.isCompatibleWith(VarType.BOOL));
-		assertFalse(VarType.FIXED.isCompatibleWith(VarType.BOOL));
+        assertFalse(VarType.FIXED.isCompatibleWith(null, VarType.BOOL));
+		assertFalse(VarType.FIXED.isCompatibleWith(null, VarType.BOOL));
+		assertFalse(VarType.FIXED.isCompatibleWith(null, VarType.BOOL));
+		assertFalse(VarType.FIXED.isCompatibleWith(null, VarType.BOOL));
     }
 
     @Test
     void arrayTypesCompatibility() {
         VarType intArray = VarType.arrayOf(VarType.INT);
         VarType anotherIntArray = VarType.arrayOf(VarType.INT);
-        assertTrue(intArray.isCompatibleWith(anotherIntArray));
+        assertTrue(intArray.isCompatibleWith(null, anotherIntArray));
     }
 }

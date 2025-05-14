@@ -86,7 +86,7 @@ public class ReturnNode extends CommandNode {
 					// Проверяем тип выражения
 					try {
 						VarType exprType = expression.getType(scope);
-						if (!exprType.isCompatibleWith(methodReturnType)) {
+						if (!exprType.isCompatibleWith(scope, methodReturnType)) {
 							markError(String.format("Return type mismatch: expected " + methodReturnType + ", got " + exprType));
 						}
 						
