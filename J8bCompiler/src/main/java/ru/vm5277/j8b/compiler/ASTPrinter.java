@@ -15,6 +15,8 @@ import ru.vm5277.j8b.compiler.nodes.BlockNode;
 import ru.vm5277.j8b.compiler.nodes.ClassBlockNode;
 import ru.vm5277.j8b.compiler.nodes.ClassNode;
 import ru.vm5277.j8b.compiler.nodes.FieldNode;
+import ru.vm5277.j8b.compiler.nodes.InterfaceBodyNode;
+import ru.vm5277.j8b.compiler.nodes.InterfaceNode;
 import ru.vm5277.j8b.compiler.nodes.LabelNode;
 import ru.vm5277.j8b.compiler.nodes.MethodNode;
 import ru.vm5277.j8b.compiler.nodes.ParameterNode;
@@ -29,10 +31,12 @@ import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode;
 import ru.vm5277.j8b.compiler.nodes.commands.WhileNode;
 import ru.vm5277.j8b.compiler.nodes.expressions.BinaryExpression;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
+import ru.vm5277.j8b.compiler.nodes.expressions.InstanceOfExpression;
 import ru.vm5277.j8b.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.j8b.compiler.nodes.expressions.MethodCallExpression;
 import ru.vm5277.j8b.compiler.nodes.expressions.NewExpression;
 import ru.vm5277.j8b.compiler.nodes.expressions.TernaryExpression;
+import ru.vm5277.j8b.compiler.nodes.expressions.TypeReferenceExpression;
 import ru.vm5277.j8b.compiler.nodes.expressions.UnaryExpression;
 import ru.vm5277.j8b.compiler.nodes.expressions.VariableExpression;
 import ru.vm5277.j8b.compiler.tokens.Token;
@@ -81,6 +85,9 @@ public class ASTPrinter {
 				if(node instanceof ClassNode) {
 					printClass((ClassNode)node);
 				}
+				else if(node instanceof InterfaceNode) {
+					printInterface((InterfaceNode)node);
+				}
 				else if(node instanceof MethodNode) {
 					printMethod((MethodNode)node);
 				}
@@ -107,6 +114,35 @@ public class ASTPrinter {
 		out.print();
 	}
 	
+	void printInterface(InterfaceNode iface) {
+		printModifiers(iface.getModifiers());
+		out.put("interface " + iface.getName() + " ");
+		InterfaceBodyNode ibn = iface.getBody();
+		if(null != ibn) {
+			out.put("{"); out.print(); out.extend();
+			for(AstNode node : ibn.getDeclarations()) {
+				if(node instanceof MethodNode) {
+					printMethod((MethodNode)node);
+				}
+//				else if(node instanceof ArrayDeclarationNode) {
+//					//printArray((ArrayDeclarationNode)node);
+//				}
+				else if(node instanceof FieldNode) {
+					printField((FieldNode)node); out.put(";");out.print();
+				}
+				else if(node instanceof BlockNode) {
+					printBody((BlockNode)node); out.print();
+				}
+				else {
+					out.put("!unknown node:" + node); out.print();
+				}
+			}
+			out.reduce();
+			out.put("}");
+		}
+		out.print();
+	}
+
 	void printModifiers(Set<Keyword> modifiers) {
 		for(Keyword kw : modifiers) {
 			out.put(kw.toString().toLowerCase() + " ");
@@ -254,6 +290,9 @@ public class ASTPrinter {
 				printBody((BlockNode)node);
 				out.print();
 			}
+			else if(node instanceof InterfaceNode) {
+				printInterface((InterfaceNode)node);
+			}
 			else {
 				out.put("!unknown node:" + node); out.print();
 			}
@@ -339,6 +378,16 @@ public class ASTPrinter {
 			out.put("(");
 			printArguments(ne.getArgs());
 			out.put(")");
+		}
+		else if(expr instanceof InstanceOfExpression) {
+			InstanceOfExpression ie = (InstanceOfExpression)expr;
+			printExpr(ie.getLeft());
+			out.put(" is ");
+			printExpr(ie.getTypeExpr());
+		}
+		else if(expr instanceof TypeReferenceExpression) {
+			TypeReferenceExpression te = (TypeReferenceExpression)expr;
+			out.put(te.getClassName());
 		}
 		else {
 			out.put("!unknown expr:" + expr); out.print();

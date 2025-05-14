@@ -12,6 +12,7 @@ import java.util.Map;
 import java.util.Set;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
+import ru.vm5277.j8b.compiler.enums.Operator;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
@@ -23,6 +24,8 @@ import ru.vm5277.j8b.compiler.nodes.commands.ReturnNode;
 import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode;
 import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode.Case;
 import ru.vm5277.j8b.compiler.nodes.commands.WhileNode;
+import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
+import ru.vm5277.j8b.compiler.nodes.expressions.InstanceOfExpression;
 import ru.vm5277.j8b.compiler.semantic.BlockScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 

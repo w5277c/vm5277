@@ -48,7 +48,7 @@ public class ClassNode extends AstNode {
 		catch(ParseException e) {markFirstError(e);} // ошибка в имени, оставляем null
 		
         // Парсинг интерфейсов (если есть)
-		if (tb.match(Keyword.IMPLEMENTS)) {
+		if (tb.match(TokenType.OOP, Keyword.IMPLEMENTS)) {
 			consumeToken(tb);
 			while(true) {
 				try {
@@ -141,7 +141,7 @@ public class ClassNode extends AstNode {
 	public boolean postAnalyze(Scope scope) {
 		for (String interfaceName : interfaces) {
 			// Проверяем существование интерфейса
-			InterfaceSymbol interfaceSymbol = classScope.getInterface(interfaceName);
+			InterfaceSymbol interfaceSymbol = classScope.resolveInterface(interfaceName);
 			if (null == interfaceSymbol) markError("Interface not found: " + interfaceName);
 
 			checkInterfaceImplementation(classScope, interfaceSymbol);

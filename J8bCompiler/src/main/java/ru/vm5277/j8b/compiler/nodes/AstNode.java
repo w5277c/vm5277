@@ -42,6 +42,8 @@ import ru.vm5277.j8b.compiler.messages.Message;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.messages.WarningMessage;
 import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode.Case;
+import ru.vm5277.j8b.compiler.nodes.expressions.InstanceOfExpression;
+import ru.vm5277.j8b.compiler.nodes.expressions.TypeReferenceExpression;
 
 public abstract class AstNode extends SemanticAnalyzer {
 	protected			TokenBuffer				tb;
@@ -113,6 +115,22 @@ public abstract class AstNode extends SemanticAnalyzer {
 		ParseException e = parserError("Unexpected statement token: " + tb.current());
 		tb.skip(Delimiter.SEMICOLON, Delimiter.LEFT_BRACE);
 		throw e;
+	}
+
+	protected ExpressionNode parseTypeReference() throws ParseException {
+		//TODO дублирование кода?
+		// Парсим цепочку идентификаторов через точки (для вложенных классов)
+		StringBuilder typeName = new StringBuilder();
+		Token token = consumeToken(tb, TokenType.ID);
+		typeName.append(token.getValue().toString());
+
+		while (tb.match(Delimiter.DOT)) {
+			consumeToken(tb); // Пропускаем точку
+			token = consumeToken(tb, TokenType.ID);
+			typeName.append(".").append(token.getValue().toString());
+		}
+
+		return new TypeReferenceExpression(tb, mc, typeName.toString());
 	}
 
 	protected VarType checkPrimtiveType() throws ParseException {

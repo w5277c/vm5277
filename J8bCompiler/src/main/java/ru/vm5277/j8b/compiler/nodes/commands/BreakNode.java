@@ -52,7 +52,7 @@ public class BreakNode extends CommandNode {
 	@Override
 	public boolean preAnalyze() {
 		// Проверка наличия метки (если указана)
-		if (label != null) markError("Break label cannot be empty");
+		if (label == null) markError("Break label cannot be empty");
 
 		// Базовая проверка - команда break должна быть внутри цикла
         if (tb.getLoopStack().isEmpty()) markError("'break' outside of loop");

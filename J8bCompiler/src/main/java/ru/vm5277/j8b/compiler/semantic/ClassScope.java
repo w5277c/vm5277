@@ -204,6 +204,7 @@ public class ClassScope implements Scope { // Плохая идея, облас�
 	}
 */
 	
+	@Override
 	public InterfaceSymbol resolveInterface(String interfaceName) {
 		// Поиск в текущем классе
 		if (interfaces.containsKey(interfaceName)) return interfaces.get(interfaceName);
@@ -216,6 +217,11 @@ public class ClassScope implements Scope { // Плохая идея, облас�
 		for (ClassScope innerClass : classes.values()) {
 			InterfaceSymbol innerInterface = innerClass.resolveInterface(interfaceName);
 			if (innerInterface != null) return innerInterface;
+		}
+
+		// Поиск в родительской области видимости (если есть)
+		if (parent != null) {
+			return parent.resolveInterface(interfaceName);
 		}
 
 		return null;

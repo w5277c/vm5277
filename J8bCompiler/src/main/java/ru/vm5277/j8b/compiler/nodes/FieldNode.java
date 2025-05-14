@@ -66,6 +66,9 @@ public class FieldNode extends AstNode {
 		return initializer;
 	}
 	
+	public boolean isStatic() {
+		return modifiers.contains(Keyword.STATIC);
+	}
 	public boolean isFinal() {
 		return modifiers.contains(Keyword.FINAL);
 	}

@@ -60,6 +60,16 @@ public class BlockScope implements Scope {
 	public ClassScope resolveClass(String className) {
 		return Scope.resolveClass(this, className);
 	}
+
+	@Override
+	public InterfaceSymbol resolveInterface(String interfaceName) {
+		// Поиск в родительской области видимости (если есть)
+		if (parent != null) {
+			return parent.resolveInterface(interfaceName);
+		}
+
+		return null;
+	}
 	
 	@Override
 	public String toString() {

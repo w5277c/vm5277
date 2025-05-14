@@ -65,6 +65,10 @@ public class InterfaceNode extends AstNode {
 		return modifiers;
 	}
 
+	public InterfaceBodyNode getBody() {
+		return blockNode;
+	}
+	
 	@Override
 	public String getNodeType() {
 		return "interface";

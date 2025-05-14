@@ -47,7 +47,7 @@ public class MethodNode extends AstNode {
 			tb.getLoopStack().remove(this);
 		}
 		else {
-			markFirstError(parserError("Method '" + name + "' must contain a body"));
+			try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
 		}
 	}
 	
@@ -119,6 +119,16 @@ public class MethodNode extends AstNode {
 		return "method";
 	}
 
+	public boolean isStatic() {
+		return modifiers.contains(Keyword.STATIC);
+	}
+	public boolean isFinal() {
+		return modifiers.contains(Keyword.FINAL);
+	}
+	public boolean isPublic() {
+		return modifiers.contains(Keyword.PUBLIC);
+	}
+	
 	@Override
 	public boolean preAnalyze() {
 		try{validateModifiers(modifiers, Keyword.PUBLIC, Keyword.PRIVATE, Keyword.STATIC, Keyword.NATIVE);} catch(SemanticException e) {addMessage(e);}
@@ -131,7 +141,9 @@ public class MethodNode extends AstNode {
 			parameter.preAnalyze();
 		}
 		
-		getBody().preAnalyze();
+		if(null != getBody()) {
+			getBody().preAnalyze();
+		}
 		
 		return true;
 	}
@@ -169,7 +181,9 @@ public class MethodNode extends AstNode {
 		}
 		catch(SemanticException e) {markError(e);}
 		
-		getBody().declare(methodScope);
+		if(null != getBody()) {
+			getBody().declare(methodScope);
+		}
 		
 		return true;
 	}

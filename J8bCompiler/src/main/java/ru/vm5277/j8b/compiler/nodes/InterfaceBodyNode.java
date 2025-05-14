@@ -5,15 +5,76 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import ru.vm5277.j8b.compiler.enums.Delimiter;
+import ru.vm5277.j8b.compiler.enums.Keyword;
+import ru.vm5277.j8b.compiler.enums.TokenType;
+import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.messages.WarningMessage;
 import ru.vm5277.j8b.compiler.semantic.ClassScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 
-public class InterfaceBodyNode extends ClassBlockNode {
+public class InterfaceBodyNode extends AstNode {
+	protected List<AstNode> declarations = new ArrayList<>();
+	
 	public InterfaceBodyNode(TokenBuffer tb, MessageContainer mc, String className) throws ParseException {
-		super(tb, mc, className);
+		super(tb, mc);
+
+		consumeToken(tb, Delimiter.LEFT_BRACE);
+
+		while (!tb.match(TokenType.EOF) && !tb.match(Delimiter.RIGHT_BRACE)) {
+			Set<Keyword> modifiers = collectModifiers(tb);
+
+			// Обработка вложенных интерфейсов
+			if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
+				declarations.add(new InterfaceNode(tb, mc, modifiers, null));
+				continue;
+			}
+
+			// Обработка вложенных классов
+			if (tb.match(TokenType.OOP, Keyword.CLASS)) {
+				declarations.add(new ClassNode(tb, mc, modifiers, null, null));
+				continue;
+			}
+
+			// Определение типа (примитив или класс)
+			VarType type = checkPrimtiveType();
+			if (null == type) type = checkClassType();
+
+			// Получаем имя поля/метода
+			String name = null;
+			if (tb.match(TokenType.ID)) {
+				name = consumeToken(tb).getStringValue();
+			}
+
+			if (tb.match(Delimiter.LEFT_PAREN)) { // Это метод
+				declarations.add(new MethodNode(tb, mc, modifiers, type, name));
+				continue;
+			}
+
+			if (null != type) { // Это поле
+				declarations.add(new FieldNode(tb, mc, modifiers, type, name));
+				continue;
+			}
+
+			// Если ничего не распознано, пропускаем токен
+			markError("Unexpected token in interface body: " + tb.current());
+			tb.consume();
+		}
+
+		try {
+			consumeToken(tb, Delimiter.RIGHT_BRACE);
+		} catch (ParseException e) {
+			markFirstError(e);
+		}
+	}
+	
+	public List<AstNode> getDeclarations() {
+		return declarations;
 	}
 	
 	@Override
@@ -31,14 +92,16 @@ public class InterfaceBodyNode extends ClassBlockNode {
 			else if(declaration instanceof FieldNode) {
 				FieldNode fieldNode = (FieldNode)declaration;
 				if(!fieldNode.getModifiers().isEmpty()) {
-					addMessage(new WarningMessage("Modifiers not allowed for interface fields (already public static final)", sp));
+					//TODO не сохраняется позиция для конкретного modifier
+					addMessage(new WarningMessage("Modifiers not allowed for interface fields (already public static final)", fieldNode.getSP()));
 				}
 				declaration.preAnalyze();
 			}
 			else if(declaration instanceof MethodNode) {
 				MethodNode methoddNode = (MethodNode)declaration;
 				if(!methoddNode.getModifiers().isEmpty()) {
-					addMessage(new WarningMessage("Modifiers not allowed for interface methods (already public abstract)", sp));
+					//TODO не сохраняется позиция для конкретного modifier
+					addMessage(new WarningMessage("Modifiers not allowed for interface methods (already public abstract)", methoddNode.getSP()));
 				}
 				declaration.preAnalyze();
 			}
@@ -62,27 +125,57 @@ public class InterfaceBodyNode extends ClassBlockNode {
 	@Override
 	public boolean postAnalyze(Scope scope) {
 		ClassScope classScope = (ClassScope)scope;
-		
+
 		for (AstNode declaration : declarations) {
-			if(declaration instanceof InterfaceNode) {
+			if (declaration instanceof InterfaceNode || declaration instanceof ClassNode) {
+				// Обработка вложенных интерфейсов и классов
 				declaration.postAnalyze(scope);
-			}
-			else if(declaration instanceof FieldNode) {
+			} 
+			else if (declaration instanceof FieldNode) {
 				FieldNode fieldNode = (FieldNode)declaration;
-				if(null == fieldNode.getInitializer()) {
-					markError("Final field '" + fieldNode.getName() + "' must be initialized");
-				}
-				else {
+
+				// Проверка инициализации поля
+				if (null == fieldNode.getInitializer()) {
+					markError("Interface field '" + fieldNode.getName() + "' must be initialized");
+				} else {
 					fieldNode.getInitializer().postAnalyze(scope);
 				}
-			}
-			else if(declaration instanceof MethodNode) {
-				MethodNode methoddNode = (MethodNode)declaration;
-				if(methoddNode.isConstructor()) {
-					markError("Interfaces cannot have constructors");
+
+				// Проверка что поле static final
+				if (!fieldNode.isStatic()) {
+					markError("Interface field '" + fieldNode.getName() + "' must be static");
 				}
-				if(null != methoddNode.getBody()) {
-					markError("Code blocks are not allowed in interfaces");
+				if (!fieldNode.isFinal()) {
+					markError("Interface field '" + fieldNode.getName() + "' must be final");
+				}
+			} 
+			else if (declaration instanceof MethodNode) {
+				MethodNode methodNode = (MethodNode)declaration;
+
+				// Запрет конструкторов
+				if (methodNode.isConstructor()) {
+					markError("Interfaces cannot have constructors");
+					continue;
+				}
+
+				// Проверка методов
+				if (methodNode.isStatic()) {
+					// Для статических методов должно быть тело
+					if (null == methodNode.getBody()) {
+						markError("Static method '" + methodNode.getName() + "' must have a body");
+					} else {
+						methodNode.getBody().postAnalyze(scope);
+					}
+				} else {
+					// Для нестатических методов не должно быть тела (абстрактные)
+					if (null != methodNode.getBody()) {
+						markError("Non-static interface method '" + methodNode.getName() + "' cannot have a body");
+					}
+				}
+
+				// Проверка что метод public
+				if (!methodNode.isPublic()) {
+					markError("Interface method '" + methodNode.getName() + "' must be public");
 				}
 			}
 		}

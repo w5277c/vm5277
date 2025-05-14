@@ -11,6 +11,7 @@ public interface Scope {
 	public Scope getParent();
 	
 	public ClassScope resolveClass(String className);
+	public InterfaceSymbol resolveInterface(String className);
 
 	public static ClassScope resolveClass(Scope scope, String className) {
 		while(true) {

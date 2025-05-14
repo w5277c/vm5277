@@ -88,9 +88,16 @@ public class Lexer {
 				continue;
             }
             
+			// Операторы
+			Token token = TOpearator.parse(sb);
+            if (null != token) {
+                tokens.add(token);
+                continue;
+            }
+
 			// Идентификаторы и ключевые слова
 			if (Character.isLetter(ch) || '_'==ch) {
-				Token token = new TKeyword(sb);
+				token = new TKeyword(sb);
 
 				// Добавляем проверку на метку
 				if (!(token.getValue() instanceof Keyword) && sb.hasNext() && ':'==sb.getChar()) {
@@ -100,13 +107,6 @@ public class Lexer {
 				continue;
 			}
 			
-			// Операторы
-			Token token = TOpearator.parse(sb);
-            if (null != token) {
-                tokens.add(token);
-                continue;
-            }
-                    
 			// Разделители
 			token = TDelimiter.parse(sb);
             if (null != token) {

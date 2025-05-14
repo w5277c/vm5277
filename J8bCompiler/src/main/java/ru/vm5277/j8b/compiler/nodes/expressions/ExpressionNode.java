@@ -68,6 +68,15 @@ public class ExpressionNode extends AstNode {
 				}
 				return new TernaryExpression(tb, mc, left, trueExpr, falseExpr);
 			}
+
+			if (operator == Operator.IS) {
+				if (minPrecedence > Operator.PRECEDENCE.get(operator)) {
+					break;
+				}
+				consumeToken(tb); // Пропускаем 'is'
+				ExpressionNode typeExpr = parseTypeReference(); // Разбираем выражение типа
+				return new InstanceOfExpression(tb, mc, left, typeExpr);
+			}
 			
 			Integer precedence = Operator.PRECEDENCE.get(operator);
             if (precedence == null || precedence<minPrecedence) {
@@ -533,6 +542,13 @@ public class ExpressionNode extends AstNode {
 		Token firstToken = consumeToken(tb, TokenType.ID);
 		ExpressionNode expr = new VariableExpression(tb, mc, firstToken.getValue().toString());
 
+/*		// Обрабатываем возможный оператор 'is' после идентификатора
+		if (tb.match(Operator.IS)) {
+			consumeToken(tb); // Пропускаем 'is'
+			ExpressionNode typeExpr = parseTypeReference();
+			return new InstanceOfExpression(tb, mc, expr, typeExpr);
+		} должно быть в ParseBinary*/
+		
 		// Парсим остальные части через точки
 		while(tb.match(Delimiter.DOT)) {
 			consumeToken(tb); // Потребляем точку
@@ -578,7 +594,7 @@ public class ExpressionNode extends AstNode {
 	public String getNodeType() {
 		return "expression";
 	}
-
+	
 	public VarType getType(Scope scope) throws SemanticException {
 		throw new SemanticException("Not supported here.");
 	}

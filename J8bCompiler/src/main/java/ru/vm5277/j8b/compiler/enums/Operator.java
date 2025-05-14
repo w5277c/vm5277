@@ -22,8 +22,8 @@ public enum Operator {
 	// Присваивание (простое и составное)
 	ASSIGN("="), PLUS_ASSIGN("+="), MINUS_ASSIGN("-="), MULT_ASSIGN("*="), DIV_ASSIGN("/="), MOD_ASSIGN("%="), AND_ASSIGN("&="), OR_ASSIGN("|="),
 	XOR_ASSIGN("^="), SHL_ASSIGN("<<="), SHR_ASSIGN(">>="),
-	//Тернарный
-	TERNARY("?");
+	//Тернарный и instanceof
+	TERNARY("?"), IS("is");
 
 	
 	public static final Map<Operator, Integer> PRECEDENCE = new HashMap<>();
@@ -55,7 +55,8 @@ public enum Operator {
 	    // 7. Равенство
 		PRECEDENCE.put(Operator.EQ, 7);
 		PRECEDENCE.put(Operator.NEQ, 7);
-	    // 8. Сравнение
+	    PRECEDENCE.put(Operator.IS, 7);
+		// 8. Сравнение
 		PRECEDENCE.put(Operator.LT, 8);
 		PRECEDENCE.put(Operator.GT, 8);
 		PRECEDENCE.put(Operator.LTE, 8);
@@ -105,7 +106,7 @@ public enum Operator {
 	
 	// Проверяет, является ли оператор сравнением
 	public boolean isComparison() {
-		return this == EQ || this == NEQ || this == LT || this == GT || this == LTE || this == GTE;
+		return this == EQ || this == NEQ || this == LT || this == GT || this == LTE || this == GTE || this == IS;
 	}
 
 	// Проверяет, является ли оператор логическим
