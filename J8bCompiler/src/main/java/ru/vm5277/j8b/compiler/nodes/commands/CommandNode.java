@@ -5,15 +5,53 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.nodes.commands;
 
+import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.ReturnStatus;
+import ru.vm5277.j8b.compiler.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.nodes.AstNode;
+import ru.vm5277.j8b.compiler.nodes.BlockNode;
 import ru.vm5277.j8b.compiler.nodes.TokenBuffer;
+import ru.vm5277.j8b.compiler.semantic.BlockScope;
 import ru.vm5277.j8b.compiler.semantic.LabelSymbol;
 import ru.vm5277.j8b.compiler.semantic.MethodScope;
 import ru.vm5277.j8b.compiler.semantic.Scope;
+import ru.vm5277.j8b.compiler.tokens.TNumber;
+import ru.vm5277.j8b.compiler.tokens.Token;
 
 public abstract class CommandNode extends AstNode {
+	public static class Case {
+		private	final	long		from;
+		private	final	long		to;
+		private	final	BlockNode	block;
+		private			BlockScope	scope;
+		
+		public Case(long from, long to, BlockNode block) {
+			this.from = from;
+			this.to = to;
+			this.block = block;
+		}
+		
+		public long getFrom() {
+			return from;
+		}
+		
+		public long getTo() {
+			return to;
+		}
+		
+		public BlockNode getBlock() {
+			return block;
+		}
+		
+		public BlockScope getScope() {
+			return scope;
+		}
+		public void setScope(BlockScope scope) {
+			this.scope = scope;
+		}
+	}
+
 	public CommandNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
 	}
@@ -46,5 +84,38 @@ public abstract class CommandNode extends AstNode {
 	// Анализирует наличие return в команде
 	public ReturnStatus getReturnStatus() {
 		return ReturnStatus.NEVER;
+	}
+	
+	protected Case parseCase(TokenBuffer tb, MessageContainer mc) {
+		consumeToken(tb); // Потребляем "case"
+
+		// Парсим значение или диапазон
+		long from = 0;
+		long to = -1;
+
+		try {from = parseNumber(tb);} catch(ParseException e) {markFirstError(e);}
+		if (tb.match(Delimiter.RANGE)) {
+			consumeToken(tb); // Потребляем ".."
+			try{to = parseNumber(tb);}catch(ParseException e) {to=0;markFirstError(e);}
+		}
+
+		try {consumeToken(tb, Delimiter.COLON);} catch(ParseException e) {markFirstError(e);}
+		BlockNode blockNode = null;
+		tb.getLoopStack().add(this);
+		try {blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());}
+		catch(ParseException e) {markFirstError(e);}
+		tb.getLoopStack().remove(this);
+		return new Case(from, to, blockNode);
+	}
+
+	private long parseNumber(TokenBuffer tb) throws ParseException {
+		Token token = consumeToken(tb);
+		if(token instanceof TNumber) {
+			Number number = (Number)token.getValue();
+			if(number instanceof Integer || number instanceof Long) {
+				return number.longValue();
+			}
+		}
+		throw parserError("Expected numeric value(or range) for 'case' in switch statement");
 	}
 }

@@ -17,7 +17,9 @@ public enum Keyword {
 	// Ключевые слова ООП
 	CLASS, INTERFACE, IMPLEMENTS, THIS,
 	//Остальное
-	IMPORT, AS, ELSE, CASE, DEFAULT, NEW;
+	IMPORT, AS, ELSE, CASE, DEFAULT, NEW,
+	//Исключения
+	TRY, CATCH, THROW, THROWS;
 	
 	public static Keyword fromString(String str) {
 		try {
@@ -51,6 +53,8 @@ public enum Keyword {
 			case BREAK:
 			case SWITCH:
 			case FREE:
+			case TRY:
+			case THROW:
 				return TokenType.COMMAND;
 			case STATIC:
 			case FINAL:
@@ -63,6 +67,7 @@ public enum Keyword {
 			case IMPLEMENTS:
 			case INTERFACE:
 			case THIS:
+			case THROWS:
 				return TokenType.OOP;
 			default:
 				return TokenType.KEYWORD;

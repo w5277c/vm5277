@@ -41,10 +41,9 @@ import ru.vm5277.j8b.compiler.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler.messages.Message;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.messages.WarningMessage;
-import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode.Case;
-import ru.vm5277.j8b.compiler.nodes.expressions.InstanceOfExpression;
+import ru.vm5277.j8b.compiler.nodes.commands.CommandNode.Case;
+import ru.vm5277.j8b.compiler.nodes.commands.TryNode;
 import ru.vm5277.j8b.compiler.nodes.expressions.TypeReferenceExpression;
-import ru.vm5277.j8b.compiler.semantic.InterfaceSymbol;
 
 public abstract class AstNode extends SemanticAnalyzer {
 	protected			TokenBuffer				tb;
@@ -73,6 +72,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 			case BREAK:		return new BreakNode(tb, mc);
 			case RETURN:	return new ReturnNode(tb, mc);
 			case SWITCH:	return new SwitchNode(tb, mc);
+			case TRY:		return new TryNode(tb, mc);
 			default:
 				markFirstError(error);
 				throw new ParseException("Unexpected command token " + tb.current(), sp);

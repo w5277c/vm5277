@@ -52,6 +52,31 @@ public class Main {
             test3 = true;
         }
 
+        try {
+            test2 = false;
+        }
+
+        try {
+            test2 = false;
+        }
+        catch(byte errCode) {
+            int t = errCode;
+        }
+
+        try {
+            test2 = false;
+        }
+        catch (byte errCode) {
+            case 0x00: test1 = true;
+            case 0x01..0x03: {
+                test1 = true;
+                test2 = false;
+            }
+            default: {
+                test3 = false;
+            }
+        }
+
 
         MathUtils.square(3);
         int sum = Math.add(4, 3);
