@@ -42,6 +42,7 @@ import ru.vm5277.j8b.compiler.messages.Message;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.messages.WarningMessage;
 import ru.vm5277.j8b.compiler.nodes.commands.CommandNode.Case;
+import ru.vm5277.j8b.compiler.nodes.commands.ThrowNode;
 import ru.vm5277.j8b.compiler.nodes.commands.TryNode;
 import ru.vm5277.j8b.compiler.nodes.expressions.TypeReferenceExpression;
 
@@ -73,6 +74,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 			case RETURN:	return new ReturnNode(tb, mc);
 			case SWITCH:	return new SwitchNode(tb, mc);
 			case TRY:		return new TryNode(tb, mc);
+			case THROW:		return new ThrowNode(tb, mc);
 			default:
 				markFirstError(error);
 				throw new ParseException("Unexpected command token " + tb.current(), sp);
@@ -366,6 +368,11 @@ public abstract class AstNode extends SemanticAnalyzer {
 		return message;
 	}
 	public WarningMessage markWarning(String text) {
+		WarningMessage message = new WarningMessage(text, sp);
+		addMessage(message);
+		return message;
+	}
+	public WarningMessage markWarning(String text, SourcePosition sp) {
 		WarningMessage message = new WarningMessage(text, sp);
 		addMessage(message);
 		return message;

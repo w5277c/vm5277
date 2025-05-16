@@ -22,12 +22,15 @@ import ru.vm5277.j8b.compiler.nodes.MethodNode;
 import ru.vm5277.j8b.compiler.nodes.ParameterNode;
 import ru.vm5277.j8b.compiler.nodes.VarNode;
 import ru.vm5277.j8b.compiler.nodes.commands.BreakNode;
+import ru.vm5277.j8b.compiler.nodes.commands.CommandNode.Case;
 import ru.vm5277.j8b.compiler.nodes.commands.ContinueNode;
 import ru.vm5277.j8b.compiler.nodes.commands.DoWhileNode;
 import ru.vm5277.j8b.compiler.nodes.commands.ForNode;
 import ru.vm5277.j8b.compiler.nodes.commands.IfNode;
 import ru.vm5277.j8b.compiler.nodes.commands.ReturnNode;
 import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode;
+import ru.vm5277.j8b.compiler.nodes.commands.ThrowNode;
+import ru.vm5277.j8b.compiler.nodes.commands.TryNode;
 import ru.vm5277.j8b.compiler.nodes.commands.WhileNode;
 import ru.vm5277.j8b.compiler.nodes.expressions.BinaryExpression;
 import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
@@ -157,6 +160,9 @@ public class ASTPrinter {
 		out.put(method.getName() + "(");
 		printParameters(method.getParameters());
 		out.put(") ");
+		if(method.canThrow()) {
+			out.put("throws ");
+		}
 		BlockNode body = method.getBody();
 		if(null == body) {
 			out.put(";");
@@ -295,6 +301,47 @@ public class ASTPrinter {
 			}
 			else if(node instanceof InterfaceNode) {
 				printInterface((InterfaceNode)node);
+			}
+			else if(node instanceof TryNode) {
+				TryNode tryNode = (TryNode)node;
+				out.put("try ");
+				printBody(tryNode.getTryBlock());
+				if(!tryNode.getCatchCases().isEmpty() || null != tryNode.getCatchDefault()) {
+					out.print();
+					out.put("catch (byte ");
+					out.put(tryNode.getVarName());
+					out.put(") ");
+					if(tryNode.getCatchCases().isEmpty()) {
+						printBody(tryNode.getCatchDefault());
+					}
+					else {
+						out.put("{");
+						out.print();
+						out.extend();
+						for(Case c : tryNode.getCatchCases()) {
+							out.put("case " + c.getFrom());
+							if(-1 != c.getTo()) {
+								out.put(".." + c.getTo());
+							}
+							out.put(": ");
+							printBody(c.getBlock());
+							out.print();
+						}
+						if(null != tryNode.getCatchDefault()) {
+							out.put("default: ");
+							printBody(tryNode.getCatchDefault());
+						}
+						out.print();
+						out.reduce();
+						out.put("}");
+					}
+				}
+				
+			}
+			else if(node instanceof ThrowNode) {
+				out.put("throw ");
+				printExpr(((ThrowNode)node).getExceptionExpr());
+				out.put(";");
 			}
 			else {
 				out.put("!unknown node:" + node); out.print();

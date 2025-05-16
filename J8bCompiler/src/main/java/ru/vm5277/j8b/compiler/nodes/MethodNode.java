@@ -29,6 +29,7 @@ public class MethodNode extends AstNode {
 	private	final	String				name;
 	private			List<ParameterNode>	parameters;
 	private			MethodScope			methodScope; // Добавляем поле для хранения области видимости
+	private			boolean				canThrow	= false;
 	
 	public MethodNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType returnType, String name) throws ParseException {
 		super(tb, mc);
@@ -41,6 +42,12 @@ public class MethodNode extends AstNode {
 		this.parameters = parseParameters(mc);
         consumeToken(tb); // Потребляем ')'
 		
+		// Проверяем наличие throws
+		if (tb.match(TokenType.OOP, Keyword.THROWS)) {
+			consumeToken(tb);
+			this.canThrow = true;
+		}
+
 		if(tb.match(Delimiter.LEFT_BRACE)) {
 			tb.getLoopStack().add(this);
 			try {blocks.add(new BlockNode(tb, mc));}catch(ParseException e) {}
@@ -51,15 +58,21 @@ public class MethodNode extends AstNode {
 		}
 	}
 	
-	public MethodNode(MessageContainer mc, Set<Keyword> modifiers, VarType returnType, String name, List<ParameterNode> parameters, BlockNode body) {
+	public MethodNode(	MessageContainer mc, Set<Keyword> modifiers, VarType returnType, String name, List<ParameterNode> parameters, boolean canThrow,
+						BlockNode body) {
 		super(null, mc);
 		
 		this.modifiers = modifiers;
 		this.returnType = returnType;
 		this.name = name;
 		this.parameters = parameters;
+		this.canThrow = canThrow;
 		
 		blocks.add(body);
+	}
+	
+	public boolean canThrow() {
+		return canThrow;
 	}
 	
 	private List<ParameterNode> parseParameters(MessageContainer mc) {
@@ -161,7 +174,7 @@ public class MethodNode extends AstNode {
 		try {
 			methodScope = new MethodScope(null, classScope);
 			MethodSymbol methodSymbol = new MethodSymbol(	name, returnType, paramSymbols, modifiers.contains(Keyword.FINAL),
-															modifiers.contains(Keyword.STATIC),	methodScope);
+															modifiers.contains(Keyword.STATIC),	canThrow, methodScope);
 			// Устанавливаем обратную ссылку
 			methodScope.setSymbol(methodSymbol);
 

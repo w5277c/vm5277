@@ -22,11 +22,12 @@ import ru.vm5277.j8b.compiler.semantic.Symbol;
 public class TryNode extends CommandNode {
 	private	BlockNode		tryBlock;
 	private	String			varName;
-	private	List<Case>		catchCases	= new ArrayList<>();
+	private	List<Case>		catchCases		= new ArrayList<>();
 	private	BlockNode		catchDefault;
 	private	BlockScope		tryScope;
 	private	BlockScope		catchScope;
 	private	BlockScope		defaultScope;
+	private	boolean			hasDefault		= false;
 	
 	public TryNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
@@ -56,13 +57,18 @@ public class TryNode extends CommandNode {
 			// Если сразу идет код без case/default - считаем его default-блоком
             if (!tb.match(Keyword.CASE) && !tb.match(Keyword.DEFAULT) && !tb.match(Delimiter.RIGHT_BRACE)) {
 				tb.getLoopStack().add(this);
-                try {catchDefault = new BlockNode(tb, mc, parseStatement());} catch (ParseException e) {markFirstError(e);}
+                try {catchDefault = new BlockNode(tb, mc, true);} catch (ParseException e) {markFirstError(e);}
                 tb.getLoopStack().remove(this);
 			}
 			else {
 				// Парсим case-блоки
 				while (!tb.match(Delimiter.RIGHT_BRACE)) {
 					if (tb.match(Keyword.CASE)) {
+						if (hasDefault) {
+							markError("'case' cannot appear after 'default' in catch block");
+							tb.skip(Delimiter.RIGHT_BRACE);
+							break;
+						}
 						Case c = parseCase(tb, mc);
 						if(null != c) catchCases.add(c);
 					}
@@ -106,6 +112,12 @@ public class TryNode extends CommandNode {
 		return "try-catch block";
 	}
 	
+	public AstNode getEndNode() {
+		if (null != catchDefault) return catchDefault;
+		if (!catchCases.isEmpty()) return catchCases.get(catchCases.size()-1).getBlock();
+		return tryBlock;
+	}
+
 	@Override
 	public boolean preAnalyze() {
 		// Проверка блока try

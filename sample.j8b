@@ -53,11 +53,11 @@ public class Main {
         }
 
         try {
-            test2 = false;
+            test1 = false;
         }
 
         try {
-            test2 = false;
+            test3 = false;
         }
         catch(byte errCode) {
             int t = errCode;
@@ -135,8 +135,9 @@ public class Main {
         //TODO
     }
 
-    void print(byte[] data) {
+    void print(byte[] data) throws {
         //TODO
+        throw 0xfe;
     }
 
     void print(int integer) {

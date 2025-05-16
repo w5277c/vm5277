@@ -12,7 +12,7 @@ import java.io.InputStreamReader;
 import ru.vm5277.j8b.compiler.messages.MessageContainer;
 
 public class Main {
-    public	final	static	String	VERSION	= "0.0.15";
+    public	final	static	String	VERSION	= "0.0.16";
 	
 	public static void main(String[] args) throws IOException {
 		MessageContainer mc = new MessageContainer(8, true, false);

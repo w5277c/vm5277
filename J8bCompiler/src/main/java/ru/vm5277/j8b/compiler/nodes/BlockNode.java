@@ -12,7 +12,6 @@ import java.util.Map;
 import java.util.Set;
 import ru.vm5277.j8b.compiler.enums.Delimiter;
 import ru.vm5277.j8b.compiler.enums.Keyword;
-import ru.vm5277.j8b.compiler.enums.Operator;
 import ru.vm5277.j8b.compiler.enums.TokenType;
 import ru.vm5277.j8b.compiler.enums.VarType;
 import ru.vm5277.j8b.compiler.exceptions.ParseException;
@@ -23,10 +22,11 @@ import ru.vm5277.j8b.compiler.nodes.commands.ForNode;
 import ru.vm5277.j8b.compiler.nodes.commands.IfNode;
 import ru.vm5277.j8b.compiler.nodes.commands.ReturnNode;
 import ru.vm5277.j8b.compiler.nodes.commands.SwitchNode;
+import ru.vm5277.j8b.compiler.nodes.commands.TryNode;
 import ru.vm5277.j8b.compiler.nodes.commands.WhileNode;
-import ru.vm5277.j8b.compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.j8b.compiler.nodes.expressions.InstanceOfExpression;
+import ru.vm5277.j8b.compiler.nodes.expressions.MethodCallExpression;
 import ru.vm5277.j8b.compiler.semantic.BlockScope;
+import ru.vm5277.j8b.compiler.semantic.MethodSymbol;
 import ru.vm5277.j8b.compiler.semantic.Scope;
 
 public class BlockNode extends AstNode {
@@ -44,9 +44,12 @@ public class BlockNode extends AstNode {
 	}
 
 	public BlockNode(TokenBuffer tb, MessageContainer mc) throws ParseException {
-        super(tb, mc);
+		this(tb, mc, false);
+	}
+	public BlockNode(TokenBuffer tb, MessageContainer mc, boolean leftBraceConsumed) throws ParseException {
+		super(tb, mc);
         
-		consumeToken(tb, Delimiter.LEFT_BRACE); //Наличие токена должно быть гарантировано вызывающим
+		if(!leftBraceConsumed) consumeToken(tb, Delimiter.LEFT_BRACE); //Наличие токена должно быть гарантировано вызывающим
 
 		while (!tb.match(TokenType.EOF) && !tb.match(Delimiter.RIGHT_BRACE)) {
 			if(tb.match(TokenType.LABEL)) {
@@ -219,12 +222,37 @@ public class BlockNode extends AstNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope) {
+		boolean inTryBlock = false;
+		TryNode currentTryNode = null;
+
 		for (int i = 0; i < declarations.size(); i++) {
 			AstNode declaration = declarations.get(i);
 
 			// Анализируем текущую ноду
 			declaration.postAnalyze(blockScope);
 
+			// Если нашли try-block, отмечаем начало зоны обработки исключений
+			if (declaration instanceof TryNode) {
+				currentTryNode = (TryNode)declaration;
+				inTryBlock = true;
+			}
+
+			// Проверка вызовов методов
+			if (declaration instanceof MethodCallExpression) {
+				MethodCallExpression call = (MethodCallExpression)declaration;
+				MethodSymbol methodSymbol = call.getMethod();
+
+				if (null != methodSymbol && methodSymbol.canThrow() && !inTryBlock) {
+					markWarning("Call to throwing method '" + methodSymbol.getName() + "' without try-catch at line " + call.getSP());
+				}
+			}
+
+			// Если это конец try-block, сбрасываем флаг
+            if (inTryBlock && declaration == currentTryNode.getEndNode()) {
+                inTryBlock = false;
+                currentTryNode = null;
+            }
+			
 			// Проверяем недостижимый код после прерывающих инструкций
 			if (i > 0 && isControlFlowInterrupted(declarations.get(i - 1))) {
 				markError("Unreachable code after " + declarations.get(i - 1).getClass().getSimpleName());

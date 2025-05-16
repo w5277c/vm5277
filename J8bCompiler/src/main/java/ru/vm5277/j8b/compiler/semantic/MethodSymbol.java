@@ -11,20 +11,24 @@ import ru.vm5277.j8b.compiler.enums.VarType;
 
 public class MethodSymbol extends Symbol {
 	private	final	List<Symbol>	parameters;
+	private			boolean			canThrow;
 	private			String			signature;
 	private	final	MethodScope		scope;
 
-	public MethodSymbol(String name, VarType returnType, List<Symbol> parameters, boolean isFinal, boolean isStatic, MethodScope scope) {
+	public MethodSymbol(String name, VarType returnType, List<Symbol> parameters, boolean isFinal, boolean isStatic, boolean canThrow, MethodScope scope) {
 		super(name, returnType, isFinal, isStatic);
 		
 		this.parameters = parameters;
 		this.scope = scope;
+		this.canThrow = canThrow;
 	}
 
-	public MethodSymbol(String name, VarType returnType, List<Symbol> parameters, boolean isFinal, boolean isStatic, boolean isNative, MethodScope scope) {
+	public MethodSymbol(String name, VarType returnType, List<Symbol> parameters, boolean isFinal, boolean isStatic, boolean isNative, boolean canThrow,
+						MethodScope scope) {
 		super(name, returnType, isFinal, isStatic, isNative);
 		
 		this.parameters = parameters;
+		this.canThrow = canThrow;
 		this.scope = scope;
 	}
 
@@ -42,6 +46,10 @@ public class MethodSymbol extends Symbol {
 			result.add(param.getType());
 		}
 		return result;
+	}
+	
+	public boolean canThrow() {
+		return canThrow;
 	}
 	
 	public synchronized String getSignature() {

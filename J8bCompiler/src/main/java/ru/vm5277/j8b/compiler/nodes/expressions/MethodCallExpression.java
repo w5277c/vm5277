@@ -20,7 +20,8 @@ public class MethodCallExpression extends ExpressionNode {
 	private	final	ExpressionNode			parent;
 	private	final	String					methodName;
 	private	final	List<ExpressionNode>	arguments;
-    
+	private			MethodSymbol			method;
+	
     public MethodCallExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode parent, String methodName, List<ExpressionNode> arguments) {
         super(tb, mc);
         
@@ -58,7 +59,7 @@ public class MethodCallExpression extends ExpressionNode {
 				ClassScope classScope = scope.resolveClass(parentType.getName());
 				if (null == classScope) throw new SemanticException("Class '" + parentType.getName() + "' not found");
 
-				MethodSymbol method = classScope.resolveMethod(methodName, argTypes);
+				method = classScope.resolveMethod(methodName, argTypes);
 				if (method != null) return method.getType();
 			}
 
@@ -68,7 +69,7 @@ public class MethodCallExpression extends ExpressionNode {
 				ClassScope classScope = scope.resolveClass(parentType.getName());
 				if (null == classScope) throw new SemanticException("Class '" + parentType.getName() + "' not found");
 
-				MethodSymbol method = classScope.resolveMethod(methodName, argTypes);
+				method = classScope.resolveMethod(methodName, argTypes);
 				if (null != method && !method.isStatic()) return method.getType();
 			}
 
@@ -77,7 +78,7 @@ public class MethodCallExpression extends ExpressionNode {
 
 		// Вызов метода текущего класса (без parent)
 		if (scope instanceof ClassScope) {
-			MethodSymbol method = ((ClassScope)scope).resolveMethod(methodName, argTypes);
+			method = ((ClassScope)scope).resolveMethod(methodName, argTypes);
 			if (null != method) return method.getType();
 		}
 
@@ -95,6 +96,7 @@ public class MethodCallExpression extends ExpressionNode {
 				if (null != methods) {
 					for (MethodSymbol interfaceMethod : methods) {
 						if (isArgumentsMatch(scope, interfaceMethod, argTypes)) {
+							method = interfaceMethod;
 							return interfaceMethod.getType();
 						}
 					}
@@ -103,6 +105,10 @@ public class MethodCallExpression extends ExpressionNode {
 		}
 
 		throw new SemanticException("Method '" + methodName + "' not found");
+	}
+	
+	public MethodSymbol getMethod() {
+		return method;
 	}
 	
 	private boolean isArgumentsMatch(Scope scope, MethodSymbol method, List<VarType> argTypes) {
@@ -162,8 +168,8 @@ public class MethodCallExpression extends ExpressionNode {
 			// Поиск метода в ClassScope
 			if (scope instanceof ClassScope) {
 				ClassScope classScope = (ClassScope)scope;
-				MethodSymbol method = classScope.resolveMethod(methodName, argTypes);
-				if (method == null) {
+				MethodSymbol methodSymbol = classScope.resolveMethod(methodName, argTypes);
+				if (methodSymbol == null) {
 					markError("Method '" + methodName + "' not found");
 					return false;
 				}

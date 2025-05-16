@@ -16,19 +16,20 @@ public class LexerTests {
 
     @Test
     public void testBasicTypesAndKeywords() throws Exception {
-        assertEquals(35, Keyword.values().length);
+        assertEquals(39, Keyword.values().length);
 		
 		String source = "true false null " + 
 						"void bool byte short int fixed cstr " +
 						"if do while for return continue break switch free " +
 						"static final private public native atomic " +
 						"class interface implements this " +
-						"import as else case default new";
+						"import as else case default new " +
+						"try catch throw throws";
         MessageContainer mc = new MessageContainer(100, true, false);
 		Lexer lexer = new Lexer(new StringReader(source), mc);
         List<Token> tokens = lexer.getTokens();
         
-        assertEquals(35, tokens.size() - 1); // -1 для EOF
+        assertEquals(39, tokens.size() - 1); // -1 для EOF
         
 		int pos=0;
 		// Проверка литералов
@@ -112,6 +113,16 @@ public class LexerTests {
 		assertEquals(Keyword.DEFAULT, tokens.get(pos++).getValue());
 		assertEquals(TokenType.KEYWORD, tokens.get(pos).getType());
 		assertEquals(Keyword.NEW, tokens.get(pos++).getValue());
+
+
+		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
+		assertEquals(Keyword.TRY, tokens.get(pos++).getValue());
+		assertEquals(TokenType.KEYWORD, tokens.get(pos).getType());
+		assertEquals(Keyword.CATCH, tokens.get(pos++).getValue());
+		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
+		assertEquals(Keyword.THROW, tokens.get(pos++).getValue());
+		assertEquals(TokenType.OOP, tokens.get(pos).getType());
+		assertEquals(Keyword.THROWS, tokens.get(pos++).getValue());
 
 	}
 
