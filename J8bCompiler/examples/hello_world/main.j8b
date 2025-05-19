@@ -1,0 +1,8 @@
+import lang.runtime;
+
+class Main {
+    public static void main() {
+	byte t=8;
+	Runtime.out(t);
+    }
+}

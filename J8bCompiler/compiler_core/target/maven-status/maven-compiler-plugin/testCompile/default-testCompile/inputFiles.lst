@@ -1,0 +1,6 @@
+/media/kostas/repos/w5277c/vm5277_local/J8bCompiler/compiler_core/src/test/java/ru/vm5277/j8b/compiler/LexerTests.java
+/media/kostas/repos/w5277c/vm5277_local/J8bCompiler/compiler_core/src/test/java/ru/vm5277/j8b/compiler/ParserTests.java
+/media/kostas/repos/w5277c/vm5277_local/J8bCompiler/compiler_core/src/test/java/ru/vm5277/j8b/compiler/SemanticAnalyzerTests.java
+/media/kostas/repos/w5277c/vm5277_local/J8bCompiler/compiler_core/src/test/java/ru/vm5277/j8b/compiler/semantic/ScopeTest.java
+/media/kostas/repos/w5277c/vm5277_local/J8bCompiler/compiler_core/src/test/java/ru/vm5277/j8b/compiler/semantic/Test.java
+/media/kostas/repos/w5277c/vm5277_local/J8bCompiler/compiler_core/src/test/java/ru/vm5277/j8b/compiler/semantic/VarTypeTest.java
