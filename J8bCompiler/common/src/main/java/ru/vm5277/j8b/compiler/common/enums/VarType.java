@@ -14,25 +14,27 @@ public class VarType {
 	static {
 		CLASS_TYPES.put("Object", new VarType("class:Object", "Object"));
 	}
-	// Примитивные типы
-	public	static	final	VarType	VOID		= new VarType("void");
-	public	static	final	VarType	BOOL		= new VarType("bool");
-	public	static	final	VarType	BYTE		= new VarType("byte");
-	public	static	final	VarType	SHORT		= new VarType("short");
-	public	static	final	VarType	INT			= new VarType("int");
-	public	static	final	VarType	FIXED		= new VarType("fixed") {
+	// Примитивные типы	 Object имеет id 0
+	public	static	final	VarType	VOID		= new VarType(1, "void");
+	public	static	final	VarType	BOOL		= new VarType(2, "bool");
+	public	static	final	VarType	BYTE		= new VarType(3, "byte");
+	public	static	final	VarType	SHORT		= new VarType(4, "short");
+	public	static	final	VarType	INT			= new VarType(5, "int");
+	public	static	final	VarType	FIXED		= new VarType(6, "fixed") {
 		@Override
 		public boolean isFixedPoint() { return true; }
 	};
-	public	static	final	VarType	CSTR		= new VarType("cstr");
+	public	static	final	VarType	CSTR		= new VarType(7, "cstr");
 	
 	// Ссылочные типы
-	public	static	final	VarType	CLASS		= new VarType("class");
+	public	static	final	VarType	CLASS		= new VarType(-1, "class");
 
 	// Специальные типы
-	public	static	final	VarType	NULL		= new VarType("null");
-	public	static	final	VarType	UNKNOWN		= new VarType("?");
+	public	static	final	VarType	NULL		= new VarType(8, "null");
+	public	static	final	VarType	UNKNOWN		= new VarType(-1, "?");
 
+	private	static			int		idCntr		= 10;
+	private					int		id;
 	private			final	String	name;
 	private			final	String	className; // Для классовых типов
 	private					boolean	isArray;
@@ -40,27 +42,29 @@ public class VarType {
 	private					int		arraySize;
 
 	// Конструктор для ссылочных типов
-	private VarType(String name) {
+	private VarType(int id, String name) {
+		this.id = id;
 		this.name = name;
 		this.className = null;
 	}
 
 	// Конструктор для классовых типов
 	private VarType(String name, String className) {
+		this.id = idCntr++;
 		this.name = name;
 		this.className = className;
 	}
 
 	// Конструктор для массивов
     public static VarType arrayOf(VarType elementType) {
-        VarType type = new VarType("array");
+        VarType type = new VarType(9, "array");
         type.isArray = true;
         type.elementType = elementType;
         return type;
     }
 	
 	public static VarType arrayOf(VarType elementType, int size) {
-		VarType type = new VarType("array");
+		VarType type = new VarType(9, "array");
 		type.isArray = true;
 		type.elementType = elementType;
 		type.arraySize = size;
@@ -88,6 +92,10 @@ public class VarType {
 	}
 	public static VarType fromClassName(String className) {
 		return CLASS_TYPES.get(className);
+	}
+	
+	public int getId() {
+		return id;
 	}
 	
 	public String getName() {

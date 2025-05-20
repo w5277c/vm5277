@@ -5,25 +5,22 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.common;
 
-import ru.vm5277.j8b.compiler.common.enums.Operator;
-
 public interface CodeGenerator {
-	public void enterClass(byte typeId, byte[] intrerfaceIds);
-	public void enterFiled(byte typeId);
-	public void enterConstructor(byte[] typeIds);
-	public void enterMethod(byte typeId, byte[] typeIds);
-	
-	public void declareLocal(byte typeId); //TODO нужна позиция в стеке?
-	
+	public void enterClass(int typeId, int[] intrerfaceIds);	//тип 
+	public void enterFiled(int typeId, String name);
+	public void enterConstructor(int[] typeIds);
+	public void enterMethod(int typeId, int[] typeIds);
+	public void enterLocal(int typeId, String name); //TODO сделать индексацию вместо имен
 	public void leave();
 	
-	// Выражения (линейные)
-	void load(Operand source);          // Загрузить значение в "аккумулятор"
-	void store(Operand dest);           // Сохранить "аккумулятор" в dest
-	void binaryOp(Operator op, Operand left, Operand right); // left op right -> аккумулятор
-	void unaryOp(Operator op, Operand operand); // op operand -> аккумулятор
-	//...
 	
+	void setAcc(Operand src);
+	Operand getAcc();
+	void loadAcc(Operand src);
+	void storeAcc(Operand dst);
 	
 	//TODO набор методов для реализации команд if, switch, for, loop и .т.д
+	public void eNew(int typeId, Operand[] parameters, boolean canThrow);
+	public void eFree(Operand op);
+
 }

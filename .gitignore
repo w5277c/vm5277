@@ -1,1 +1,4 @@
-J8bCompiler/target/
+J8bCompiler/codegen_avr/target/
+J8bCompiler/common/target/
+J8bCompiler/compiler_core/target/
+

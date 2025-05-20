@@ -5,6 +5,9 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler_core.nodes.expressions;
 
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
+import ru.vm5277.j8b.compiler.common.Operand;
+import ru.vm5277.j8b.compiler.common.enums.OperandType;
 import ru.vm5277.j8b.compiler.common.enums.VarType;
 import ru.vm5277.j8b.compiler.common.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler_core.messages.MessageContainer;
@@ -71,5 +74,10 @@ public class VariableExpression extends ExpressionNode {
 			return false;
 		}
 		return true;
+	}
+	
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		cg.loadAcc(new Operand(resolvedSymbol.getType().getId(), OperandType.VARIABLE, resolvedSymbol.getName()));
 	}
 }

@@ -7,6 +7,7 @@ package ru.vm5277.j8b.compiler_core.nodes;
 
 import ru.vm5277.j8b.compiler_core.nodes.expressions.ExpressionNode;
 import java.util.Set;
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
 import ru.vm5277.j8b.compiler_core.enums.Delimiter;
 import ru.vm5277.j8b.compiler_core.enums.Keyword;
 import ru.vm5277.j8b.compiler.common.enums.Operator;
@@ -21,15 +22,15 @@ import ru.vm5277.j8b.compiler_core.semantic.Symbol;
 
 public class FieldNode extends AstNode {
 	private	final	Set<Keyword>	modifiers;
-	private			VarType			returnType;
+	private			VarType			type;
 	private			String			name;
 	private			ExpressionNode	initializer;
 
-	public FieldNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType returnType, String name) {
+	public FieldNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType  type, String name) {
 		super(tb, mc);
 
 		this.modifiers = modifiers;
-		this.returnType = returnType;
+		this.type = type;
 		this.name = name;
 
 		if (!tb.match(Operator.ASSIGN)) {
@@ -46,7 +47,7 @@ public class FieldNode extends AstNode {
 		super(null, mc);
 		
 		this.modifiers = modifiers;
-		this.returnType = returnType;
+		this.type = returnType;
 		this.name = name;
 	}
 	
@@ -55,7 +56,7 @@ public class FieldNode extends AstNode {
 	}
 	
 	public VarType getType() {
-		return returnType;
+		return type;
 	}
 	
 	public String getName() {
@@ -83,7 +84,7 @@ public class FieldNode extends AstNode {
 
 	@Override
 	public String toString() {
-		return getClass().getSimpleName() + ": " + modifiers + ", " + returnType + ", " + name;
+		return getClass().getSimpleName() + ": " + modifiers + ", " + type + ", " + name;
 	}
 
 	@Override
@@ -98,7 +99,7 @@ public class FieldNode extends AstNode {
 		if(scope instanceof ClassScope) {
 			ClassScope classScope = (ClassScope)scope;
 
-			try{classScope.addField(new Symbol(name, returnType, modifiers.contains(Keyword.FINAL), modifiers.contains(Keyword.STATIC)));}
+			try{classScope.addField(new Symbol(name, type, modifiers.contains(Keyword.FINAL), modifiers.contains(Keyword.STATIC)));}
 			catch(SemanticException e) {markError(e);}
 		}
 		else markError("Unexpected scope:" + scope.getClass().getSimpleName() + " in filed:" + name);
@@ -117,16 +118,27 @@ public class FieldNode extends AstNode {
 		// Проверка совместимости типов
 		try {
 			VarType initType = initializer.getType(scope);
-			if (!isCompatibleWith(scope, returnType, initType)) {
-				markError("Type mismatch: cannot assign " + initType + " to " + returnType);
+			if (!isCompatibleWith(scope, type, initType)) {
+				markError("Type mismatch: cannot assign " + initType + " to " + type);
 			}
 			// Дополнительная проверка на сужающее преобразование
-			if (returnType.isNumeric() && initType.isNumeric() && returnType.getSize() < initType.getSize()) {
-				markError("Narrowing conversion from " + initType + " to " + returnType + " requires explicit cast");
+			if (type.isNumeric() && initType.isNumeric() && type.getSize() < initType.getSize()) {
+				markError("Narrowing conversion from " + initType + " to " + type + " requires explicit cast");
 			}
 		}
 		catch (SemanticException e) {markError(e);}
 		
 		return true;
+	}
+	
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		cg.enterFiled(type.getId(), name);
+		try {
+			initializer.codeGen(cg);
+		}
+		finally {
+			cg.leave();
+		}
 	}
 }

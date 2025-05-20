@@ -7,6 +7,9 @@ package ru.vm5277.j8b.compiler_core.nodes.expressions;
 
 import java.util.ArrayList;
 import java.util.List;
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
+import ru.vm5277.j8b.compiler.common.Operand;
+import ru.vm5277.j8b.compiler.common.enums.OperandType;
 import ru.vm5277.j8b.compiler.common.enums.VarType;
 import ru.vm5277.j8b.compiler.common.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler_core.messages.MessageContainer;
@@ -28,7 +31,7 @@ public class NewExpression extends ExpressionNode {
 	
 	
 	@Override
-	public VarType getType(Scope scope) throws SemanticException {
+	public VarType getType(Scope scope) {
 		return VarType.fromClassName(className);
 	}
 	
@@ -117,5 +120,20 @@ public class NewExpression extends ExpressionNode {
 			}
 		}
 		return true;
+	}
+	
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		Operand[] operands = null;
+		if(!args.isEmpty()) {
+			
+			operands = new Operand[args.size()];
+			for(int i=0; i<args.size(); i++) {
+				args.get(i).codeGen(cg);
+				operands[i] = cg.getAcc();
+			}
+		}
+
+		cg.eNew(getType(null).getId(), operands, false);//TODO canThrow
 	}
 }

@@ -10,6 +10,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
 import ru.vm5277.j8b.compiler_core.enums.Delimiter;
 import ru.vm5277.j8b.compiler_core.enums.Keyword;
 import ru.vm5277.j8b.compiler_core.enums.TokenType;
@@ -263,6 +264,13 @@ public class BlockNode extends AstNode {
 		return true;
 	}
 
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		for(AstNode decl : declarations) {
+			decl.codeGen(cg);
+		}
+	}
+	
 	@Override
 	public String toString() {
 		return getClass().getSimpleName();

@@ -8,6 +8,7 @@ package ru.vm5277.j8b.compiler_core.nodes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
 import ru.vm5277.j8b.compiler_core.enums.Delimiter;
 import ru.vm5277.j8b.compiler_core.enums.Keyword;
 import ru.vm5277.j8b.compiler_core.enums.TokenType;
@@ -236,5 +237,31 @@ public class MethodNode extends AstNode {
 			}
 		}
 		return true;
+	}
+	
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		int[] typeIds = null;
+		if(!parameters.isEmpty()) {
+			typeIds = new int[parameters.size()];
+			for(int i=0; i<parameters.size(); i++) {
+				typeIds[i] = parameters.get(i).getType().getId();
+			}
+		}
+		
+		if(null == returnType) {
+			cg.enterConstructor(typeIds);
+		}
+		else {
+			cg.enterMethod(returnType.getId(), typeIds);
+		}
+		
+		try {
+			BlockNode body = blocks.get(0);
+			if(null != body) body.codeGen(cg);
+		}
+		finally {
+			cg.leave();
+		}
 	}
 }

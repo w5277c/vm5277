@@ -86,9 +86,8 @@ public class TryNode extends CommandNode {
 						markFirstError(parserError("Expected 'case', 'default' or code block in catch"));
 					}
 				}
+				try {consumeToken(tb, Delimiter.RIGHT_BRACE);}catch(ParseException e) {markFirstError(e);}
 			}
-			
-			try {consumeToken(tb, Delimiter.RIGHT_BRACE);}catch(ParseException e) {markFirstError(e);}
 		}
 		// try может быть без catch
 	}

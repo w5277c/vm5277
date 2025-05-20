@@ -8,6 +8,7 @@ package ru.vm5277.j8b.compiler_core.nodes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
 import ru.vm5277.j8b.compiler.common.exceptions.ParseException;
 import ru.vm5277.j8b.compiler_core.enums.Delimiter;
 import ru.vm5277.j8b.compiler_core.enums.Keyword;
@@ -157,5 +158,12 @@ public class ClassBlockNode extends AstNode {
 		}
 
 		return false;
+	}
+
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		for(AstNode decl : declarations) {
+			decl.codeGen(cg);
+		}
 	}
 }

@@ -6,6 +6,7 @@
 package ru.vm5277.j8b.compiler_core.nodes;
 
 import java.util.Set;
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
 import ru.vm5277.j8b.compiler_core.enums.Delimiter;
 import ru.vm5277.j8b.compiler_core.enums.Keyword;
 import ru.vm5277.j8b.compiler.common.enums.Operator;
@@ -120,5 +121,16 @@ public class VarNode extends AstNode {
 		catch (SemanticException e) {markError(e);}
 		
 		return true;
+	}
+	
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		cg.enterFiled(type.getId(), name);
+		try {
+			initializer.codeGen(cg);
+		}
+		finally {
+			cg.leave();
+		}
 	}
 }

@@ -11,22 +11,32 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.Map;
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
+import ru.vm5277.j8b.compiler_core.codegen.PlatformLoader;
 import ru.vm5277.j8b.compiler_core.messages.MessageContainer;
+import ru.vm5277.j8b.compiler_core.nodes.ClassNode;
 
 public class Main {
-    public	final	static	String	VERSION	= "0.0.17";
+    public	final	static	String	VERSION	= "0.0.18";
 	
-	public static void main(String[] args) throws IOException {
+	public static void main(String[] args) throws IOException, Exception {
 		MessageContainer mc = new MessageContainer(8, true, false);
 		String runtimePath = args[0];
 		File inputFile = new File(args[1]);
 		String basePath = inputFile.getParent();
 		
+		CodeGenerator cg = PlatformLoader.loadGenerator("avr", null);
+		
 		try (InputStreamReader isr = new InputStreamReader(new FileInputStream(inputFile))) {
 			Lexer lexer = new Lexer(isr, mc);
 			ASTParser parser = new ASTParser(basePath, lexer.getTokens(), mc);
+			ClassNode clazz = parser.getClazz();
 			new ASTPrinter(parser.getClazz());
 			new SemanticAnalyzer(runtimePath, parser.getClazz());
+			
+			if(!mc.hasErrors()) {
+				clazz.codeGen(cg);
+			}
 		}
 		catch(Exception ex) {
 			ex.printStackTrace();

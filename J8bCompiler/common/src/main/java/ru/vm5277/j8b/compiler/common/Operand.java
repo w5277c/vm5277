@@ -5,6 +5,34 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.common;
 
-public interface Operand {
+import ru.vm5277.j8b.compiler.common.enums.OperandType;
+
+public class Operand {
+	private	int			typeId;
+	private	OperandType	opType;
+	private	Object		value;
+	
+	public Operand(int typeId, OperandType opType, Object value) {
+		this.typeId = typeId;
+		this.opType = opType;
+		this.value = value;
+	}
+	
+	public int getTypeId() {
+		return typeId;
+	}
+	
+	public OperandType getOperandType() {
+		return opType;
+	}	
+	
+	public Object getValue() {
+		return value;
+	}
+	
+	@Override
+	public String toString() {
+		return opType + ":" + typeId + "=" + value;
+	}
 	
 }

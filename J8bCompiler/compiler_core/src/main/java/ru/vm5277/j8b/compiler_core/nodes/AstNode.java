@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
 import ru.vm5277.j8b.compiler.common.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.common.SourcePosition;
 import ru.vm5277.j8b.compiler_core.nodes.commands.IfNode;
@@ -435,5 +436,9 @@ public abstract class AstNode extends SemanticAnalyzer {
 	
 	public MessageContainer getMessageContainer() {
 		return mc;
+	}
+	
+	public void codeGen(CodeGenerator cg) {
+		throw new UnsupportedOperationException();
 	}
 }

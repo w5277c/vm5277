@@ -8,6 +8,7 @@ package ru.vm5277.j8b.compiler_core.nodes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
 import ru.vm5277.j8b.compiler_core.enums.Delimiter;
 import ru.vm5277.j8b.compiler_core.enums.Keyword;
 import ru.vm5277.j8b.compiler_core.enums.TokenType;
@@ -181,5 +182,17 @@ public class InterfaceBodyNode extends AstNode {
 		}
 
 		return true;
+	}
+	
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		for(AstNode decl : declarations) {
+			if(decl instanceof MethodNode && ((MethodNode)decl).isStatic()) {
+				decl.codeGen(cg);
+			}
+			else if(decl instanceof FieldNode && ((FieldNode)decl).isStatic()) {
+				decl.codeGen(cg);
+			}
+		}
 	}
 }

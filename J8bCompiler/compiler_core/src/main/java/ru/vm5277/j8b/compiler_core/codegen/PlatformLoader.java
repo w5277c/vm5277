@@ -10,9 +10,10 @@ import java.lang.reflect.Constructor;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Map;
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
 
 public class PlatformLoader {
-	private	static	final	String	LIB_PREFIX		= "codegen-";
+	private	static	final	String	LIB_PREFIX		= "codegen_";
 	private	static	final	String	LIB_DIR			= "lib/";
 	private	static	final	String	LIB_CLASSPATH	= "ru.vm5277.j8b.compiler.codegen.";
 	private	static	final	String	LIB_CLASSNAME	= ".Generator";

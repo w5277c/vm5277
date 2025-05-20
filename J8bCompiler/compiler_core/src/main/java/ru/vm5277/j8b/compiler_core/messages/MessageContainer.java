@@ -73,4 +73,13 @@ public class MessageContainer {
 		}
 		return result;
 	}
+
+	public boolean hasErrors() {
+		for(Message message : messages) {
+			if(message instanceof ErrorMessage) {
+				return true;
+			}
+		}
+		return false;
+	}
 }

@@ -5,6 +5,9 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler_core.nodes.expressions;
 
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
+import ru.vm5277.j8b.compiler.common.Operand;
+import ru.vm5277.j8b.compiler.common.enums.OperandType;
 import ru.vm5277.j8b.compiler.common.enums.VarType;
 import ru.vm5277.j8b.compiler.common.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler_core.messages.MessageContainer;
@@ -89,5 +92,10 @@ public class LiteralExpression extends ExpressionNode {
 			markError(e.getMessage());
 			return false;
 		}
+	}
+	
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		cg.setAcc(new Operand(getType(null).getId(), OperandType.LITERAL, value));
 	}
 }

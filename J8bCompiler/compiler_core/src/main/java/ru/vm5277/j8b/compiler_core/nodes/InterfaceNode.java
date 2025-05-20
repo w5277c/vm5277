@@ -8,6 +8,9 @@ package ru.vm5277.j8b.compiler_core.nodes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
+import ru.vm5277.j8b.compiler.common.Operand;
+import ru.vm5277.j8b.compiler.common.enums.OperandType;
 import ru.vm5277.j8b.compiler.common.exceptions.ParseException;
 import ru.vm5277.j8b.compiler_core.enums.Delimiter;
 import ru.vm5277.j8b.compiler_core.enums.Keyword;
@@ -155,6 +158,25 @@ public class InterfaceNode extends AstNode {
 		}
 
 		return true;
+	}
+	
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		int[] interfaceIds = null;
+		if(!interfaces.isEmpty()) {
+			interfaceIds = new int[interfaces.size()];
+			for(int i=0; i<interfaces.size(); i++) {
+				interfaceIds[i] = VarType.fromClassName(interfaces.get(i)).getId();
+			}
+		}
+			
+		cg.enterClass(VarType.fromClassName(name).getId(), interfaceIds);
+		try {
+			blockNode.codeGen(cg);
+		}
+		finally {
+			cg.leave();
+		}
 	}
 }
 
