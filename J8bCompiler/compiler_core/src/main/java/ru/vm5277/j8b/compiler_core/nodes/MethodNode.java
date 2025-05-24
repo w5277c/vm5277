@@ -30,6 +30,7 @@ public class MethodNode extends AstNode {
 	private	final	String				name;
 	private			List<ParameterNode>	parameters;
 	private			MethodScope			methodScope; // Добавляем поле для хранения области видимости
+	private			MethodSymbol		methodSymbol;
 	private			boolean				canThrow	= false;
 	
 	public MethodNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType returnType, String name) throws ParseException {
@@ -174,8 +175,8 @@ public class MethodNode extends AstNode {
 		// Создаем MethodSymbol
 		try {
 			methodScope = new MethodScope(null, classScope);
-			MethodSymbol methodSymbol = new MethodSymbol(	name, returnType, paramSymbols, modifiers.contains(Keyword.FINAL),
-															modifiers.contains(Keyword.STATIC),	canThrow, methodScope);
+			methodSymbol = new MethodSymbol(	name, returnType, paramSymbols, modifiers.contains(Keyword.FINAL),
+												modifiers.contains(Keyword.STATIC),	canThrow, methodScope);
 			// Устанавливаем обратную ссылку
 			methodScope.setSymbol(methodSymbol);
 
@@ -250,10 +251,10 @@ public class MethodNode extends AstNode {
 		}
 		
 		if(null == returnType) {
-			cg.enterConstructor(typeIds);
+			methodSymbol.setRuntimeId(cg.enterConstructor(typeIds));
 		}
 		else {
-			cg.enterMethod(returnType.getId(), typeIds);
+			methodSymbol.setRuntimeId(cg.enterMethod(returnType.getId(), typeIds));
 		}
 		
 		try {

@@ -5,6 +5,8 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler_core.nodes.commands;
 
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
+import ru.vm5277.j8b.compiler.common.Operand;
 import ru.vm5277.j8b.compiler_core.nodes.BlockNode;
 import ru.vm5277.j8b.compiler_core.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler_core.nodes.expressions.ExpressionNode;
@@ -16,6 +18,7 @@ import ru.vm5277.j8b.compiler.common.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.common.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler_core.messages.MessageContainer;
 import ru.vm5277.j8b.compiler_core.nodes.expressions.InstanceOfExpression;
+import ru.vm5277.j8b.compiler_core.nodes.expressions.LiteralExpression;
 import ru.vm5277.j8b.compiler_core.semantic.BlockScope;
 import ru.vm5277.j8b.compiler_core.semantic.Scope;
 import ru.vm5277.j8b.compiler_core.semantic.Symbol;
@@ -25,6 +28,8 @@ public class IfNode extends CommandNode {
 	private	BlockScope		thenScope;
 	private	BlockScope		elseScope;
 	private	String			varName;
+	private	boolean			alwaysTrue;
+	private	boolean			alwaysFalse;
 	
 	public IfNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
@@ -87,7 +92,15 @@ public class IfNode extends CommandNode {
 	public String getVarName() {
 		return varName;
 	}
-	
+
+
+	public boolean alwaysTrue() {
+		return alwaysTrue;
+	}
+	public boolean alwaysFalse() {
+		return alwaysFalse;
+	}
+
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
@@ -189,6 +202,59 @@ public class IfNode extends CommandNode {
             markWarning("Code after if statement may be unreachable");
         }
 		
+		try {
+			condition = condition.optimizeWithScope(scope);
+			if(condition instanceof LiteralExpression) {
+				LiteralExpression le = (LiteralExpression)condition;
+				if(VarType.BOOL == le.getType(scope)) {
+					if((boolean)le.getValue()) {
+						alwaysTrue = true;
+					}
+					else {
+						alwaysFalse = true;
+					}
+				}
+			}
+		}
+		catch (ParseException e) {
+			markFirstError(e);
+		}
+		
 		return true;
+	}
+	
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		if(alwaysTrue) {
+			cg.enterBlock();
+			getThenBlock().codeGen(cg);
+			cg.leave();
+			return;
+		}
+		if(alwaysFalse()) {
+			if (getElseBlock() != null) {
+				cg.enterBlock();
+				getElseBlock().codeGen(cg);
+				cg.leave();
+			}
+			return;
+		}
+		
+		int condBlockid = cg.enterBlock();
+		condition.codeGen(cg);
+		cg.leave();
+		
+		int thenBlockid = cg.enterBlock();
+		getThenBlock().codeGen(cg);
+		cg.leave();
+
+		Integer elseBlockId = null;
+		if(null != getElseBlock()) {
+			elseBlockId = cg.enterBlock();
+			getElseBlock().codeGen(cg);
+			cg.leave();
+		}
+		
+		cg.eIf(condBlockid, thenBlockid, elseBlockId);
 	}
 }

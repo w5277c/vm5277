@@ -10,5 +10,6 @@ package ru.vm5277.j8b.compiler.common.enums;
  */
 public enum OperandType {
 	LITERAL,
-	VARIABLE;
+	VARIABLE,
+	TYPE;
 }

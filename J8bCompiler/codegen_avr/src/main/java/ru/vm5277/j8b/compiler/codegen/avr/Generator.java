@@ -10,9 +10,10 @@ import java.util.Arrays;
 import java.util.Map;
 import ru.vm5277.j8b.compiler.common.CodeGenerator;
 import ru.vm5277.j8b.compiler.common.Operand;
-import ru.vm5277.j8b.compiler.common.enums.Operator;
+import ru.vm5277.j8b.compiler.common.enums.OperandType;
+import ru.vm5277.j8b.compiler.common.enums.VarType;
 
-public class Generator implements CodeGenerator {
+public class Generator extends CodeGenerator {
 	private	Operand acc;
 	
 	public Generator(Map<String, String> params) {
@@ -20,28 +21,45 @@ public class Generator implements CodeGenerator {
 	
 	
 	@Override
-	public void enterClass(int typeId, int[] intrerfaceIds) {
+	public int enterClass(int typeId, int[] intrerfaceIds) {
+		int id = genId();
 		System.out.println("CG:enterClass, typeId:" + typeId + ", interfaces id:" + Arrays.toString(intrerfaceIds));
+		return id;
 	}
 
 	@Override
-	public void enterFiled(int typeId, String name) {
-		System.out.println("CG:enterField, typeId:" + typeId + ", name:" + name);
+	public int enterFiled(int typeId, String name) {
+		int id = genId();
+		System.out.println("CG:enterField, id:" + id + ", typeId:" + typeId + ", name:" + name);
+		return id;
 	}
 
 	@Override
-	public void enterConstructor(int[] typeIds) {
-		System.out.println("CG:enterConstructor, parameters:" + Arrays.toString(typeIds));
+	public int enterConstructor(int[] typeIds) {
+		int id = genId();
+		System.out.println("CG:enterConstructor, id:" + id + ", parameters:" + Arrays.toString(typeIds));
+		return id;
 	}
 
 	@Override
-	public void enterMethod(int typeId, int[] typeIds) {
-		System.out.println("CG:enterMehod, typeId:" + typeId + ", parameters:" + Arrays.toString(typeIds));
+	public int enterMethod(int typeId, int[] typeIds) {
+		int id = genId();
+		System.out.println("CG:enterMehod, id:" + id + ", typeId:" + typeId + ", parameters:" + Arrays.toString(typeIds));
+		return id;
 	}
 
 	@Override
-	public void enterLocal(int typeId, String name) {
-		System.out.println("CG:enterLocal, typeId:" + typeId + ", name:" + name);
+	public int enterLocal(int typeId, String name) {
+		int id = genId();
+		System.out.println("CG:enterLocal, id:" + id + ", typeId:" + typeId + ", name:" + name);
+		return id;
+	}
+
+	@Override
+	public int enterBlock() {
+		int id = genId();
+		System.out.println("CG:enterBlock, id:" + id);
+		return id;
 	}
 
 	@Override
@@ -71,11 +89,28 @@ public class Generator implements CodeGenerator {
 	}
 
 	@Override
-	public void loadAcc(Operand src) {
-		System.out.println("CG:loadAcc, src:" + src);
+	public void loadAcc(int id) { //Загружаем значение переменной в acc
+		System.out.println("CG:loadAcc, srcId:" + id);
 	}
 	@Override
-	public void storeAcc(Operand dst) {
-		System.out.println("CG:storeAcc, src:" + dst);
+	public void storeAcc(int id) { //Записываем acc в переменную
+		System.out.println("CG:storeAcc, dstId:" + id);
+		
+	}
+
+	@Override
+	public void invokeMethod(int id, Operand[] args) {
+		System.out.println("CG:invokeMethod, id:" + id + ", args:" + Arrays.toString(args));
+	}
+
+	@Override
+	public Operand emitInstanceof(Operand op, int typeId) {
+		System.out.println("CG:emitInstanceOf, op:" + op + ", typeId:" + typeId);
+		return new Operand(VarType.BOOL.getId(), OperandType.LITERAL, true);
+	}
+
+	@Override
+	public void eIf(int conditionBlockId, int thenBlockId, Integer elseBlockId) {
+		throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
 	}
 }

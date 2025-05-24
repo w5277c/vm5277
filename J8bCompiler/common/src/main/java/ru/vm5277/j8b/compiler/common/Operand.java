@@ -8,18 +8,24 @@ package ru.vm5277.j8b.compiler.common;
 import ru.vm5277.j8b.compiler.common.enums.OperandType;
 
 public class Operand {
-	private	int			typeId;
+	private	int			Id;
 	private	OperandType	opType;
 	private	Object		value;
 	
 	public Operand(int typeId, OperandType opType, Object value) {
-		this.typeId = typeId;
+		this.Id = typeId;
 		this.opType = opType;
 		this.value = value;
 	}
 	
-	public int getTypeId() {
-		return typeId;
+	public Operand(int Id, OperandType opType) {
+		this.Id = Id;
+		this.opType = opType;
+		this.value = null;
+	}
+
+	public int getId() {
+		return Id;
 	}
 	
 	public OperandType getOperandType() {
@@ -32,7 +38,7 @@ public class Operand {
 	
 	@Override
 	public String toString() {
-		return opType + ":" + typeId + "=" + value;
+		return opType + "[id:" + Id + "]" + (null == value ? "" : "=" + value);
 	}
 	
 }

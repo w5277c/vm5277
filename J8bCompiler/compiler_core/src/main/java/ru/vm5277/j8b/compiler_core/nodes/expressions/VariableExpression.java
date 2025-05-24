@@ -6,8 +6,6 @@
 package ru.vm5277.j8b.compiler_core.nodes.expressions;
 
 import ru.vm5277.j8b.compiler.common.CodeGenerator;
-import ru.vm5277.j8b.compiler.common.Operand;
-import ru.vm5277.j8b.compiler.common.enums.OperandType;
 import ru.vm5277.j8b.compiler.common.enums.VarType;
 import ru.vm5277.j8b.compiler.common.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler_core.messages.MessageContainer;
@@ -18,7 +16,7 @@ import ru.vm5277.j8b.compiler_core.semantic.Symbol;
 
 public class VariableExpression extends ExpressionNode {
     private final	String	value;
-    private			Symbol	resolvedSymbol;
+    private			Symbol	symbol;
 	
     public VariableExpression(TokenBuffer tb, MessageContainer mc, String value) {
         super(tb, mc);
@@ -31,17 +29,17 @@ public class VariableExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public VarType getType(Scope scope) throws SemanticException {
-		if (resolvedSymbol == null) {
-            resolvedSymbol = scope.resolve(value);
-			if(null == resolvedSymbol) {
+	public VarType getType(Scope scope) {
+		if (symbol == null) {
+            symbol = scope.resolve(value);
+			if(null == symbol) {
 				ClassScope classScope = scope.resolveClass(value);
 				if(null != classScope) {
-					resolvedSymbol = new Symbol(value, VarType.CLASS, false, false);
+					symbol = new Symbol(value, VarType.CLASS, false, false);
 				}
 			}
         }
-        return resolvedSymbol.getType();
+        return symbol.getType();
 	}
 	
 	@Override
@@ -60,16 +58,16 @@ public class VariableExpression extends ExpressionNode {
 
 	@Override
 	public boolean postAnalyze(Scope scope) {
-		if (resolvedSymbol == null) {
-            resolvedSymbol = scope.resolve(value);
-			if(null == resolvedSymbol) {
+		if (symbol == null) {
+            symbol = scope.resolve(value);
+			if(null == symbol) {
 				ClassScope classScope = scope.resolveClass(value);
 				if(null != classScope) {
-					resolvedSymbol = new Symbol(value, VarType.fromClassName(value), false, false);
+					symbol = new Symbol(value, VarType.fromClassName(value), false, false);
 				}
 			}
         }
-		if (null == resolvedSymbol) {
+		if (null == symbol) {
 			markError("Variable '" + value + "' is not declared");
 			return false;
 		}
@@ -78,6 +76,10 @@ public class VariableExpression extends ExpressionNode {
 	
 	@Override
 	public void codeGen(CodeGenerator cg) {
-		cg.loadAcc(new Operand(resolvedSymbol.getType().getId(), OperandType.VARIABLE, resolvedSymbol.getName()));
+		cg.loadAcc(symbol.getRuntimeId());
+	}
+	
+	public Symbol getSymbol() {
+		return symbol;
 	}
 }

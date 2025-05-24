@@ -9,7 +9,6 @@ import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.j8b.compiler.common.CodeGenerator;
 import ru.vm5277.j8b.compiler.common.Operand;
-import ru.vm5277.j8b.compiler.common.enums.OperandType;
 import ru.vm5277.j8b.compiler.common.enums.VarType;
 import ru.vm5277.j8b.compiler.common.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler_core.messages.MessageContainer;

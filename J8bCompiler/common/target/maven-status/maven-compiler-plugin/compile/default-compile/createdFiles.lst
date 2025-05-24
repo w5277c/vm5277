@@ -1,3 +1,4 @@
+ru/vm5277/j8b/compiler/common/enums/OperandType.class
 ru/vm5277/j8b/compiler/common/exceptions/CriticalParseException.class
 ru/vm5277/j8b/compiler/common/Operand.class
 ru/vm5277/j8b/compiler/common/CodeGenerator.class
@@ -11,6 +12,7 @@ ru/vm5277/j8b/compiler/common/messages/Message.class
 ru/vm5277/j8b/compiler/common/enums/VarType.class
 ru/vm5277/j8b/compiler/common/messages/InfoMessage.class
 ru/vm5277/j8b/compiler/common/exceptions/MessageContainerIsFullException.class
+ru/vm5277/j8b/compiler/common/Param.class
 ru/vm5277/j8b/compiler/common/messages/WarningMessage.class
 ru/vm5277/j8b/compiler/common/exceptions/CompilationAbortedException.class
 ru/vm5277/j8b/compiler/common/exceptions/ParseException.class

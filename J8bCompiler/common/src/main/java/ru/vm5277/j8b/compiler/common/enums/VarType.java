@@ -172,7 +172,7 @@ public class VarType {
 	public Integer getArraySize() {
 		return arraySize;
 	}
-	
+
 	@Override
 	public String toString() {
 		return isArray ? getElementType() + "[]" : getName();

@@ -5,7 +5,6 @@
 /media/kostas/repos/w5277c/vm5277_local/J8bCompiler/compiler_core/src/main/java/ru/vm5277/j8b/compiler_core/Main.java
 /media/kostas/repos/w5277c/vm5277_local/J8bCompiler/compiler_core/src/main/java/ru/vm5277/j8b/compiler_core/SemanticAnalyzer.java
 /media/kostas/repos/w5277c/vm5277_local/J8bCompiler/compiler_core/src/main/java/ru/vm5277/j8b/compiler_core/SourceBuffer.java
-/media/kostas/repos/w5277c/vm5277_local/J8bCompiler/compiler_core/src/main/java/ru/vm5277/j8b/compiler_core/codegen/CodeGenerator.java
 /media/kostas/repos/w5277c/vm5277_local/J8bCompiler/compiler_core/src/main/java/ru/vm5277/j8b/compiler_core/codegen/PlatformLoader.java
 /media/kostas/repos/w5277c/vm5277_local/J8bCompiler/compiler_core/src/main/java/ru/vm5277/j8b/compiler_core/enums/Delimiter.java
 /media/kostas/repos/w5277c/vm5277_local/J8bCompiler/compiler_core/src/main/java/ru/vm5277/j8b/compiler_core/enums/Keyword.java

@@ -5,15 +5,18 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler_core.semantic;
 
+import ru.vm5277.j8b.compiler.common.Operand;
 import ru.vm5277.j8b.compiler.common.enums.VarType;
 
 public class Symbol {
-	protected	String	name;
-	protected	VarType	type;
-	protected	boolean	isStatic;
-	protected	boolean	isFinal;
-	protected	boolean	isNative;
-
+	protected			String	name;
+	protected			VarType	type;
+	protected			boolean	isStatic;
+	protected			boolean	isFinal;
+	protected			boolean	isNative;
+	protected			int		runtimeId;
+	protected			Operand	constOp;
+	
 	protected Symbol(String name) {
 		this.name = name;
 	}
@@ -55,5 +58,19 @@ public class Symbol {
 	
 	public boolean isStatic() {
 		return isStatic;
+	}
+	
+	public void setRuntimeId(int runtimeId) {
+		this.runtimeId = runtimeId;
+	}
+	public int getRuntimeId() {
+		return runtimeId;
+	}
+
+	public void setConstantOperand(Operand op) {
+		this.constOp = op;
+	}
+	public Operand getConstantOperand() {
+		return constOp;
 	}
 }

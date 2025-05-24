@@ -5,22 +5,33 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler.common;
 
-public interface CodeGenerator {
-	public void enterClass(int typeId, int[] intrerfaceIds);	//тип 
-	public void enterFiled(int typeId, String name);
-	public void enterConstructor(int[] typeIds);
-	public void enterMethod(int typeId, int[] typeIds);
-	public void enterLocal(int typeId, String name); //TODO сделать индексацию вместо имен
-	public void leave();
+public abstract class CodeGenerator {
+	private	int	idCntr	= 0;
+	
+	public int genId() {
+		return idCntr++;
+	}
+	
+	public abstract int enterClass(int typeId, int[] intrerfaceIds);	//тип 
+	public abstract int enterFiled(int typeId, String name);
+	public abstract int enterConstructor(int[] typeIds);
+	public abstract int enterMethod(int typeId, int[] typeIds);
+	public abstract int enterLocal(int typeId, String name); //TODO сделать индексацию вместо имен
+	public abstract int enterBlock();
+	public abstract void leave();
 	
 	
-	void setAcc(Operand src);
-	Operand getAcc();
-	void loadAcc(Operand src);
-	void storeAcc(Operand dst);
+	public abstract void setAcc(Operand src);
+	public abstract Operand getAcc();
+	public abstract void loadAcc(int srcId); //Загрузить переменную в аккумулятор
+	public abstract void storeAcc(int srcId); //Записать аккумулятор в переменную
+	
+	public abstract void invokeMethod(int id, Operand[] args);
+	public abstract Operand emitInstanceof(Operand op, int typeId);	//todo может быть поросто boolean?
 	
 	//TODO набор методов для реализации команд if, switch, for, loop и .т.д
-	public void eNew(int typeId, Operand[] parameters, boolean canThrow);
-	public void eFree(Operand op);
-
+	public abstract void eNew(int typeId, Operand[] parameters, boolean canThrow);
+	public abstract void eFree(Operand op);
+	
+	public abstract void eIf(int conditionBlockId, int thenBlockId, Integer elseBlockId);
 }

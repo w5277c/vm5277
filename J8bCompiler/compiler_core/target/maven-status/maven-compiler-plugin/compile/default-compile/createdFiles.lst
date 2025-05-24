@@ -25,7 +25,6 @@ ru/vm5277/j8b/compiler_core/nodes/commands/TryNode.class
 ru/vm5277/j8b/compiler_core/nodes/AstNode.class
 ru/vm5277/j8b/compiler_core/enums/Keyword.class
 ru/vm5277/j8b/compiler_core/tokens/TNote.class
-ru/vm5277/j8b/compiler_core/codegen/CodeGenerator.class
 ru/vm5277/j8b/compiler_core/nodes/commands/SwitchNode.class
 ru/vm5277/j8b/compiler_core/FileImporter.class
 ru/vm5277/j8b/compiler_core/enums/ReturnStatus.class

@@ -8,6 +8,8 @@ package ru.vm5277.j8b.compiler_core.nodes;
 import ru.vm5277.j8b.compiler_core.nodes.expressions.ExpressionNode;
 import java.util.Set;
 import ru.vm5277.j8b.compiler.common.CodeGenerator;
+import ru.vm5277.j8b.compiler.common.Operand;
+import ru.vm5277.j8b.compiler.common.enums.OperandType;
 import ru.vm5277.j8b.compiler_core.enums.Delimiter;
 import ru.vm5277.j8b.compiler_core.enums.Keyword;
 import ru.vm5277.j8b.compiler.common.enums.Operator;
@@ -16,6 +18,8 @@ import ru.vm5277.j8b.compiler.common.exceptions.ParseException;
 import ru.vm5277.j8b.compiler.common.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler_core.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.common.messages.WarningMessage;
+import ru.vm5277.j8b.compiler_core.nodes.expressions.LiteralExpression;
+import ru.vm5277.j8b.compiler_core.nodes.expressions.VariableExpression;
 import ru.vm5277.j8b.compiler_core.semantic.ClassScope;
 import ru.vm5277.j8b.compiler_core.semantic.Scope;
 import ru.vm5277.j8b.compiler_core.semantic.Symbol;
@@ -25,7 +29,8 @@ public class FieldNode extends AstNode {
 	private			VarType			type;
 	private			String			name;
 	private			ExpressionNode	initializer;
-
+	private			Symbol			symbol;
+	
 	public FieldNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType  type, String name) {
 		super(tb, mc);
 
@@ -98,8 +103,20 @@ public class FieldNode extends AstNode {
 	public boolean declare(Scope scope) {
 		if(scope instanceof ClassScope) {
 			ClassScope classScope = (ClassScope)scope;
-
-			try{classScope.addField(new Symbol(name, type, modifiers.contains(Keyword.FINAL), modifiers.contains(Keyword.STATIC)));}
+			boolean isFinal = modifiers.contains(Keyword.FINAL);
+			symbol = new Symbol(name, type, isFinal, modifiers.contains(Keyword.STATIC));
+			if(isFinal && null != initializer) {
+				if(initializer instanceof LiteralExpression) {
+					LiteralExpression le = (LiteralExpression)initializer;
+					symbol.setConstantOperand(new Operand(le.getType(scope).getId(), OperandType.LITERAL, le.getValue()));
+				}
+				else if(initializer instanceof VariableExpression) {
+					VariableExpression ve = (VariableExpression)initializer;
+					symbol.setConstantOperand(new Operand(ve.getType(scope).getId(), OperandType.TYPE, ve.getValue()));
+				}
+			}
+			
+			try{classScope.addField(symbol);}
 			catch(SemanticException e) {markError(e);}
 		}
 		else markError("Unexpected scope:" + scope.getClass().getSimpleName() + " in filed:" + name);
@@ -133,7 +150,7 @@ public class FieldNode extends AstNode {
 	
 	@Override
 	public void codeGen(CodeGenerator cg) {
-		cg.enterFiled(type.getId(), name);
+		symbol.setRuntimeId(cg.enterFiled(type.getId(), name));
 		try {
 			initializer.codeGen(cg);
 		}

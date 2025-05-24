@@ -14,7 +14,7 @@ public class MethodSymbol extends Symbol {
 	private			boolean			canThrow;
 	private			String			signature;
 	private	final	MethodScope		scope;
-
+	
 	public MethodSymbol(String name, VarType returnType, List<Symbol> parameters, boolean isFinal, boolean isStatic, boolean canThrow, MethodScope scope) {
 		super(name, returnType, isFinal, isStatic);
 		

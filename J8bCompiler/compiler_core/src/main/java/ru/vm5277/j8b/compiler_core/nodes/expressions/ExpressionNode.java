@@ -7,6 +7,8 @@ package ru.vm5277.j8b.compiler_core.nodes.expressions;
 
 import java.util.ArrayList;
 import java.util.List;
+import ru.vm5277.j8b.compiler.common.Operand;
+import ru.vm5277.j8b.compiler.common.enums.OperandType;
 import ru.vm5277.j8b.compiler_core.enums.Delimiter;
 import ru.vm5277.j8b.compiler_core.enums.Keyword;
 import ru.vm5277.j8b.compiler.common.enums.Operator;
@@ -20,6 +22,7 @@ import ru.vm5277.j8b.compiler_core.messages.MessageContainer;
 import ru.vm5277.j8b.compiler_core.nodes.AstNode;
 import ru.vm5277.j8b.compiler_core.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler_core.semantic.Scope;
+import ru.vm5277.j8b.compiler_core.semantic.Symbol;
 import ru.vm5277.j8b.compiler_core.tokens.Token;
 
 public class ExpressionNode extends AstNode {
@@ -31,6 +34,10 @@ public class ExpressionNode extends AstNode {
         return parseAssignment();
     }
    
+	public ExpressionNode optimizeWithScope() throws ParseException {
+		return this;
+	};
+	
 	private ExpressionNode parseAssignment() throws ParseException{
 		ExpressionNode left = parseBinary(0);
 
@@ -70,12 +77,16 @@ public class ExpressionNode extends AstNode {
 			}
 
 			if (operator == Operator.IS) {
+				consumeToken(tb); // Пропускаем 'is'
+
+				// Запрещаем литералы слева
+				if (left instanceof LiteralExpression) throw new ParseException("Literals cannot be used with 'instanceof'", left.getSP());
+
 				if (minPrecedence > Operator.PRECEDENCE.get(operator)) {
 					break;
 				}
-				consumeToken(tb); // Пропускаем 'is'
 				ExpressionNode typeExpr = parseTypeReference(); // Разбираем выражение типа
-				return new InstanceOfExpression(tb, mc, left, typeExpr);
+				return optimizeExpression(new InstanceOfExpression(tb, mc, left, typeExpr));
 			}
 			
 			Integer precedence = Operator.PRECEDENCE.get(operator);
@@ -244,6 +255,16 @@ public class ExpressionNode extends AstNode {
 	}
 
 	private ExpressionNode optimizeExpression(ExpressionNode node) throws ParseException {
+		if (node instanceof InstanceOfExpression) {
+			InstanceOfExpression ioe = (InstanceOfExpression)node;
+
+			// Проверка Object справа (все объекты - экземпляры Object)
+			if (ioe.getRightType() != null && ioe.getRightType().isClassType() && "Object".equals(ioe.getRightType().getClassName()))
+				return new LiteralExpression(tb, mc, true);
+			
+			return ioe;
+		}
+		
 		// Оптимизация унарных операций
 		if (node instanceof UnaryExpression) {
 			UnaryExpression ue = (UnaryExpression)node;
@@ -260,6 +281,69 @@ public class ExpressionNode extends AstNode {
 
 		return node;
 	}
+	
+	
+	// Оптимизация выражения с использованием Scope (поздний этап).
+	public ExpressionNode optimizeWithScope(Scope scope) throws ParseException {
+		// Заменяем переменные на их значения из Scope (если они final и известны)
+		if (this instanceof VariableExpression) {
+			VariableExpression varExpr = (VariableExpression) this;
+			Symbol symbol = scope.resolve(varExpr.getValue());
+			if (null != symbol && symbol.isFinal()) {
+				if(null != symbol.getConstantOperand() && OperandType.LITERAL == symbol.getConstantOperand().getOperandType()) {
+					return new LiteralExpression(tb, mc, symbol.getConstantOperand().getValue());
+				}
+			}
+		}
+		
+		if (this instanceof InstanceOfExpression) {
+			InstanceOfExpression ioe = (InstanceOfExpression)this;
+
+			// Оптимизация через флаг из postAnalyze
+			if (ioe.isFulfillsContract()) return new LiteralExpression(tb, mc, true);
+
+			// Оптимизация для final переменных с известными типами
+			if (ioe.getLeft() instanceof VariableExpression) {
+				VariableExpression varExpr = (VariableExpression)ioe.getLeft();
+				Symbol symbol = varExpr.getSymbol();
+				if (null != symbol && symbol.isFinal() && ioe.getLeftType() != null && ioe.getRightType() != null) {
+					VarType leftType = ioe.getLeftType();
+					Operand op = symbol.getConstantOperand();
+					if(null != op && OperandType.TYPE == op.getOperandType()) {
+						symbol = scope.resolve((String)op.getValue());
+						if(null != symbol) leftType = symbol.getType();
+					}
+					// Точное совпадение типов
+					if (leftType == ioe.getRightType()) return new LiteralExpression(tb, mc, true);
+
+					// Массивы одинаковой размерности
+					if (leftType.isArray() && ioe.getRightType().isArray()) {
+						// Совпадает размерность?
+						if (leftType.getArrayDepth() != ioe.getRightType().getArrayDepth())  return new LiteralExpression(tb, mc, false);
+
+						// Object[] совместим с любым массивом
+						if ("Object".equals(ioe.getRightType().getClassName())) return new LiteralExpression(tb, mc, true);
+
+						// Проверка типа элементов
+						if (leftType.getClassName().equals(ioe.getRightType().getClassName())) return new LiteralExpression(tb, mc, true);
+						
+						// Все остальные случаи -> false
+						return new LiteralExpression(tb, mc, false);
+					}
+				}
+			}
+			return ioe;
+		}
+
+		if (this instanceof BinaryExpression) {
+			BinaryExpression bin = (BinaryExpression) this;
+			ExpressionNode left = bin.getLeft().optimizeWithScope(scope);
+			ExpressionNode right = bin.getRight().optimizeWithScope(scope);
+			return optimizeOperationChain(left, bin.getOperator(), right, 0);
+		}
+		return this;
+	}
+
 	private ExpressionNode optimizeMultiplicativeChain(ExpressionNode left, Operator op, ExpressionNode right) {
 		if (left instanceof LiteralExpression && right instanceof LiteralExpression) {
 			Object leftVal = ((LiteralExpression)left).getValue();

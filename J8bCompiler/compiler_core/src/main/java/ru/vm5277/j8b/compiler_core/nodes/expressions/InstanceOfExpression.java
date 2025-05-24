@@ -5,20 +5,27 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler_core.nodes.expressions;
 
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
+import ru.vm5277.j8b.compiler.common.Operand;
 import ru.vm5277.j8b.compiler.common.enums.VarType;
 import ru.vm5277.j8b.compiler.common.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler_core.messages.MessageContainer;
 import ru.vm5277.j8b.compiler_core.nodes.TokenBuffer;
+import ru.vm5277.j8b.compiler_core.semantic.ClassScope;
+import ru.vm5277.j8b.compiler_core.semantic.InterfaceSymbol;
 import ru.vm5277.j8b.compiler_core.semantic.Scope;
 
 public class InstanceOfExpression extends ExpressionNode {
 	private	final	ExpressionNode	left;		// Проверяемое выражение
-	private	final	ExpressionNode	typeExpr;	// Выражение, возвращающее тип
-
+	private	final	ExpressionNode	rightExpr;	// Выражение, возвращающее тип
+	private			VarType			leftType;
+	private			VarType			rightType;
+	private			boolean			fulfillsContract;	//Флаг реализации интерфейса
+	
 	public InstanceOfExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode left, ExpressionNode typeExpr) {
 		super(tb, mc);
 		this.left = left;
-		this.typeExpr = typeExpr;
+		this.rightExpr = typeExpr;
 	}
 
 	@Override
@@ -32,16 +39,16 @@ public class InstanceOfExpression extends ExpressionNode {
 	}
 
 	public ExpressionNode getTypeExpr() {
-		return typeExpr;
+		return rightExpr;
 	}
 
 	@Override
 	public boolean preAnalyze() {
-		if (left == null || typeExpr == null) {
+		if (left == null || rightExpr == null) {
 			markError("Both operands of 'is' must be non-null");
 			return false;
 		}
-		return left.preAnalyze() && typeExpr.preAnalyze();
+		return left.preAnalyze() && rightExpr.preAnalyze();
 	}
 	
 	@Override
@@ -52,23 +59,39 @@ public class InstanceOfExpression extends ExpressionNode {
 			}
 
 			// Анализируем правую часть (тип)
-			if (!typeExpr.postAnalyze(scope)) {
+			if (!rightExpr.postAnalyze(scope)) {
 				return false;
 			}
 
 			// Проверяем, что typeExpr возвращает тип (класс)
-			VarType type = typeExpr.getType(scope);
-			if (!type.isClassType()) {
-				markError("Right-hand side of 'is' must be a class type, got: " + type);
+			rightType = rightExpr.getType(scope);
+			if (!rightType.isClassType()) {
+				markError("Right-hand side of 'is' must be a class type, got: " + rightType);
 				return false;
 			}
 
-			// Предупреждение для примитивов (если left — примитив)
-			VarType leftType = left.getType(scope);
-			if (leftType.isPrimitive()) {
-				markWarning("Primitive type check 'is' is usually constant for " + leftType);
+			leftType = left.getType(scope);
+			if (left instanceof LiteralExpression) {
+				markError("Cannot check type of literals at runtime");
+				return false;
 			}
+			
+			// Проверка реализации интерфейса
+			if (leftType.isClassType()) {
+				if(leftType.getClassName().equals(rightType.getClassName())) {
+					fulfillsContract = true;
+				}
+				else {
+					ClassScope leftClass = scope.resolveClass(leftType.getClassName());
+					InterfaceSymbol rightInterface = scope.resolveInterface(rightType.getClassName());
 
+					
+					if (null != leftClass && null != rightInterface) {
+						fulfillsContract = leftClass.getInterfaces().containsKey(rightInterface.getName());
+					}
+				}
+			}
+			
 			return true;
 		}
 		catch (SemanticException e) {
@@ -77,8 +100,29 @@ public class InstanceOfExpression extends ExpressionNode {
 		}
 	}
 
+	public VarType getLeftType() {
+		return leftType;
+	}
+	
+	public VarType getRightType() {
+		return rightType;
+	}
+
+	public boolean isFulfillsContract() {
+		return fulfillsContract;
+	}
+	
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		left.codeGen(cg);
+		Operand objectOp = cg.getAcc();
+		rightExpr.codeGen(cg);
+		Operand result = cg.emitInstanceof(objectOp, (int)cg.getAcc().getValue());
+		cg.setAcc(result);
+	}
+	
 	@Override
 	public String toString() {
-		return left + " is " + typeExpr;
+		return left + " is " + rightExpr;
 	}
 }

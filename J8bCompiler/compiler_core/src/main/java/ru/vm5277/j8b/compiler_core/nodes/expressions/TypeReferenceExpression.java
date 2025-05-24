@@ -5,6 +5,9 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler_core.nodes.expressions;
 
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
+import ru.vm5277.j8b.compiler.common.Operand;
+import ru.vm5277.j8b.compiler.common.enums.OperandType;
 import ru.vm5277.j8b.compiler.common.enums.VarType;
 import ru.vm5277.j8b.compiler.common.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler_core.messages.MessageContainer;
@@ -13,8 +16,9 @@ import ru.vm5277.j8b.compiler_core.semantic.InterfaceSymbol;
 import ru.vm5277.j8b.compiler_core.semantic.Scope;
 
 public class TypeReferenceExpression extends ExpressionNode {
-	private final String className;
-
+	private final	String	className;
+	private			VarType	varType;
+	
 	public TypeReferenceExpression(TokenBuffer tb, MessageContainer mc, String className) {
 		super(tb, mc);
 		
@@ -50,7 +54,7 @@ public class TypeReferenceExpression extends ExpressionNode {
 	@Override
 	public boolean postAnalyze(Scope scope) {
 		try {
-			getType(scope); // Проверяем существование типа
+			varType = getType(scope); // Проверяем существование типа
 			return true;
 		}
 		catch (SemanticException e) {
@@ -62,5 +66,10 @@ public class TypeReferenceExpression extends ExpressionNode {
 	@Override
 	public String toString() {
 		return "TypeReference: " + className;
+	}
+	
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		cg.setAcc(new Operand(0, OperandType.TYPE, varType.getId()));
 	}
 }

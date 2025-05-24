@@ -1,6 +1,8 @@
 /media/kostas/repos/w5277c/vm5277_local/J8bCompiler/common/src/main/java/ru/vm5277/j8b/compiler/common/CodeGenerator.java
 /media/kostas/repos/w5277c/vm5277_local/J8bCompiler/common/src/main/java/ru/vm5277/j8b/compiler/common/Operand.java
+/media/kostas/repos/w5277c/vm5277_local/J8bCompiler/common/src/main/java/ru/vm5277/j8b/compiler/common/Param.java
 /media/kostas/repos/w5277c/vm5277_local/J8bCompiler/common/src/main/java/ru/vm5277/j8b/compiler/common/SourcePosition.java
+/media/kostas/repos/w5277c/vm5277_local/J8bCompiler/common/src/main/java/ru/vm5277/j8b/compiler/common/enums/OperandType.java
 /media/kostas/repos/w5277c/vm5277_local/J8bCompiler/common/src/main/java/ru/vm5277/j8b/compiler/common/enums/Operator.java
 /media/kostas/repos/w5277c/vm5277_local/J8bCompiler/common/src/main/java/ru/vm5277/j8b/compiler/common/enums/VarType.java
 /media/kostas/repos/w5277c/vm5277_local/J8bCompiler/common/src/main/java/ru/vm5277/j8b/compiler/common/exceptions/CompilationAbortedException.java

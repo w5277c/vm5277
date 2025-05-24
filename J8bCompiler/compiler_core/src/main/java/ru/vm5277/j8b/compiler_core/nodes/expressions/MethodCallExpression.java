@@ -7,6 +7,8 @@ package ru.vm5277.j8b.compiler_core.nodes.expressions;
 
 import java.util.ArrayList;
 import java.util.List;
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
+import ru.vm5277.j8b.compiler.common.Operand;
 import ru.vm5277.j8b.compiler.common.enums.VarType;
 import ru.vm5277.j8b.compiler.common.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler_core.messages.MessageContainer;
@@ -19,15 +21,15 @@ import ru.vm5277.j8b.compiler_core.semantic.Scope;
 public class MethodCallExpression extends ExpressionNode {
 	private	final	ExpressionNode			parent;
 	private	final	String					methodName;
-	private	final	List<ExpressionNode>	arguments;
-	private			MethodSymbol			method;
+	private	final	List<ExpressionNode>	args;
+	private			MethodSymbol			symbol;
 	
     public MethodCallExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode parent, String methodName, List<ExpressionNode> arguments) {
         super(tb, mc);
         
 		this.parent = parent;
 		this.methodName = methodName;
-        this.arguments = arguments;
+        this.args = arguments;
     }
 
 	public String getMethodName() {
@@ -39,14 +41,25 @@ public class MethodCallExpression extends ExpressionNode {
 	}
 
 	public List<ExpressionNode> getArguments() {
-		return arguments;
+		return args;
 	}
 	
 	@Override
 	public VarType getType(Scope scope) throws SemanticException {
+		// Проверка существования parent (если есть)
+		if (null != parent) {
+			try {
+				VarType parentType = parent.getType(scope);
+				if (null == parentType) throw new SemanticException("Cannot resolve parent expression");
+			}
+			catch (SemanticException e) {
+				throw new SemanticException("Invalid parent in method call: " + e.getMessage());
+			}
+		}
+		
 		// Получаем типы аргументов
 		List<VarType> argTypes = new ArrayList<>();
-		for (ExpressionNode arg : arguments) {
+		for (ExpressionNode arg : args) {
 			argTypes.add(arg.getType(scope));
 		}
 
@@ -59,8 +72,8 @@ public class MethodCallExpression extends ExpressionNode {
 				ClassScope classScope = scope.resolveClass(parentType.getName());
 				if (null == classScope) throw new SemanticException("Class '" + parentType.getName() + "' not found");
 
-				method = classScope.resolveMethod(methodName, argTypes);
-				if (method != null) return method.getType();
+				symbol = classScope.resolveMethod(methodName, argTypes);
+				if (symbol != null) return symbol.getType();
 			}
 
 			// Если parent - объект (вызов метода экземпляра)
@@ -69,8 +82,8 @@ public class MethodCallExpression extends ExpressionNode {
 				ClassScope classScope = scope.resolveClass(parentType.getName());
 				if (null == classScope) throw new SemanticException("Class '" + parentType.getName() + "' not found");
 
-				method = classScope.resolveMethod(methodName, argTypes);
-				if (null != method && !method.isStatic()) return method.getType();
+				symbol = classScope.resolveMethod(methodName, argTypes);
+				if (null != symbol && !symbol.isStatic()) return symbol.getType();
 			}
 
 			throw new SemanticException("Method '" + methodName + "' not found in " + parentType);
@@ -78,8 +91,8 @@ public class MethodCallExpression extends ExpressionNode {
 
 		// Вызов метода текущего класса (без parent)
 		if (scope instanceof ClassScope) {
-			method = ((ClassScope)scope).resolveMethod(methodName, argTypes);
-			if (null != method) return method.getType();
+			symbol = ((ClassScope)scope).resolveMethod(methodName, argTypes);
+			if (null != symbol) return symbol.getType();
 		}
 
 		// TODO Проверка статических импортов
@@ -96,7 +109,7 @@ public class MethodCallExpression extends ExpressionNode {
 				if (null != methods) {
 					for (MethodSymbol interfaceMethod : methods) {
 						if (isArgumentsMatch(scope, interfaceMethod, argTypes)) {
-							method = interfaceMethod;
+							symbol = interfaceMethod;
 							return interfaceMethod.getType();
 						}
 					}
@@ -108,7 +121,7 @@ public class MethodCallExpression extends ExpressionNode {
 	}
 	
 	public MethodSymbol getMethod() {
-		return method;
+		return symbol;
 	}
 	
 	private boolean isArgumentsMatch(Scope scope, MethodSymbol method, List<VarType> argTypes) {
@@ -129,12 +142,12 @@ public class MethodCallExpression extends ExpressionNode {
 			return false;
 		}
 
-		if (arguments == null) {
+		if (args == null) {
 			markError("Arguments list cannot be null");
 			return false;
 		}
 
-		for (ExpressionNode arg : arguments) {
+		for (ExpressionNode arg : args) {
 			if (arg == null) {
 				markError("Argument cannot be null");
 				return false;
@@ -148,28 +161,40 @@ public class MethodCallExpression extends ExpressionNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope) {
-		try {		
-			// Проверка родительского объекта (если метод не статический)
-			if (parent != null && !parent.postAnalyze(scope)) {
+		// Проверка parent (если есть)
+		if (null != parent) {
+			if (!parent.postAnalyze(scope)) return false;
+
+			try {
+				VarType parentType = parent.getType(scope);
+				if (null == parentType) {
+					markError("Cannot determine type of parent expression");
+					return false;
+				}
+			}
+			catch (SemanticException e) {
+				markError("Parent type error: " + e.getMessage());
 				return false;
 			}
+		}
 
+		try {		
 			// Проверка аргументов
-			for (ExpressionNode arg : arguments) {
+			for (ExpressionNode arg : args) {
 				if (!arg.postAnalyze(scope)) return false;
 			}
 
 			// Получаем типы аргументов
 			List<VarType> argTypes = new ArrayList<>();
-			for (ExpressionNode arg : arguments) {
+			for (ExpressionNode arg : args) {
 				argTypes.add(arg.getType(scope));
 			}
 
 			// Поиск метода в ClassScope
 			if (scope instanceof ClassScope) {
 				ClassScope classScope = (ClassScope)scope;
-				MethodSymbol methodSymbol = classScope.resolveMethod(methodName, argTypes);
-				if (methodSymbol == null) {
+				symbol = classScope.resolveMethod(methodName, argTypes);
+				if (symbol == null) {
 					markError("Method '" + methodName + "' not found");
 					return false;
 				}
@@ -180,5 +205,19 @@ public class MethodCallExpression extends ExpressionNode {
             return false;
         }
 		return true;
+	}
+	
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		Operand[] operands = null;
+		if(!args.isEmpty()) {
+			
+			operands = new Operand[args.size()];
+			for(int i=0; i<args.size(); i++) {
+				args.get(i).codeGen(cg);
+				operands[i] = cg.getAcc();
+			}
+		}
+		cg.invokeMethod(symbol.getRuntimeId(), operands);
 	}
 }

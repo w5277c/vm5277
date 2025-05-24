@@ -230,17 +230,28 @@ public class ASTPrinter {
 			}
 			else if(node instanceof IfNode) {
 				IfNode in = (IfNode)node;
-				out.put("if (");
-				printExpr(in.getCondition());
-				if(null != in.getVarName()) {
-					out.put(" as " + in.getVarName());
+				
+				if(in.alwaysTrue() || in.alwaysFalse()) {
+					if(in.alwaysTrue()) {
+						printBody(in.getThenBlock());
+					}
+					else if(null != in.getElseBlock()) {
+						printBody(in.getElseBlock());
+					}
 				}
-				out.put(") ");
-				printBody(in.getThenBlock());
-				if(null != in.getElseBlock()) {
-					out.print();
-					out.put("else ");
-					printBody(in.getElseBlock());
+				else {
+					out.put("if (");
+					printExpr(in.getCondition());
+					if(null != in.getVarName()) {
+						out.put(" as " + in.getVarName());
+					}
+					out.put(") ");
+					printBody(in.getThenBlock());
+					if(null != in.getElseBlock()) {
+						out.print();
+						out.put("else ");
+						printBody(in.getElseBlock());
+					}
 				}
 			}
 			else if(node instanceof ReturnNode) {
@@ -352,6 +363,7 @@ public class ASTPrinter {
 	}
 	
 	void printField(FieldNode node) {
+		printModifiers(node.getModifiers());
 		if(null != node.getType()) {
 			out.put(node.getType() + " ");
 		}
@@ -363,6 +375,7 @@ public class ASTPrinter {
 	}
 	
 	void printVar(VarNode node) {
+		printModifiers(node.getModifiers());
 		if(null != node.getType()) {
 			out.put(node.getType() + " ");
 		}

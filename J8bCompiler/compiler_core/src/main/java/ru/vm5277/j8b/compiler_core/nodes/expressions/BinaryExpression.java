@@ -11,6 +11,7 @@ import ru.vm5277.j8b.compiler.common.enums.Operator;
 import ru.vm5277.j8b.compiler.common.enums.VarType;
 import ru.vm5277.j8b.compiler_core.messages.MessageContainer;
 import ru.vm5277.j8b.compiler_core.semantic.Scope;
+import ru.vm5277.j8b.compiler_core.semantic.Symbol;
 
 public class BinaryExpression extends ExpressionNode {
     private final ExpressionNode	left;
@@ -81,7 +82,7 @@ public class BinaryExpression extends ExpressionNode {
 			markError("Right operand is missing in binary expression");
 			return false;
 		}
-
+		
 		// Рекурсивный анализ операндов
 		if (!left.preAnalyze()) {
 			return false; // Ошибка уже помечена в left
@@ -101,8 +102,24 @@ public class BinaryExpression extends ExpressionNode {
 
 			VarType leftType = left.getType(scope);
 			VarType rightType = right.getType(scope);
-			
-			
+
+			if(operator.isAssignment()) {
+				if(left instanceof VariableExpression) {
+					VariableExpression varExpr = (VariableExpression) left;
+					Symbol symbol = scope.resolve(varExpr.getValue());
+					if(null != symbol && symbol.isFinal()) {
+						markError("Cannot assign to final variable: " + varExpr.getValue());
+						return false;
+					}
+				}
+				else if (left instanceof MemberAccessExpression) {
+					// Для полей классов проверяем final (если нужно)
+					MemberAccessExpression memberExpr = (MemberAccessExpression) left;
+					// TODO Здесь можно добавить проверку final для полей класса
+					// через memberExpr.getTarget() и memberExpr.getMemberName()
+	            }
+			}
+
 			// Проверка совместимости типов
 			if (!isCompatibleWith(scope, leftType, rightType)) {
 				markError("Type mismatch: " + leftType.getName() + " " + operator + " " + rightType.getName());
