@@ -17,7 +17,7 @@ import ru.vm5277.j8b.compiler_core.enums.TokenType;
 import ru.vm5277.j8b.compiler.common.enums.VarType;
 import ru.vm5277.j8b.compiler.common.exceptions.ParseException;
 import ru.vm5277.j8b.compiler_core.messages.MessageContainer;
-import ru.vm5277.j8b.compiler_core.nodes.commands.CommandNode.Case;
+import ru.vm5277.j8b.compiler_core.nodes.commands.CommandNode.AstCase;
 import ru.vm5277.j8b.compiler_core.nodes.commands.DoWhileNode;
 import ru.vm5277.j8b.compiler_core.nodes.commands.ForNode;
 import ru.vm5277.j8b.compiler_core.nodes.commands.IfNode;
@@ -164,7 +164,7 @@ public class BlockNode extends AstNode {
 		else if (node instanceof SwitchNode) {
 			// Для switch нужно проверить все case-блоки
 			SwitchNode switchNode = (SwitchNode)node;
-			for (Case c : switchNode.getCases()) {
+			for (AstCase c : switchNode.getCases()) {
 				if (!hasReturnStatement(c.getBlock())) {
 					return false;
 				}

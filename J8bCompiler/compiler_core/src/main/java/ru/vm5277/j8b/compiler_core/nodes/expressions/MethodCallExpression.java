@@ -2,6 +2,8 @@
 Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 23.04.2025	konstantin@5277.ru		Начало
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+;TODO пересмотреть getType и postAnalyze, код как минимум не оптимизирован
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler_core.nodes.expressions;
 
@@ -46,10 +48,19 @@ public class MethodCallExpression extends ExpressionNode {
 	
 	@Override
 	public VarType getType(Scope scope) throws SemanticException {
+		VarType parentType = null;
+		//поиск метода в текущем классе
+		if(null == parent) {
+			ClassScope classScope = Scope.getThis(scope);
+			if(null != classScope) {
+				parentType = VarType.fromClassName(classScope.getName());
+			}
+		}
+
 		// Проверка существования parent (если есть)
-		if (null != parent) {
+		if (null == parentType && null != parent) {
 			try {
-				VarType parentType = parent.getType(scope);
+				parentType = parent.getType(scope);
 				if (null == parentType) throw new SemanticException("Cannot resolve parent expression");
 			}
 			catch (SemanticException e) {
@@ -64,9 +75,7 @@ public class MethodCallExpression extends ExpressionNode {
 		}
 
 		// Если есть parent (вызов через объект или класс)
-		if (null != parent) {
-			VarType parentType = parent.getType(scope);
-
+		if (null != parentType) {
 			// Если parent - класс (статический вызов)
 			if (parentType.isClassType()) {
 				ClassScope classScope = scope.resolveClass(parentType.getName());
@@ -161,6 +170,8 @@ public class MethodCallExpression extends ExpressionNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope) {
+
+		try {getType(scope);} catch(SemanticException e) {markError(e);}; //TODO костыль, нужен для присваивания symbol
 		// Проверка parent (если есть)
 		if (null != parent) {
 			if (!parent.postAnalyze(scope)) return false;

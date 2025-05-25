@@ -42,7 +42,7 @@ import ru.vm5277.j8b.compiler.common.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler.common.messages.Message;
 import ru.vm5277.j8b.compiler_core.messages.MessageContainer;
 import ru.vm5277.j8b.compiler.common.messages.WarningMessage;
-import ru.vm5277.j8b.compiler_core.nodes.commands.CommandNode.Case;
+import ru.vm5277.j8b.compiler_core.nodes.commands.CommandNode.AstCase;
 import ru.vm5277.j8b.compiler_core.nodes.commands.ThrowNode;
 import ru.vm5277.j8b.compiler_core.nodes.commands.TryNode;
 import ru.vm5277.j8b.compiler_core.nodes.expressions.TypeReferenceExpression;
@@ -288,7 +288,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		// Для switch
 		if (node instanceof SwitchNode) {
 			SwitchNode switchNode = (SwitchNode)node;
-			for (Case c : switchNode.getCases()) {
+			for (AstCase c : switchNode.getCases()) {
 				if (!isControlFlowInterrupted(c.getBlock())) {
 					return false;
 				}
@@ -439,6 +439,6 @@ public abstract class AstNode extends SemanticAnalyzer {
 	}
 	
 	public void codeGen(CodeGenerator cg) {
-		throw new UnsupportedOperationException();
+		throw new UnsupportedOperationException(this.toString());
 	}
 }

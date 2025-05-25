@@ -22,7 +22,7 @@ import ru.vm5277.j8b.compiler_core.nodes.MethodNode;
 import ru.vm5277.j8b.compiler_core.nodes.ParameterNode;
 import ru.vm5277.j8b.compiler_core.nodes.VarNode;
 import ru.vm5277.j8b.compiler_core.nodes.commands.BreakNode;
-import ru.vm5277.j8b.compiler_core.nodes.commands.CommandNode.Case;
+import ru.vm5277.j8b.compiler_core.nodes.commands.CommandNode.AstCase;
 import ru.vm5277.j8b.compiler_core.nodes.commands.ContinueNode;
 import ru.vm5277.j8b.compiler_core.nodes.commands.DoWhileNode;
 import ru.vm5277.j8b.compiler_core.nodes.commands.ForNode;
@@ -268,14 +268,14 @@ public class ASTPrinter {
 				out.put("switch (");
 				printExpr(sn.getExpression());
 				out.put(") {"); out.extend(); out.print();
-				for(SwitchNode.Case c : sn.getCases()) {
-					out.put("case " + c.getFrom());
-					if(-1 != c.getTo()) {
-						out.put(".." + c.getTo());
+				for(SwitchNode.AstCase astCase : sn.getCases()) {
+					out.put("case " + astCase.getFrom());
+					if(null != astCase.getTo()) {
+						out.put(".." + astCase.getTo());
 					}
 					out.put(": ");
 					out.extend(); out.print();
-					printBody(c.getBlock());
+					printBody(astCase.getBlock());
 					out.reduce(); out.print();
 				}
 				out.reduce(); out.put("}");
@@ -329,13 +329,13 @@ public class ASTPrinter {
 						out.put("{");
 						out.print();
 						out.extend();
-						for(Case c : tryNode.getCatchCases()) {
-							out.put("case " + c.getFrom());
-							if(-1 != c.getTo()) {
-								out.put(".." + c.getTo());
+						for(AstCase astCase : tryNode.getCatchCases()) {
+							out.put("case " + astCase.getFrom());
+							if(null != astCase.getTo()) {
+								out.put(".." + astCase.getTo());
 							}
 							out.put(": ");
-							printBody(c.getBlock());
+							printBody(astCase.getBlock());
 							out.print();
 						}
 						if(null != tryNode.getCatchDefault()) {

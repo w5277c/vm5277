@@ -5,19 +5,24 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler_core.nodes.expressions;
 
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
+import ru.vm5277.j8b.compiler.common.Operand;
 import ru.vm5277.j8b.compiler.common.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler_core.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler.common.enums.Operator;
 import ru.vm5277.j8b.compiler.common.enums.VarType;
 import ru.vm5277.j8b.compiler_core.messages.MessageContainer;
+import ru.vm5277.j8b.compiler_core.semantic.ClassScope;
 import ru.vm5277.j8b.compiler_core.semantic.Scope;
 import ru.vm5277.j8b.compiler_core.semantic.Symbol;
 
 public class BinaryExpression extends ExpressionNode {
-    private final ExpressionNode	left;
-    private final Operator			operator;
-    private final ExpressionNode	right;
-    
+    private	final	ExpressionNode	left;
+    private	final	Operator		operator;
+    private	final	ExpressionNode	right;
+	private			VarType			leftType;
+	private			VarType			rightType;
+
     public BinaryExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode left, Operator operator, ExpressionNode right) {
         super(tb, mc);
         
@@ -100,8 +105,8 @@ public class BinaryExpression extends ExpressionNode {
 			// Анализ операндов
 			if (!left.postAnalyze(scope) || !right.postAnalyze(scope)) return false;
 
-			VarType leftType = left.getType(scope);
-			VarType rightType = right.getType(scope);
+			leftType = left.getType(scope);
+			rightType = right.getType(scope);
 
 			if(operator.isAssignment()) {
 				if(left instanceof VariableExpression) {
@@ -115,8 +120,23 @@ public class BinaryExpression extends ExpressionNode {
 				else if (left instanceof MemberAccessExpression) {
 					// Для полей классов проверяем final (если нужно)
 					MemberAccessExpression memberExpr = (MemberAccessExpression) left;
-					// TODO Здесь можно добавить проверку final для полей класса
-					// через memberExpr.getTarget() и memberExpr.getMemberName()
+					ExpressionNode target = memberExpr.getTarget();
+					String fieldName = memberExpr.getMemberName();
+
+					// Получаем тип объекта
+					VarType targetType = target.getType(scope);
+
+					if (targetType.isClassType()) {
+						// Ищем класс в scope
+						ClassScope classScope = scope.resolveClass(targetType.getClassName());
+						if (null != classScope) {
+							Symbol field = classScope.getFields().get(fieldName);
+							if (null != field && field.isFinal()) {
+								markError("Cannot assign to final field: " + targetType.getClassName() + "." + fieldName);
+								return false;
+							}
+						}
+					}
 	            }
 			}
 
@@ -230,6 +250,53 @@ public class BinaryExpression extends ExpressionNode {
 		catch(SemanticException e) {markError(e); return false;}
 
 		return true;
+	}
+	
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		// Генерация кода для левого и правого операндов
+		left.codeGen(cg);
+		Operand leftOp = cg.getAcc();
+		right.codeGen(cg);
+		//Operand rightOp = cg.getAcc();
+
+		// Обработка операторов присваивания (=, +=, -=, и т.д.)
+		if (operator.isAssignment()) {
+			// Для простого присваивания (=) генерируем сохранение значения
+			if (operator == Operator.ASSIGN) {
+				// Если левый операнд — переменная, генерируем store
+				if (left instanceof VariableExpression) {
+					VariableExpression varExpr = (VariableExpression) left;
+					//TODO cg.emitStoreVariable(varExpr.getValue(), leftType);
+					cg.storeAcc(varExpr.getSymbol().getRuntimeId());
+				}
+				// Если левый операнд — доступ к полю (x.y), генерируем putfield
+				else if (left instanceof MemberAccessExpression) {
+					MemberAccessExpression memberExpr = (MemberAccessExpression) left;
+					//TODO cg.emitFieldStore(memberExpr.getTarget().getType(cg.getCurrentScope()).getClassName(),memberExpr.getMemberName(),leftType);
+				}
+			}
+			// Для составных присваиваний (+=, -=, ...) генерируем соответствующий оператор
+			else {
+/*				cg.emitBinaryOp(arithmeticOp, leftType, rightType);
+				// Затем сохраняем результат обратно
+				if (left instanceof VariableExpression) {
+					VariableExpression varExpr = (VariableExpression) left;
+					cg.emitStoreVariable(varExpr.getValue(), leftType);
+				} else if (left instanceof MemberAccessExpression) {
+					MemberAccessExpression memberExpr = (MemberAccessExpression) left;
+					cg.emitFieldStore(
+						memberExpr.getTarget().getType(cg.getCurrentScope()).getClassName(),
+						memberExpr.getMemberName(),
+						leftType
+					);
+				}*/
+			}
+		}
+		// Обработка арифметических, логических и битовых операций
+		else {
+			//cg.emitBinaryOp(operator, leftType, rightType);
+		}
 	}
 	
 	@Override

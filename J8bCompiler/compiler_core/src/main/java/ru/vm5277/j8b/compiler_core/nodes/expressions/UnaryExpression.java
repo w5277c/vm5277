@@ -5,6 +5,7 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler_core.nodes.expressions;
 
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
 import ru.vm5277.j8b.compiler.common.exceptions.SemanticException;
 import ru.vm5277.j8b.compiler.common.enums.Operator;
 import ru.vm5277.j8b.compiler.common.enums.VarType;
@@ -131,6 +132,14 @@ public class UnaryExpression extends ExpressionNode {
 	
 	public ExpressionNode getOperand() {
 		return operand;
+	}
+	
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		// Генерация кода для операнда (например, переменной или другого выражения)
+		operand.codeGen(cg);
+
+		cg.emitUnary(operator);
 	}
 	
 	@Override

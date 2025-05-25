@@ -6,6 +6,7 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler_core.nodes.commands;
 
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
 import ru.vm5277.j8b.compiler_core.nodes.BlockNode;
 import ru.vm5277.j8b.compiler_core.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler_core.nodes.expressions.ExpressionNode;
@@ -20,8 +21,9 @@ import ru.vm5277.j8b.compiler_core.semantic.Scope;
 
 public class WhileNode extends CommandNode {
 	private	ExpressionNode	condition;
+	private	BlockNode		body;
 	private	BlockScope		blockScope;
-	
+
 	public WhileNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
 
@@ -31,7 +33,10 @@ public class WhileNode extends CommandNode {
 		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(ParseException e) {markFirstError(e);}
 
 		tb.getLoopStack().add(this);
-		try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement()));}
+		try {
+			body = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
+			blocks.add(body);
+		}
 		catch(ParseException e) {markFirstError(e);}
 		tb.getLoopStack().remove(this);
 	}
@@ -41,16 +46,7 @@ public class WhileNode extends CommandNode {
 	}
 
 	public BlockNode getBody() {
-		return blocks.isEmpty() ? null : blocks.get(0);
-	}
-
-	@Override
-	public String toString() {
-		StringBuilder sb = new StringBuilder("while (");
-		sb.append(condition);
-		sb.append(") ");
-		sb.append(getBody());
-		return sb.toString();
+		return body;
 	}
 
 	@Override
@@ -64,7 +60,7 @@ public class WhileNode extends CommandNode {
 		if (null != condition) condition.preAnalyze();
 		else markError("While condition cannot be null");
 
-		if (null != getBody()) getBody().preAnalyze();
+		if (null != body) body.preAnalyze();
 		
 		return true;
 	}
@@ -72,12 +68,12 @@ public class WhileNode extends CommandNode {
 	@Override
 	public boolean declare(Scope scope) {
 		// Объявление переменных условия (если нужно)
-		if (condition != null) condition.declare(scope);
+		if (null != condition) condition.declare(scope);
 
 		// Создаем новую область видимости для тела цикла
 		blockScope = new BlockScope(scope);
 		// Объявляем элементы тела цикла
-		if (getBody() != null) getBody().declare(blockScope);
+		if (null != body) body.declare(blockScope);
 
 		return true;
 	}
@@ -96,13 +92,26 @@ public class WhileNode extends CommandNode {
 		}
 
 		// Анализ тела цикла
-		if (null != getBody()) getBody().postAnalyze(blockScope);
+		if (null != body) body.postAnalyze(blockScope);
 		
 		// Проверяем бесконечный цикл с возвратом
-		if (condition instanceof LiteralExpression && Boolean.TRUE.equals(((LiteralExpression)condition).getValue()) &&	isControlFlowInterrupted(getBody())) {
+		if (condition instanceof LiteralExpression && Boolean.TRUE.equals(((LiteralExpression)condition).getValue()) &&	isControlFlowInterrupted(body)) {
 			markWarning("Code after infinite while loop is unreachable");
 		}
 
 		return true;
+	}
+	
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		int condBlockId = cg.enterBlock();
+		condition.codeGen(cg);
+		cg.leave();
+
+		int bodyBlockId = cg.enterBlock();
+		body.codeGen(cg);
+		cg.leave();
+
+		cg.eWhile(condBlockId, bodyBlockId);
 	}
 }

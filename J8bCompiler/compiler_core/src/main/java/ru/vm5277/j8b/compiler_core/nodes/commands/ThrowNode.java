@@ -5,6 +5,7 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler_core.nodes.commands;
 
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
 import ru.vm5277.j8b.compiler_core.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler_core.nodes.expressions.ExpressionNode;
 import ru.vm5277.j8b.compiler_core.enums.Delimiter;
@@ -15,7 +16,7 @@ import ru.vm5277.j8b.compiler_core.messages.MessageContainer;
 import ru.vm5277.j8b.compiler_core.semantic.Scope;
 
 public class ThrowNode extends CommandNode {
-	private ExpressionNode exceptionExpr;
+	private	ExpressionNode	exceptionExpr;
 
 	public ThrowNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
@@ -31,11 +32,6 @@ public class ThrowNode extends CommandNode {
 
 	public ExpressionNode getExceptionExpr() {
 		return exceptionExpr;
-	}
-
-	@Override
-	public String toString() {
-		return "throw " + (null != exceptionExpr ? exceptionExpr.toString() : "");
 	}
 
 	@Override
@@ -71,5 +67,11 @@ public class ThrowNode extends CommandNode {
 			}
 		}
 		return true;
+	}
+	
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		exceptionExpr.codeGen(cg);
+		cg.eThrow();
 	}
 }

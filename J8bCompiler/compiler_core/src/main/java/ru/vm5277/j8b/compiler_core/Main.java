@@ -17,7 +17,7 @@ import ru.vm5277.j8b.compiler_core.messages.MessageContainer;
 import ru.vm5277.j8b.compiler_core.nodes.ClassNode;
 
 public class Main {
-    public	final	static	String	VERSION	= "0.0.19";
+    public	final	static	String	VERSION	= "0.0.20";
 	
 	public static void main(String[] args) throws IOException, Exception {
 		MessageContainer mc = new MessageContainer(8, true, false);

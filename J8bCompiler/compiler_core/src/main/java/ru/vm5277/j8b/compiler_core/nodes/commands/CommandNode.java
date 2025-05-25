@@ -20,13 +20,13 @@ import ru.vm5277.j8b.compiler_core.tokens.TNumber;
 import ru.vm5277.j8b.compiler_core.tokens.Token;
 
 public abstract class CommandNode extends AstNode {
-	public static class Case {
+	public static class AstCase {
 		private	final	long		from;
-		private	final	long		to;
+		private	final	Long		to;
 		private	final	BlockNode	block;
 		private			BlockScope	scope;
 		
-		public Case(long from, long to, BlockNode block) {
+		public AstCase(long from, Long to, BlockNode block) {
 			this.from = from;
 			this.to = to;
 			this.block = block;
@@ -36,7 +36,7 @@ public abstract class CommandNode extends AstNode {
 			return from;
 		}
 		
-		public long getTo() {
+		public Long getTo() {
 			return to;
 		}
 		
@@ -86,17 +86,17 @@ public abstract class CommandNode extends AstNode {
 		return ReturnStatus.NEVER;
 	}
 	
-	protected Case parseCase(TokenBuffer tb, MessageContainer mc) {
+	protected AstCase parseCase(TokenBuffer tb, MessageContainer mc) {
 		consumeToken(tb); // Потребляем "case"
 
 		// Парсим значение или диапазон
 		long from = 0;
-		long to = -1;
+		Long to = null;
 
 		try {from = parseNumber(tb);} catch(ParseException e) {markFirstError(e);}
 		if (tb.match(Delimiter.RANGE)) {
 			consumeToken(tb); // Потребляем ".."
-			try{to = parseNumber(tb);}catch(ParseException e) {to=0;markFirstError(e);}
+			try{to = parseNumber(tb);}catch(ParseException e) {to=0l;markFirstError(e);}
 		}
 
 		try {consumeToken(tb, Delimiter.COLON);} catch(ParseException e) {markFirstError(e);}
@@ -105,7 +105,7 @@ public abstract class CommandNode extends AstNode {
 		try {blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());}
 		catch(ParseException e) {markFirstError(e);}
 		tb.getLoopStack().remove(this);
-		return new Case(from, to, blockNode);
+		return new AstCase(from, to, blockNode);
 	}
 
 	private long parseNumber(TokenBuffer tb) throws ParseException {

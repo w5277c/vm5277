@@ -13,6 +13,16 @@ public interface Scope {
 	public ClassScope resolveClass(String className);
 	public InterfaceSymbol resolveInterface(String className);
 
+	public static ClassScope getThis(Scope scope) {
+		while(true) {
+			if(scope instanceof ClassScope) {
+				return (ClassScope)scope;
+			}
+			if(null == scope.getParent()) return null;
+			scope = scope.getParent();
+		}
+	}
+	
 	public static ClassScope resolveClass(Scope scope, String className) {
 		while(true) {
 			if(scope instanceof ClassScope) {

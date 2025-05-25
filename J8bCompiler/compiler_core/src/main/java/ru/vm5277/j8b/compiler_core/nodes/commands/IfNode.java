@@ -6,7 +6,6 @@
 package ru.vm5277.j8b.compiler_core.nodes.commands;
 
 import ru.vm5277.j8b.compiler.common.CodeGenerator;
-import ru.vm5277.j8b.compiler.common.Operand;
 import ru.vm5277.j8b.compiler_core.nodes.BlockNode;
 import ru.vm5277.j8b.compiler_core.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler_core.nodes.expressions.ExpressionNode;
@@ -93,26 +92,11 @@ public class IfNode extends CommandNode {
 		return varName;
 	}
 
-
 	public boolean alwaysTrue() {
 		return alwaysTrue;
 	}
 	public boolean alwaysFalse() {
 		return alwaysFalse;
-	}
-
-	@Override
-	public String toString() {
-		StringBuilder sb = new StringBuilder();
-		sb.append("if (").append(condition.toString()).append(") ");
-		sb.append(getThenBlock().toString());
-
-		if (getElseBlock() != null) {
-			sb.append(" else ");
-			sb.append(getElseBlock().toString());
-		}
-
-		return sb.toString();
 	}
 
 	@Override
@@ -240,11 +224,11 @@ public class IfNode extends CommandNode {
 			return;
 		}
 		
-		int condBlockid = cg.enterBlock();
+		int condBlockId = cg.enterBlock();
 		condition.codeGen(cg);
 		cg.leave();
 		
-		int thenBlockid = cg.enterBlock();
+		int thenBlockId = cg.enterBlock();
 		getThenBlock().codeGen(cg);
 		cg.leave();
 
@@ -255,6 +239,6 @@ public class IfNode extends CommandNode {
 			cg.leave();
 		}
 		
-		cg.eIf(condBlockid, thenBlockid, elseBlockId);
+		cg.eIf(condBlockId, thenBlockId, elseBlockId);
 	}
 }

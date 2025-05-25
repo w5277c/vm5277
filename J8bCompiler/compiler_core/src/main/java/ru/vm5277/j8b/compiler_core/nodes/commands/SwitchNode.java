@@ -21,7 +21,7 @@ import ru.vm5277.j8b.compiler_core.semantic.Scope;
 
 public class SwitchNode extends CommandNode {
 	private	ExpressionNode	expression;
-	private	final	List<Case>				cases			= new ArrayList<>();
+	private	final	List<AstCase>				cases			= new ArrayList<>();
 	private			BlockNode				defaultBlock	= null;
 	private			BlockScope				switchScope;
 	private			BlockScope				defaultScope;
@@ -39,7 +39,7 @@ public class SwitchNode extends CommandNode {
 		// Парсим case-блоки
 		while (!tb.match(Delimiter.RIGHT_BRACE)) {
 			if (tb.match(Keyword.CASE)) {
-				Case c = parseCase(tb, mc);
+				AstCase c = parseCase(tb, mc);
 				if(null != c) cases.add(c);
 			}
 			else if (tb.match(Keyword.DEFAULT)) {
@@ -62,7 +62,7 @@ public class SwitchNode extends CommandNode {
 		return expression;
 	}
 
-	public List<Case> getCases() {
+	public List<AstCase> getCases() {
 		return cases;
 	}
 
@@ -75,12 +75,12 @@ public class SwitchNode extends CommandNode {
 		StringBuilder sb = new StringBuilder("switch (");
 		sb.append(expression).append(") {\n");
 
-		for (Case c : cases) {
-			sb.append("case ").append(c.getFrom());
-			if (-1 != c.getTo()) {
-				sb.append("..").append(c.getTo());
+		for (AstCase astCase : cases) {
+			sb.append("case ").append(astCase.getFrom());
+			if (null != astCase.getTo()) {
+				sb.append("..").append(astCase.getTo());
 			}
-			sb.append(": ").append(c.getBlock()).append("\n");
+			sb.append(": ").append(astCase.getBlock()).append("\n");
 		}
 
 		if (null != defaultBlock) {
@@ -103,7 +103,7 @@ public class SwitchNode extends CommandNode {
 		else markError("Switch expression cannot be null");
 
 		// Проверка всех case-блоков
-		for (Case c : cases) {
+		for (AstCase c : cases) {
 			if (null != c.getBlock()) c.getBlock().preAnalyze();
 		}
 
@@ -122,7 +122,7 @@ public class SwitchNode extends CommandNode {
 		switchScope = new BlockScope(scope);
 
 		// Объявление всех case-блоков
-		for (Case c : cases) {
+		for (AstCase c : cases) {
 			if (null != c.getBlock()) {
 				BlockScope caseScope = new BlockScope(switchScope);
 				c.getBlock().declare(caseScope);
@@ -158,28 +158,28 @@ public class SwitchNode extends CommandNode {
 
 		// Проверка case-значений на уникальность
 		List<Long> caseValues = new ArrayList<>();
-		for (Case c : cases) {
+		for (AstCase astCase : cases) {
 			// Проверка диапазона
-			if (-1 != c.getTo() && c.getFrom() > c.getTo()) {
-				markError("Invalid case range: " + c.getFrom() + ".." + c.getTo());
+			if (null != astCase.getTo() && astCase.getFrom() > astCase.getTo()) {
+				markError("Invalid case range: " + astCase.getFrom() + ".." + astCase.getTo());
 			}
 
 			// Проверка на дубликаты
-			if (c.getTo() == -1) {
-				if (caseValues.contains(c.getFrom())) markError("Duplicate case value: " + c.getFrom());
-				else caseValues.add(c.getFrom());
+			if (null == astCase.getTo()) {
+				if (caseValues.contains(astCase.getFrom())) markError("Duplicate case value: " + astCase.getFrom());
+				else caseValues.add(astCase.getFrom());
 			}
 			else {
-				for (long i = c.getFrom(); i <= c.getTo(); i++) {
+				for (long i = astCase.getFrom(); i <= astCase.getTo(); i++) {
 					if (caseValues.contains(i)) markError("Duplicate case value in range: " + i);
 					else caseValues.add(i);
 				}
 			}
 
 			// Анализ блока case
-			if (null != c.getBlock()) {
-				c.getBlock().postAnalyze(c.getScope());
-				if (!isControlFlowInterrupted(c.getBlock())) {
+			if (null != astCase.getBlock()) {
+				astCase.getBlock().postAnalyze(astCase.getScope());
+				if (!isControlFlowInterrupted(astCase.getBlock())) {
 					allCasesReturn = false;
 				}
 			}

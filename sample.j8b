@@ -27,8 +27,13 @@ public class Main {
     CustTimer timer = new CustTimer();
 
     public Main() {
-        Object obj = timer;
-//        CustTimer ct = obj;
+
+        final int g=2;
+        if(g<5) {
+            int t = g;
+        }
+
+        final Object obj = timer;
         if(obj is CustTimer as custTimer) {
             custTimer.set(123);
         }
@@ -37,7 +42,7 @@ public class Main {
     // Главная функция
     void main() {
         // Вызов функции
-        getSystem().init();
+        //getSystem().init();
 
 
         bool test1 = timer is Async;
@@ -120,7 +125,7 @@ public class Main {
     // Блок кода
     {
         cstr test = "test string";
-        printStr(test);
+        print(test);
     }
 
 

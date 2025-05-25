@@ -7,10 +7,13 @@
 package ru.vm5277.j8b.compiler.codegen.avr;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Map;
+import ru.vm5277.j8b.compiler.common.Case;
 import ru.vm5277.j8b.compiler.common.CodeGenerator;
 import ru.vm5277.j8b.compiler.common.Operand;
 import ru.vm5277.j8b.compiler.common.enums.OperandType;
+import ru.vm5277.j8b.compiler.common.enums.Operator;
 import ru.vm5277.j8b.compiler.common.enums.VarType;
 
 public class Generator extends CodeGenerator {
@@ -108,9 +111,34 @@ public class Generator extends CodeGenerator {
 		System.out.println("CG:emitInstanceOf, op:" + op + ", typeId:" + typeId);
 		return new Operand(VarType.BOOL.getId(), OperandType.LITERAL, true);
 	}
+	
+	@Override
+	public void emitUnary(Operator op) {
+		System.out.println("CG:emitUnary, op:" + op);
+	}
 
 	@Override
 	public void eIf(int conditionBlockId, int thenBlockId, Integer elseBlockId) {
-		throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
+		System.out.println("CG:if, condBlockId:" + conditionBlockId + ", thenBlockId:" + thenBlockId + ", elseBlockId:" + elseBlockId);
+	}
+
+	@Override
+	public void eTry(int blockId, List<Case> cases, Integer defaultBlockId) {
+		System.out.println("CG:try, blockId:" + blockId + ", casesBlocks:" + cases + ", defaultBlockId:" + defaultBlockId);
+	}
+	
+	@Override
+	public void eWhile(int conditionBlockId, int bodyBlockId) {
+		System.out.println("CG:while, condBlockId:" + conditionBlockId + ", bodyBlockId:" + bodyBlockId);
+	}
+	
+	@Override
+	public void eReturn() {
+		System.out.println("CG:return");
+	}
+	
+	@Override
+	public void eThrow() {
+		System.out.println("CG:throw");
 	}
 }

@@ -35,7 +35,7 @@ public class VariableExpression extends ExpressionNode {
 			if(null == symbol) {
 				ClassScope classScope = scope.resolveClass(value);
 				if(null != classScope) {
-					symbol = new Symbol(value, VarType.CLASS, false, false);
+					symbol = new Symbol(value, VarType.fromClassName(value), false, false);
 				}
 			}
         }

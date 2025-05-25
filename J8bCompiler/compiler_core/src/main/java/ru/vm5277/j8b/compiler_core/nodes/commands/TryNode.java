@@ -10,6 +10,8 @@ import ru.vm5277.j8b.compiler_core.nodes.BlockNode;
 import ru.vm5277.j8b.compiler_core.nodes.TokenBuffer;
 import java.util.ArrayList;
 import java.util.List;
+import ru.vm5277.j8b.compiler.common.Case;
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
 import ru.vm5277.j8b.compiler_core.enums.Delimiter;
 import ru.vm5277.j8b.compiler_core.enums.Keyword;
 import ru.vm5277.j8b.compiler_core.enums.TokenType;
@@ -24,7 +26,7 @@ import ru.vm5277.j8b.compiler_core.semantic.Symbol;
 public class TryNode extends CommandNode {
 	private	BlockNode		tryBlock;
 	private	String			varName;
-	private	List<Case>		catchCases		= new ArrayList<>();
+	private	List<AstCase>	catchCases		= new ArrayList<>();
 	private	BlockNode		catchDefault;
 	private	BlockScope		tryScope;
 	private	BlockScope		catchScope;
@@ -71,7 +73,7 @@ public class TryNode extends CommandNode {
 							tb.skip(Delimiter.RIGHT_BRACE);
 							break;
 						}
-						Case c = parseCase(tb, mc);
+						AstCase c = parseCase(tb, mc);
 						if(null != c) catchCases.add(c);
 					}
 					else if (tb.match(Keyword.DEFAULT)) {
@@ -100,7 +102,7 @@ public class TryNode extends CommandNode {
 		return tryBlock;
 	}
 
-	public List<Case> getCatchCases() {
+	public List<AstCase> getCatchCases() {
 		return catchCases;
 	}
 
@@ -126,7 +128,7 @@ public class TryNode extends CommandNode {
 		else markError("Try block cannot be null");
 
 		// Проверка всех catch-блоков
-		for (Case c : catchCases) {
+		for (AstCase c : catchCases) {
 			if (null != c.getBlock()) c.getBlock().preAnalyze();
 		}
 
@@ -149,7 +151,7 @@ public class TryNode extends CommandNode {
 		}
 
 		// Объявление catch-блоков
-		for (Case c : catchCases) {
+		for (AstCase c : catchCases) {
 			BlockScope caseScope = new BlockScope(catchScope);
 			c.getBlock().declare(caseScope);
 			c.setScope(caseScope);
@@ -171,30 +173,55 @@ public class TryNode extends CommandNode {
 
 		// Проверка catch-значений на уникальность
 		List<Long> catchValues = new ArrayList<>();
-		for (Case c : catchCases) {
+		for (AstCase astCase : catchCases) {
 			// Проверка диапазона
-			if (-1 != c.getTo() && c.getFrom() > c.getTo()) {
-				markError("Invalid catch range: " + c.getFrom() + ".." + c.getTo());
+			if (null != astCase.getTo() && astCase.getFrom() > astCase.getTo()) {
+				markError("Invalid catch range: " + astCase.getFrom() + ".." + astCase.getTo());
 			}
 
 			// Проверка на дубликаты
-			if (c.getTo() == -1) {
-				if (catchValues.contains(c.getFrom())) markError("Duplicate catch value: " + c.getFrom());
-				else catchValues.add(c.getFrom());
-			} else {
-				for (long i = c.getFrom(); i <= c.getTo(); i++) {
+			if (null == astCase.getTo()) {
+				if (catchValues.contains(astCase.getFrom())) markError("Duplicate catch value: " + astCase.getFrom());
+				else catchValues.add(astCase.getFrom());
+			}
+			else {
+				for (long i = astCase.getFrom(); i <= astCase.getTo(); i++) {
 					if (catchValues.contains(i)) markError("Duplicate catch value in range: " + i);
 					else catchValues.add(i);
 				}
 			}
 
 			// Анализ блока catch
-			if (null != c.getBlock()) c.getBlock().postAnalyze(c.getScope());
+			if (null != astCase.getBlock()) astCase.getBlock().postAnalyze(astCase.getScope());
 		}
 
 		// Анализ default-блока
 		if (null != catchDefault) catchDefault.postAnalyze(defaultScope);
 
 		return true;
+	}
+	
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		int blockId = cg.enterBlock();
+		tryBlock.codeGen(cg);
+		cg.leave();
+		
+		List<Case> cases = new ArrayList<>();
+		for(AstCase astCase : catchCases) {
+			int caseBlockId = cg.enterBlock();
+			astCase.getBlock().codeGen(cg);
+			cg.leave();
+			cases.add(new Case(astCase.getFrom(), astCase.getTo(), caseBlockId));
+		}
+			
+		Integer defaultBlockId = null;
+		if(null != catchDefault) {
+			defaultBlockId = cg.enterBlock();
+			catchDefault.codeGen(cg);
+			cg.leave();
+		}
+		
+		cg.eTry(blockId, cases, defaultBlockId);
 	}
 }

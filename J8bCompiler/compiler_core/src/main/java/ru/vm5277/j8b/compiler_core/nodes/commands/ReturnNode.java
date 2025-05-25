@@ -5,6 +5,7 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler_core.nodes.commands;
 
+import ru.vm5277.j8b.compiler.common.CodeGenerator;
 import ru.vm5277.j8b.compiler_core.nodes.TokenBuffer;
 import ru.vm5277.j8b.compiler_core.nodes.expressions.ExpressionNode;
 import ru.vm5277.j8b.compiler_core.enums.Delimiter;
@@ -40,14 +41,9 @@ public class ReturnNode extends CommandNode {
     }
 
     public boolean returnsValue() {
-        return expression != null;
+        return null != expression;
     }
 	
-	@Override
-	public String toString() {
-		return "return" + (null != expression ? " " + expression : "");
-	}
-
 	@Override
 	public String getNodeType() {
 		return "return command";
@@ -77,7 +73,7 @@ public class ReturnNode extends CommandNode {
 			VarType methodReturnType = methodScope.getSymbol().getType();
 
 			// Проверяем соответствие возвращаемого значения
-			if (expression == null) { // return без значения
+			if (null == expression) { // return без значения
 				if (!methodReturnType.isVoid()) markError("Void method cannot return a value");
 			}
 			else { // return с выражением
@@ -101,5 +97,13 @@ public class ReturnNode extends CommandNode {
 			}
 		}
 		return true;
+	}
+	
+	@Override
+	public void codeGen(CodeGenerator cg) {
+		if(null != expression) {
+			expression.codeGen(cg);
+		}
+		cg.eReturn();
 	}
 }
