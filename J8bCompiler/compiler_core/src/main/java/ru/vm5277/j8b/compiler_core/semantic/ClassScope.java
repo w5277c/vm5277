@@ -129,13 +129,11 @@ public class ClassScope implements Scope { // Плохая идея, облас�
 		fields.put(symbolName, symbol);
 	}
 	
-	protected ClassScope getClass(String className) {
-		return classes.get(className);
+	@Override
+	public ClassScope getThis() {
+		return this;
 	}
 	
-	public InterfaceSymbol getInterface(String interfaceName) {
-		return interfaces.get(interfaceName);
-	}
 	public Map<String, InterfaceSymbol> getInterfaces() {
 		return interfaces;
 	}
@@ -188,9 +186,36 @@ public class ClassScope implements Scope { // Плохая идея, облас�
 		return null;
 	}
 	
-	@Override
 	public ClassScope resolveClass(String className) {
-		return Scope.resolveClass(this, className);
+		// Поиск в текущем классе
+		if (classes.containsKey(className)) return classes.get(className);
+
+		// Поиск в импортах (если интерфейс объявлен в другом пакете)
+		String importedName = imports.get(className);
+		if (null != importedName && interfaces.containsKey(importedName)) return classes.get(importedName);
+
+		// Поиск в родительской области видимости (если есть)
+		if (parent != null) {
+			return parent.resolveClass(className);
+		}
+		
+		return null;
+	}
+
+	public InterfaceSymbol resolveInterface(String interfaceName) {
+		// Поиск в текущем классе
+		if (interfaces.containsKey(interfaceName)) return interfaces.get(interfaceName);
+
+		// Поиск в импортах (если интерфейс объявлен в другом пакете)
+		String importedName = imports.get(interfaceName);
+		if (null != importedName && interfaces.containsKey(importedName)) return interfaces.get(importedName);
+
+		// Поиск в родительской области видимости (если есть)
+		if (parent != null) {
+			return parent.resolveInterface(interfaceName);
+		}
+
+		return null;
 	}
 	
 	public MethodSymbol resolveMethod(String methodName, List<VarType> argTypes) {
@@ -212,30 +237,6 @@ public class ClassScope implements Scope { // Плохая идея, облас�
 		return null;
 	}
 */
-	
-	@Override
-	public InterfaceSymbol resolveInterface(String interfaceName) {
-		// Поиск в текущем классе
-		if (interfaces.containsKey(interfaceName)) return interfaces.get(interfaceName);
-
-		// Поиск в импортах (если интерфейс объявлен в другом пакете)
-		String importedName = imports.get(interfaceName);
-		if (null != importedName && interfaces.containsKey(importedName)) return interfaces.get(importedName);
-
-		// Поиск во вложенных классах TODO это не поиск во вложенных классах!
-		//for (ClassScope innerClass : classes.values()) {
-		//	InterfaceSymbol innerInterface = innerClass.resolveInterface(interfaceName);
-		//	if (innerInterface != null) return innerInterface;
-		//}
-
-		// Поиск в родительской области видимости (если есть)
-		if (parent != null) {
-			return parent.resolveInterface(interfaceName);
-		}
-
-		return null;
-	}
-
 	
 	private boolean isApplicable(MethodSymbol method, List<VarType> argTypes) {
 		List<VarType> paramTypes = method.getParameterTypes();

@@ -176,7 +176,7 @@ public class MethodNode extends AstNode {
 		try {
 			methodScope = new MethodScope(null, classScope);
 			methodSymbol = new MethodSymbol(	name, returnType, paramSymbols, modifiers.contains(Keyword.FINAL),
-												modifiers.contains(Keyword.STATIC),	canThrow, methodScope);
+												modifiers.contains(Keyword.STATIC),	modifiers.contains(Keyword.NATIVE), canThrow, methodScope);
 			// Устанавливаем обратную ссылку
 			methodScope.setSymbol(methodSymbol);
 

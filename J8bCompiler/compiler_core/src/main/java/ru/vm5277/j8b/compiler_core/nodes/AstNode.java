@@ -329,7 +329,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		if (left.isClassType() && right.isClassType()) {
 			if(null == left.getClassName()) return false;
 			if(left.getClassName().equals(right.getClassName())) return true;
-			return null != scope.resolveInterface(left.getName());
+			return null != scope.getThis().resolveInterface(left.getName());
 		}
 		
 		// Проверка массивов

@@ -26,8 +26,8 @@ public class ASTParser extends AstNode {
 	private			List<ClassNode>		importedClasses	= new ArrayList<>();
 	private			ClassNode			classNode;
 
-	public ASTParser(String basePath, List<Token> tokens, MessageContainer mc) throws IOException {
-		this.fileImporter = new FileImporter(basePath, mc);
+	public ASTParser(String runtimePath, String basePath, List<Token> tokens, MessageContainer mc) throws IOException {
+		this.fileImporter = new FileImporter(runtimePath, basePath, mc);
 		this.mc = mc;
 		mc.setOwner(MessageOwner.AST);
 		
@@ -43,7 +43,7 @@ public class ASTParser extends AstNode {
 			List<Token> importedTokens = fileImporter.importFile(importNode.getImportPath());
 			if (!importedTokens.isEmpty()) {
 				// Рекурсивный парсинг импортированного файла
-				ASTParser importedParser = new ASTParser(basePath, importedTokens, mc);
+				ASTParser importedParser = new ASTParser(runtimePath, basePath, importedTokens, mc);
 				if (null != importedParser.getClazz()) {
 					importedClasses.add(importedParser.getClazz());
 				}

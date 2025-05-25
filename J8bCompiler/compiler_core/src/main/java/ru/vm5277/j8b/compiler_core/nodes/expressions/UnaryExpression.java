@@ -117,7 +117,7 @@ public class UnaryExpression extends ExpressionNode {
 	private boolean isFinalVariable(VariableExpression var, Scope scope) {
 		Symbol symbol = scope.resolve(var.getValue());
 		if(null == symbol) {
-			ClassScope classScope = scope.resolveClass(var.getValue());
+			ClassScope classScope = scope.getThis().resolveClass(var.getValue());
 			if(null != classScope) {
 				symbol = new Symbol(var.getValue(), VarType.CLASS, false, false);
 			}

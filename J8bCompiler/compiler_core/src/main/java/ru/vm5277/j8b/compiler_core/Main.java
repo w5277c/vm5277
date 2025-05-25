@@ -17,7 +17,7 @@ import ru.vm5277.j8b.compiler_core.messages.MessageContainer;
 import ru.vm5277.j8b.compiler_core.nodes.ClassNode;
 
 public class Main {
-    public	final	static	String	VERSION	= "0.0.20";
+    public	final	static	String	VERSION	= "0.0.21";
 	
 	public static void main(String[] args) throws IOException, Exception {
 		MessageContainer mc = new MessageContainer(8, true, false);
@@ -29,7 +29,7 @@ public class Main {
 		
 		try (InputStreamReader isr = new InputStreamReader(new FileInputStream(inputFile))) {
 			Lexer lexer = new Lexer(isr, mc);
-			ASTParser parser = new ASTParser(basePath, lexer.getTokens(), mc);
+			ASTParser parser = new ASTParser(runtimePath, basePath, lexer.getTokens(), mc);
 			ClassNode clazz = parser.getClazz();
 //			new ASTPrinter(parser.getClazz());
 			new SemanticAnalyzer(runtimePath, parser.getClazz());

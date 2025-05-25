@@ -46,7 +46,7 @@ public class Test {
     void test2() throws ParseException, IOException, SemanticException {
 		MessageContainer mc = new MessageContainer(100, true, false);
 		Lexer lexer = new Lexer(new StringReader("class Clazz{ void method() { byte b1 = -1; byte b2=0; byte b3=255; byte b4 = 256; byte B5=128; }}"), mc);
-		ASTParser parser = new ASTParser("", lexer.getTokens(), mc);
+		ASTParser parser = new ASTParser("", "", lexer.getTokens(), mc);
 		new SemanticAnalyzer(null, parser.getClazz());
 	}
 }

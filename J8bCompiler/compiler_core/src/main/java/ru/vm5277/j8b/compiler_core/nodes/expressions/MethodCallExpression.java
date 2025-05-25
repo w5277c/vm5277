@@ -25,6 +25,7 @@ public class MethodCallExpression extends ExpressionNode {
 	private	final	String					methodName;
 	private	final	List<ExpressionNode>	args;
 	private			MethodSymbol			symbol;
+	private			VarType					type;
 	
     public MethodCallExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode parent, String methodName, List<ExpressionNode> arguments) {
         super(tb, mc);
@@ -51,7 +52,7 @@ public class MethodCallExpression extends ExpressionNode {
 		VarType parentType = null;
 		//поиск метода в текущем классе
 		if(null == parent) {
-			ClassScope classScope = Scope.getThis(scope);
+			ClassScope classScope = scope.getThis();
 			if(null != classScope) {
 				parentType = VarType.fromClassName(classScope.getName());
 			}
@@ -78,7 +79,7 @@ public class MethodCallExpression extends ExpressionNode {
 		if (null != parentType) {
 			// Если parent - класс (статический вызов)
 			if (parentType.isClassType()) {
-				ClassScope classScope = scope.resolveClass(parentType.getName());
+				ClassScope classScope = scope.getThis().resolveClass(parentType.getName());
 				if (null == classScope) throw new SemanticException("Class '" + parentType.getName() + "' not found");
 
 				symbol = classScope.resolveMethod(methodName, argTypes);
@@ -88,7 +89,7 @@ public class MethodCallExpression extends ExpressionNode {
 			// Если parent - объект (вызов метода экземпляра)
 			else {
 				// Получаем класс объекта
-				ClassScope classScope = scope.resolveClass(parentType.getName());
+				ClassScope classScope = scope.getThis().resolveClass(parentType.getName());
 				if (null == classScope) throw new SemanticException("Class '" + parentType.getName() + "' not found");
 
 				symbol = classScope.resolveMethod(methodName, argTypes);
@@ -171,7 +172,7 @@ public class MethodCallExpression extends ExpressionNode {
 	@Override
 	public boolean postAnalyze(Scope scope) {
 
-		try {getType(scope);} catch(SemanticException e) {markError(e);}; //TODO костыль, нужен для присваивания symbol
+		try {type = getType(scope);} catch(SemanticException e) {markError(e);}; //TODO костыль, нужен для присваивания symbol
 		// Проверка parent (если есть)
 		if (null != parent) {
 			if (!parent.postAnalyze(scope)) return false;
@@ -222,13 +223,19 @@ public class MethodCallExpression extends ExpressionNode {
 	public void codeGen(CodeGenerator cg) {
 		Operand[] operands = null;
 		if(!args.isEmpty()) {
-			
 			operands = new Operand[args.size()];
 			for(int i=0; i<args.size(); i++) {
 				args.get(i).codeGen(cg);
 				operands[i] = cg.getAcc();
 			}
 		}
-		cg.invokeMethod(symbol.getRuntimeId(), operands);
+		
+		if(symbol.isNative()) {
+			String className = ((ClassScope)symbol.getScope().getParent()).getName();
+			cg.invokeNative(className, symbol.getName(), type.getId(), operands);
+		}
+		else {
+			cg.invokeMethod(symbol.getRuntimeId(), type.getId(), operands);
+		}
 	}
 }

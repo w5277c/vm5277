@@ -2,6 +2,7 @@
 Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 23.04.2025	konstantin@5277.ru		Начало
+26.05.2025	konstantin@5277.ru		Временный костыль, нужно унифицировать QualifiedName
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b.compiler_core.nodes;
 
@@ -26,6 +27,7 @@ import ru.vm5277.j8b.compiler_core.nodes.commands.SwitchNode;
 import ru.vm5277.j8b.compiler_core.nodes.commands.TryNode;
 import ru.vm5277.j8b.compiler_core.nodes.commands.WhileNode;
 import ru.vm5277.j8b.compiler_core.nodes.expressions.MethodCallExpression;
+import ru.vm5277.j8b.compiler_core.nodes.expressions.TypeReferenceExpression;
 import ru.vm5277.j8b.compiler_core.semantic.BlockScope;
 import ru.vm5277.j8b.compiler_core.semantic.MethodSymbol;
 import ru.vm5277.j8b.compiler_core.semantic.Scope;
@@ -93,19 +95,40 @@ public class BlockNode extends AstNode {
 
 
 				if(null != type) {
-					// Получаем имя метода/конструктора
-					String name = null;
-					try {name = consumeToken(tb, TokenType.ID).getStringValue();}catch(ParseException e) {markFirstError(e);} // Нет имени сущности, пытаемся парсить дальше
+					if(tb.match(Delimiter.DOT)) {
+						while (tb.match(Delimiter.DOT)) {
+							tb.consume();
+							
+							String methodName = (String)consumeToken(tb, TokenType.ID).getValue();
+							if (tb.match(Delimiter.LEFT_PAREN)) {
+								// Это вызов метода
+								declarations.add(	new MethodCallExpression(tb, mc, new TypeReferenceExpression(tb, mc, type.getClassName()), methodName,
+													parseArguments(tb)));
+								consumeToken(tb, Delimiter.SEMICOLON);
+								break;
+							}
+							else {
+								// Доступ к полю (можно добавить FieldAccessNode)
+								throw new ParseException("Field access not implemented yet", tb.current().getSP());
+							}
+						}
+						continue;
+					}
+					else {
+						// Получаем имя метода/конструктора
+						String name = null;
+						try {name = consumeToken(tb, TokenType.ID).getStringValue();}catch(ParseException e) {markFirstError(e);} // Нет имени сущности, пытаемся парсить дальше
 
-					if (tb.match(Delimiter.LEFT_BRACKET)) { // Это объявление массива
-						ArrayDeclarationNode node = new ArrayDeclarationNode(tb, mc, modifiers, type, name);
-						if(null != name) declarations.add(node);
+						if (tb.match(Delimiter.LEFT_BRACKET)) { // Это объявление массива
+							ArrayDeclarationNode node = new ArrayDeclarationNode(tb, mc, modifiers, type, name);
+							if(null != name) declarations.add(node);
+						}
+						else { // Переменная
+							VarNode varNode = new VarNode(tb, mc, modifiers, type, name);
+							if(null != name) declarations.add(varNode);
+						}
+						continue;
 					}
-					else { // Переменная
-						VarNode varNode = new VarNode(tb, mc, modifiers, type, name);
-						if(null != name) declarations.add(varNode);
-					}
-					continue;
 				}
 			}
 			catch(ParseException e) {

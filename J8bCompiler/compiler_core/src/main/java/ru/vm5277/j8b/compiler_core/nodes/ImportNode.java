@@ -24,10 +24,6 @@ public class ImportNode extends AstNode {
 	public ImportNode(TokenBuffer tb, MessageContainer mc) {
         super(tb, mc);
 		
-		if(6>1) {
-			
-		}
-		
 		try {
 			// Пропуск import токена
 			consumeToken(tb);

@@ -102,10 +102,15 @@ public class Generator extends CodeGenerator {
 	}
 
 	@Override
-	public void invokeMethod(int id, Operand[] args) {
-		System.out.println("CG:invokeMethod, id:" + id + ", args:" + Arrays.toString(args));
+	public void invokeMethod(int id, int typeId, Operand[] args) {
+		System.out.println("CG:invokeMethod, id:" + id + ", typeId:" + typeId + ", args:" + Arrays.toString(args));
 	}
-
+	
+	@Override
+	public void invokeNative(String libName, String function, int typeId, Operand[] parameters) {
+		System.out.println("CG:invokeNative " + libName + "." + function + ", typeId:" + typeId + ", params" + Arrays.toString(parameters));
+	}
+	
 	@Override
 	public Operand emitInstanceof(Operand op, int typeId) {
 		System.out.println("CG:emitInstanceOf, op:" + op + ", typeId:" + typeId);

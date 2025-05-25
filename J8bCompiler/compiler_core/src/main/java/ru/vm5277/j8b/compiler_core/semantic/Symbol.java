@@ -60,6 +60,10 @@ public class Symbol {
 		return isStatic;
 	}
 	
+	public boolean isNative() {
+		return isNative;
+	}
+	
 	public void setRuntimeId(int runtimeId) {
 		this.runtimeId = runtimeId;
 	}

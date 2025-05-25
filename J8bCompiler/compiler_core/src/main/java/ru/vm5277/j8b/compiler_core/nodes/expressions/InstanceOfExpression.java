@@ -82,8 +82,8 @@ public class InstanceOfExpression extends ExpressionNode {
 					fulfillsContract = true;
 				}
 				else {
-					ClassScope leftClass = scope.resolveClass(leftType.getClassName());
-					InterfaceSymbol rightInterface = scope.resolveInterface(rightType.getClassName());
+					ClassScope leftClass = scope.getThis().resolveClass(leftType.getClassName());
+					InterfaceSymbol rightInterface = scope.getThis().resolveInterface(rightType.getClassName());
 
 					
 					if (null != leftClass && null != rightInterface) {

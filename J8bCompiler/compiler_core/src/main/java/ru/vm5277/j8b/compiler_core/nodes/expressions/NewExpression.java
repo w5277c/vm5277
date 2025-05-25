@@ -70,7 +70,7 @@ public class NewExpression extends ExpressionNode {
 			}
 
 			// Проверяем существование класса
-			ClassScope classScope = scope.resolveClass(className);
+			ClassScope classScope = scope.getThis().resolveClass(className);
 			if (null == classScope) {
 				markError("Class '" + className + "' not found");
 				return false;

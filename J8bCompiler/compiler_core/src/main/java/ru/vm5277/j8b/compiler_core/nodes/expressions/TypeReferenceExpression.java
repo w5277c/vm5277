@@ -37,7 +37,7 @@ public class TypeReferenceExpression extends ExpressionNode {
 
 		if(null == type) {
 			// Затем проверяем, является ли это интерфейсом
-			InterfaceSymbol interfaceSymbol = scope.resolveInterface(className);
+			InterfaceSymbol interfaceSymbol = scope.getThis().resolveInterface(className);
 			if (null != interfaceSymbol) {
 				type = VarType.addClassName(className);
 			}

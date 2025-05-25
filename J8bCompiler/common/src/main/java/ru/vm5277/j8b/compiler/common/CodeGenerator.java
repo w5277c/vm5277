@@ -28,7 +28,8 @@ public abstract class CodeGenerator {
 	public abstract void loadAcc(int srcId); //Загрузить переменную в аккумулятор
 	public abstract void storeAcc(int srcId); //Записать аккумулятор в переменную
 	
-	public abstract void invokeMethod(int id, Operand[] args);
+	public abstract void invokeMethod(int id, int typeId, Operand[] args);
+	public abstract void invokeNative(String libName, String function, int typeId, Operand[] parameters);
 	public abstract Operand emitInstanceof(Operand op, int typeId);	//todo может быть поросто boolean?
 	public abstract void emitUnary(Operator op); //PLUS, MINUS, BIT_NOT, NOT, PRE_INC, PRE_DEC, POST_INC, POST_DEC
 	

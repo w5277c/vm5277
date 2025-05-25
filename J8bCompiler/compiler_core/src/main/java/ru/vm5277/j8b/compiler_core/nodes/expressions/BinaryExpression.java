@@ -128,7 +128,7 @@ public class BinaryExpression extends ExpressionNode {
 
 					if (targetType.isClassType()) {
 						// Ищем класс в scope
-						ClassScope classScope = scope.resolveClass(targetType.getClassName());
+						ClassScope classScope = scope.getThis().resolveClass(targetType.getClassName());
 						if (null != classScope) {
 							Symbol field = classScope.getFields().get(fieldName);
 							if (null != field && field.isFinal()) {

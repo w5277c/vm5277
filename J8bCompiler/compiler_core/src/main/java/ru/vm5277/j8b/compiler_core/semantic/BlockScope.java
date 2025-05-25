@@ -52,23 +52,16 @@ public class BlockScope implements Scope {
 	}
 	
 	@Override
+	public ClassScope getThis() {
+		if(parent instanceof ClassScope) {
+			return (ClassScope)parent;
+		}
+		return null == parent ? null : parent.getThis();
+	}
+	
+	@Override
 	public Scope getParent() {
 		return parent;
-	}
-
-	@Override
-	public ClassScope resolveClass(String className) {
-		return Scope.resolveClass(this, className);
-	}
-
-	@Override
-	public InterfaceSymbol resolveInterface(String interfaceName) {
-		// Поиск в родительской области видимости (если есть)
-		if (parent != null) {
-			return parent.resolveInterface(interfaceName);
-		}
-
-		return null;
 	}
 	
 	@Override

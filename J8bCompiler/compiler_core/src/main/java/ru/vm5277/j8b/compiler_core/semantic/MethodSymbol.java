@@ -15,14 +15,6 @@ public class MethodSymbol extends Symbol {
 	private			String			signature;
 	private	final	MethodScope		scope;
 	
-	public MethodSymbol(String name, VarType returnType, List<Symbol> parameters, boolean isFinal, boolean isStatic, boolean canThrow, MethodScope scope) {
-		super(name, returnType, isFinal, isStatic);
-		
-		this.parameters = parameters;
-		this.scope = scope;
-		this.canThrow = canThrow;
-	}
-
 	public MethodSymbol(String name, VarType returnType, List<Symbol> parameters, boolean isFinal, boolean isStatic, boolean isNative, boolean canThrow,
 						MethodScope scope) {
 		super(name, returnType, isFinal, isStatic, isNative);

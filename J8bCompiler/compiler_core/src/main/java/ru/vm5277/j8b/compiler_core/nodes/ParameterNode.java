@@ -14,7 +14,7 @@ import ru.vm5277.j8b.compiler_core.semantic.MethodScope;
 import ru.vm5277.j8b.compiler_core.semantic.Scope;
 
 public class ParameterNode extends AstNode {
-	private	final	VarType	type;
+	private			VarType	type;
     private	final	String	name;
 	private	final	boolean	isFinal;
 	
@@ -27,6 +27,7 @@ public class ParameterNode extends AstNode {
 		}
 		
 		this.type = checkPrimtiveType();
+		if (null == this.type) this.type = checkClassType();
 		this.name = (String)consumeToken(tb, TokenType.ID).getValue();
 	}
 

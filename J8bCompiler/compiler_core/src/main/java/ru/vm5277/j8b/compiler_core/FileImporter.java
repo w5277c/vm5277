@@ -17,39 +17,39 @@ import ru.vm5277.j8b.compiler_core.tokens.Token;
 
 public class FileImporter {
 	private	final	List<String>		importedFiles	= new ArrayList<>();
+	private	final	String				runtimePath;
 	private	final	String				basePath;
 	private	final	MessageContainer	mc;
 
-	public FileImporter(String basePath, MessageContainer mc) {
+	public FileImporter(String runtimePath, String basePath, MessageContainer mc) {
+		this.runtimePath = runtimePath;
 		this.basePath = basePath;
 		this.mc = mc;
 	}
 
 	public List<Token> importFile(String importPath) throws IOException {
-		String filePath = resolveFilePath(importPath);
-
 		// Проверка циклических зависимостей
-		if (importedFiles.contains(filePath)) {
+		if (importedFiles.contains(importPath)) {
 			mc.add(new WarningMessage("Circular import detected: " + importPath, null));
 		}
 		else {
-			importedFiles.add(filePath);
+			importedFiles.add(importPath);
 		}
 
-		File file = new File(filePath);
+		File file = new File(runtimePath + File.separator + importPath.replace('.', File.separatorChar) + ".j8b");
 		if (!file.exists()) {
-			mc.add(new ErrorMessage("Imported file not found: " + filePath, null));
+			file = new File(basePath + File.separator + importPath.replace('.', File.separatorChar) + ".j8b");
+			if(!file.exists()) {
+				mc.add(new ErrorMessage("Imported file not found: " + importPath, null));
+				file = null;
+			}
 		}
-		else {
+		if(null != file) {
 			try (FileReader reader = new FileReader(file)) {
 				Lexer lexer = new Lexer(reader, mc);
 				return lexer.getTokens();
 			}
 		}
 		return new ArrayList<>();
-	}
-
-	private String resolveFilePath(String importPath) {
-		return basePath + File.separator + importPath.replace('.', File.separatorChar) + ".j8b";
 	}
 }

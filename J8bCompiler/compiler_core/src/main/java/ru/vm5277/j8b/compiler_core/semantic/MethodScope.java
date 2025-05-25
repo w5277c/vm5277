@@ -58,19 +58,10 @@ public class MethodScope implements Scope {
 		return parent != null ? parent.resolve(name) : null;
 	}
 	
+	
 	@Override
-	public ClassScope resolveClass(String className) {
-		return Scope.resolveClass(this, className);
-	}
-
-	@Override
-	public InterfaceSymbol resolveInterface(String interfaceName) {
-		// Поиск в родительской области видимости (если есть)
-		if (parent != null) {
-			return parent.resolveInterface(interfaceName);
-		}
-
-		return null;
+	public ClassScope getThis() {
+		return parent;
 	}
 
 	@Override
