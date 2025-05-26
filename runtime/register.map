@@ -1,0 +1,5 @@
+#class.method path.function regs
+#regs: reg,reg,reg,...(reg: 16-31.16-31....)
+
+####lang.runtime
+    Runtime.out io.out.out_char 16

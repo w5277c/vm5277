@@ -103,7 +103,7 @@ public class WhileNode extends CommandNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) {
+	public void codeGen(CodeGenerator cg) throws Exception {
 		int condBlockId = cg.enterBlock();
 		condition.codeGen(cg);
 		cg.leave();

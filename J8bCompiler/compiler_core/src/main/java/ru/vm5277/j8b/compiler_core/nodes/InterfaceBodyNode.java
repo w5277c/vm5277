@@ -185,7 +185,7 @@ public class InterfaceBodyNode extends AstNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) {
+	public void codeGen(CodeGenerator cg) throws Exception {
 		for(AstNode decl : declarations) {
 			if(decl instanceof MethodNode && ((MethodNode)decl).isStatic()) {
 				decl.codeGen(cg);

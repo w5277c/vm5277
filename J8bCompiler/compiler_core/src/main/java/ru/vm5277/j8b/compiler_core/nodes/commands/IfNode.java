@@ -208,7 +208,7 @@ public class IfNode extends CommandNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) {
+	public void codeGen(CodeGenerator cg) throws Exception {
 		if(alwaysTrue) {
 			cg.enterBlock();
 			getThenBlock().codeGen(cg);

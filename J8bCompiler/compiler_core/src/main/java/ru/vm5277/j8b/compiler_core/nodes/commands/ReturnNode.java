@@ -100,7 +100,7 @@ public class ReturnNode extends CommandNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) {
+	public void codeGen(CodeGenerator cg) throws Exception {
 		if(null != expression) {
 			expression.codeGen(cg);
 		}

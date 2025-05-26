@@ -70,7 +70,7 @@ public class ThrowNode extends CommandNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) {
+	public void codeGen(CodeGenerator cg) throws Exception {
 		exceptionExpr.codeGen(cg);
 		cg.eThrow();
 	}

@@ -220,7 +220,7 @@ public class MethodCallExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) {
+	public void codeGen(CodeGenerator cg) throws Exception {
 		Operand[] operands = null;
 		if(!args.isEmpty()) {
 			operands = new Operand[args.size()];
@@ -232,7 +232,7 @@ public class MethodCallExpression extends ExpressionNode {
 		
 		if(symbol.isNative()) {
 			String className = ((ClassScope)symbol.getScope().getParent()).getName();
-			cg.invokeNative(className, symbol.getName(), type.getId(), operands);
+			cg.invokeNative(className + "." + symbol.getName(), type.getId(), operands);
 		}
 		else {
 			cg.invokeMethod(symbol.getRuntimeId(), type.getId(), operands);

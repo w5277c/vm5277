@@ -12,16 +12,19 @@ import java.util.Map;
 import ru.vm5277.j8b.compiler.common.Case;
 import ru.vm5277.j8b.compiler.common.CodeGenerator;
 import ru.vm5277.j8b.compiler.common.Operand;
+import ru.vm5277.j8b.compiler.common.RegisterMap;
 import ru.vm5277.j8b.compiler.common.enums.OperandType;
 import ru.vm5277.j8b.compiler.common.enums.Operator;
 import ru.vm5277.j8b.compiler.common.enums.VarType;
 
 public class Generator extends CodeGenerator {
-	private	Operand acc;
+	private	final	Map<String, RegisterMap> regMap;
+	private			Operand acc;	//TODO похоже будет не нужен
+	private			StringBuilder	asmSource	= new StringBuilder();
 	
-	public Generator(Map<String, String> params) {
+	public Generator(Map<String, RegisterMap> regMap, Map<String, String> params) {
+		this.regMap = regMap;
 	}
-	
 	
 	@Override
 	public int enterClass(int typeId, int[] intrerfaceIds) {
@@ -107,8 +110,44 @@ public class Generator extends CodeGenerator {
 	}
 	
 	@Override
-	public void invokeNative(String libName, String function, int typeId, Operand[] parameters) {
-		System.out.println("CG:invokeNative " + libName + "." + function + ", typeId:" + typeId + ", params" + Arrays.toString(parameters));
+	public void invokeNative(String methodQName, int typeId, Operand[] parameters) throws Exception {
+		System.out.println("CG:invokeNative " + methodQName + ", typeId:" + typeId + ", params" + Arrays.toString(parameters));
+		
+		RegisterMap rm = regMap.get(methodQName);
+		if(null == rm) throw new Exception("CG:InvokeNative, register map record not found for method: " + methodQName);
+		byte[][] regIds = rm.getRegIds();
+		if(parameters.length != regIds.length) {
+			throw new Exception("CG:InvokeNative, invalid parameter count for method " + methodQName + ", expected " + regIds.length + ", got " +
+								parameters.length);
+		}
+
+		StringBuilder sb = new StringBuilder();
+		for(int i=0; i<parameters.length; i++) {
+			byte[] registers = regIds[i];
+			if(0 == registers.length || 4 < registers.length) throw new Exception("CG:Invalid parameters for invoke method " + methodQName);
+			
+			long value = 0;
+			Operand op = parameters[i];
+			if(OperandType.VARIABLE == op.getOperandType()) {
+				throw new UnsupportedOperationException("Variable parameters not implemented yet");
+			}
+			else if(OperandType.LITERAL == op.getOperandType()) {
+				if(op.getValue() instanceof Number) {
+					value = ((Number)op.getValue()).longValue();
+				}
+				else throw new Exception("CG:InvokeNative: literal must be a number for method " + methodQName);
+			}
+			for(int j=0; j<registers.length; j++) {
+				int reg = registers[j] & 0xFF;
+				if (reg<16 || reg>31) throw new Exception("CG:InvokeNative: invalid register R" + reg + " for method " + methodQName);
+				sb.append("LDI R").append(reg).append(",").append(value&0xff).append("\n");
+				value >>>= 8;
+			}
+			sb.append("CALL ").append(rm.getRtosFunction()).append("\n");
+		}
+		asmSource.append(sb);
+		
+		System.out.println("CG:invokeNative asm:\n" + sb.toString());
 	}
 	
 	@Override

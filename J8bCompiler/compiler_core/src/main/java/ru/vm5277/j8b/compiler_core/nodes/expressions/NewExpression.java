@@ -122,7 +122,7 @@ public class NewExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) {
+	public void codeGen(CodeGenerator cg) throws Exception {
 		Operand[] operands = null;
 		if(!args.isEmpty()) {
 			

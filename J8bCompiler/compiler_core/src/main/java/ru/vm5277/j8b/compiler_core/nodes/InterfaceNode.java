@@ -9,8 +9,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.j8b.compiler.common.CodeGenerator;
-import ru.vm5277.j8b.compiler.common.Operand;
-import ru.vm5277.j8b.compiler.common.enums.OperandType;
 import ru.vm5277.j8b.compiler.common.exceptions.ParseException;
 import ru.vm5277.j8b.compiler_core.enums.Delimiter;
 import ru.vm5277.j8b.compiler_core.enums.Keyword;
@@ -161,7 +159,7 @@ public class InterfaceNode extends AstNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) {
+	public void codeGen(CodeGenerator cg) throws Exception {
 		int[] interfaceIds = null;
 		if(!interfaces.isEmpty()) {
 			interfaceIds = new int[interfaces.size()];

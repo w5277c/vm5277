@@ -202,7 +202,7 @@ public class TryNode extends CommandNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) {
+	public void codeGen(CodeGenerator cg) throws Exception {
 		int blockId = cg.enterBlock();
 		tryBlock.codeGen(cg);
 		cg.leave();

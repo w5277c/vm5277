@@ -11,6 +11,7 @@ import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Map;
 import ru.vm5277.j8b.compiler.common.CodeGenerator;
+import ru.vm5277.j8b.compiler.common.RegisterMap;
 
 public class PlatformLoader {
 	private	static	final	String	LIB_PREFIX		= "codegen_";
@@ -18,7 +19,7 @@ public class PlatformLoader {
 	private	static	final	String	LIB_CLASSPATH	= "ru.vm5277.j8b.compiler.codegen.";
 	private	static	final	String	LIB_CLASSNAME	= ".Generator";
 	
-	public static CodeGenerator loadGenerator(String platform, Map<String, String> params) throws Exception {
+	public static CodeGenerator loadGenerator(String platform, Map<String, RegisterMap> regMap, Map<String, String> params) throws Exception {
 		// Формируем имя JAR-файла (например, "codegen-avr.jar")
 		String jarName = LIB_PREFIX + platform + ".jar";
 		File jarFile = new File(LIB_DIR + jarName);
@@ -31,9 +32,9 @@ public class PlatformLoader {
 		// Загружаем класс-генератор (ожидаемое имя: ru.vm5277.j8b.compiler.codegen.platform.Generator)
 		String className = LIB_CLASSPATH + platform + LIB_CLASSNAME;
 		Class<?> generatorClass = classLoader.loadClass(className);
-		Constructor<?> constructor = generatorClass.getConstructor(Map.class);
+		Constructor<?> constructor = generatorClass.getConstructor(Map.class, Map.class);
 
 		// Создаем экземпляр, передавая параметры
-		return (CodeGenerator) constructor.newInstance(params);
+		return (CodeGenerator) constructor.newInstance(regMap, params);
 	}
 }

@@ -113,7 +113,7 @@ public class InstanceOfExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) {
+	public void codeGen(CodeGenerator cg) throws Exception {
 		left.codeGen(cg);
 		Operand objectOp = cg.getAcc();
 		rightExpr.codeGen(cg);

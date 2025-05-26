@@ -241,7 +241,7 @@ public class MethodNode extends AstNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) {
+	public void codeGen(CodeGenerator cg) throws Exception {
 		int[] typeIds = null;
 		if(!parameters.isEmpty()) {
 			typeIds = new int[parameters.size()];

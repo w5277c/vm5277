@@ -438,7 +438,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		return mc;
 	}
 	
-	public void codeGen(CodeGenerator cg) {
+	public void codeGen(CodeGenerator cg) throws Exception { 
 		throw new UnsupportedOperationException(this.toString());
 	}
 }

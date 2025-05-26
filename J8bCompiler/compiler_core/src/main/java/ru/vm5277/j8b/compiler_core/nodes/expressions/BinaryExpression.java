@@ -253,7 +253,7 @@ public class BinaryExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) {
+	public void codeGen(CodeGenerator cg) throws Exception {
 		// Генерация кода для левого и правого операндов
 		left.codeGen(cg);
 		Operand leftOp = cg.getAcc();

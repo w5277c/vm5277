@@ -135,7 +135,7 @@ public class UnaryExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) {
+	public void codeGen(CodeGenerator cg) throws Exception {
 		// Генерация кода для операнда (например, переменной или другого выражения)
 		operand.codeGen(cg);
 

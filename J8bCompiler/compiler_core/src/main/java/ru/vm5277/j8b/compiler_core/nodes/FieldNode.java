@@ -149,7 +149,7 @@ public class FieldNode extends AstNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) {
+	public void codeGen(CodeGenerator cg) throws Exception {
 		symbol.setRuntimeId(cg.enterFiled(type.getId(), name));
 		try {
 			initializer.codeGen(cg);

@@ -288,7 +288,7 @@ public class BlockNode extends AstNode {
 	}
 
 	@Override
-	public void codeGen(CodeGenerator cg) {
+	public void codeGen(CodeGenerator cg) throws Exception {
 		for(AstNode decl : declarations) {
 			decl.codeGen(cg);
 		}

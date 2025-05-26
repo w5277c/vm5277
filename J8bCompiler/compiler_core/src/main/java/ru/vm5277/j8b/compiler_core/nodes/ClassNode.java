@@ -187,7 +187,7 @@ public class ClassNode extends AstNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) {
+	public void codeGen(CodeGenerator cg) throws Exception {
 		int[] interfaceIds = null;
 		if(!interfaces.isEmpty()) {
 			interfaceIds = new int[interfaces.size()];
