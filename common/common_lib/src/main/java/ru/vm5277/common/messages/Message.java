@@ -1,0 +1,52 @@
+/*--------------------------------------------------------------------------------------------------------------------------------------------------------------
+Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
+----------------------------------------------------------------------------------------------------------------------------------------------------------------
+02.05.2025	konstantin@5277.ru		Начало
+--------------------------------------------------------------------------------------------------------------------------------------------------------------*/
+package ru.vm5277.common.messages;
+
+import java.io.File;
+import ru.vm5277.common.SourcePosition;
+
+public class Message {
+	private			String			type;
+	private			MessageOwner	owner;
+	private			String			path;
+	private	final	String			text;
+	private	final	SourcePosition	sp;
+	
+	Message(String type, String text, SourcePosition sp) {
+		this.type = type;
+		this.text = text;
+		this.sp = sp;
+	}
+
+	Message(String type, MessageOwner owner, String text, SourcePosition sp) {
+		this.type = type;
+		this.owner = owner;
+		this.text = text;
+		this.sp = sp;
+	}
+	
+	public void setMessageOwnerIfNull(MessageOwner owner) {
+		if(null == this.owner) {
+			this.owner = owner;
+		}
+	}
+	
+	public String getText() {
+		return text;
+	}
+	
+	public SourcePosition getSP() {
+		return sp;
+	}
+	
+	public String toStrig() {
+		return owner + "|" + type.toUpperCase() + "|\t" + path + (null == sp ? "" : sp) + "\t"  + text;
+	}
+
+	public void setPath(String path) {
+		this.path = path;
+	}
+}

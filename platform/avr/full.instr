@@ -1,0 +1,159 @@
+# R	register 0≤d≤31
+# Rh	hight register 16≤d≤31
+# Ri	index register r24,r26,r28,r30
+# Re	even register r0,r2,r4,...,r30
+# A	I/O register address
+# k3	constant 3bit
+# k6	constant 6bit
+# k7s	signed constant 7bit
+# k7	constant 7bit
+# k8	constant 8bit
+# k12s	signed constant 12bit
+# k16	constant 16bit
+# k22	constant 22bit
+
+# ============ ARITHMETIC AND LOGIC INSTRUCTIONS ============
+ADD	add	zcnvh	1	1	0x0c00	R,R	# Add two registers (Rd ← Rd + Rr), update Z,C,N,V,H
+ADC	adc	zcnvh	1	1	0x1c00	R,R	# Add with Carry (Rd ← Rd + Rr + C)
+ADIW	adiw	zcnvs	2	1	0x9600	Ri,k6	# Add immediate to word (Rdh:Rdl ← Rdh:Rdl + K)
+SUB	sub	zcnvh	1	1	0x1800	R,R	# Subtract registers (Rd ← Rd - Rr)
+SUBI	subi	zcnvh	1	1	0x5000	Rh,k8	# Subtract immediate (Rd ← Rd - K)
+SBC	sbc	zcnvh	1	1	0x0800	R,R	# Subtract with Carry (Rd ← Rd - Rr - C)
+SBCI	sbci	zcnvh	1	1	0x4000	Rh,k8	# Subtract immediate with Carry (Rd ← Rd - K - C)
+SBIW	sbiw	zcnvs	2	1	0x9700	Ri,k6	# Subtract immediate from word (Rdh:Rdl ← Rdh:Rdl - K)
+AND	and	znv	1	1	0x2000	R,R	# Logical AND (Rd ← Rd & Rr), update Z,N,V
+ANDI	andi	znv	1	1	0x7000	Rh,k8	# Logical AND with immediate (Rd ← Rd & K)
+OR	or	znv	1	1	0x2800	R,R	# Logical OR (Rd ← Rd | Rr), update Z,N,V
+ORI	ori	znv	1	1	0x6000	Rh,k8	# Logical OR with immediate (Rd ← Rd | K)
+EOR	eor	znv	1	1	0x2400	R,R	# Exclusive OR (Rd ← Rd ^ Rr), update Z,N,V
+COM	com	zcnv	1	1	0x9400	R	# One's complement (Rd ← ~Rd), update Z,C,N,V
+NEG	neg	zcnvh	1	1	0x9401	R	# Two's complement (Rd ← 0 - Rd), update Z,C,N,V,H
+SBR	sbr	znv	1	1	0x6000	Rh,k8	# Set bits in register (alias for ORI)
+CBR	cbr	znv	1	1	0x7000	Rh,k8	# Clear bits in register (alias for ANDI with ~K)
+INC	inc	znv	1	1	0x9403	R	# Increment (Rd ← Rd + 1), update Z,N,V
+DEC	dec	znv	1	1	0x940a	R	# Decrement (Rd ← Rd - 1), update Z,N,V
+CLR	clr	znv	1	1	0x2400	R	# Clear register (Rd ← 0, alias for EOR Rd,Rd)
+SER	ser	none	1	1	0xef0f	Rh	# Set register (Rd ← 0xFF, alias for LDI Rd, 0xFF)
+MUL	mul	zc	2	1	0x9c00	R,R	# Multiply unsigned (R1:R0 ← Rd × Rr), update Z,C
+MULS	muls	zc	2	1	0x0200	R,R	# Multiply signed (R1:R0 ← Rd × Rr), update Z,C
+MULSU	mulsu	zc	2	1	0x0300	R,R	# Multiply signed/unsigned (R1:R0 ← Rd × Rr), update Z,C
+FMUL	fmul	zc	2	1	0x0308	R,R	# Fractional multiply unsigned (R1:R0 ← Rd × Rr × 2), update Z,C
+FMULS	fmuls	zc	2	1	0x0380	R,R	# Fractional multiply signed (R1:R0 ← Rd × Rr × 2), update Z,C
+FMULSU	fmulsu	zc	2	1	0x0388	R,R	# Fractional multiply signed/unsigned (R1:R0 ← Rd × Rr × 2), update Z,C
+
+# ============ BRANCH INSTRUCTIONS ============
+RJMP	rjmp	none	2	1	0xc000	k12s	# Relative jump (PC ← PC + k + 1)
+IJMP	ijmp	none	2	1	0x9409	none	# Indirect jump (PC ← Z)
+JMP	jmp	none	3	2	0x940c	k22	# Long jump (PC ← k)
+RCALL	rcall	none	3	1	0xd000	k12s	# Relative call (PC ← PC + k + 1, push ret addr)
+ICALL	icall	none	3	1	0x9509	none	# Indirect call (PC ← Z, push ret addr)
+CALL	call	none	4	2	0x940e	k22	# Long call (PC ← k, push ret addr)
+RET	ret	none	4	1	0x9508	none	# Return from subroutine (PC ← pop())
+RETI	reti	i	4	1	0x9518	none	# Return from interrupt (PC ← pop(), enable interrupts)
+CPSE	cpse	none	1/2/3	1	0x1000	R,R	# Compare, skip if equal (if Rd == Rr, skip next)
+CP	cp	znvch	1	1	0x1400	R,R	# Compare (Rd - Rr), update Z,N,V,C,H
+CPC	cpc	znvch	1	1	0x0400	R,R	# Compare with Carry (Rd - Rr - C), update Z,N,V,C,H
+CPI	cpi	znvch	1	1	0x3000	Rh,k8	# Compare with immediate (Rd - K), update Z,N,V,C,H
+SBRC	sbrc	none	1/2/3	1	0xfc00	R,k3	# Skip if bit in register cleared (if Rr(b) == 0, skip)
+SBRS	sbrs	none	1/2/3	1	0xfe00	R,k3	# Skip if bit in register set (if Rr(b) == 1, skip)
+SBIC	sbic	none	1/2/3	1	0x9900	A,k3	# Skip if I/O bit cleared (if I/O(b) == 0, skip)
+SBIS	sbis	none	1/2/3	1	0x9b00	A,k3	# Skip if I/O bit set (if I/O(b) == 1, skip)
+BRBS	brbs	none	1/2	1	0xf000	k3,k7s	# Branch if status flag set (if SREG(s) == 1, PC ← PC + k + 1)
+BRBC	brbc	none	1/2	1	0xf400	k3,k7s	# Branch if status flag cleared (if SREG(s) == 0, PC ← PC + k + 1)
+BREQ	breq	none	1/2	1	0xf001	k7s	# Branch if equal (Z == 1)
+BRNE	brne	none	1/2	1	0xf401	k7s	# Branch if not equal (Z == 0)
+BRCS	brcs	none	1/2	1	0xf000	k7s	# Branch if carry set (C == 1)
+BRCC	brcc	none	1/2	1	0xf400	k7s	# Branch if carry cleared (C == 0)
+BRSH	brsh	none	1/2	1	0xf400	k7s	# Branch if same or higher (unsigned, C == 0)
+BRLO	brlo	none	1/2	1	0xf000	k7s	# Branch if lower (unsigned, C == 1)
+BRMI	brmi	none	1/2	1	0xf002	k7s	# Branch if minus (N == 1)
+BRPL	brpl	none	1/2	1	0xf402	k7s	# Branch if plus (N == 0)
+BRGE	brge	none	1/2	1	0xf404	k7s	# Branch if greater or equal (signed, S == 0)
+BRLT	brlt	none	1/2	1	0xf004	k7s	# Branch if less than (signed, S == 1)
+BRHS	brhs	none	1/2	1	0xf005	k7s	# Branch if half-carry set (H == 1)
+BRHC	brhc	none	1/2	1	0xf405	k7s	# Branch if half-carry cleared (H == 0)
+BRTS	brts	none	1/2	1	0xf006	k7s	# Branch if T flag set (T == 1)
+BRTC	brtc	none	1/2	1	0xf406	k7s	# Branch if T flag cleared (T == 0)
+BRVS	brvs	none	1/2	1	0xf003	k7s	# Branch if overflow set (V == 1)
+BRVC	brvc	none	1/2	1	0xf403	k7s	# Branch if overflow cleared (V == 0)
+BRIE	brie	none	1/2	1	0xf007	k7s	# Branch if interrupts enabled (I == 1)
+BRID	brid	none	1/2	1	0xf407	k7s	# Branch if interrupts disabled (I == 0)
+
+# ============ BIT AND BIT-TEST INSTRUCTIONS ============
+SBI	sbi	none	2	1	0x9a00	A,k3	# Set bit in I/O register (I/O(b) ← 1)
+CBI	cbi	none	2	1	0x9800	A,k3	# Clear bit in I/O register (I/O(b) ← 0)
+LSL	lsl	zcnv	1	1	0x0c00	R	# Logical shift left (Rd ← Rd << 1), update Z,C,N,V
+LSR	lsr	zcnv	1	1	0x9406	R	# Logical shift right (Rd ← Rd >> 1), update Z,C,N,V
+ROL	rol	zcnv	1	1	0x1c00	R	# Rotate left through carry (Rd ← (Rd << 1) | C), update Z,C,N,V
+ROR	ror	zcnv	1	1	0x9407	R	# Rotate right through carry (Rd ← (Rd >> 1) | (C << 7)), update Z,C,N,V
+ASR	asr	zcnv	1	1	0x9405	R	# Arithmetic shift right (Rd ← Rd >> 1, MSB preserved), update Z,C,N,V
+SWAP	swap	none	1	1	0x9402	R	# Swap nibbles (Rd ← (Rd << 4) | (Rd >> 4))
+BSET	bset	sregs	1	1	0x9408	k3	# Set status flag (SREG(s) ← 1)
+BCLR	bclr	sregs	1	1	0x9488	k3	# Clear status flag (SREG(s) ← 0)
+BST	bst	t	1	1	0xfa00	R,k3	# Store bit to T flag (T ← Rr(b))
+BLD	bld	none	1	1	0xf800	R,k3	# Load bit from T flag (Rd(b) ← T)
+SEC	sec	c	1	1	0x9408	none	# Set carry flag (C ← 1)
+CLC	clc	c	1	1	0x9488	none	# Clear carry flag (C ← 0)
+SEN	sen	n	1	1	0x9428	none	# Set negative flag (N ← 1)
+CLN	cln	n	1	1	0x94a8	none	# Clear negative flag (N ← 0)
+SEZ	sez	z	1	1	0x9418	none	# Set zero flag (Z ← 1)
+CLZ	clz	z	1	1	0x9498	none	# Clear zero flag (Z ← 0)
+SEI	sei	i	1	1	0x9478	none	# Set interrupt flag (I ← 1, enable interrupts)
+CLI	cli	i	1	1	0x94f8	none	# Clear interrupt flag (I ← 0, disable interrupts)
+SES	ses	s	1	1	0x9448	none	# Set sign flag (S ← 1)
+CLS	cls	s	1	1	0x94c8	none	# Clear sign flag (S ← 0)
+SEV	sev	v	1	1	0x9438	none	# Set overflow flag (V ← 1)
+CLV	clv	v	1	1	0x94b8	none	# Clear overflow flag (V ← 0)
+SET	set	t	1	1	0x9468	none	# Set T flag (T ← 1)
+CLT	clt	t	1	1	0x94e8	none	# Clear T flag (T ← 0)
+SEH	seh	h	1	1	0x9458	none	# Set half-carry flag (H ← 1)
+CLH	clh	h	1	1	0x94d8	none	# Clear half-carry flag (H ← 0)
+
+# ============ DATA TRANSFER INSTRUCTIONS ============
+MOV	mov	none	1	1	0x2c00	R,R	# Copy register (Rd ← Rr)
+MOVW	movw	none	1	1	0x0100	Re,Re	# Copy register pair (Rd+1:Rd ← Rr+1:Rr)
+LDI	ldi	none	1	1	0xe000	Rh,k8	# Load immediate (Rd ← K)
+LDX	ld	none	2	1	0x900c	R,X	# Load indirect from X (Rd ← [X])
+LDXP	ld	none	2	1	0x900d	R,X+	# Load indirect from X and post-increment (Rd ← [X], X ← X + 1)
+LDMX	ld	none	2	1	0x900e	R,-X	# Load indirect from X and pre-decrement (X ← X - 1, Rd ← [X])
+LDY	ld	none	2	1	0x8008	R,Y	# Load indirect from Y (Rd ← [Y])
+LDYP	ld	none	2	1	0x9009	R,Y+	# Load indirect from Y and post-increment (Rd ← [Y], Y ← Y + 1)
+LDMY	ld	none	2	1	0x900a	R,-Y	# Load indirect from Y and pre-decrement (Y ← Y - 1, Rd ← [Y])
+LDZ	ld	none	2	1	0x8000	R,Z	# Load indirect from Z (Rd ← [Z])
+LDZP	ld	none	2	1	0x9001	R,Z+	# Load indirect from Z and post-increment (Rd ← [Z], Z ← Z + 1)
+LDMZ	ld	none	2	1	0x9002	R,-Z	# Load indirect from Z and pre-decrement (Z ← Z - 1, Rd ← [Z])
+LDDY	ldd	none	2	1	0x8008	R,Y+k6	# Load indirect from Y + q (Rd ← [Y + q])
+LDDZ	ldd	none	2	1	0x8000	R,Z+k6	# Load indirect from Z + q (Rd ← [Z + q])
+LDS	lds	none	2	2	0x9000	R,k16	# Load direct from SRAM (Rd ← [k])
+LDS16	lds	none	2	2	0xa000	Rh,k7	# Load direct from SRAM 16 bit(Rd ← [K])
+STX	st	none	2	1	0x920c	X,R	# Store indirect to X ([X] ← Rr)
+STXP	st	none	2	1	0x920d	X+,R	# Store indirect to X and post-increment ([X] ← Rr, X ← X + 1)
+STMX	st	none	2	1	0x920e	-X,R	# Store indirect to X and pre-decrement (X ← X - 1, [X] ← Rr)
+STY	st	none	2	1	0x8208	Y,R	# Store indirect to Y ([Y] ← Rr)
+STYP	st	none	2	1	0x9209	Y+,R	# Store indirect to Y and post-increment ([Y] ← Rr, Y ← Y + 1)
+STMY	st	none	2	1	0x920a	-Y,R	# Store indirect to Y and pre-decrement (Y ← Y - 1, [Y] ← Rr)
+STZ	st	none	2	1	0x8200	Z,R	# Store indirect to Z ([Z] ← Rr)
+STZP	st	none	2	1	0x9201	Z+,R	# Store indirect to Z and post-increment ([Z] ← Rr, Z ← Z + 1)
+STMZ	st	none	2	1	0x9202	-Z,R	# Store indirect to Z and pre-decrement (Z ← Z - 1, [Z] ← Rr)
+STDY	std	none	2	1	0x8208	Y+k6,R	# Store indirect to Y + q ([Y + q] ← Rr)
+STDZ	std	none	2	1	0x8200	Z+k6,R	# Store indirect to Z + q ([Z + q] ← Rr)
+STS	sts	none	2	2	0x9200	k16,R	# Store direct to SRAM ([k] ← Rr)
+STS16	sts	none	2	2	0xa800	k7,Rh	# Store direct to SRAM 16 bit([k] ← Rr)
+LPM	lpm	none	3	1	0x95c8	none	# Load Program Memory (Rd ← [Z], базовый вариант)
+LPMZ	lpm	none	3	1	0x9004	R,Z	# Load Program Memory (Rd ← [Z], синоним LPM Rd, Z)
+LPMZP	lpm	none	3	1	0x9005	R,Z+	# Load Program Memory with Post-Increment (Rd ← [Z], Z ← Z + 1)
+ELPM	elpm	none	3	1	0x95d8	none	# Extended LPM (Rd ← [RAMPZ:Z], для >64K Flash)
+ELPMZ	elpm	none	3	1	0x9006	R,Z	# Extended LPM (Rd ← [RAMPZ:Z], синоним ELPM Rd, Z)
+ELPMZP	elpm	none	3	1	0x9007	R,Z+	# Extended LPM with Post-Increment (Rd ← [RAMPZ:Z], Z ← Z + 1)
+SPM	spm	none	-	1	0x95e8	none|Z	# Store program memory ([Z] ← R1:R0)
+SPMZP	spm	none	-	1	0x95f8	Z+	# Store program memory ([Z] ← R1:R0, Z ← Z + 1)
+IN	in	none	1	1	0xb000	R,A	# Read I/O port (Rd ← I/O(A))
+OUT	out	none	1	1	0xb800	A,R	# Write I/O port (I/O(A) ← Rr)
+PUSH	push	none	2	1	0x920f	R	# Push register on stack ([SP] ← Rr, SP ← SP - 1)
+POP	pop	none	2	1	0x900f	R	# Pop register from stack (Rd ← [SP + 1], SP ← SP + 1)
+
+# ============ MCU CONTROL INSTRUCTIONS ============
+NOP	nop	none	1	1	0x0000	none	# No operation
+SLEEP	sleep	none	1	1	0x9588	none	# Enter sleep mode
+WDR	wdr	none	1	1	0x95a8	none	# Watchdog reset
+BREAK	break	none	-	1	0x9598	none	# Debugger breakpoint (not on ATmega328)

@@ -1,4 +1,7 @@
-J8bCompiler/codegen_avr/target/
-J8bCompiler/common/target/
-J8bCompiler/compiler_core/target/
-
+/common/common_lib/target/
+/common/j8b_compiler/target/
+/common/avr_assembler/target/
+/common/avr_codegen/target/
+/platform/avr/codegen/target/
+/platform/pic/codegen/target/
+/platform/stm8/codegen/target/
