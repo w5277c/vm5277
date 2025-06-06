@@ -13,7 +13,7 @@ import ru.vm5277.common.messages.MessageContainer;
 
 public class LabelNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
-		scope.addLabel(((String)Node.consumeToken(tb, TokenType.LABEL).getValue()).toLowerCase());
+		scope.addLabel(((String)Node.consumeToken(tb, TokenType.LABEL).getValue()).toLowerCase(), tb.getSP());
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 }

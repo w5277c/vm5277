@@ -12,7 +12,7 @@
             <properties>
                 <exec.vmArgs></exec.vmArgs>
                 <exec.args>${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}</exec.args>
-                <exec.appArgs>/home/kostas/repos/w5277c/vm5277_local/examples/avr_asm/hello_world/main.asm</exec.appArgs>
+                <exec.appArgs>-I /home/kostas/repos/w5277c/core5277/ /home/kostas/repos/w5277c/5277.ru/firmware/aqua_module/main.asm</exec.appArgs>
                 <exec.mainClass>${packageClassName}</exec.mainClass>
                 <exec.executable>java</exec.executable>
             </properties>
@@ -29,7 +29,7 @@
             <properties>
                 <exec.vmArgs>-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address}</exec.vmArgs>
                 <exec.args>${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}</exec.args>
-                <exec.appArgs>/home/kostas/repos/w5277c/vm5277_local/examples/avr_asm/hello_world/main.asm</exec.appArgs>
+                <exec.appArgs>-I /home/kostas/repos/w5277c/core5277/ /home/kostas/repos/w5277c/5277.ru/firmware/aqua_module/main.asm</exec.appArgs>
                 <exec.mainClass>${packageClassName}</exec.mainClass>
                 <exec.executable>java</exec.executable>
                 <jpda.listen>true</jpda.listen>
@@ -49,7 +49,7 @@
                 <exec.args>${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}</exec.args>
                 <exec.mainClass>${packageClassName}</exec.mainClass>
                 <exec.executable>java</exec.executable>
-                <exec.appArgs>/home/kostas/repos/w5277c/vm5277_local/examples/avr_asm/hello_world/main.asm</exec.appArgs>
+                <exec.appArgs>-I /home/kostas/repos/w5277c/core5277/ /home/kostas/repos/w5277c/5277.ru/firmware/aqua_module/main.asm</exec.appArgs>
             </properties>
         </action>
     </actions>

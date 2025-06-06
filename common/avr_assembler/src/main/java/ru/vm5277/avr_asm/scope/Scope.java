@@ -13,11 +13,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Stack;
 import ru.vm5277.avr_asm.InstrReader;
 import static ru.vm5277.avr_asm.Main.tabSize;
 import ru.vm5277.avr_asm.nodes.MnemNode;
 import ru.vm5277.avr_asm.nodes.Node;
 import ru.vm5277.avr_asm.semantic.Expression;
+import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.exceptions.ParseException;
 
 public class Scope {
@@ -30,9 +32,8 @@ public class Scope {
 	}
 	private					String									name;
 	private			static	int										TABSIZE			= 4;
-	private			static	String									device			= null;
+	private			static	String									mcu				= null;
 	private			static	InstrReader								instrReader;
-	private					Set<String>								supInstIds		= new HashSet<>();	// Поддерживаемые инструкции
 	private	final			List<String>							importedFiles	= new ArrayList<>();
 	private	final			Map<String, Byte>						regAliases		= new HashMap<>();	// Алиасы регистров
 	private	final			Map<String, VariableSymbol>				variables		= new HashMap<>();
@@ -46,7 +47,9 @@ public class Scope {
 	private					boolean									isMacroMode		= false;
 	private					List<Expression>						macroParams		= null;
 	private					int										blockCntr		= 0;
-	private					boolean									isBlockSkip		= false;
+	private					boolean									blockSuccess	= false;
+	private					boolean									elseIfSkip		= false;
+	private					Stack<Boolean>							blockSkip		= new Stack<>();
 	private					List<MnemNode>							mnemNodes		= new ArrayList<>();
 
 	public Scope(InstrReader instrReader) {
@@ -54,8 +57,9 @@ public class Scope {
 	}
 	
 	public void setDevice(String device) throws ParseException {
-		if(null != this.device) throw new ParseException("TODO устройство уже задано", null);
-		this.device = device;
+		if(null != this.mcu) throw new ParseException("TODO устройство уже задано", null);
+		this.mcu = device;
+		instrReader.setMCU(device);
 	}
 	
 	public boolean addImport(String basePath, String path) throws ParseException {
@@ -75,24 +79,24 @@ public class Scope {
 		return mnemNodes;
 	}
 	
-	public void addLabel(String name) throws ParseException {
-		if(null != currentMacro) throw new ParseException("TODO Метки не поддерживается в макросе", null);
-		if(labels.keySet().contains(name)) throw new ParseException("Label already defined:" + name, null); //TODO
-		if(null != registers.get(name)) throw new ParseException("TODO имя метки совпадает с регистром:" + name, null);
+	public void addLabel(String name, SourcePosition sp) throws ParseException {
+		if(null != currentMacro) throw new ParseException("TODO Метки не поддерживается в макросе", sp);
+		if(labels.keySet().contains(name)) throw new ParseException("Label already defined:" + name, sp); //TODO
+		if(null != registers.get(name)) throw new ParseException("TODO имя метки совпадает с регистром:" + name, sp);
 		if(regAliases.keySet().contains(name)) {
-			throw new ParseException("TODO имя метки совпадает с алиасом регистра:" + name, null);
+			throw new ParseException("TODO имя метки совпадает с алиасом регистра:" + name, sp);
 		}
-		if(variables.keySet().contains(name)) throw new ParseException("TODO имя метки совпадает с переменной:" + name, null);
+		if(variables.keySet().contains(name)) throw new ParseException("TODO имя метки совпадает с переменной:" + name, sp);
 		labels.put(name, getCSeg().getCurrentBlock().getAddress());
 	}
 	
-	public void setVariable(VariableSymbol variableSymbol) throws ParseException {
-		if(null != currentMacro) throw new ParseException("TODO переменные не поддерживаются в макросе", null);
+	public void setVariable(VariableSymbol variableSymbol, SourcePosition sp) throws ParseException {
+		if(null != currentMacro) throw new ParseException("TODO переменные не поддерживаются в макросе", sp);
 		String name = variableSymbol.getName();
-		if(null != registers.get(name)) throw new ParseException("TODO имя переменной совпадает с регистром:" + name, null);
-		if(regAliases.keySet().contains(name)) throw new ParseException("TODO имя переменной совпадает с алиасом регистра:" + name, null);
+		if(null != registers.get(name)) throw new ParseException("TODO имя переменной совпадает с регистром:" + name, sp);
+		if(regAliases.keySet().contains(name)) throw new ParseException("TODO имя переменной совпадает с алиасом регистра:" + name, sp);
 		VariableSymbol vs = variables.get(name);
-		if(null != vs && vs.isConstant()) throw new ParseException("TODO Нельзя переписать значение константы:" + name, null);
+		if(null != vs && vs.isConstant()) throw new ParseException("TODO Нельзя переписать значение константы:" + name, sp);
 		
 		variables.put(name, variableSymbol);
 	}
@@ -115,22 +119,22 @@ public class Scope {
 		return labels.get(name);
 	}
 	
-	public void addRegAlias(String alias, byte regId) throws ParseException {
-		if(null != currentMacro) throw new ParseException("TODO Алиасы не поддерживаются в макросе", null);
-		if(regAliases.keySet().contains(alias)) throw new ParseException("TODO алиас уже занят:" + alias, null);
+	public void addRegAlias(String alias, byte regId, SourcePosition sp) throws ParseException {
+		if(null != currentMacro) throw new ParseException("TODO Алиасы не поддерживаются в макросе", sp);
+		if(regAliases.keySet().contains(alias)) throw new ParseException("TODO алиас уже занят:" + alias, sp);
 		regAliases.put(alias, regId);
 	}
 	
-	public void startMacro(MacroSymbol macro) throws ParseException {
-		if(null != currentMacro) throw new ParseException("TODO Вложенные макросы не поддерживаются", null);
+	public void startMacro(MacroSymbol macro, SourcePosition sp) throws ParseException {
+		if(null != currentMacro) throw new ParseException("TODO Вложенные макросы не поддерживаются", sp);
 		currentMacro = macro;
 		if(macros.keySet().contains(macro.getName())) {
-			throw new ParseException("TODO максрос с таким именем уже существует:" + macro.getName(), null);
+			throw new ParseException("TODO максрос с таким именем уже существует:" + macro.getName(), sp);
 		}
 		macros.put(macro.getName(), macro);
 	}
-	public void endMacro() throws ParseException {
-		if(null == currentMacro) throw new ParseException("TODO Вложенные конца макроа без его начала", null);
+	public void endMacro(SourcePosition sp) throws ParseException {
+		if(null == currentMacro) throw new ParseException("TODO Вложенные конца макроа без его начала", sp);
 		currentMacro = null;
 	}
 	public boolean isMacro() {
@@ -152,21 +156,45 @@ public class Scope {
 	}
 	
 	public void blockStart(boolean skip) {
+		blockSuccess |= !skip;
+		
+		blockSkip.add(skip);
 		blockCntr++;
-		isBlockSkip |= skip;
 	}
-	
-	public void blockEnd() throws ParseException {
-		if(blockCntr > 0) {
-			blockCntr--;
+	public void blockSkipInvert() {
+		if(!blockSkip.isEmpty()) {
+			blockSkip.add(!blockSkip.pop());
+		}
+	}
+	public void blockElseIf(boolean skip) {
+		if(!blockSuccess) {
+			elseIfSkip = skip;
+			blockSuccess |= !skip;
+		}
+	}
+	public int getBlockCntr() {
+		return  blockCntr;
+	}
+	public void blockEnd(SourcePosition sp) throws ParseException {
+		elseIfSkip = false;
+		blockSuccess = false;
+		
+		blockCntr--;
+		if(!blockSkip.isEmpty()) {
+			blockSkip.pop();
 		}
 		else {
-			throw new ParseException("TODO конец блока без его начала", null);
+			throw new ParseException("TODO конец блока без его начала", sp);
 		}
 	}
 	
+
 	public boolean isBlockSkip() {
-		return 0!=blockCntr && isBlockSkip;
+		boolean result = elseIfSkip;
+		for(Boolean skip : blockSkip) {
+			result |=skip;
+		}
+		return result;
 	}
 
 	public void startMacroImpl(List<Expression> macroParams) {
@@ -186,13 +214,6 @@ public class Scope {
 	
 	public InstrReader getInstrReader() {
 		return instrReader;
-	}
-	
-	public void addMnemonics(Collection<String> instructionIds) {
-		this.supInstIds.addAll(instructionIds);
-	}
-	public boolean isSupported(String instructionicId) {
-		return this.supInstIds.contains(instructionicId);
 	}
 	
 	public CodeSegment getCSeg() throws ParseException {

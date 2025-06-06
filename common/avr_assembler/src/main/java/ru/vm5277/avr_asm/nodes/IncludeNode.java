@@ -8,6 +8,8 @@ package ru.vm5277.avr_asm.nodes;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 import ru.vm5277.avr_asm.AsmLexer;
 import ru.vm5277.avr_asm.Parser;
 import ru.vm5277.avr_asm.TokenBuffer;
@@ -18,32 +20,31 @@ import ru.vm5277.common.TokenType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
-import ru.vm5277.common.tokens.Token;
 
 public class IncludeNode {
-	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc, String rtosPath, String basePath) throws ParseException {
+	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc, Map<String, SourceType> sourcePaths) throws ParseException {
 		String importPath = (String)Node.consumeToken(tb, TokenType.STRING).getValue();
 
-		String _basePath = rtosPath;
-		File file = new File(_basePath + File.separator + importPath);
-		if (!file.exists()) {
-			_basePath = basePath;
-			file = new File(_basePath + File.separator + importPath);
-			if(!file.exists()) {
-				throw new ParseException("TODO Imported file not found: " + importPath, tb.getSP());
-			}
-		}
 
-		if(!scope.addImport(_basePath, importPath)) {
+		File exist = null;
+		for(String path : sourcePaths.keySet()) {
+			File file = new File(path + File.separator + importPath);
+			if (file.exists()) exist = file;
+		}
+		if(null == exist) throw new ParseException("TODO Imported file not found: " + importPath, tb.getSP());
+
+		if(!scope.addImport(exist.getAbsolutePath(), importPath)) {
 			mc.add(new WarningMessage("File '" + importPath + "' already imported", tb.getSP()));
 		}
 		else {
 			SourcePosition sp = tb.getSP();
 
-			try (FileReader reader = new FileReader(file)) {
+			try (FileReader reader = new FileReader(exist)) {
 				mc.setFile(importPath, sp);
 				Lexer lexer = new AsmLexer(reader, scope, mc);
-				new Parser(lexer.getTokens(), scope, mc, rtosPath, file.getParent());
+				Map<String, SourceType> innerSourcePaths = new HashMap<>(sourcePaths);
+				innerSourcePaths.put(exist.getParent(), SourceType.LIB);
+				new Parser(lexer.getTokens(), scope, mc, innerSourcePaths);
 			}
 			catch(IOException e) {
 				throw new ParseException("TODO " + e.getMessage(), sp);

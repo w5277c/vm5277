@@ -19,7 +19,7 @@ public class DefNode {
 		String str = (String)Node.consumeToken(tb, TokenType.ID).getValue();
 		Byte reg = scope.resolveReg(str);
 		if(null != reg) {
-			scope.addRegAlias(name, reg);
+			scope.addRegAlias(name, reg, tb.getSP());
 		}
 		else {
 			throw new ParseException("TODO не верно указан регистр:" + str, tb.getSP());

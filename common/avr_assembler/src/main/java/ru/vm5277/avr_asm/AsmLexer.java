@@ -28,7 +28,7 @@ public class AsmLexer extends Lexer {
 
 		while (sb.hasNext()) {
 			// Пропускаем комментарий
-			if(';'==sb.getChar()) {
+			if(';'==sb.getChar() || '#'==sb.getChar()) {
 				while (sb.hasNext() && '\n'!=sb.getChar()) {
 					sb.next();
 				}

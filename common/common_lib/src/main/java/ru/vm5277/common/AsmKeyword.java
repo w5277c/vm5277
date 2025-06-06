@@ -15,7 +15,6 @@ public class AsmKeyword extends Keyword {
 	public	static	final	Keyword					INCLUDE	= new Keyword(".include", TokenType.DIRECTIVE);
 	// Указание целевого МК
 	public	static	final	Keyword					DEVICE	= new Keyword(".device", TokenType.DIRECTIVE);
-	public	static	final	Keyword					MNEMONICS= new Keyword(".mnemonics", TokenType.DIRECTIVE);
 	// Условия
 	public	static	final	Keyword					IFDEF	= new Keyword(".ifdef", TokenType.DIRECTIVE);
 	public	static	final	Keyword					IFNDEF	= new Keyword(".ifndef", TokenType.DIRECTIVE);

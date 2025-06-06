@@ -17,7 +17,7 @@ public class DataNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc, int valueSize) throws ParseException {
 		while(true) {
 			long value = Node.getValue(Expression.parse(tb, scope, mc), tb.getSP());
-			if(value > (valueSize<<8)) {
+			if(value >= (1<<(valueSize*8))) {
 				throw new ParseException("TODO значение больше, чем указанный тип данных:" + value + ", size:" + valueSize, tb.getSP());
 			}
 			byte[] tmp = new byte[valueSize];

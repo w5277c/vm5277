@@ -45,7 +45,7 @@ public class MnemNode extends Node {
 
 		Map<String, Instruction> instructions = scope.getInstrReader().getInstrByMn().get(mnemonic);
 		for(Instruction instr : instructions.values()) {
-			if(scope.isSupported(instr.getId())) {
+			if(scope.getInstrReader().getSupported().contains(instr.getId())) {
 				supported.put(instr.getId(), instr);
 			}
 		}

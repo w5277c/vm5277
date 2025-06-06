@@ -7,7 +7,6 @@ package ru.vm5277.avr_asm.nodes;
 
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
-import ru.vm5277.avr_asm.scope.VariableSymbol;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.avr_asm.semantic.LiteralExpression;
 import ru.vm5277.avr_asm.semantic.VariableExpression;

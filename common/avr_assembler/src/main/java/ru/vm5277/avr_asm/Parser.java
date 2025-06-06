@@ -8,6 +8,7 @@ package ru.vm5277.avr_asm;
 import ru.vm5277.avr_asm.nodes.DataNode;
 import ru.vm5277.avr_asm.nodes.*;
 import java.util.List;
+import java.util.Map;
 import ru.vm5277.avr_asm.scope.MacroSymbol;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.common.AsmKeyword;
@@ -15,6 +16,7 @@ import ru.vm5277.common.Keyword;
 import ru.vm5277.common.TokenType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.ErrorMessage;
+import ru.vm5277.common.messages.Message;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.MessageOwner;
 import ru.vm5277.common.tokens.Token;
@@ -23,15 +25,13 @@ public class Parser {
 	private	final	TokenBuffer				tb;
 	private	final	Scope					scope;
 	private	final	MessageContainer		mc;
-	private	final	String					rtosPath;
-	private	final	String					basePath;
+	private	final	Map<String, SourceType>	sourcePaths;
 	
-	public Parser(List<Token> tokens, Scope scope, MessageContainer mc, String rtosPath, String basePath, int tabSize) {
+	public Parser(List<Token> tokens, Scope scope, MessageContainer mc, Map<String, SourceType> sourcePaths, int tabSize) {
 		this.tb = new TokenBuffer(tokens.iterator());
 		this.scope = scope;
 		this.mc = mc;
-		this.rtosPath = rtosPath;
-		this.basePath = basePath;
+		this.sourcePaths = sourcePaths;
 		
 		scope.setTabSize(tabSize);
 		
@@ -39,12 +39,11 @@ public class Parser {
 		parse();
 	}
 	
-	public Parser(List<Token> tokens, Scope scope, MessageContainer mc, String rtosPath, String basePath) {
+	public Parser(List<Token> tokens, Scope scope, MessageContainer mc, Map<String, SourceType> sourcePaths) {
 		this.tb = new TokenBuffer(tokens.iterator());
 		this.scope = scope;
 		this.mc = mc;
-		this.rtosPath = rtosPath;
-		this.basePath = basePath;
+		this.sourcePaths = sourcePaths;
 		
 		mc.setOwner(MessageOwner.PARSER);
 		parse();
@@ -76,17 +75,19 @@ public class Parser {
 						if(AsmKeyword.IF.getName().equals(kd)) {IfNode.parse(tb, scope, mc); continue;}
 						if(AsmKeyword.ENDIF.getName().equals(kd)) {EndIfNode.parse(tb, scope, mc); continue;}
 						if(AsmKeyword.IFDEF.getName().equals(kd)) {IfDefNode.parse(tb, scope, mc); continue;}
+						if(AsmKeyword.ELSE.getName().equals(kd)) {ElseNode.parse(tb, scope, mc); continue;}						
 						//TODO остальные директивы с условиями
+						
+						tb.skipLine(); continue;
 					}
 				}
 				else {
 					if(tb.match(TokenType.DIRECTIVE)) {
 						String kd = ((Keyword)tb.consume().getValue()).getName();
 						if(!scope.isMacroMode()) {
-							if(AsmKeyword.INCLUDE.getName().equals(kd))	{IncludeNode.parse(tb, scope, mc, rtosPath, basePath); continue;}
+							if(AsmKeyword.INCLUDE.getName().equals(kd))	{IncludeNode.parse(tb, scope, mc, sourcePaths); continue;}
 							if(AsmKeyword.ORG.getName().equals(kd)) {OrgNode.parse(tb, scope, mc); continue;}
 							if(AsmKeyword.DEVICE.getName().equals(kd)) {DeviceNode.parse(tb, scope, mc); continue;}
-							if(AsmKeyword.MNEMONICS.getName().equals(kd)) {MnemonicsNode.parse(tb, scope, mc); continue;}
 							if(AsmKeyword.EQU.getName().equals(kd)) {EquNode.parse(tb, scope, mc); continue;}
 							if(AsmKeyword.MACRO.getName().equals(kd)) {MacroNode.parseDef(tb, scope, mc); continue;}
 						}
@@ -95,6 +96,8 @@ public class Parser {
 						if(AsmKeyword.IF.getName().equals(kd)) {IfNode.parse(tb, scope, mc); continue;}
 						if(AsmKeyword.ENDIF.getName().equals(kd)) {EndIfNode.parse(tb, scope, mc); continue;}
 						if(AsmKeyword.IFDEF.getName().equals(kd)) {IfDefNode.parse(tb, scope, mc); continue;}
+						if(AsmKeyword.ELSE.getName().equals(kd)) {ElseNode.parse(tb, scope, mc); continue;}
+						if(AsmKeyword.MESSAGE.getName().equals(kd)) {MessageNode.parse(tb, scope, mc); continue;}
 						if(AsmKeyword.DB.getName().equals(kd)) {DataNode.parse(tb, scope, mc, 1); continue;}
 						if(AsmKeyword.DW.getName().equals(kd)) {DataNode.parse(tb, scope, mc, 2); continue;}
 						if(AsmKeyword.DD.getName().equals(kd)) {DataNode.parse(tb, scope, mc, 4); continue;}
@@ -117,7 +120,7 @@ public class Parser {
 					if(tb.match(TokenType.ID)) {
 						MacroSymbol macro = scope.resolveMacro(((String)tb.current().getValue()).toLowerCase());
 						if(null != macro) {
-							MacroNode.parseCall(tb, scope, mc, rtosPath, basePath, macro);
+							MacroNode.parseCall(tb, scope, mc, sourcePaths, macro);
 							continue;
 						}
 					}

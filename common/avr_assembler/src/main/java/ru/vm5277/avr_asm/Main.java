@@ -10,9 +10,12 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import ru.vm5277.avr_asm.nodes.MnemNode;
-import ru.vm5277.avr_asm.nodes.Node;
+import ru.vm5277.avr_asm.nodes.SourceType;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.common.Lexer;
 import ru.vm5277.common.messages.InfoMessage;
@@ -45,34 +48,38 @@ public class Main {
 				System.out.println("AVR assembler version: " + VERSION);
 				System.exit(0);
 			}
-			else {
-				source = args[0];
-			}
 		}
 
 		String mcu = null;
+		Map<String, SourceType> sourcePaths	= new HashMap<>();
 		
-		for(int i=2; i< args.length; i++) {
+		for(int i=0; i<args.length; i++) {
 			String arg = args[i++];
 			if(args.length > i+1) {
-				if(arg.equals("-t") || arg.equals("--tabsize")) {
+				if(arg.equals("-I") || arg.equals("--include")) {
+					sourcePaths.put(args[i], SourceType.LIB);
+				}
+				else if(arg.equals("-t") || arg.equals("--tabsize")) {
 					tabSize = Integer.parseInt(args[i]);
 				}
-				i++;
 			}
 			else {
-				System.err.println("[ERROR] Invalid parameter:" + arg);
-				System.exit(0);
+				source = arg;
+//				System.err.println("[ERROR] Invalid parameter:" + arg);
+//				System.exit(0);
 			}
 		}
  
-		MessageContainer mc = new MessageContainer(8, true, false);
+		MessageContainer mc = new MessageContainer(16, true, false);
 		
-		File rtosDir = new File(toolkitPath + File.separator + "platform" + File.separator + "avr" + File.separator + "rtos");
-		File baseDir = new File(source).getParentFile();
+		String rtosPath = toolkitPath + File.separator + "platform" + File.separator + "avr" + File.separator + "rtos";
+		sourcePaths.put(rtosPath, SourceType.RTOS);
+		String baseDir = new File(source).getParentFile().getAbsolutePath();
+		sourcePaths.put(baseDir, SourceType.BASE);
 		
-		InstrReader instrReader = new InstrReader(rtosDir.getParentFile().getAbsolutePath(), mc);
+		InstrReader instrReader = new InstrReader("./", mc);
 		Scope scope = new Scope(instrReader);
+		if(null != mcu) scope.setDevice(mcu);
 		
 		try (InputStreamReader isr = new InputStreamReader(new FileInputStream(source))) {
 			mc.setFile(source, null);
@@ -80,7 +87,7 @@ public class Main {
 			//for(Token token : lexer.getTokens()) {
 				//System.out.print(token.toString());
 			//}
-			Parser parser = new Parser(lexer.getTokens(), scope, mc, rtosDir.getAbsolutePath(), baseDir.getAbsolutePath(), tabSize);
+			Parser parser = new Parser(lexer.getTokens(), scope, mc, sourcePaths, tabSize);
 			mc.add(new InfoMessage("---Second pass---", null));
 			for(MnemNode mnemNode : scope.getMnemNodes()) {
 				mnemNode.secondPass();

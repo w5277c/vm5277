@@ -7,6 +7,7 @@ package ru.vm5277.avr_asm.nodes;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import ru.vm5277.avr_asm.Parser;
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.MacroSymbol;
@@ -20,11 +21,12 @@ import ru.vm5277.common.tokens.Token;
 
 public class MacroNode {
 	public static void parseDef(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
-		scope.startMacro(new MacroSymbol(((String)Node.consumeToken(tb, TokenType.ID).getValue()).toLowerCase(), tb.getSP().getLine()));
+		scope.startMacro(new MacroSymbol(((String)Node.consumeToken(tb, TokenType.ID).getValue()).toLowerCase(), tb.getSP().getLine()), tb.getSP());
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 	
-	public static void parseCall(TokenBuffer tb, Scope scope, MessageContainer mc, String rtosPath, String basePath, MacroSymbol macro) throws ParseException {
+	public static void parseCall(TokenBuffer tb, Scope scope, MessageContainer mc, Map<String, SourceType> sourcePaths, MacroSymbol macro)
+																																		throws ParseException {
 		tb.consume();
 
 		List<Expression> params = new ArrayList<>();
@@ -41,7 +43,7 @@ public class MacroNode {
 				token.getSP().setMacroOffset(macro.getName(), tb.getSP().getLine());
 			}
 			
-			Parser parser = new Parser(macro.getTokens(), scope, mc, rtosPath, basePath);
+			Parser parser = new Parser(macro.getTokens(), scope, mc, sourcePaths);
 		}
 		finally {
 			scope.stopMacroImpl();
