@@ -8,10 +8,6 @@ package ru.vm5277.common.messages;
 import ru.vm5277.common.SourcePosition;
 
 public class WarningMessage extends Message {
-	public WarningMessage(MessageOwner owner, String text, SourcePosition sp) {
-		super("WRN", owner, text, sp);
-	}
-
 	public WarningMessage(String text, SourcePosition sp) {
 		super("WRN", text, sp);
 	}

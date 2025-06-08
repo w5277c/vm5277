@@ -45,10 +45,8 @@ public class FileImporter {
 			}
 		}
 		if(null != file) {
-			try (FileReader reader = new FileReader(file)) {
-				J8bLexer lexer = new J8bLexer(reader, mc);
-				return lexer.getTokens();
-			}
+			J8bLexer lexer = new J8bLexer(file, mc);
+			return lexer.getTokens();
 		}
 		return new ArrayList<>();
 	}

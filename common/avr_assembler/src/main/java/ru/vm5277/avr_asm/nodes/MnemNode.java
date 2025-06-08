@@ -21,7 +21,6 @@ import ru.vm5277.avr_asm.scope.CodeBlock;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.TokenType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.ErrorMessage;
@@ -67,11 +66,6 @@ public class MnemNode extends Node {
 		
 	public void secondPass() {
 		try {
-			
-			if(mnemonic.equalsIgnoreCase("nop")) {
-				int t=3432423;
-			}
-			
 			scope.getCSeg().setAddr((long)addr);
 			
 			if(0x01==supported.size()) {
@@ -89,13 +83,17 @@ public class MnemNode extends Node {
 						case Instruction.OPERAND_RR:
 							parse(instr, new Reg(scope, sp, expr1), new Reg(scope, sp, expr1));
 							break;
+						case Instruction.OPERAND_K7S:
+							parse(instr, new Const(mc, scope, sp, expr1, -64, 63, 7, addr));
+							break;
 						case Instruction.OPERAND_K12S:
-							parse(instr, new Const(scope, sp, expr1, -2048, 2047, 12));
+							parse(instr, new Const(mc, scope, sp, expr1, -2048, 2047, 12, addr));
 							break;
 						case Instruction.OPERAND_K22:
-							parse(instr, new Const(scope, sp, expr1, 0, 0x3fffff, 22));
+							parse(instr, new Const(mc, scope, sp, expr1, 0, 0x3fffff, 22, addr));
 							break;
 						default:
+							mc.add(new ErrorMessage("//TODO1 не поддерживаемая мнемоника " + mnemonic, sp));
 							break;
 					}
 				}
@@ -104,17 +102,28 @@ public class MnemNode extends Node {
 						parse(instr, new Reg(scope, sp, expr1), new Reg(scope, sp, expr2));
 					}
 					else if(Instruction.OPERAND_RH.equals(operands[0x00]) && Instruction.OPERAND_K8.equals(operands[0x01])) {
-						parse(instr, new HReg(scope, sp, expr1), new Const(scope, sp, expr2, 0, 255, 8));
+						parse(instr, new HReg(scope, sp, expr1), new Const(mc, scope, sp, expr2, 0, 255, 8));
 					}
 					else if(Instruction.OPERAND_R.equals(operands[0x00]) && Instruction.OPERAND_K6.equals(operands[0x01])) {
-						parse(instr, new IReg(scope, sp, expr1), new Const(scope, sp, expr2, 0, 63, 6));
+						parse(instr, new IReg(scope, sp, expr1), new Const(mc, scope, sp, expr2, 0, 63, 6));
 					}
 					else if(Instruction.OPERAND_K3.equals(operands[0x00]) && Instruction.OPERAND_K7S.equals(operands[0x01])) {
-						parse(instr, new Const(scope, sp, expr1, 0, 7, 3), new Const(scope, sp, expr2, -64, 63, 7));
+						parse(instr, new Const(mc, scope, sp, expr1, 0, 7, 3), new Const(mc, scope, sp, expr2, -64, 63, 7));
+					}
+					else if(Instruction.OPERAND_K16.equals(operands[0x00]) && Instruction.OPERAND_R.equals(operands[0x01])) {
+						parse(instr, new Const(mc, scope, sp, expr1, 0, 65535, 16), new Reg(scope, sp, expr2));
+					}
+					else {
+						mc.add(new ErrorMessage("//TODO2 не поддерживаемая мнемоника " + mnemonic, sp));
 					}
 				}
+				else {
+					mc.add(new ErrorMessage("//TODO3 не поддерживаемая мнемоника " + mnemonic, sp));
+				}
 			}
-			mc.add(new ErrorMessage("//TODO не поддерживаемая мнемоника " + mnemonic, sp));
+			else {
+				mc.add(new ErrorMessage("//TODO не поддерживаемая мнемоника " + mnemonic, sp));
+			}
 		}
 		catch(Exception e) {
 			mc.add(new ErrorMessage("//TODO ошибка парсинга мнемоники " + mnemonic + ": " + e.getMessage(), sp));
@@ -133,6 +142,9 @@ public class MnemNode extends Node {
 		}
 		
 		switch (k.getBits()) {
+			case 7:
+				opcode |= (0<=k.getValue() ? k.getValue()&0x3f : 0x40 | ((k.getValue()*(-1))-1)&0x3f)<<3;
+				break;
 			case 12:
 				opcode |= 0<=k.getValue() ? k.getValue()&0x0eff : 0x0800 | ((k.getValue()*(-1))-1)&0x0eff;
 				break;
@@ -158,12 +170,21 @@ public class MnemNode extends Node {
 		if(0x01 != instr.getWSize()) throw new Exception();
 		scope.getCSeg().writeOpcode(instr.getOpcode() | (rd.getId()&0x1f)<<4 | (rr.getId()&0x0f) | (rr.getId()&0x10<<9));
 	}
-
+	private void parse(Instruction instr, HReg rd, Const k) throws Exception {
+		if(0x01 != instr.getWSize()) throw new Exception();
+		if(8==k.getBits()) {
+			scope.getCSeg().writeOpcode((int)(instr.getOpcode() | (rd.getId()&0x0f)<<4 | k.getValue() & 0x0f | (k.getValue() & 0xf0) << 8));
+		}
+		else throw new Exception("");
+	}
 	private void parse(Instruction instr, Reg rd, Const k) throws Exception {
 		if(0x01 != instr.getWSize()) throw new Exception();
 		if(6==k.getBits()) {
 			byte id = (byte)((rd.getId()-24)/2);
 			scope.getCSeg().writeOpcode((int)(instr.getOpcode() | id<<4 | k.getValue()&0x0f | (k.getValue()&0x30)<<6));
+		}
+		else if(8==k.getBits()) {
+			scope.getCSeg().writeOpcode((int)(instr.getOpcode() | (rd.getId()&0x0f)<<4 | k.getValue() & 0x0f | (k.getValue() & 0xf0) << 8));
 		}
 		else throw new Exception("");
 	}
@@ -173,6 +194,14 @@ public class MnemNode extends Node {
 		if(3==k1.getBits() && 7==k2.getBits()) {
 			long opcode = instr.getOpcode() | k1.getValue()&0x07;
 			scope.getCSeg().writeOpcode((int)(opcode | (0<=k2.getValue() ? (k2.getValue()&0x3f)<<3 : 0x0200) | (((k2.getValue()*(-1))-1)&0x3f)<<3));
+		}
+		else throw new Exception();
+	}
+
+	private void parse(Instruction instr, Const k, Reg reg) throws Exception {
+		if(16==k.getBits()) {
+			long opcode = (((long)instr.getOpcode())<<16) | k.getValue() | (reg.getId() << 20);
+			((CodeBlock)scope.getCSeg().getCurrentBlock()).writeDoubleOpcode(opcode);
 		}
 		else throw new Exception();
 	}

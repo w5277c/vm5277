@@ -28,30 +28,28 @@ public class IncludeNode {
 		String importPath = (String)Node.consumeToken(tb, TokenType.STRING).getValue();
 
 
-		File exist = null;
+		File sourceFile = null;
 		for(String path : sourcePaths.keySet()) {
 			File file = new File(path + File.separator + importPath);
-			if (file.exists()) exist = file;
+			if (file.exists()) sourceFile = file;
 		}
-		if(null == exist) throw new ParseException("TODO Imported file not found: " + importPath, tb.getSP());
+		if(null == sourceFile) throw new ParseException("TODO Imported file not found: " + importPath, tb.getSP());
 
-		if(!scope.addImport(exist.getAbsolutePath() + File.separator + importPath)) {
+		if(!scope.addImport(sourceFile.getAbsolutePath() + File.separator + importPath)) {
 			mc.add(new WarningMessage("File '" + importPath + "' already imported", tb.getSP()));
 		}
 		else {
 			SourcePosition sp = tb.getSP();
 
-			try (FileReader reader = new FileReader(exist)) {
-				mc.setFile(importPath, sp);
-				Lexer lexer = new AsmLexer(reader, scope, mc);
+			try {
+				Lexer lexer = new AsmLexer(sourceFile, scope, mc);
 				Map<String, SourceType> innerSourcePaths = new HashMap<>(sourcePaths);
-				innerSourcePaths.put(exist.getParent(), SourceType.LIB);
+				innerSourcePaths.put(sourceFile.getParent(), SourceType.LIB);
 				new Parser(lexer.getTokens(), scope, mc, innerSourcePaths);
 			}
 			catch(IOException e) {
 				throw new ParseException("TODO " + e.getMessage(), sp);
 			}
-			mc.releaseFile(sp); // TODO объединить с IncludeSymbol?
 			try {scope.leaveImport();}
 			catch(ParseException e) {mc.add(e.getErrorMessage());}
 			catch(CriticalParseException e) {mc.add(e.getErrorMessage()); throw e;}

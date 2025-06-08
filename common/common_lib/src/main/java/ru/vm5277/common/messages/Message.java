@@ -5,13 +5,11 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.common.messages;
 
-import java.io.File;
 import ru.vm5277.common.SourcePosition;
 
 public class Message {
 	private			String			type;
 	private			MessageOwner	owner;
-	private			String			path;
 	private	final	String			text;
 	private	final	SourcePosition	sp;
 	
@@ -21,13 +19,6 @@ public class Message {
 		this.sp = sp;
 	}
 
-	Message(String type, MessageOwner owner, String text, SourcePosition sp) {
-		this.type = type;
-		this.owner = owner;
-		this.text = text;
-		this.sp = sp;
-	}
-	
 	public void setMessageOwnerIfNull(MessageOwner owner) {
 		if(null == this.owner) {
 			this.owner = owner;
@@ -43,10 +34,6 @@ public class Message {
 	}
 	
 	public String toStrig() {
-		return owner + "|" + type.toUpperCase() + "|\t" + path + (null == sp ? "" : sp) + "\t"  + text;
-	}
-
-	public void setPath(String path) {
-		this.path = path;
+		return owner + "|" + type.toUpperCase() + "|" + (null == sp ? "" : sp) + "\t"  + text;
 	}
 }

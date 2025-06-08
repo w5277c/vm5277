@@ -5,11 +5,15 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.common;
 
+import java.io.File;
+
 public class SourceBuffer extends SourcePosition {
 	private	String			src		= null;
 	private	int				pos		= -1;
 
-	public SourceBuffer(String src) {
+	public SourceBuffer(File sourceFile, String src) {
+		super(sourceFile);
+		
 		this.src = src;
 		this.pos = 0;
 		this.line = 1;
@@ -72,6 +76,6 @@ public class SourceBuffer extends SourcePosition {
 	
 	// Фиксируем текущую позицию в отдельный SourcePosition 
 	public SourcePosition snapSP() {
-		return new SourcePosition(line, column);
+		return new SourcePosition(sourceFile, line, column);
 	}
 }

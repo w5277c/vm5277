@@ -5,6 +5,7 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b_compiler;
 
+import java.io.File;
 import ru.vm5277.common.messages.MessageContainer;
 import java.io.IOException;
 import java.io.Reader;
@@ -24,10 +25,19 @@ import ru.vm5277.common.tokens.TLabel;
 import ru.vm5277.common.tokens.TNote;
 
 public class J8bLexer extends Lexer {
+	public J8bLexer(File sourceFile, MessageContainer mc) throws IOException {
+		super(sourceFile, mc);
 	
-	public J8bLexer(Reader reader, MessageContainer mc) throws IOException {
-		super(reader, mc);
-
+		parse();
+	}
+	
+	public J8bLexer(String source, MessageContainer mc) throws IOException {
+		super(source, mc);
+		
+		parse();
+	}
+	
+	private void parse() {
 		while (sb.hasNext()) {
 			// Пропускаем пробелы
 			if(skipWhiteSpaces(sb)) continue;

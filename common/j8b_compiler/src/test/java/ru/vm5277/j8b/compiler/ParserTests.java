@@ -25,7 +25,7 @@ public class ParserTests {
 								"	int t1=-5; int t2=5+i1+i2-2-i3; int t3=7==10-6/2?7:2; int t4=5<3 ? 7:2; int t5=true?1:0;}";
 //		String source = "class A{ int t3=7==10-6/2?7:2;}";
 		MessageContainer mc = new MessageContainer(100, true, false);		
-		J8bLexer lexer = new J8bLexer(new StringReader(source), mc);
+		J8bLexer lexer = new J8bLexer(source, mc);
 		ASTParser parser = new ASTParser(null, null, lexer.getTokens(), mc);
 		
 		FieldNode field = (FieldNode)parser.getClazz().getBody().getDeclarations().get(0);
@@ -165,7 +165,7 @@ public class ParserTests {
 	public void incrementDecrementTest() throws Exception {
 		String source = "class A{ public A() {int i=1; i++; i--; ++i; --i;}}";
 		MessageContainer mc = new MessageContainer(100);
-		J8bLexer lexer = new J8bLexer(new StringReader(source), mc);
+		J8bLexer lexer = new J8bLexer(source, mc);
 		ASTParser parser = new ASTParser(null, null, lexer.getTokens(), mc);
 	}
 	
@@ -173,63 +173,63 @@ public class ParserTests {
 	public void ifTest() throws Exception {
 		String source = "class A{ public A() { int r=0; if(5>3) r=1; if(6>3) {r=1;} else r=2; if(5>3) {r=1;r++;} else {r=2;r++;}}}";
 		MessageContainer mc = new MessageContainer(100);
-		new ASTParser(null, null, new J8bLexer(new StringReader(source), mc).getTokens(), mc);
+		new ASTParser(null, null, new J8bLexer(source, mc).getTokens(), mc);
 	}
 	
 	@Test
 	public void doWhileTest() throws Exception {
 		String source = "class A{ public A() { int i=0; do { i++; } while(i<10); else {i+=10;}}}";
 		MessageContainer mc = new MessageContainer(100);
-		new ASTParser(null, null, new J8bLexer(new StringReader(source), mc).getTokens(), mc);
+		new ASTParser(null, null, new J8bLexer(source, mc).getTokens(), mc);
 	}
 
 	@Test
 	public void whileTest() throws Exception {
 		String source = "class A{ public A() { int i=0; while(i<10) { i++; } else {i+=10;}}}";
 		MessageContainer mc = new MessageContainer(100);
-		new ASTParser(null, null, new J8bLexer(new StringReader(source), mc).getTokens(), mc);
+		new ASTParser(null, null, new J8bLexer(source, mc).getTokens(), mc);
 	}
 
 	@Test
 	public void forTest() throws Exception {
 		String source = "class A{ public A() { int i=0; for(int f=0; f<10; f++) { if(1==f) continue; if(2==f) break; } else {i+=10;}}}";
 		MessageContainer mc = new MessageContainer(100);
-		new ASTParser(null, null, new J8bLexer(new StringReader(source), mc).getTokens(), mc);
+		new ASTParser(null, null, new J8bLexer(source, mc).getTokens(), mc);
 	}
 
 	@Test
 	public void gotoTest() throws Exception {
 		String source = "class A{ public A() { label2: int i=0; goto label1; i++; label1: i++;}}";
 		MessageContainer mc = new MessageContainer(100);
-		new ASTParser(null, null, new J8bLexer(new StringReader(source), mc).getTokens(), mc);
+		new ASTParser(null, null, new J8bLexer(source, mc).getTokens(), mc);
 	}
 
 	@Test
 	public void returnTest() throws Exception {
 		String source = "class A{ public int A() { return 123+i;} void B() { return;}}";
 		MessageContainer mc = new MessageContainer(100);
-		new ASTParser(null, null, new J8bLexer(new StringReader(source), mc).getTokens(), mc);
+		new ASTParser(null, null, new J8bLexer(source, mc).getTokens(), mc);
 	}
 
 	@Test
 	public void switchTest() throws Exception {
 		String source ="class A{ public int A() { int t=0; switch(t) { case 0: return 1; case 1..10: return 2; case 11: {t++; return 3;} default: return 4;}}}";
 		MessageContainer mc = new MessageContainer(100);
-		new ASTParser(null, null, new J8bLexer(new StringReader(source), mc).getTokens(), mc);
+		new ASTParser(null, null, new J8bLexer(source, mc).getTokens(), mc);
 	}
 
 	@Test
 	public void someTest1() throws Exception {
 		String source ="class A{ public int A() { if(count %2 == 0) {} }}";
 		MessageContainer mc = new MessageContainer(100);
-		new ASTParser(null, null, new J8bLexer(new StringReader(source), mc).getTokens(), mc);
+		new ASTParser(null, null, new J8bLexer(source, mc).getTokens(), mc);
 	}
 	
 	@Test
 	public void someTest2() throws Exception {
 		String source ="class A{ public int A() { return -a-b; }}";
 		MessageContainer mc = new MessageContainer(100);
-		new ASTParser(null, null, new J8bLexer(new StringReader(source), mc).getTokens(), mc);
+		new ASTParser(null, null, new J8bLexer(source, mc).getTokens(), mc);
 	}
 	
 }

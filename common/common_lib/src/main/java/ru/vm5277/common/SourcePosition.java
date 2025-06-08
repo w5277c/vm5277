@@ -5,16 +5,21 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.common;
 
+import java.io.File;
+
 public class SourcePosition implements Cloneable {
 	private		String	macroName	= null;
 	private		int		macroLine	= 0;
+	protected	File	sourceFile;
 	protected	int		line		= -1;
 	protected	int		column		= -1;
 
-	public SourcePosition() {
+	public SourcePosition(File sourceFile) {
+		this.sourceFile = sourceFile;
 	}
 
-	public SourcePosition(int line, int column) {
+	public SourcePosition(File sourceFile, int line, int column) {
+		this.sourceFile = sourceFile;
 		this.line = line;
 		this.column = column;
 	}
@@ -37,8 +42,9 @@ public class SourcePosition implements Cloneable {
 	@Override
 	public String toString() {
 		if(null == macroName) {
-			return "[" + line + ":" + column + "]";
+			return line + ":" + column + " " + (null == sourceFile ? "" : sourceFile.getAbsolutePath()) + "\t";
 		}
-		return "[" + macroLine + ":" + column + "|MACRO:" + macroName.toUpperCase() + ":" + line + "]";
+		return	macroLine + ":" + column + "|MACRO:" + macroName.toUpperCase() + ":" + line + " " +
+				(null == sourceFile ? "" : sourceFile.getAbsolutePath()) + "\t";
 	}
 }

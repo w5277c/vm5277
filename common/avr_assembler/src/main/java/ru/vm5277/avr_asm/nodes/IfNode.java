@@ -15,7 +15,14 @@ import ru.vm5277.common.messages.MessageContainer;
 
 public class IfNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException, CriticalParseException {
-		Long value = Node.getNumValue(Expression.parse(tb, scope, mc), tb.getSP());
+		Long value = 0x00l;
+		if(scope.getIncludeSymbol().isBlockSkip()) {
+			try{Expression.parse(tb, scope, mc);} catch(ParseException e) {};
+			//TODO должно быть везде, где вычисляются выражения. Так как переменные и метки могут отсутствовать
+		}
+		else {
+			value = Node.getNumValue(Expression.parse(tb, scope, mc), tb.getSP());
+		}
 		scope.getIncludeSymbol().blockStart(0x01!=value);
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}

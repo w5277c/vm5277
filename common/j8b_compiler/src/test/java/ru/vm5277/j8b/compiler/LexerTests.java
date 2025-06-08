@@ -26,7 +26,7 @@ public class LexerTests {
 						"import as else case default new " +
 						"try catch throw throws";
         MessageContainer mc = new MessageContainer(100, true, false);
-		J8bLexer lexer = new J8bLexer(new StringReader(source), mc);
+		J8bLexer lexer = new J8bLexer(source, mc);
         List<Token> tokens = lexer.getTokens();
         
         assertEquals(39, tokens.size() - 1); // -1 для EOF
@@ -133,7 +133,7 @@ public class LexerTests {
         
 		
 		MessageContainer mc = new MessageContainer(100, true, false);
-		J8bLexer lexer = new J8bLexer(new StringReader(source), mc);
+		J8bLexer lexer = new J8bLexer(source, mc);
         List<Token> tokens = lexer.getTokens();
         
         assertEquals(10, tokens.size() - 1);
@@ -180,7 +180,7 @@ public class LexerTests {
     public void testFixedPointLiterals() throws Exception {
         String source = "3.141 127.001 0.0000000001";
         MessageContainer mc = new MessageContainer(100, true, false);
-		J8bLexer lexer = new J8bLexer(new StringReader(source), mc);
+		J8bLexer lexer = new J8bLexer(source, mc);
         List<Token> tokens = lexer.getTokens();
         
         assertEquals(3, tokens.size() - 1); // -1 для EOF
@@ -197,7 +197,7 @@ public class LexerTests {
     public void testOperators() throws Exception {
         String source = "= + - * / % == != < > <= >=";	//TODO добавить остальные?
         MessageContainer mc = new MessageContainer(100, true, false);
-		J8bLexer lexer = new J8bLexer(new StringReader(source), mc);
+		J8bLexer lexer = new J8bLexer(source, mc);
         List<Token> tokens = lexer.getTokens();
         
         assertEquals(12, tokens.size() - 1);
@@ -232,7 +232,7 @@ public class LexerTests {
     public void testNotes() throws Exception {
         String source = "#p/8e5-e5-e5-c5-e5-/4g5-g4";
         MessageContainer mc = new MessageContainer(100, true, false);
-		J8bLexer lexer = new J8bLexer(new StringReader(source), mc);
+		J8bLexer lexer = new J8bLexer(source, mc);
         List<Token> tokens = lexer.getTokens();
         
         assertEquals(1, tokens.size() - 1); // -1 для EOF
@@ -245,7 +245,7 @@ public class LexerTests {
     public void testLabel() throws Exception {
         String source = "label1:";
         MessageContainer mc = new MessageContainer(100, true, false);
-		J8bLexer lexer = new J8bLexer(new StringReader(source), mc);
+		J8bLexer lexer = new J8bLexer(source, mc);
         List<Token> tokens = lexer.getTokens();
         
         assertEquals(1, tokens.size() - 1); // -1 для EOF
@@ -258,7 +258,7 @@ public class LexerTests {
 	public void testErrorMessages1() throws Exception {
 		String source = "/*ndkfhskhfk*/ #g4534534;";
         MessageContainer mc = new MessageContainer(100, true, false);
-		J8bLexer lexer = new J8bLexer(new StringReader(source), mc);
+		J8bLexer lexer = new J8bLexer(source, mc);
 		List<ErrorMessage> messages = mc.getErrorMessages();
 		assertEquals(1, messages.size());
 		ErrorMessage em = messages.get(0);

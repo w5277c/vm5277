@@ -100,4 +100,9 @@ public class Instruction {
 	public String[] getOperands() {
 		return operands;
 	}
+	
+	@Override
+	public String toString() {
+		return id;
+	}
 }

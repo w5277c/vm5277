@@ -5,9 +5,11 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.common;
 
+import java.io.File;
+import java.io.FileInputStream;
 import ru.vm5277.common.messages.MessageContainer;
 import java.io.IOException;
-import java.io.Reader;
+import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.tokens.Token;
@@ -19,16 +21,24 @@ public class Lexer {
 	protected			SourceBuffer		sb;
 	protected	final	List<Token>			tokens	= new ArrayList<>();
 	
-	public Lexer(Reader reader, MessageContainer mc) throws IOException {
+	public Lexer(File sourceFile, MessageContainer mc) throws IOException {
 		mc.setOwner(MessageOwner.LEXER);
 		
-		StringBuilder stringBuilder = new StringBuilder();
-		char[] buffer = new char[4*1024];
-		for (int length; (length = reader.read(buffer)) != -1;) {
-			stringBuilder.append(buffer, 0, length);
+		try (InputStreamReader isr = new InputStreamReader(new FileInputStream(sourceFile))) {
+			StringBuilder stringBuilder = new StringBuilder();
+			char[] buffer = new char[4*1024];
+			for (int length; (length = isr.read(buffer)) != -1;) {
+				stringBuilder.append(buffer, 0, length);
+			}
+			sb = new SourceBuffer(sourceFile, stringBuilder.toString());
 		}
-		sb = new SourceBuffer(stringBuilder.toString());
+		this.mc = mc;
+	}
 
+	public Lexer(String source, MessageContainer mc) throws IOException {
+		mc.setOwner(MessageOwner.LEXER);
+		
+		sb = new SourceBuffer(null, source);
 		this.mc = mc;
 	}
 

@@ -64,6 +64,7 @@ public class Expression extends Node {
 					case GTE:		left = new LiteralExpression(leftVal >=	rightVal); break;
 					case OR:		left = new LiteralExpression((leftVal != 0) || (rightVal != 0)); break;
 					case AND:		left = new LiteralExpression((leftVal != 0) && (rightVal != 0)); break;
+					case NOT:		left = new LiteralExpression(leftVal != rightVal); break;
 					default:		{
 						throw new ParseException("TODO не поддердживаемый тип операции:" + operator, null);
 					}
@@ -85,7 +86,7 @@ public class Expression extends Node {
 			if(operator.isUnary()) {
 				tb.consume();
 
-				Expression expr = parseUnary(tb, scope, mc);
+				Expression expr = parsePrimary(tb, scope, mc);
 				if(expr instanceof LiteralExpression) {
 					Object value = ((LiteralExpression)expr).getValue();
 					if(value instanceof Number) {
@@ -148,7 +149,7 @@ public class Expression extends Node {
 				consumeToken(tb, Delimiter.RIGHT_PAREN);
 				return result;
 			}
-			return new VariableExpression(tb, scope, mc, name);
+			return new IdExpression(tb, scope, mc, name);
 		}
 		else {
 			throw new ParseException("Unexpected token in expression: " + token, tb.current().getSP());

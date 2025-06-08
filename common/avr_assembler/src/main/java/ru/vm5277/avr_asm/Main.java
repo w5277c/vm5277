@@ -82,22 +82,16 @@ public class Main {
 		Scope scope = new Scope(sourceFile, instrReader);
 		if(null != mcu) scope.setDevice(mcu);
 		
-		try (InputStreamReader isr = new InputStreamReader(new FileInputStream(sourceFile))) {
-			mc.setFile(source, null);
-			Lexer lexer = new AsmLexer(isr, scope, mc);
-			//for(Token token : lexer.getTokens()) {
-				//System.out.print(token.toString());
-			//}
-			Parser parser = new Parser(lexer.getTokens(), scope, mc, sourcePaths, tabSize);
-			mc.add(new InfoMessage("---Second pass---", null));
-			for(MnemNode mnemNode : scope.getMnemNodes()) {
-				mnemNode.secondPass();
-			}
+		Lexer lexer = new AsmLexer(sourceFile, scope, mc);
+		//for(Token token : lexer.getTokens()) {
+			//System.out.print(token.toString());
+		//}
+		Parser parser = new Parser(lexer.getTokens(), scope, mc, sourcePaths, tabSize);
+		mc.add(new InfoMessage("---Second pass---", null));
+		for(MnemNode mnemNode : scope.getMnemNodes()) {
+			mnemNode.secondPass();
 		}
-		catch(Exception ex) {
-			ex.printStackTrace();
-		}
-		mc.releaseFile(null); // TODO объединить с IncludeSymbol?
+
 		try {scope.leaveImport();} //TODO не проверяю на MessageContainerIsFullException
 		catch(ParseException e) {mc.add(e.getErrorMessage());}
 		catch(CriticalParseException e) {mc.add(e.getErrorMessage()); throw e;}

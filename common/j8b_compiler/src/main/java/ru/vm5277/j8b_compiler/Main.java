@@ -101,21 +101,17 @@ public class Main {
 		File libDir = new File(toolkitPath + File.separator + "bin" + File.separator + "libs");
 		CodeGenerator cg = PlatformLoader.loadGenerator(platform, libDir, rml.getMap(), null);
 		
-		File baseDir = new File(source).getParentFile();
-		try (InputStreamReader isr = new InputStreamReader(new FileInputStream(source))) {
-			J8bLexer lexer = new J8bLexer(isr, mc);
-			ASTParser parser = new ASTParser(runtimeDir, baseDir, lexer.getTokens(), mc);
-			ClassNode clazz = parser.getClazz();
+		File sourceFile = new File(source);
+		File baseDir = sourceFile.getParentFile();
+		J8bLexer lexer = new J8bLexer(sourceFile, mc);
+		ASTParser parser = new ASTParser(runtimeDir, baseDir, lexer.getTokens(), mc);
+		ClassNode clazz = parser.getClazz();
 //			new ASTPrinter(parser.getClazz());
-			new SemanticAnalyzer(runtimeDir, parser.getClazz());
-			new ASTPrinter(parser.getClazz());
-			
-			if(!mc.hasErrors()) {
-				clazz.codeGen(cg);
-			}
-		}
-		catch(Exception ex) {
-			ex.printStackTrace();
+		new SemanticAnalyzer(runtimeDir, parser.getClazz());
+		new ASTPrinter(parser.getClazz());
+
+		if(!mc.hasErrors()) {
+			clazz.codeGen(cg);
 		}
     }
 	

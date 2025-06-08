@@ -11,17 +11,17 @@ import ru.vm5277.avr_asm.scope.VariableSymbol;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.MessageContainer;
 
-public class VariableExpression extends Expression {
+public class IdExpression extends Expression {
     private	Scope	scope;
 	private	String	name;
 	private	Long	value;
 	
-    public VariableExpression(TokenBuffer tb, Scope scope, MessageContainer mc, String name) throws ParseException {
+    public IdExpression(TokenBuffer tb, Scope scope, MessageContainer mc, String name) throws ParseException {
         this.scope = scope;
 		this.name = name;
     }
     
-	public Long getValue() throws ParseException {
+	public Long getNumericValue() throws ParseException {
 		if(null == value) {
 			VariableSymbol symbol = scope.resolveVariable(name);
 			if(null != symbol) {
@@ -33,6 +33,10 @@ public class VariableExpression extends Expression {
 			}
 		}
 		return value;
+	}
+	
+	public String getId() {
+		return name;
 	}
 	
 	@Override

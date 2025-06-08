@@ -9,7 +9,7 @@ import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.avr_asm.semantic.LiteralExpression;
-import ru.vm5277.avr_asm.semantic.VariableExpression;
+import ru.vm5277.avr_asm.semantic.IdExpression;
 import ru.vm5277.common.Delimiter;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.SourcePosition;
@@ -82,8 +82,8 @@ public class Node {
 	}
 
 	public static Long getNumValue(Expression expr, SourcePosition sp) throws ParseException {
-		if(expr instanceof VariableExpression) {
-			return ((VariableExpression)expr).getValue();
+		if(expr instanceof IdExpression) {
+			return ((IdExpression)expr).getNumericValue();
 		}
 		if(expr instanceof LiteralExpression) {
 			return getLong(((LiteralExpression)expr).getValue());

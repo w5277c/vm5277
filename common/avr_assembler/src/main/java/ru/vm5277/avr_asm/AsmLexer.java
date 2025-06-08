@@ -5,6 +5,7 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.avr_asm;
 
+import java.io.File;
 import ru.vm5277.avr_asm.tokens.TDirective;
 import ru.vm5277.common.messages.MessageContainer;
 import java.io.IOException;
@@ -23,8 +24,8 @@ import ru.vm5277.common.messages.ErrorMessage;
 
 public class AsmLexer extends Lexer {
 	
-	public AsmLexer(Reader reader, Scope scope, MessageContainer mc) throws IOException {
-		super(reader, mc);
+	public AsmLexer(File sourceFile, Scope scope, MessageContainer mc) throws IOException {
+		super(sourceFile, mc);
 
 		while (sb.hasNext()) {
 			// Пропускаем комментарий
@@ -163,6 +164,7 @@ public class AsmLexer extends Lexer {
 			sb.next();
 			mc.add(new ErrorMessage("Unexpected character: '" + ch + "'", sp));
         }
-        tokens.add(new Token(sb, TokenType.EOF, null));
+        tokens.add(new Token(sb, TokenType.NEWLINE, null));
+		tokens.add(new Token(sb, TokenType.EOF, null));
 	}
 }

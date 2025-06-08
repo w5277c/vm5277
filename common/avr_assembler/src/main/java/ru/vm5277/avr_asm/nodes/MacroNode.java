@@ -49,8 +49,7 @@ public class MacroNode {
 			for(Token token : macro.getTokens()) {
 				token.getSP().setMacroOffset(macro.getName(), tb.getSP().getLine());
 			}
-			
-			Parser parser = new Parser(macro.getTokens(), scope, mc, sourcePaths);
+			new Parser(macro.getTokens(), scope, mc, sourcePaths);
 		}
 		finally {
 			scope.stopMacroImpl();

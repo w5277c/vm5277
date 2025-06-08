@@ -32,6 +32,7 @@ public class Scope {
 	private			static	int										TABSIZE			= 4;
 	private			static	String									mcu				= null;
 	private			static	InstrReader								instrReader;
+	private			static	boolean									isPedantic		= false;
 	private	final			Map<String, Byte>						regAliases		= new HashMap<>();	// Алиасы регистров
 	private	final			Map<String, VariableSymbol>				variables		= new HashMap<>();
 	private	final			Map<String, Integer>					labels			= new HashMap<>();
@@ -118,10 +119,13 @@ public class Scope {
 	}
 
 	public VariableSymbol resolveVariable(String name) throws ParseException {
-		if(name.equals("pc")) return new VariableSymbol(name, getCSeg().getCurrentBlock().getAddress(), true);
+		if(name.equals("pc")) {
+			return new VariableSymbol(name, getCSeg().getCurrentBlock().getAddress(), true);
+		}
 		if(isMacroCall()) {
 			MacroCallSymbol symbol = macroCallSymbols.lastElement();
-			return symbol.resolveVariable(name);
+			VariableSymbol result = symbol.resolveVariable(name);
+			if(null != result) return result;
 		}
 		return variables.get(name);
 	}
@@ -139,7 +143,8 @@ public class Scope {
 	public Integer resolveLabel(String name) {
 		if(isMacroCall()) {
 			MacroCallSymbol symbol = macroCallSymbols.lastElement();
-			return symbol.resolveLabel(name);
+			Integer result = symbol.resolveLabel(name);
+			if(null != result) return result;
 		}
 		return labels.get(name);
 	}
@@ -218,5 +223,12 @@ public class Scope {
 	
 	public Segment getCurrentSegment() {
 		return currentSegment;
+	}
+	
+	public static void setPedantic(boolean _isPedantic) {
+		isPedantic = _isPedantic;
+	}
+	public static boolean isPedantic() {
+		return isPedantic;
 	}
 }

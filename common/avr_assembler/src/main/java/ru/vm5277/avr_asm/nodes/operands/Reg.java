@@ -7,6 +7,7 @@ package ru.vm5277.avr_asm.nodes.operands;
 
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
+import ru.vm5277.avr_asm.semantic.IdExpression;
 import ru.vm5277.avr_asm.semantic.LiteralExpression;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.exceptions.ParseException;
@@ -30,15 +31,22 @@ public class Reg {
 				case "z+": id=30; inc=true; break;
 				case "-z": id=30; dec=true; break;
 				default:
-					Byte result = scope.resolveReg(str);
-					if(null==result || 0x00>result || 0x1f<result) {
-						throw new ParseException("TODO ожидаем регистр, получили " + result, sp);
-					}
-					id = result;
+					throw new ParseException("TODO ожидаем регистр, получили " + expr, sp);
 			}
+		}
+		else if(expr instanceof IdExpression) {
+			String str = (String)((IdExpression)expr).getId();
+			Byte result = scope.resolveReg(str);
+			if(null==result || 0x00>result || 0x1f<result) {
+				throw new ParseException("TODO ожидаем регистр, получили " + result, sp);
+			}
+			id = result;
 		}
 		else {
 			throw new ParseException("TODO ожидаем регистр, получили " + expr, sp);
+		}
+		if(0x00>id || 0x1f<id) {
+			throw new ParseException("TODO ожидаем регистр, получили " + id, sp);
 		}
 	}
 	public Reg(byte id) {
@@ -47,5 +55,10 @@ public class Reg {
 	
 	public int getId() {
 		return id;
+	}
+	
+	@Override
+	public String toString() {
+		return Integer.toString(id);
 	}
 }

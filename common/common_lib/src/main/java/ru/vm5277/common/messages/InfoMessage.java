@@ -8,10 +8,6 @@ package ru.vm5277.common.messages;
 import ru.vm5277.common.SourcePosition;
 
 public class InfoMessage extends Message {
-	public InfoMessage(MessageOwner owner, String text, SourcePosition sp) {
-		super("INF", owner, text, sp);
-	}
-
 	public InfoMessage(String text, SourcePosition sp) {
 		super("INF", text, sp);
 	}

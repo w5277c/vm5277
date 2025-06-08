@@ -5,17 +5,13 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.common.messages;
 
-import java.io.File;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageOwner;
 import ru.vm5277.common.messages.Message;
 import ru.vm5277.common.exceptions.MessageContainerIsFullException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Stack;
-import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.exceptions.CompilationAbortedException;
-import ru.vm5277.common.exceptions.CriticalParseException;
 
 public class MessageContainer {
 	
@@ -25,7 +21,6 @@ public class MessageContainer {
 	private			boolean			showImmeditly	= false;
 	private			boolean			stopImmeditly	= false;
 	private			MessageOwner	currentOwner	= MessageOwner.OTHER;
-	private			Stack<String>	filePathes		= new Stack();
 	
 	public MessageContainer() {
 	}
@@ -44,21 +39,7 @@ public class MessageContainer {
 		this.currentOwner = owner;
 	}
 	
-	public void setFile(String filePath, SourcePosition sp) {
-//		add(new InfoMessage("TODO вошли в файл:" + file.getAbsolutePath(), sp));
-		filePathes.push(filePath);
-	}
-	public void releaseFile(SourcePosition sp) {
-//		add(new InfoMessage("TODO покинули файл", sp));
-		filePathes.pop();
-	}
-	
 	public void add(Message message) {
-		if(!filePathes.isEmpty()) {
-			String path = "";
-			try {path = filePathes.get(filePathes.size()-1);} catch(Exception ex) {}
-			message.setPath(path);
-		}
 		message.setMessageOwnerIfNull(currentOwner);
 		if(showImmeditly) {
 			System.out.println(message.toStrig());
