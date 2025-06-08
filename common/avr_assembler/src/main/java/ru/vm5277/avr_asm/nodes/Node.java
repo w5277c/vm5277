@@ -81,7 +81,7 @@ public class Node {
 		return message;
 	}
 
-	public static Long getValue(Expression expr, SourcePosition sp) throws ParseException {
+	public static Long getNumValue(Expression expr, SourcePosition sp) throws ParseException {
 		if(expr instanceof VariableExpression) {
 			return ((VariableExpression)expr).getValue();
 		}

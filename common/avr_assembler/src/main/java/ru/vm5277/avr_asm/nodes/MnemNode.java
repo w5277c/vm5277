@@ -39,10 +39,6 @@ public class MnemNode extends Node {
 		super(tb, scope, mc);
 		
 		mnemonic = ((String)tb.consume().getValue()).toLowerCase();
-		if(mnemonic.equalsIgnoreCase("nop")) {
-			int t=3432423;
-		}
-
 		Map<String, Instruction> instructions = scope.getInstrReader().getInstrByMn().get(mnemonic);
 		for(Instruction instr : instructions.values()) {
 			if(scope.getInstrReader().getSupported().contains(instr.getId())) {
@@ -67,7 +63,6 @@ public class MnemNode extends Node {
 				expr2 = Expression.parse(tb, scope, mc);
 			}
 		}
-		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 		
 	public void secondPass() {
@@ -90,6 +85,9 @@ public class MnemNode extends Node {
 						case Instruction.OPERAND_R:
 						case Instruction.OPERAND_RH:
 							parse(instr, new Reg(scope, sp, expr1));
+							break;
+						case Instruction.OPERAND_RR:
+							parse(instr, new Reg(scope, sp, expr1), new Reg(scope, sp, expr1));
 							break;
 						case Instruction.OPERAND_K12S:
 							parse(instr, new Const(scope, sp, expr1, -2048, 2047, 12));

@@ -15,7 +15,7 @@ public class IReg extends Reg {
 		super(scope, sp, expr);
 		
 		if(24!=id && 26!=id && 28!=id && 30!=id) {
-			throw new ParseException("TODO ожидаем WH,XH,YH,ZH регистр, получили " + id, sp);
+			throw new ParseException("TODO ожидаем XH,YH,ZH регистр, получили " + id, sp);
 		}
 	}
 }

@@ -7,6 +7,7 @@ package ru.vm5277.avr_asm.semantic;
 
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.nodes.Node;
+import ru.vm5277.avr_asm.scope.MacroCallSymbol;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.common.AsmKeyword;
 import ru.vm5277.common.Delimiter;
@@ -38,17 +39,21 @@ public class Expression extends Node {
 	
 			//TODO перейти на long
 			Expression right = parseBinary(tb, scope, mc, precedence + (operator.isAssignment() ? 0 : 1));
+			
 			Long leftVal = null;
 			Long rightVal = null;
-			try {leftVal = Node.getValue(left, null);} catch(ParseException e) {}
-			try {rightVal = Node.getValue(right, null);} catch(ParseException e) {}
+			try {leftVal = Node.getNumValue(left, null);} catch(ParseException e) {}
+			try {rightVal = Node.getNumValue(right, null);} catch(ParseException e) {}
 
 			if(null != leftVal && null != rightVal) {
 				switch (operator) {
 					case MULT:		left = new LiteralExpression(leftVal *	rightVal); break;
 					case DIV:		left = new LiteralExpression(leftVal /	rightVal); break;
 					case SHL:		left = new LiteralExpression(leftVal <<	rightVal); break;
+					case SHR:		left = new LiteralExpression(leftVal >>>	rightVal); break;
 					case BIT_OR:	left = new LiteralExpression(leftVal |	rightVal); break;
+					case BIT_AND:	left = new LiteralExpression(leftVal &	rightVal); break;
+					case BIT_XOR:	left = new LiteralExpression(leftVal ^	rightVal); break;
 					case PLUS:		left = new LiteralExpression(leftVal +	rightVal); break;
 					case MINUS:		left = new LiteralExpression(leftVal -	rightVal); break;
 					case EQ:		left = new LiteralExpression(leftVal.longValue() == rightVal); break;
@@ -57,7 +62,11 @@ public class Expression extends Node {
 					case LTE:		left = new LiteralExpression(leftVal <=	rightVal); break;
 					case GT:		left = new LiteralExpression(leftVal >	rightVal); break;
 					case GTE:		left = new LiteralExpression(leftVal >=	rightVal); break;
-					default:		throw new ParseException("TODO не поддердживаемый тип операции:" + operator, null);
+					case OR:		left = new LiteralExpression((leftVal != 0) || (rightVal != 0)); break;
+					case AND:		left = new LiteralExpression((leftVal != 0) && (rightVal != 0)); break;
+					default:		{
+						throw new ParseException("TODO не поддердживаемый тип операции:" + operator, null);
+					}
 				}
 			}
 			else {
@@ -72,26 +81,28 @@ public class Expression extends Node {
 	
 	private static Expression parseUnary(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
 		if (tb.match(TokenType.OPERATOR)) {
-/*TODO			Operator operator = ((Operator)tb.current().getValue()); //TODO check it
-			
+			Operator operator = ((Operator)tb.current().getValue()); //TODO check it
 			if(operator.isUnary()) {
-				consumeToken(tb);
-				return new UnaryExpression(tb, mc, operator, parseUnary());
-			}
-			else if (operator == Operator.MINUS && tb.match(TokenType.NUMBER)) {
-				// Схлопываем "-число" в LiteralExpression с отрицательным значением
-				consumeToken(tb); // Потребляем минус
-				Token numberToken = consumeToken(tb, TokenType.NUMBER);
-				Number value = (Number) numberToken.getValue();
-				// Меняем знак
-				if (value instanceof Integer) {
-					return new LiteralExpression(tb, mc, -value.intValue());
-				} else if (value instanceof Long) {
-					return new LiteralExpression(tb, mc, -value.longValue());
-				} else if (value instanceof Double) {
-					return new LiteralExpression(tb, mc, -value.doubleValue());
+				tb.consume();
+
+				Expression expr = parseUnary(tb, scope, mc);
+				if(expr instanceof LiteralExpression) {
+					Object value = ((LiteralExpression)expr).getValue();
+					if(value instanceof Number) {
+						long num = ((Number)value).longValue();
+						switch (operator) {
+							case BIT_NOT: return new LiteralExpression((~num) &0xffffffffl);
+							case MINUS:  return new LiteralExpression(-num);
+							case NOT:    return new LiteralExpression(num == 0 ? 1L : 0L);
+						}
+						
+					}
+					else if(value instanceof Boolean && Operator.NOT == operator) {
+						return new LiteralExpression(!(boolean)value);
+					}
 				}
-			}*/
+				return new UnaryExpression(tb, scope, mc, operator, parseUnary(tb, scope, mc));
+			}
 		}
 		return parsePrimary(tb, scope, mc);
 	}
@@ -100,10 +111,11 @@ public class Expression extends Node {
 		Token token = tb.current();
 		
 		if(tb.match(TokenType.MACRO_PARAM)) {
-			if(scope.isMacroMode()) {
+			if(scope.isMacroCall()) {
 				tb.consume();
 				Integer index = (Integer)(consumeToken(tb, TokenType.NUMBER)).getValue();
-				Expression result = scope.getMacroParam(index);
+				MacroCallSymbol marcoCall = scope.getMarcoCall();
+				Expression result = marcoCall.getParams().get(index);
 				return result;
 			}
 			else {
@@ -119,6 +131,14 @@ public class Expression extends Node {
 			Expression expr = parseBinary(tb, scope, mc, 0);
 			Node.consumeToken(tb, Delimiter.RIGHT_PAREN);
 			return expr;
+		}
+		else if(tb.match(TokenType.INDEX_REG)) {
+			IRegExpression expr = new IRegExpression((String)tb.consume().getValue());
+			if((!tb.match(TokenType.ID) && !tb.match(TokenType.NUMBER)) || (!expr.isInc() && !expr.isDec())) {
+				return expr;
+			}
+			return new BinaryExpression(tb, scope, mc, new IRegExpression(expr.getId(), false, false),
+										expr.isDec() ? Operator.MINUS : Operator.PLUS, parsePrimary(tb, scope, mc));
 		}
 		else if(tb.match(TokenType.ID)) {
 			String name = ((String)tb.consume().getValue()).toLowerCase();
@@ -139,13 +159,22 @@ public class Expression extends Node {
 		Expression expr = Expression.parse(tb, scope, mc);
 		
 		Long value = null;
-		try {value = Node.getValue(expr, null);} catch(ParseException e) {}
+		try {value = Node.getNumValue(expr, null);} catch(ParseException e) {}
 		if(null != value) {
-			if(AsmKeyword.LOW.getName().equals(name)) {
-				return new LiteralExpression(value & 0xff);
-			}
-			else if(AsmKeyword.HIGH.getName().equals(name)) {
-				return new LiteralExpression((value >> 8) & 0xff);
+			if(AsmKeyword.LOW.getName().equals(name) || AsmKeyword.BYTE1.getName().equals(name)) return new LiteralExpression(value & 0xff);
+			else if(AsmKeyword.HIGH.getName().equals(name) || AsmKeyword.BYTE2.getName().equals(name)) return new LiteralExpression((value >> 8) & 0xff);
+			else if(AsmKeyword.BYTE3.getName().equals(name) || AsmKeyword.PAGE.getName().equals(name)) return new LiteralExpression((value >> 16) & 0xff);
+			else if(AsmKeyword.BYTE4.getName().equals(name)) return new LiteralExpression((value >> 24) & 0xff);
+			else if(AsmKeyword.LWRD.getName().equals(name)) return new LiteralExpression(value & 0xffff);
+			else if(AsmKeyword.HWRD.getName().equals(name)) return new LiteralExpression((value >> 16) & 0xffff);
+			else if(AsmKeyword.EXP2.getName().equals(name)) return new LiteralExpression(1 << value);
+			else if(AsmKeyword.LOG.getName().equals(name)) {
+				long result = 0;
+				while (0x01 <= value) {
+					value = value >> 0x01;
+					result++;
+				}
+				return new LiteralExpression(result);
 			}
 			else {
 				throw new ParseException("TODO не поддерживаемая функция:" + name, tb.getSP());

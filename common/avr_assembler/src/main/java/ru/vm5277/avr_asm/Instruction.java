@@ -15,6 +15,7 @@ public class Instruction {
 	public	final	static	String	OPERAND_RI	= "ri";		// Index register R24,R26,R28,R30
 	public	final	static	String	OPERAND_RE	= "re";		// Even registers R0,R2,R4,...,R30
 	public	final	static	String	OPERAND_A	= "a";		// I/O register address
+	public	final	static	String	OPERAND_RR	= "rr";		// Register for both operands
 	public	final	static	String	OPERAND_K3	= "k3";		// Constant 0<=k<=7
 	public	final	static	String	OPERAND_K6	= "k6";		// Constant 0<=k<=63
 	public	final	static	String	OPERAND_K7S	= "k7s";	// Constant -64<=k<=63

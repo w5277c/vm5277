@@ -14,7 +14,7 @@ import ru.vm5277.common.messages.MessageContainer;
 
 public class OrgNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
-		scope.getCSeg().setAddr(Node.getValue(Expression.parse(tb, scope, mc), tb.getSP()));
+		scope.getCSeg().setAddr(Node.getNumValue(Expression.parse(tb, scope, mc), tb.getSP()));
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 }

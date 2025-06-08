@@ -9,11 +9,11 @@ import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.tokens.Token;
 
-public class MacroSymbol extends Symbol {
+public class MacroDefSymbol extends Symbol {
 	private	int			firstLine;
 	private	List<Token> tokens		= new ArrayList<>();
 	
-	public MacroSymbol(String name, int firstLine) {
+	public MacroDefSymbol(String name, int firstLine) {
 		super(name);
 		
 		this.firstLine = firstLine;

@@ -10,23 +10,30 @@ import java.util.List;
 import java.util.Map;
 import ru.vm5277.avr_asm.Parser;
 import ru.vm5277.avr_asm.TokenBuffer;
-import ru.vm5277.avr_asm.scope.MacroSymbol;
+import ru.vm5277.avr_asm.scope.MacroDefSymbol;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.Delimiter;
 import ru.vm5277.common.TokenType;
+import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.tokens.Token;
 
 public class MacroNode {
 	public static void parseDef(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
-		scope.startMacro(new MacroSymbol(((String)Node.consumeToken(tb, TokenType.ID).getValue()).toLowerCase(), tb.getSP().getLine()), tb.getSP());
+		try{
+			scope.startMacro(new MacroDefSymbol(((String)Node.consumeToken(tb, TokenType.ID).getValue()).toLowerCase(), tb.getSP().getLine()), tb.getSP());
+		}
+		catch(ParseException e) {
+			mc.add(e.getErrorMessage());
+			tb.skipLine();
+		}
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 	
-	public static void parseCall(TokenBuffer tb, Scope scope, MessageContainer mc, Map<String, SourceType> sourcePaths, MacroSymbol macro)
-																																		throws ParseException {
+	public static void parseCall(TokenBuffer tb, Scope scope, MessageContainer mc, Map<String, SourceType> sourcePaths, MacroDefSymbol macro)
+																												throws ParseException, CriticalParseException {
 		tb.consume();
 
 		List<Expression> params = new ArrayList<>();
@@ -37,7 +44,7 @@ public class MacroNode {
 			Node.consumeToken(tb, Delimiter.COMMA);
 		}
 
-		scope.startMacroImpl(params);
+		scope.startMacroImpl(macro.getName(), params);
 		try {
 			for(Token token : macro.getTokens()) {
 				token.getSP().setMacroOffset(macro.getName(), tb.getSP().getLine());

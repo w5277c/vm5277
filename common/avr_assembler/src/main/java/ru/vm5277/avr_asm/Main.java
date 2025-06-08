@@ -10,14 +10,14 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import ru.vm5277.avr_asm.nodes.MnemNode;
 import ru.vm5277.avr_asm.nodes.SourceType;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.common.Lexer;
+import ru.vm5277.common.exceptions.CriticalParseException;
+import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.InfoMessage;
 import ru.vm5277.common.messages.MessageContainer;
 
@@ -74,14 +74,15 @@ public class Main {
 		
 		String rtosPath = toolkitPath + File.separator + "platform" + File.separator + "avr" + File.separator + "rtos";
 		sourcePaths.put(rtosPath, SourceType.RTOS);
-		String baseDir = new File(source).getParentFile().getAbsolutePath();
+		File sourceFile = new File(source);
+		String baseDir = sourceFile.getParentFile().getAbsolutePath();
 		sourcePaths.put(baseDir, SourceType.BASE);
 		
 		InstrReader instrReader = new InstrReader("./", mc);
-		Scope scope = new Scope(instrReader);
+		Scope scope = new Scope(sourceFile, instrReader);
 		if(null != mcu) scope.setDevice(mcu);
 		
-		try (InputStreamReader isr = new InputStreamReader(new FileInputStream(source))) {
+		try (InputStreamReader isr = new InputStreamReader(new FileInputStream(sourceFile))) {
 			mc.setFile(source, null);
 			Lexer lexer = new AsmLexer(isr, scope, mc);
 			//for(Token token : lexer.getTokens()) {
@@ -96,7 +97,11 @@ public class Main {
 		catch(Exception ex) {
 			ex.printStackTrace();
 		}
-		mc.releaseFile(null);
+		mc.releaseFile(null); // TODO объединить с IncludeSymbol?
+		try {scope.leaveImport();} //TODO не проверяю на MessageContainerIsFullException
+		catch(ParseException e) {mc.add(e.getErrorMessage());}
+		catch(CriticalParseException e) {mc.add(e.getErrorMessage()); throw e;}
+
     }
 	
 	private static void showHelp() {

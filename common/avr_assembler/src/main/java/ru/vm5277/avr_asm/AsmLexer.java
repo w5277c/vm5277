@@ -92,7 +92,18 @@ public class AsmLexer extends Lexer {
 				tokens.add(new TNumber(sb, mc));
 				continue;
             }
-            
+
+			// Проверка на индексные регистры -X,-Y,-Z
+			if ('-'==ch && sb.hasNext()) {
+				ch = (char)(sb.getChar(1)|0x20);
+				if ('x'==ch || 'y'==ch || 'z'==ch) {
+					sb.next(2);
+					Token token = new Token(sb, TokenType.INDEX_REG, "-"+ch);
+					tokens.add(token);
+					continue;
+				}
+			}
+			
 			// Операторы
 			Token token = TOpearator.parse(sb);
             if (null != token) {
@@ -107,7 +118,7 @@ public class AsmLexer extends Lexer {
 				continue;
 			}
 
-			// TODO добавить токены вида -W,W+,-X,X+,-Y,Y+,-Z,Z+
+
 			
 			// Идентификаторы и ключевые слова
 			if (Character.isLetter(ch) || '_'==ch) {
@@ -124,6 +135,16 @@ public class AsmLexer extends Lexer {
 				else if (sb.hasNext() && ':'==sb.getChar()) {
 					token = new Token(sb, TokenType.LABEL, str);
 					sb.next();
+				}
+				// Проверка на индексные регистры X+,Y+,Z+
+				else if (str.equals("x") || str.equals("y") || str.equals("z")) {
+					if (sb.hasNext() && '+'==sb.getChar()) {
+						sb.next();
+						token = new Token(sb, TokenType.INDEX_REG, str+"+");
+					}
+					else {
+						token = new Token(sb, TokenType.INDEX_REG, str);
+					}
 				}
 				else {
 					token = new Token(sb, TokenType.ID, str);

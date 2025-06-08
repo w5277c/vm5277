@@ -13,16 +13,33 @@ import ru.vm5277.common.exceptions.ParseException;
 
 public class Reg {
 	protected	int	id;
-
+	protected	boolean	inc	= false;
+	protected	boolean	dec	= false;
+	
 	public Reg(Scope scope, SourcePosition sp, Expression expr) throws ParseException {
 		if(expr instanceof LiteralExpression) {
-			Byte result = scope.resolveReg((String)((LiteralExpression)expr).getValue());
-			if(null==result || 0x00>result || 0x1f<result) {
-				throw new ParseException("TODO ожидаем регистр, получили " + result, sp);
+			String str = (String)((LiteralExpression)expr).getValue();
+			switch (str) {
+				case "x": id=26; break;
+				case "x+": id=26; inc=true; break;
+				case "-x": id=26; dec=true; break;
+				case "y": id=28; break;
+				case "y+": id=28; inc=true; break;
+				case "-y": id=28; dec=true; break;
+				case "z": id=30; break;
+				case "z+": id=30; inc=true; break;
+				case "-z": id=30; dec=true; break;
+				default:
+					Byte result = scope.resolveReg(str);
+					if(null==result || 0x00>result || 0x1f<result) {
+						throw new ParseException("TODO ожидаем регистр, получили " + result, sp);
+					}
+					id = result;
 			}
-			id = result;
 		}
-		throw new ParseException("TODO ожидаем регистр, получили " + expr, sp);
+		else {
+			throw new ParseException("TODO ожидаем регистр, получили " + expr, sp);
+		}
 	}
 	public Reg(byte id) {
 		this.id = id;

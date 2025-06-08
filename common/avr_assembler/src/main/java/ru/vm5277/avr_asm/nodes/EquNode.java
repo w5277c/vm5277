@@ -18,7 +18,7 @@ public class EquNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
 		String name = ((String)Node.consumeToken(tb, TokenType.ID).getValue()).toLowerCase();
 		Node.consumeToken(tb, Operator.ASSIGN);
-		scope.setVariable(new VariableSymbol(name, Node.getValue(Expression.parse(tb, scope, mc), tb.getSP()), true), tb.getSP());
+		scope.setVariable(new VariableSymbol(name, Node.getNumValue(Expression.parse(tb, scope, mc), tb.getSP()), true), tb.getSP());
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 }

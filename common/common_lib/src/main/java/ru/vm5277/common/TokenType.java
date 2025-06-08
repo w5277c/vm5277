@@ -17,6 +17,7 @@ public enum TokenType {
 	MNEMONIC,	//Мнемоника ассемблера
 	
 	ID,
+	INDEX_REG,
 	LABEL,
 	NUMBER,
 	NOTE,

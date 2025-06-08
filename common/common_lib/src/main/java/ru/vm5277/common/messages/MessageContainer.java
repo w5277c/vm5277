@@ -15,6 +15,7 @@ import java.util.List;
 import java.util.Stack;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.exceptions.CompilationAbortedException;
+import ru.vm5277.common.exceptions.CriticalParseException;
 
 public class MessageContainer {
 	

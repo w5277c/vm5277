@@ -21,7 +21,7 @@ public class VariableExpression extends Expression {
 		this.name = name;
     }
     
-	public Long getValue() {
+	public Long getValue() throws ParseException {
 		if(null == value) {
 			VariableSymbol symbol = scope.resolveVariable(name);
 			if(null != symbol) {

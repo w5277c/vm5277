@@ -8,13 +8,14 @@ package ru.vm5277.avr_asm.nodes;
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.common.TokenType;
+import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class IfDefNode {
-	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
+	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException, CriticalParseException {
 		String id = (String)Node.consumeToken(tb,TokenType.ID).getValue();
-		scope.blockStart(null == scope.resolveVariable(id));
+		scope.getIncludeSymbol().blockStart(null == scope.resolveVariable(id));
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 }

@@ -8,12 +8,13 @@ package ru.vm5277.avr_asm.nodes;
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.common.TokenType;
+import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class ElseNode {
-	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
-		scope.blockSkipInvert();
+	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException, CriticalParseException {
+		scope.getIncludeSymbol().blockSkipInvert();
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 }

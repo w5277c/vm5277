@@ -17,12 +17,14 @@ import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.common.Lexer;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.TokenType;
+import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 
 public class IncludeNode {
-	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc, Map<String, SourceType> sourcePaths) throws ParseException {
+	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc, Map<String, SourceType> sourcePaths)
+																												throws ParseException, CriticalParseException {
 		String importPath = (String)Node.consumeToken(tb, TokenType.STRING).getValue();
 
 
@@ -33,7 +35,7 @@ public class IncludeNode {
 		}
 		if(null == exist) throw new ParseException("TODO Imported file not found: " + importPath, tb.getSP());
 
-		if(!scope.addImport(exist.getAbsolutePath(), importPath)) {
+		if(!scope.addImport(exist.getAbsolutePath() + File.separator + importPath)) {
 			mc.add(new WarningMessage("File '" + importPath + "' already imported", tb.getSP()));
 		}
 		else {
@@ -49,7 +51,10 @@ public class IncludeNode {
 			catch(IOException e) {
 				throw new ParseException("TODO " + e.getMessage(), sp);
 			}
-			mc.releaseFile(sp);
+			mc.releaseFile(sp); // TODO объединить с IncludeSymbol?
+			try {scope.leaveImport();}
+			catch(ParseException e) {mc.add(e.getErrorMessage());}
+			catch(CriticalParseException e) {mc.add(e.getErrorMessage()); throw e;}
 		}
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}

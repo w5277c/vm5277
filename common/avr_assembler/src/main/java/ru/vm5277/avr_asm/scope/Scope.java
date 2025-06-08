@@ -7,12 +7,9 @@ package ru.vm5277.avr_asm.scope;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Stack;
 import ru.vm5277.avr_asm.InstrReader;
 import static ru.vm5277.avr_asm.Main.tabSize;
@@ -20,6 +17,7 @@ import ru.vm5277.avr_asm.nodes.MnemNode;
 import ru.vm5277.avr_asm.nodes.Node;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.ParseException;
 
 public class Scope {
@@ -34,26 +32,22 @@ public class Scope {
 	private			static	int										TABSIZE			= 4;
 	private			static	String									mcu				= null;
 	private			static	InstrReader								instrReader;
-	private	final			List<String>							importedFiles	= new ArrayList<>();
 	private	final			Map<String, Byte>						regAliases		= new HashMap<>();	// Алиасы регистров
 	private	final			Map<String, VariableSymbol>				variables		= new HashMap<>();
 	private	final			Map<String, Integer>					labels			= new HashMap<>();
-	private	final			Map<String, MacroSymbol>				macros			= new HashMap<>();
+	private	final			Map<String, MacroDefSymbol>				macros			= new HashMap<>();
+	private					Stack<MacroCallSymbol>					macroCallSymbols= new Stack<>();
 	private					CodeSegment								cSeg;
 	private					List<Node>								dSeg;
 	private					List<Node>								eSeg;
 	private					Segment									currentSegment;
-	private					MacroSymbol								currentMacro	= null;
-	private					boolean									isMacroMode		= false;
-	private					List<Expression>						macroParams		= null;
-	private					int										blockCntr		= 0;
-	private					boolean									blockSuccess	= false;
-	private					boolean									elseIfSkip		= false;
-	private					Stack<Boolean>							blockSkip		= new Stack<>();
+	private					MacroDefSymbol							currentMacroDef	= null;
+	private					Stack<IncludeSymbol>					includeSymbols	= new Stack<>();
 	private					List<MnemNode>							mnemNodes		= new ArrayList<>();
 
-	public Scope(InstrReader instrReader) {
+	public Scope(File sourceFile, InstrReader instrReader) throws ParseException {
 		this.instrReader = instrReader;
+		addImport(sourceFile.getAbsolutePath());
 	}
 	
 	public void setDevice(String device) throws ParseException {
@@ -62,12 +56,22 @@ public class Scope {
 		instrReader.setMCU(device);
 	}
 	
-	public boolean addImport(String basePath, String path) throws ParseException {
-		if(null != currentMacro) throw new ParseException("TODO Import не поддерживается в макросе", null);
-		String fullPath = basePath + File.separator + path;
-		if(importedFiles.contains(fullPath)) return false;
-		importedFiles.add(fullPath);
+	public boolean addImport(String fullPath) throws ParseException {
+		if(null != currentMacroDef || isMacroCall()) throw new ParseException("TODO Import не поддерживается в макросе", null);
+		
+		for(IncludeSymbol symbol : includeSymbols) {
+			if(symbol.getName().equals(fullPath)) return false;
+		}
+		IncludeSymbol includeSymbol = new IncludeSymbol(fullPath);
+		includeSymbols.add(includeSymbol);
 		return true;
+	}
+	public void leaveImport() throws CriticalParseException, ParseException {
+		if(0 >= includeSymbols.size()) throw new CriticalParseException("TODO список import файлов пуст", null);
+		IncludeSymbol includeSymbol = includeSymbols.pop();
+		if(0 != includeSymbol.getBlockCntr()) {
+			throw new ParseException("TODO нарушена стрктура условных блоков, не закрытых блоков:" + includeSymbol.getBlockCntr(), null);
+		}
 	}
 	
 	public void addSecondPassNode(MnemNode mnemNode) {
@@ -80,28 +84,45 @@ public class Scope {
 	}
 	
 	public void addLabel(String name, SourcePosition sp) throws ParseException {
-		if(null != currentMacro) throw new ParseException("TODO Метки не поддерживается в макросе", sp);
+		if(null != currentMacroDef) throw new ParseException("TODO Метки не поддерживается в макросе", sp);
 		if(labels.keySet().contains(name)) throw new ParseException("Label already defined:" + name, sp); //TODO
 		if(null != registers.get(name)) throw new ParseException("TODO имя метки совпадает с регистром:" + name, sp);
 		if(regAliases.keySet().contains(name)) {
 			throw new ParseException("TODO имя метки совпадает с алиасом регистра:" + name, sp);
 		}
-		if(variables.keySet().contains(name)) throw new ParseException("TODO имя метки совпадает с переменной:" + name, sp);
-		labels.put(name, getCSeg().getCurrentBlock().getAddress());
+		if(name.equals("pc") || variables.keySet().contains(name)) throw new ParseException("TODO имя метки совпадает с переменной:" + name, sp);
+		if(isMacroCall()) {
+			MacroCallSymbol symbol = macroCallSymbols.lastElement();
+			symbol.addLabel(name, sp, getCSeg().getCurrentBlock().getAddress());
+		}
+		else {
+			labels.put(name, getCSeg().getCurrentBlock().getAddress());
+		}
 	}
 	
 	public void setVariable(VariableSymbol variableSymbol, SourcePosition sp) throws ParseException {
-		if(null != currentMacro) throw new ParseException("TODO переменные не поддерживаются в макросе", sp);
+		if(null != currentMacroDef) throw new ParseException("TODO переменные не поддерживаются в макросе", sp);
 		String name = variableSymbol.getName();
+		if(name.equals("pc")) throw new ParseException("TODO нельзя использовать регистр PC в качестве переменной", sp);
 		if(null != registers.get(name)) throw new ParseException("TODO имя переменной совпадает с регистром:" + name, sp);
 		if(regAliases.keySet().contains(name)) throw new ParseException("TODO имя переменной совпадает с алиасом регистра:" + name, sp);
 		VariableSymbol vs = variables.get(name);
 		if(null != vs && vs.isConstant()) throw new ParseException("TODO Нельзя переписать значение константы:" + name, sp);
-		
-		variables.put(name, variableSymbol);
+		if(isMacroCall()) {
+			MacroCallSymbol symbol = macroCallSymbols.lastElement();
+			symbol.addVariable(variableSymbol, sp, getCSeg().getCurrentBlock().getAddress());
+		}
+		else {
+			variables.put(name, variableSymbol);
+		}
 	}
 
-	public VariableSymbol resolveVariable(String name) {
+	public VariableSymbol resolveVariable(String name) throws ParseException {
+		if(name.equals("pc")) return new VariableSymbol(name, getCSeg().getCurrentBlock().getAddress(), true);
+		if(isMacroCall()) {
+			MacroCallSymbol symbol = macroCallSymbols.lastElement();
+			return symbol.resolveVariable(name);
+		}
 		return variables.get(name);
 	}
 
@@ -111,37 +132,35 @@ public class Scope {
 		return result;
 	}
 	
-	public MacroSymbol resolveMacro(String name) {
+	public MacroDefSymbol resolveMacro(String name) {
 		return macros.get(name);
 	}
 	
 	public Integer resolveLabel(String name) {
+		if(isMacroCall()) {
+			MacroCallSymbol symbol = macroCallSymbols.lastElement();
+			return symbol.resolveLabel(name);
+		}
 		return labels.get(name);
 	}
 	
 	public void addRegAlias(String alias, byte regId, SourcePosition sp) throws ParseException {
-		if(null != currentMacro) throw new ParseException("TODO Алиасы не поддерживаются в макросе", sp);
+		if(null != currentMacroDef) throw new ParseException("TODO Алиасы не поддерживаются в макросе", sp);
 		if(regAliases.keySet().contains(alias)) throw new ParseException("TODO алиас уже занят:" + alias, sp);
 		regAliases.put(alias, regId);
 	}
 	
-	public void startMacro(MacroSymbol macro, SourcePosition sp) throws ParseException {
-		if(null != currentMacro) throw new ParseException("TODO Вложенные макросы не поддерживаются", sp);
-		currentMacro = macro;
+	public void startMacro(MacroDefSymbol macro, SourcePosition sp) throws ParseException {
+		if(null != currentMacroDef || isMacroCall()) throw new ParseException("TODO Вложенные макросы не поддерживаются", sp);
+		currentMacroDef = macro;
 		if(macros.keySet().contains(macro.getName())) {
 			throw new ParseException("TODO максрос с таким именем уже существует:" + macro.getName(), sp);
 		}
 		macros.put(macro.getName(), macro);
 	}
 	public void endMacro(SourcePosition sp) throws ParseException {
-		if(null == currentMacro) throw new ParseException("TODO Вложенные конца макроа без его начала", sp);
-		currentMacro = null;
-	}
-	public boolean isMacro() {
-		return null != currentMacro;
-	}
-	public MacroSymbol getCurrentMacro() {
-		return currentMacro;
+		if(null == currentMacroDef) throw new ParseException("TODO Вложенные конца макроа без его начала", sp);
+		currentMacroDef = null;
 	}
 	
 	public String getName() {
@@ -155,61 +174,30 @@ public class Scope {
 		return tabSize;
 	}
 	
-	public void blockStart(boolean skip) {
-		blockSuccess |= !skip;
-		
-		blockSkip.add(skip);
-		blockCntr++;
-	}
-	public void blockSkipInvert() {
-		if(!blockSkip.isEmpty()) {
-			blockSkip.add(!blockSkip.pop());
-		}
-	}
-	public void blockElseIf(boolean skip) {
-		if(!blockSuccess) {
-			elseIfSkip = skip;
-			blockSuccess |= !skip;
-		}
-	}
-	public int getBlockCntr() {
-		return  blockCntr;
-	}
-	public void blockEnd(SourcePosition sp) throws ParseException {
-		elseIfSkip = false;
-		blockSuccess = false;
-		
-		blockCntr--;
-		if(!blockSkip.isEmpty()) {
-			blockSkip.pop();
-		}
-		else {
-			throw new ParseException("TODO конец блока без его начала", sp);
-		}
-	}
-	
-
-	public boolean isBlockSkip() {
-		boolean result = elseIfSkip;
-		for(Boolean skip : blockSkip) {
-			result |=skip;
-		}
-		return result;
+	public IncludeSymbol getIncludeSymbol() throws CriticalParseException {
+		if(0 >= includeSymbols.size()) throw new CriticalParseException("TODO список import файлов пуст", null);
+		return includeSymbols.lastElement();
 	}
 
-	public void startMacroImpl(List<Expression> macroParams) {
-		this.isMacroMode = true;
-		this.macroParams = macroParams;
+	public void startMacroImpl(String name, List<Expression> macroParams) {
+		MacroCallSymbol symbol = new MacroCallSymbol(name, macroParams);
+		macroCallSymbols.add(symbol);
 	}
-	public boolean isMacroMode() {
-		return isMacroMode;
+	public boolean isMacroCall() {
+		return !macroCallSymbols.isEmpty();
 	}
 	public void stopMacroImpl() {
-		this.isMacroMode = false;
-		this.macroParams = null;
+		macroCallSymbols.pop();
 	}
-	public Expression getMacroParam(int index) {
-		return index>= macroParams.size() ? null : macroParams.get(index);
+	public MacroCallSymbol getMarcoCall() {
+		return macroCallSymbols.lastElement();
+	}
+	
+	public boolean isMacroDef() {
+		return null != currentMacroDef;
+	}
+	public MacroDefSymbol getMacroDef() {
+		return currentMacroDef;
 	}
 	
 	public InstrReader getInstrReader() {

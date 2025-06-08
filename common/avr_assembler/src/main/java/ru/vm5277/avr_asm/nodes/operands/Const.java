@@ -17,7 +17,7 @@ public class Const {
 
 	public Const(Scope scope, SourcePosition sp, Expression expr, int min, int max, int bits) throws ParseException {
 		this.bits = bits;
-		value = Node.getValue(expr, sp);
+		value = Node.getNumValue(expr, sp);
 		if(min>value || max<value) {
 			throw new ParseException("TODO значение вне диапазона " + min + "<=" + value + "<" + max, sp);
 		}

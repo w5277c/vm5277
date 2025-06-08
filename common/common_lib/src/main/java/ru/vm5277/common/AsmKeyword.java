@@ -56,6 +56,15 @@ public class AsmKeyword extends Keyword {
 	// Функции
 	public	static	final	Keyword					LOW		= new Keyword("low", TokenType.COMMAND);
 	public	static	final	Keyword					HIGH	= new Keyword("high", TokenType.COMMAND);
+	public	static	final	Keyword					BYTE1	= new Keyword("byte1", TokenType.COMMAND);
+	public	static	final	Keyword					BYTE2	= new Keyword("byte2", TokenType.COMMAND);
+	public	static	final	Keyword					BYTE3	= new Keyword("byte3", TokenType.COMMAND);
+	public	static	final	Keyword					BYTE4	= new Keyword("byte4", TokenType.COMMAND);
+	public	static	final	Keyword					LWRD	= new Keyword("lwrd", TokenType.COMMAND);
+	public	static	final	Keyword					HWRD	= new Keyword("hwrd", TokenType.COMMAND);
+	public	static	final	Keyword					PAGE	= new Keyword("page", TokenType.COMMAND);
+	public	static	final	Keyword					EXP2	= new Keyword("exp2", TokenType.COMMAND);
+	public	static	final	Keyword					LOG		= new Keyword("log", TokenType.COMMAND);
 	
 	public AsmKeyword(String name, TokenType tokenType) {
 		super(name, tokenType);
