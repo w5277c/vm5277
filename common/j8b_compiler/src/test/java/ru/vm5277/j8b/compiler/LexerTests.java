@@ -1,18 +1,16 @@
 package ru.vm5277.j8b.compiler;
 
-import ru.vm5277.j8b_compiler.J8bLexer;
-import ru.vm5277.common.tokens.Token;
-import ru.vm5277.common.TokenType;
-import ru.vm5277.common.J8bKeyword;
-import java.io.StringReader;
+import ru.vm5277.j8b_compiler.TokenType;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
-import ru.vm5277.common.Keyword;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
-import static ru.vm5277.common.tokens.Token.toStringValue;
+import ru.vm5277.j8b_compiler.Lexer;
+import ru.vm5277.j8b_compiler.Keyword;
+import ru.vm5277.j8b_compiler.tokens.Token;
+import static ru.vm5277.j8b_compiler.tokens.Token.toStringValue;
 
 public class LexerTests {
 
@@ -26,7 +24,7 @@ public class LexerTests {
 						"import as else case default new " +
 						"try catch throw throws";
         MessageContainer mc = new MessageContainer(100, true, false);
-		J8bLexer lexer = new J8bLexer(source, mc);
+		Lexer lexer = new Lexer(source, mc);
         List<Token> tokens = lexer.getTokens();
         
         assertEquals(39, tokens.size() - 1); // -1 для EOF
@@ -42,87 +40,87 @@ public class LexerTests {
 
 		// Проверка типов
 		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.VOID, tokens.get(pos++).getValue());
+		assertEquals(Keyword.VOID, tokens.get(pos++).getValue());
 		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.BOOL, tokens.get(pos++).getValue());
+		assertEquals(Keyword.BOOL, tokens.get(pos++).getValue());
 		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.BYTE, tokens.get(pos++).getValue());
+		assertEquals(Keyword.BYTE, tokens.get(pos++).getValue());
 		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.SHORT, tokens.get(pos++).getValue());
+		assertEquals(Keyword.SHORT, tokens.get(pos++).getValue());
 		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.INT, tokens.get(pos++).getValue());
+		assertEquals(Keyword.INT, tokens.get(pos++).getValue());
 		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.FIXED, tokens.get(pos++).getValue());
+		assertEquals(Keyword.FIXED, tokens.get(pos++).getValue());
 		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.CSTR, tokens.get(pos++).getValue());
+		assertEquals(Keyword.CSTR, tokens.get(pos++).getValue());
 
 		// Проверка комманд
 		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.IF, tokens.get(pos++).getValue());
+		assertEquals(Keyword.IF, tokens.get(pos++).getValue());
 		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.DO, tokens.get(pos++).getValue());
+		assertEquals(Keyword.DO, tokens.get(pos++).getValue());
 		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.WHILE, tokens.get(pos++).getValue());
+		assertEquals(Keyword.WHILE, tokens.get(pos++).getValue());
 		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.FOR, tokens.get(pos++).getValue());
+		assertEquals(Keyword.FOR, tokens.get(pos++).getValue());
 		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.RETURN, tokens.get(pos++).getValue());
+		assertEquals(Keyword.RETURN, tokens.get(pos++).getValue());
 		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.CONTINUE, tokens.get(pos++).getValue());
+		assertEquals(Keyword.CONTINUE, tokens.get(pos++).getValue());
 		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.BREAK, tokens.get(pos++).getValue());
+		assertEquals(Keyword.BREAK, tokens.get(pos++).getValue());
 		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.SWITCH, tokens.get(pos++).getValue());
+		assertEquals(Keyword.SWITCH, tokens.get(pos++).getValue());
 		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.FREE, tokens.get(pos++).getValue());
+		assertEquals(Keyword.FREE, tokens.get(pos++).getValue());
 
 		// Проверка модификаторов
 		assertEquals(TokenType.MODIFIER, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.STATIC, tokens.get(pos++).getValue());
+		assertEquals(Keyword.STATIC, tokens.get(pos++).getValue());
 		assertEquals(TokenType.MODIFIER, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.FINAL, tokens.get(pos++).getValue());
+		assertEquals(Keyword.FINAL, tokens.get(pos++).getValue());
 		assertEquals(TokenType.MODIFIER, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.PRIVATE, tokens.get(pos++).getValue());
+		assertEquals(Keyword.PRIVATE, tokens.get(pos++).getValue());
 		assertEquals(TokenType.MODIFIER, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.PUBLIC, tokens.get(pos++).getValue());
+		assertEquals(Keyword.PUBLIC, tokens.get(pos++).getValue());
 		assertEquals(TokenType.MODIFIER, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.NATIVE, tokens.get(pos++).getValue());
+		assertEquals(Keyword.NATIVE, tokens.get(pos++).getValue());
 		assertEquals(TokenType.MODIFIER, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.ATOMIC, tokens.get(pos++).getValue());
+		assertEquals(Keyword.ATOMIC, tokens.get(pos++).getValue());
 
 		// Проверка ключевых слов ООП
 		assertEquals(TokenType.OOP, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.CLASS, tokens.get(pos++).getValue());
+		assertEquals(Keyword.CLASS, tokens.get(pos++).getValue());
 		assertEquals(TokenType.OOP, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.INTERFACE, tokens.get(pos++).getValue());
+		assertEquals(Keyword.INTERFACE, tokens.get(pos++).getValue());
 		assertEquals(TokenType.OOP, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.IMPLEMENTS, tokens.get(pos++).getValue());
+		assertEquals(Keyword.IMPLEMENTS, tokens.get(pos++).getValue());
 		assertEquals(TokenType.OOP, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.THIS, tokens.get(pos++).getValue());
+		assertEquals(Keyword.THIS, tokens.get(pos++).getValue());
 		
 		// Остальное
 		assertEquals(TokenType.KEYWORD, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.IMPORT, tokens.get(pos++).getValue());
+		assertEquals(Keyword.IMPORT, tokens.get(pos++).getValue());
 		assertEquals(TokenType.KEYWORD, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.AS, tokens.get(pos++).getValue());
+		assertEquals(Keyword.AS, tokens.get(pos++).getValue());
 		assertEquals(TokenType.KEYWORD, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.ELSE, tokens.get(pos++).getValue());
+		assertEquals(Keyword.ELSE, tokens.get(pos++).getValue());
 		assertEquals(TokenType.KEYWORD, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.CASE, tokens.get(pos++).getValue());
+		assertEquals(Keyword.CASE, tokens.get(pos++).getValue());
 		assertEquals(TokenType.KEYWORD, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.DEFAULT, tokens.get(pos++).getValue());
+		assertEquals(Keyword.DEFAULT, tokens.get(pos++).getValue());
 		assertEquals(TokenType.KEYWORD, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.NEW, tokens.get(pos++).getValue());
+		assertEquals(Keyword.NEW, tokens.get(pos++).getValue());
 
 
 		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.TRY, tokens.get(pos++).getValue());
+		assertEquals(Keyword.TRY, tokens.get(pos++).getValue());
 		assertEquals(TokenType.KEYWORD, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.CATCH, tokens.get(pos++).getValue());
+		assertEquals(Keyword.CATCH, tokens.get(pos++).getValue());
 		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.THROW, tokens.get(pos++).getValue());
+		assertEquals(Keyword.THROW, tokens.get(pos++).getValue());
 		assertEquals(TokenType.OOP, tokens.get(pos).getType());
-		assertEquals(J8bKeyword.THROWS, tokens.get(pos++).getValue());
+		assertEquals(Keyword.THROWS, tokens.get(pos++).getValue());
 
 	}
 
@@ -133,7 +131,7 @@ public class LexerTests {
         
 		
 		MessageContainer mc = new MessageContainer(100, true, false);
-		J8bLexer lexer = new J8bLexer(source, mc);
+		Lexer lexer = new Lexer(source, mc);
         List<Token> tokens = lexer.getTokens();
         
         assertEquals(10, tokens.size() - 1);
@@ -180,7 +178,7 @@ public class LexerTests {
     public void testFixedPointLiterals() throws Exception {
         String source = "3.141 127.001 0.0000000001";
         MessageContainer mc = new MessageContainer(100, true, false);
-		J8bLexer lexer = new J8bLexer(source, mc);
+		Lexer lexer = new Lexer(source, mc);
         List<Token> tokens = lexer.getTokens();
         
         assertEquals(3, tokens.size() - 1); // -1 для EOF
@@ -197,7 +195,7 @@ public class LexerTests {
     public void testOperators() throws Exception {
         String source = "= + - * / % == != < > <= >=";	//TODO добавить остальные?
         MessageContainer mc = new MessageContainer(100, true, false);
-		J8bLexer lexer = new J8bLexer(source, mc);
+		Lexer lexer = new Lexer(source, mc);
         List<Token> tokens = lexer.getTokens();
         
         assertEquals(12, tokens.size() - 1);
@@ -232,7 +230,7 @@ public class LexerTests {
     public void testNotes() throws Exception {
         String source = "#p/8e5-e5-e5-c5-e5-/4g5-g4";
         MessageContainer mc = new MessageContainer(100, true, false);
-		J8bLexer lexer = new J8bLexer(source, mc);
+		Lexer lexer = new Lexer(source, mc);
         List<Token> tokens = lexer.getTokens();
         
         assertEquals(1, tokens.size() - 1); // -1 для EOF
@@ -245,7 +243,7 @@ public class LexerTests {
     public void testLabel() throws Exception {
         String source = "label1:";
         MessageContainer mc = new MessageContainer(100, true, false);
-		J8bLexer lexer = new J8bLexer(source, mc);
+		Lexer lexer = new Lexer(source, mc);
         List<Token> tokens = lexer.getTokens();
         
         assertEquals(1, tokens.size() - 1); // -1 для EOF
@@ -258,7 +256,7 @@ public class LexerTests {
 	public void testErrorMessages1() throws Exception {
 		String source = "/*ndkfhskhfk*/ #g4534534;";
         MessageContainer mc = new MessageContainer(100, true, false);
-		J8bLexer lexer = new J8bLexer(source, mc);
+		Lexer lexer = new Lexer(source, mc);
 		List<ErrorMessage> messages = mc.getErrorMessages();
 		assertEquals(1, messages.size());
 		ErrorMessage em = messages.get(0);

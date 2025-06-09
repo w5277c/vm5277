@@ -12,7 +12,7 @@ public class Instruction {
 	public	final	static	String	FLAGS_SREGS	= "sregs";
 	public	final	static	String	OPERAND_R	= "r";		// Register 0<=R<=31
 	public	final	static	String	OPERAND_RH	= "rh";		// High register 16<=R<=31
-	public	final	static	String	OPERAND_RI	= "ri";		// Index register R24,R26,R28,R30
+	public	final	static	String	OPERAND_RA	= "ra";		// arithmetic register R24,R26,R28,R30
 	public	final	static	String	OPERAND_RE	= "re";		// Even registers R0,R2,R4,...,R30
 	public	final	static	String	OPERAND_A	= "a";		// I/O register address
 	public	final	static	String	OPERAND_RR	= "rr";		// Register for both operands
@@ -30,7 +30,7 @@ public class Instruction {
 	public	final	static	String	OPERAND_Y	= "y";
 	public	final	static	String	OPERAND_YP	= "y+";
 	public	final	static	String	OPERAND_MY	= "-y";
-	public	final	static	String	OPERAND_Z	= "x";
+	public	final	static	String	OPERAND_Z	= "z";
 	public	final	static	String	OPERAND_ZP	= "z+";
 	public	final	static	String	OPERAND_MZ	= "-z";
 	

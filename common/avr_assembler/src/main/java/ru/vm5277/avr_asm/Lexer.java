@@ -6,26 +6,42 @@
 package ru.vm5277.avr_asm;
 
 import java.io.File;
+import java.io.FileInputStream;
 import ru.vm5277.avr_asm.tokens.TDirective;
 import ru.vm5277.common.messages.MessageContainer;
 import java.io.IOException;
-import java.io.Reader;
+import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
 import ru.vm5277.avr_asm.scope.Scope;
-import ru.vm5277.common.Lexer;
 import ru.vm5277.common.SourcePosition;
-import ru.vm5277.common.TokenType;
-import ru.vm5277.common.tokens.TChar;
-import ru.vm5277.common.tokens.TDelimiter;
-import ru.vm5277.common.tokens.TNumber;
-import ru.vm5277.common.tokens.TOpearator;
-import ru.vm5277.common.tokens.TString;
-import ru.vm5277.common.tokens.Token;
+import ru.vm5277.avr_asm.tokens.TChar;
+import ru.vm5277.avr_asm.tokens.TDelimiter;
+import ru.vm5277.avr_asm.tokens.TNumber;
+import ru.vm5277.avr_asm.tokens.TOpearator;
+import ru.vm5277.avr_asm.tokens.TString;
+import ru.vm5277.avr_asm.tokens.Token;
+import ru.vm5277.common.SourceBuffer;
 import ru.vm5277.common.messages.ErrorMessage;
+import ru.vm5277.common.messages.MessageOwner;
 
-public class AsmLexer extends Lexer {
+public class Lexer {
+	protected	final	MessageContainer	mc;
+	protected			SourceBuffer		sb;
+	protected	final	List<Token>			tokens	= new ArrayList<>();
 	
-	public AsmLexer(File sourceFile, Scope scope, MessageContainer mc) throws IOException {
-		super(sourceFile, mc);
+	public Lexer(File sourceFile, Scope scope, MessageContainer mc) throws IOException {
+		this.mc = mc;
+		mc.setOwner(MessageOwner.LEXER);
+		
+		try (InputStreamReader isr = new InputStreamReader(new FileInputStream(sourceFile))) {
+			StringBuilder stringBuilder = new StringBuilder();
+			char[] buffer = new char[4*1024];
+			for (int length; (length = isr.read(buffer)) != -1;) {
+				stringBuilder.append(buffer, 0, length);
+			}
+			sb = new SourceBuffer(sourceFile, stringBuilder.toString());
+		}
 
 		while (sb.hasNext()) {
 			// Пропускаем комментарий
@@ -166,5 +182,75 @@ public class AsmLexer extends Lexer {
         }
         tokens.add(new Token(sb, TokenType.NEWLINE, null));
 		tokens.add(new Token(sb, TokenType.EOF, null));
+	}
+	
+	public List<Token> getTokens() {
+		return tokens;
+	}
+	
+	public void print() {
+		for(Token token : tokens) {
+			System.out.print(token.toString());
+			if(TokenType.NEWLINE == token.getType()) {
+				System.out.println();
+			}
+		}
+		System.out.println();
+	}
+
+	public static boolean skipWhiteSpaces(SourceBuffer sb) {
+		char ch = sb.getChar();
+		if (Character.isWhitespace(ch)) {
+			if ('\n'==ch) {
+				sb.incLine();
+			}
+			else if ('\r'==ch) {
+				if (sb.hasNext(1) && '\n'==sb.getChar(1)) {
+					sb.next();
+				}
+				sb.incLine();
+			}
+			else {
+				sb.incColumn();
+			}
+			sb.incPos();
+			return true;
+		}
+		return false;
+	}
+	
+	public static boolean skipComment(SourceBuffer sb, MessageContainer mc) {
+		char ch = sb.getChar();
+		if ('/'==ch && sb.hasNext(1)) {
+			if ('/'==sb.getChar(1)) {
+				while (sb.hasNext() && '\n'!=sb.getChar()) {
+					sb.next();
+				}
+				return true;
+			}
+			else if ('*'==sb.getChar(1)) {
+				sb.next(2);
+				while (sb.hasNext()) {
+					ch = sb.getChar();
+					if ('*'==ch && sb.hasNext(1) && '/'==sb.getChar(1)) {
+						// Конец комментария
+						sb.next(2);
+						return true;
+					}
+
+					if ('\n'==ch) {
+						sb.incLine();
+					}
+					else {
+						sb.incColumn();
+					}
+					sb.incPos();
+				}
+
+				mc.add(new ErrorMessage("Unterminated block comment", sb.snapSP()));
+				return true;
+			}
+		}
+		return false;
 	}
 }

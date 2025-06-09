@@ -5,7 +5,7 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b_compiler.nodes.commands;
 
-import ru.vm5277.common.Delimiter;
+import ru.vm5277.j8b_compiler.Delimiter;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.j8b_compiler.nodes.AstNode;
@@ -15,8 +15,8 @@ import ru.vm5277.j8b_compiler.semantic.BlockScope;
 import ru.vm5277.j8b_compiler.semantic.LabelSymbol;
 import ru.vm5277.j8b_compiler.semantic.MethodScope;
 import ru.vm5277.j8b_compiler.semantic.Scope;
-import ru.vm5277.common.tokens.TNumber;
-import ru.vm5277.common.tokens.Token;
+import ru.vm5277.j8b_compiler.tokens.TNumber;
+import ru.vm5277.j8b_compiler.tokens.Token;
 
 public abstract class CommandNode extends AstNode {
 	public static class AstCase {

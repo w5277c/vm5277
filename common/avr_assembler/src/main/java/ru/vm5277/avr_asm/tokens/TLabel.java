@@ -1,31 +1,19 @@
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------
 Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-22.04.2025	konstantin@5277.ru		Начало
+30.04.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.common.tokens;
+package ru.vm5277.avr_asm.tokens;
 
 import ru.vm5277.common.SourceBuffer;
-import ru.vm5277.common.TokenType;
-import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.avr_asm.TokenType;
 
-public class TString extends Token {
-	public TString(SourceBuffer sb, MessageContainer mc) {
+public class TLabel extends Token {
+	public TLabel(String keyword, SourceBuffer sb) {
 		super(sb);
-		type = TokenType.STRING;
 		
-		StringBuilder str = new StringBuilder();
-		sb.next(); // Пропускаем '"'
-		while (sb.hasNext() && '"'!=sb.getChar()) {
-			str.append(sb.getChar());
-			sb.next();			
-        }
-		if (!sb.hasNext()) {
-			setError("Unterminated string literal", mc);
-		}
-		else {
-			sb.next();
-		}
-        value = str.toString();
+		type = TokenType.LABEL;
+		sb.next();
+		value = keyword;
 	}
 }

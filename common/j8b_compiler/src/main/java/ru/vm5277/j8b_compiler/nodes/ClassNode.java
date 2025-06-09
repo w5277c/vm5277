@@ -11,10 +11,9 @@ import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.j8b_compiler.CodeGenerator;
 import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.J8bKeyword;
-import ru.vm5277.common.Keyword;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.j8b_compiler.Delimiter;
+import ru.vm5277.j8b_compiler.Keyword;
+import ru.vm5277.j8b_compiler.TokenType;
 import ru.vm5277.common.j8b_compiler.VarType;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -50,7 +49,7 @@ public class ClassNode extends AstNode {
 		catch(ParseException e) {markFirstError(e);} // ошибка в имени, оставляем null
 		
         // Парсинг интерфейсов (если есть)
-		if (tb.match(TokenType.OOP, J8bKeyword.IMPLEMENTS)) {
+		if (tb.match(TokenType.OOP, Keyword.IMPLEMENTS)) {
 			consumeToken(tb);
 			while(true) {
 				try {
@@ -111,7 +110,7 @@ public class ClassNode extends AstNode {
 			addMessage(new WarningMessage("Class name should start with uppercase letter:" + name, sp));
 		}
 		
-		try{validateModifiers(modifiers, J8bKeyword.PUBLIC, J8bKeyword.PRIVATE, J8bKeyword.STATIC);} catch(SemanticException e) {addMessage(e);}
+		try{validateModifiers(modifiers, Keyword.PUBLIC, Keyword.PRIVATE, Keyword.STATIC);} catch(SemanticException e) {addMessage(e);}
 		
 		// Анализ тела класса
 		blockNode.preAnalyze();

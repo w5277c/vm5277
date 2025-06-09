@@ -6,9 +6,8 @@
 package ru.vm5277.j8b_compiler.nodes;
 
 import java.util.Set;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.J8bKeyword;
-import ru.vm5277.common.Keyword;
+import ru.vm5277.j8b_compiler.Delimiter;
+import ru.vm5277.j8b_compiler.Keyword;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.j8b_compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
@@ -78,7 +77,7 @@ public class ArrayDeclarationNode extends AstNode {
 			VarType arrayType = VarType.arrayOf(elementType);
 			
 			// Проверяем конфликты имён и регистрируем переменную
-			symbol = new Symbol(name, arrayType, modifiers.contains(J8bKeyword.FINAL), modifiers.contains(J8bKeyword.STATIC));
+			symbol = new Symbol(name, arrayType, modifiers.contains(Keyword.FINAL), modifiers.contains(Keyword.STATIC));
 			if (scope instanceof ClassScope) {
 				((ClassScope)scope).addField(symbol);
 			}
@@ -154,7 +153,7 @@ public class ArrayDeclarationNode extends AstNode {
 		}
 
 		// 3. Проверка final-массивов
-		if (modifiers.contains(J8bKeyword.FINAL) && null == initializer) markError("Final array must be initialized");
+		if (modifiers.contains(Keyword.FINAL) && null == initializer) markError("Final array must be initialized");
 
 		return true;
 	}

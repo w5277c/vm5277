@@ -7,7 +7,7 @@ package ru.vm5277.avr_asm.scope;
 
 import java.util.ArrayList;
 import java.util.List;
-import ru.vm5277.common.tokens.Token;
+import ru.vm5277.avr_asm.tokens.Token;
 
 public class MacroDefSymbol extends Symbol {
 	private	int			firstLine;

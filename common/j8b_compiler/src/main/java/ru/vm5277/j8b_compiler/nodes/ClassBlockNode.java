@@ -10,10 +10,9 @@ import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.j8b_compiler.CodeGenerator;
 import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.J8bKeyword;
-import ru.vm5277.common.Keyword;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.j8b_compiler.Delimiter;
+import ru.vm5277.j8b_compiler.Keyword;
+import ru.vm5277.j8b_compiler.TokenType;
 import ru.vm5277.common.j8b_compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.j8b_compiler.semantic.ClassScope;
@@ -33,12 +32,12 @@ public class ClassBlockNode extends AstNode {
 			Set<Keyword> modifiers = collectModifiers(tb);
 
 			// Обработка классов с модификаторами
-			if (tb.match(TokenType.OOP, J8bKeyword.CLASS)) {
+			if (tb.match(TokenType.OOP, Keyword.CLASS)) {
 				declarations.add(new ClassNode(tb, mc, modifiers, null, null));
 				continue;
 			}
 			// Обработка интерфейсов с модификаторами
-			if (tb.match(TokenType.OOP, J8bKeyword.INTERFACE)) {
+			if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
 				declarations.add(new InterfaceNode(tb, mc, modifiers, null));
 				continue;
 			}

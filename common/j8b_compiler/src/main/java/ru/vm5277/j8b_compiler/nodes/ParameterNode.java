@@ -5,8 +5,8 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b_compiler.nodes;
 
-import ru.vm5277.common.J8bKeyword;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.j8b_compiler.Keyword;
+import ru.vm5277.j8b_compiler.TokenType;
 import ru.vm5277.common.j8b_compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -21,7 +21,7 @@ public class ParameterNode extends AstNode {
 	public ParameterNode(TokenBuffer tb, MessageContainer mc) throws ParseException {
 		super(tb, mc);
 		
-		this.isFinal = tb.match(J8bKeyword.FINAL);
+		this.isFinal = tb.match(Keyword.FINAL);
 		if (this.isFinal) {
             consumeToken(tb); // Потребляем 'final'
 		}

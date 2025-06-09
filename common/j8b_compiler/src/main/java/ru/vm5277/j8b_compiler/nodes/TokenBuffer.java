@@ -8,11 +8,11 @@ package ru.vm5277.j8b_compiler.nodes;
 import java.util.Iterator;
 import java.util.Stack;
 import ru.vm5277.common.SourcePosition;
-import ru.vm5277.common.tokens.Token;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.Keyword;
+import ru.vm5277.j8b_compiler.Delimiter;
 import ru.vm5277.common.Operator;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.j8b_compiler.TokenType;
+import ru.vm5277.j8b_compiler.Keyword;
+import ru.vm5277.j8b_compiler.tokens.Token;
 
 public class TokenBuffer {
 	private	Token	current;

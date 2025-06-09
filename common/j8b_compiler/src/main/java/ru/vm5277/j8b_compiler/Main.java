@@ -103,7 +103,7 @@ public class Main {
 		
 		File sourceFile = new File(source);
 		File baseDir = sourceFile.getParentFile();
-		J8bLexer lexer = new J8bLexer(sourceFile, mc);
+		Lexer lexer = new Lexer(sourceFile, mc);
 		ASTParser parser = new ASTParser(runtimeDir, baseDir, lexer.getTokens(), mc);
 		ClassNode clazz = parser.getClazz();
 //			new ASTPrinter(parser.getClazz());

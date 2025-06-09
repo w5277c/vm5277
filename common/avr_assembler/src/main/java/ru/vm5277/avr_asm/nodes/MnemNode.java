@@ -3,10 +3,6 @@
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 30.05.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-//TODO двухпроходная модель, сначала выделяем память и регистрируем все в scope, в том числе формруем возможные опкоды
-//опкоды инструкций связанных с метками помечаем не выплнеными
-//На втором заходе формируем опкоды с метками, зная их смещения.
-
 package ru.vm5277.avr_asm.nodes;
 
 import java.util.HashMap;
@@ -15,13 +11,18 @@ import ru.vm5277.avr_asm.Instruction;
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.nodes.operands.Const;
 import ru.vm5277.avr_asm.nodes.operands.HReg;
-import ru.vm5277.avr_asm.nodes.operands.IReg;
+import ru.vm5277.avr_asm.nodes.operands.AReg;
 import ru.vm5277.avr_asm.nodes.operands.Reg;
 import ru.vm5277.avr_asm.scope.CodeBlock;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.avr_asm.Delimiter;
+import ru.vm5277.avr_asm.TokenType;
+import ru.vm5277.avr_asm.nodes.operands.EReg;
+import ru.vm5277.avr_asm.nodes.operands.FlashAddr;
+import ru.vm5277.avr_asm.nodes.operands.IOReg;
+import ru.vm5277.avr_asm.semantic.BinaryExpression;
+import ru.vm5277.common.Operator;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
@@ -54,7 +55,7 @@ public class MnemNode extends Node {
 		if(0x02 == instr.getWSize()) {
 			scope.getCSeg().writeOpcode(0x0000);
 		}
-		
+
 		if(!tb.match(TokenType.NEWLINE)) {
 			expr1 = Expression.parse(tb, scope, mc);
 			if(tb.match(Delimiter.COMMA)) {
@@ -66,62 +67,7 @@ public class MnemNode extends Node {
 		
 	public void secondPass() {
 		try {
-			scope.getCSeg().setAddr((long)addr);
-			
-			if(0x01==supported.size()) {
-				Instruction instr = (Instruction)supported.values().toArray()[0x00];
-				String[] operands = instr.getOperands();
-				if(0x01 == operands.length) {
-					if(null != operands[0x00]) switch (operands[0x00]) {
-						case Instruction.OPERAND_NONE:
-							// Чистый opcode уже записан
-							break;
-						case Instruction.OPERAND_R:
-						case Instruction.OPERAND_RH:
-							parse(instr, new Reg(scope, sp, expr1));
-							break;
-						case Instruction.OPERAND_RR:
-							parse(instr, new Reg(scope, sp, expr1), new Reg(scope, sp, expr1));
-							break;
-						case Instruction.OPERAND_K7S:
-							parse(instr, new Const(mc, scope, sp, expr1, -64, 63, 7, addr));
-							break;
-						case Instruction.OPERAND_K12S:
-							parse(instr, new Const(mc, scope, sp, expr1, -2048, 2047, 12, addr));
-							break;
-						case Instruction.OPERAND_K22:
-							parse(instr, new Const(mc, scope, sp, expr1, 0, 0x3fffff, 22, addr));
-							break;
-						default:
-							mc.add(new ErrorMessage("//TODO1 не поддерживаемая мнемоника " + mnemonic, sp));
-							break;
-					}
-				}
-				else if(0x02 == operands.length) {
-					if(Instruction.OPERAND_R.equals(operands[0x00]) && Instruction.OPERAND_R.equals(operands[0x01])) {
-						parse(instr, new Reg(scope, sp, expr1), new Reg(scope, sp, expr2));
-					}
-					else if(Instruction.OPERAND_RH.equals(operands[0x00]) && Instruction.OPERAND_K8.equals(operands[0x01])) {
-						parse(instr, new HReg(scope, sp, expr1), new Const(mc, scope, sp, expr2, 0, 255, 8));
-					}
-					else if(Instruction.OPERAND_R.equals(operands[0x00]) && Instruction.OPERAND_K6.equals(operands[0x01])) {
-						parse(instr, new IReg(scope, sp, expr1), new Const(mc, scope, sp, expr2, 0, 63, 6));
-					}
-					else if(Instruction.OPERAND_K3.equals(operands[0x00]) && Instruction.OPERAND_K7S.equals(operands[0x01])) {
-						parse(instr, new Const(mc, scope, sp, expr1, 0, 7, 3), new Const(mc, scope, sp, expr2, -64, 63, 7));
-					}
-					else if(Instruction.OPERAND_K16.equals(operands[0x00]) && Instruction.OPERAND_R.equals(operands[0x01])) {
-						parse(instr, new Const(mc, scope, sp, expr1, 0, 65535, 16), new Reg(scope, sp, expr2));
-					}
-					else {
-						mc.add(new ErrorMessage("//TODO2 не поддерживаемая мнемоника " + mnemonic, sp));
-					}
-				}
-				else {
-					mc.add(new ErrorMessage("//TODO3 не поддерживаемая мнемоника " + mnemonic, sp));
-				}
-			}
-			else {
+			if(!_secondPass()) {
 				mc.add(new ErrorMessage("//TODO не поддерживаемая мнемоника " + mnemonic, sp));
 			}
 		}
@@ -129,10 +75,194 @@ public class MnemNode extends Node {
 			mc.add(new ErrorMessage("//TODO ошибка парсинга мнемоники " + mnemonic + ": " + e.getMessage(), sp));
 		}
 	}
+	private boolean _secondPass() throws Exception {
+		scope.getCSeg().setAddr((long)addr);
+
+		if(!supported.isEmpty()) {
+			Instruction instr = (Instruction)supported.values().toArray()[0x00];
+			String[] operands = instr.getOperands();
+
+			if(0x01 == operands.length) {
+				if(mnemonic.equals("spm")) {
+					if(null == expr1) return true;	//нет операнда
+					return false;
+				}
+				
+				if(null != operands[0x00]) switch (operands[0x00]) {
+					case Instruction.OPERAND_NONE: return true; // Чистый opcode уже записан
+					case Instruction.OPERAND_R:
+					case Instruction.OPERAND_RH:	parse(instr, new Reg(scope, sp, expr1)); return true;
+					case Instruction.OPERAND_RR:	parse(instr, new Reg(scope, sp, expr1), new Reg(scope, sp, expr1)); return true;
+					case Instruction.OPERAND_K7S:	parse(instr, new FlashAddr(mc, scope, sp, expr1, -64, 63, 7, addr)); return true;
+					case Instruction.OPERAND_K12S:	parse(instr, new FlashAddr(mc, scope, sp, expr1, -2048, 2047, 12, addr)); return true;
+					case Instruction.OPERAND_K22:	parse(instr, new Const(mc, scope, sp, expr1, 0, 0x3fffff, 22)); return true; // JMP и CALL
+				}
+				return false;
+			}
+
+			if(0x02 == operands.length) {
+				if(Instruction.OPERAND_RE.equals(operands[0x00]) && Instruction.OPERAND_RE.equals(operands[0x01])) {
+					parse(instr, new EReg(scope, sp, expr1), new EReg(scope, sp, expr2)); return true;
+				}
+				if(Instruction.OPERAND_R.equals(operands[0x00]) && Instruction.OPERAND_R.equals(operands[0x01])) {
+					parse(instr, new Reg(scope, sp, expr1), new Reg(scope, sp, expr2)); return true;
+				}
+				if(Instruction.OPERAND_R.equals(operands[0x00]) && Instruction.OPERAND_K3.equals(operands[0x01])) {
+					parse(instr, new Reg(scope, sp, expr1), new Const(mc, scope, sp, expr2, 0, 7, 3)); return true;
+				}
+				if(Instruction.OPERAND_A.equals(operands[0x00]) && Instruction.OPERAND_K3.equals(operands[0x01])) {
+					parse(instr, new IOReg(scope, sp, expr1), new Const(mc, scope, sp, expr2, 0, 7, 3)); return true;
+				}
+				if(Instruction.OPERAND_RH.equals(operands[0x00]) && Instruction.OPERAND_K8.equals(operands[0x01])) {
+					parse(instr, new HReg(scope, sp, expr1), new Const(mc, scope, sp, expr2, 0, 255, 8)); return true;
+				}
+				if(Instruction.OPERAND_RA.equals(operands[0x00]) && Instruction.OPERAND_K6.equals(operands[0x01])) {
+					parse(instr, new AReg(scope, sp, expr1), new Const(mc, scope, sp, expr2, 0, 63, 6)); return true;
+				}
+				if(Instruction.OPERAND_K3.equals(operands[0x00]) && Instruction.OPERAND_K7S.equals(operands[0x01])) {
+					parse(instr, new Const(mc, scope, sp, expr1, 0, 7, 3), new Const(mc, scope, sp, expr2, -64, 63, 7)); return true;
+				}
+				if(Instruction.OPERAND_R.equals(operands[0x00]) && Instruction.OPERAND_K16.equals(operands[0x01])) {
+					parse(instr, new Reg(scope, sp, expr1), new Const(mc, scope, sp, expr2, 0, 65535, 16)); return true;
+				}
+				if(Instruction.OPERAND_K16.equals(operands[0x00]) && Instruction.OPERAND_R.equals(operands[0x01])) {
+					parse(instr, new Const(mc, scope, sp, expr1, 0, 65535, 16), new Reg(scope, sp, expr2)); return true;
+				}
+
+				if(Instruction.OPERAND_R.equals(operands[0x00]) && mnemonic.equals("ld")) {
+					Instruction i = supported.get("ldx");
+					if(null != i && operands[0x01].equals(Instruction.OPERAND_X)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					i = supported.get("ldxp");
+					if(null != i && operands[0x01].equals(Instruction.OPERAND_XP)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					i = supported.get("ldmx");
+					if(null != i && operands[0x01].equals(Instruction.OPERAND_MX)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					i = supported.get("ldy");
+					if(null != i && operands[0x01].equals(Instruction.OPERAND_Y)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					i = supported.get("ldyp");
+					if(null != i && operands[0x01].equals(Instruction.OPERAND_YP)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					i = supported.get("ldmy");
+					if(null != i && operands[0x01].equals(Instruction.OPERAND_MY)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					i = supported.get("ldz");
+					if(null != i && operands[0x01].equals(Instruction.OPERAND_Z)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					i = supported.get("ldzp");
+					if(null != i && operands[0x01].equals(Instruction.OPERAND_ZP)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					i = supported.get("ldmz");
+					if(null != i && operands[0x01].equals(Instruction.OPERAND_MZ)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					return false;
+				}
+
+				if(Instruction.OPERAND_R.equals(operands[0x01]) && mnemonic.equals("st")) {
+					Instruction i = supported.get("stx");
+					if(null != i && operands[0x00].equals(Instruction.OPERAND_X)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					i = supported.get("stxp");
+					if(null != i && operands[0x00].equals(Instruction.OPERAND_XP)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					i = supported.get("stmx");
+					if(null != i && operands[0x00].equals(Instruction.OPERAND_MX)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					i = supported.get("sty");
+					if(null != i && operands[0x00].equals(Instruction.OPERAND_Y)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					i = supported.get("styp");
+					if(null != i && operands[0x00].equals(Instruction.OPERAND_YP)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					i = supported.get("stmy");
+					if(null != i && operands[0x00].equals(Instruction.OPERAND_MY)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					i = supported.get("stz");
+					if(null != i && operands[0x00].equals(Instruction.OPERAND_Z)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					i = supported.get("stzp");
+					if(null != i && operands[0x00].equals(Instruction.OPERAND_ZP)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					i = supported.get("stmz");
+					if(null != i && operands[0x00].equals(Instruction.OPERAND_MZ)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					return false;
+				}
+
+				if(Instruction.OPERAND_R.equals(operands[0x00]) && mnemonic.equals("ldd")) {
+					if(expr2 instanceof BinaryExpression) {
+						BinaryExpression be = (BinaryExpression)expr2;
+						if(Operator.PLUS == be.getOp()) {
+							Instruction i = supported.get("lddy");
+							if(null != i && operands[0x01].equals(Instruction.OPERAND_YP + Instruction.OPERAND_K6)) {
+								parseQ(i, new Reg(scope, sp, expr1), new Const(mc, scope, sp, be.getRightExpr(), 0, 63, 6)); return true;
+							}
+							i = supported.get("lddz");
+							if(null != i && operands[0x01].equals(Instruction.OPERAND_ZP + Instruction.OPERAND_K6)) {
+								parseQ(i, new Reg(scope, sp, expr1), new Const(mc, scope, sp, be.getRightExpr(), 0, 63, 6)); return true;
+
+							}
+						}
+					}
+					return false;
+				}
+
+				if(Instruction.OPERAND_R.equals(operands[0x01]) && mnemonic.equals("std")) {
+					if(expr1 instanceof BinaryExpression) {
+						BinaryExpression be = (BinaryExpression)expr1;
+						if(Operator.PLUS == be.getOp()) {
+							Instruction i = supported.get("stdy");
+							if(null != i && operands[0x00].equals(Instruction.OPERAND_YP + Instruction.OPERAND_K6)) {
+								parseQ(i, new Reg(scope, sp, expr2), new Const(mc, scope, sp, be.getRightExpr(), 0, 63, 6)); return true;
+							}
+							i = supported.get("stdz");
+							if(null != i && operands[0x00].equals(Instruction.OPERAND_ZP + Instruction.OPERAND_K6)) {
+								parseQ(i, new Reg(scope, sp, expr2), new Const(mc, scope, sp, be.getRightExpr(), 0, 63, 6)); return true;
+							}
+						}
+					}
+					return false;
+				}
+
+				if(Instruction.OPERAND_R.equals(operands[0x00]) && mnemonic.equals("lpm")) {
+					Instruction i = supported.get("lpmz");
+					if(null != i && operands[0x01].equals(Instruction.OPERAND_Z)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					i = supported.get("lpmzp");
+					if(null != i && operands[0x01].equals(Instruction.OPERAND_ZP)) {
+						parse(i, new Reg(scope, sp, expr1)); return true;
+					}
+					return false;
+				}
+			}
+		}
+		return false;
+	}
 
 	private void parse(Instruction instr, Reg reg) throws Exception {
 		if(0x01 != instr.getWSize()) throw new Exception();
-		scope.getCSeg().writeOpcode(instr.getOpcode() | (reg.getId()&0x1f)<<4);
+		scope.getCSeg().writeOpcode(instr.getOpcode() | reg.getId()<<4);
 	}
 
 	private void parse(Instruction instr, Const k) throws Exception {
@@ -166,9 +296,15 @@ public class MnemNode extends Node {
 		}
 	}
 	
+	private void parse(Instruction instr, EReg rd, EReg rr) throws Exception {
+		if(0x01 != instr.getWSize()) throw new Exception();
+		
+		scope.getCSeg().writeOpcode(instr.getOpcode() | rr.getId()>>1 | (rd.getId()>>1)<<4);
+	}
+
 	private void parse(Instruction instr, Reg rd, Reg rr) throws Exception {
 		if(0x01 != instr.getWSize()) throw new Exception();
-		scope.getCSeg().writeOpcode(instr.getOpcode() | (rd.getId()&0x1f)<<4 | (rr.getId()&0x0f) | (rr.getId()&0x10<<9));
+		scope.getCSeg().writeOpcode(instr.getOpcode() | rd.getId()<<4 | (rr.getId()&0x0f) | (rr.getId()&0x10<<9));
 	}
 	private void parse(Instruction instr, HReg rd, Const k) throws Exception {
 		if(0x01 != instr.getWSize()) throw new Exception();
@@ -178,15 +314,34 @@ public class MnemNode extends Node {
 		else throw new Exception("");
 	}
 	private void parse(Instruction instr, Reg rd, Const k) throws Exception {
-		if(0x01 != instr.getWSize()) throw new Exception();
-		if(6==k.getBits()) {
-			byte id = (byte)((rd.getId()-24)/2);
-			scope.getCSeg().writeOpcode((int)(instr.getOpcode() | id<<4 | k.getValue()&0x0f | (k.getValue()&0x30)<<6));
+		switch (k.getBits()) {
+			case 3:
+				if(0x01 != instr.getWSize()) throw new Exception();
+				scope.getCSeg().writeOpcode((int)(instr.getOpcode() | rd.getId()<<4 | k.getValue()&0x07));
+				break;
+			case 6:
+				if(0x01 != instr.getWSize()) throw new Exception();
+				byte id = (byte)((rd.getId()-24)/2);
+				scope.getCSeg().writeOpcode((int)(instr.getOpcode() | id<<4 | k.getValue()&0x0f | (k.getValue()&0x30)<<6));
+				break;
+			case 16:
+				long opcode = (((long)instr.getOpcode())<<16) | k.getValue() | (rd.getId() << 20);
+				((CodeBlock)scope.getCSeg().getCurrentBlock()).writeDoubleOpcode(opcode);
+				break;
+			default:
+				throw new Exception("");
 		}
-		else if(8==k.getBits()) {
-			scope.getCSeg().writeOpcode((int)(instr.getOpcode() | (rd.getId()&0x0f)<<4 | k.getValue() & 0x0f | (k.getValue() & 0xf0) << 8));
+	}
+
+	private void parse(Instruction instr, IOReg rd, Const k) throws Exception {
+		switch (k.getBits()) {
+			case 3:
+				if(0x01 != instr.getWSize()) throw new Exception();
+				scope.getCSeg().writeOpcode((int)(instr.getOpcode() | rd.getId()<<3 | k.getValue()&0x07));
+				break;
+			default:
+				throw new Exception("");
 		}
-		else throw new Exception("");
 	}
 
 	private void parse(Instruction instr, Const k1, Const k2) throws Exception {
@@ -198,11 +353,15 @@ public class MnemNode extends Node {
 		else throw new Exception();
 	}
 
-	private void parse(Instruction instr, Const k, Reg reg) throws Exception {
+	private void parse(Instruction instr, Const k, Reg rd) throws Exception {
 		if(16==k.getBits()) {
-			long opcode = (((long)instr.getOpcode())<<16) | k.getValue() | (reg.getId() << 20);
+			long opcode = (((long)instr.getOpcode())<<16) | k.getValue() | (rd.getId() << 20);
 			((CodeBlock)scope.getCSeg().getCurrentBlock()).writeDoubleOpcode(opcode);
 		}
 		else throw new Exception();
+	}
+
+	private void parseQ(Instruction instr, Reg rd, Const k) throws Exception {
+		scope.getCSeg().writeOpcode((int)(instr.getOpcode() | rd.getId()<<4 | k.getValue()&0x07 | (k.getValue()&0x18)<<7 | (k.getValue()&0x20)<<8));
 	}
 }

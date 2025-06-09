@@ -5,7 +5,6 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.avr_asm.nodes.operands;
 
-import ru.vm5277.avr_asm.nodes.Node;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.SourcePosition;
@@ -14,16 +13,15 @@ import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 
 public class Const {
-	private	int		bits;
-	private	long	value;
+	protected	int		bits;
+	protected	long	value;
 
-	public Const(MessageContainer mc, Scope scope, SourcePosition sp, Expression expr, int min, int max, int bits) throws ParseException {
-		this(mc, scope, sp, expr, min, max, bits, 0);
+	protected Const() {
 	}
-	public Const(MessageContainer mc, Scope scope, SourcePosition sp, Expression expr, int min, int max, int bits, int addr) throws ParseException {
+	
+	public Const(MessageContainer mc, Scope scope, SourcePosition sp, Expression expr, int min, int max, int bits) throws ParseException {
 		this.bits = bits;
-		value = Node.getNumValue(expr, sp) - addr;
-		
+		value = Expression.getLong(expr, sp);
 		if(!Scope.isPedantic() && 0==min && value>max) {
 			long mask = (1<<bits)-1;
 			long new_value = value & mask;

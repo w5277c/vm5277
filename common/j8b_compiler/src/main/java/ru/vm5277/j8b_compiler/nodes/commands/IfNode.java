@@ -9,9 +9,9 @@ import ru.vm5277.common.j8b_compiler.CodeGenerator;
 import ru.vm5277.j8b_compiler.nodes.BlockNode;
 import ru.vm5277.j8b_compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b_compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.J8bKeyword;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.j8b_compiler.Delimiter;
+import ru.vm5277.j8b_compiler.Keyword;
+import ru.vm5277.j8b_compiler.TokenType;
 import ru.vm5277.common.j8b_compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.exceptions.SemanticException;
@@ -38,7 +38,7 @@ public class IfNode extends CommandNode {
 		try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(ParseException e){markFirstError(e);}
 		try {this.condition = new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
 		// Парсинг условия (обычное или pattern matching)
-		if (tb.match(J8bKeyword.AS)) {
+		if (tb.match(Keyword.AS)) {
 			tb.consume(); // Потребляем "as"
 			// Проверяем, что после типа идет идентификатор
 			if (tb.match(TokenType.ID)) {
@@ -57,10 +57,10 @@ public class IfNode extends CommandNode {
 		tb.getLoopStack().remove(this);
 
 		// Else блок
-        if (tb.match(J8bKeyword.ELSE)) {
+        if (tb.match(Keyword.ELSE)) {
 			consumeToken(tb);
         
-			if (tb.match(TokenType.COMMAND, J8bKeyword.IF)) {
+			if (tb.match(TokenType.COMMAND, Keyword.IF)) {
 				// Обработка else if
 				tb.getLoopStack().add(this);
 				blocks.add(new BlockNode(tb, mc, new IfNode(tb, mc)));

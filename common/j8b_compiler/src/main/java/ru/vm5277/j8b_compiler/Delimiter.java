@@ -4,7 +4,9 @@
 22.04.2025	konstantin@5277.ru		Начало
 28.04.2025	konstantin@5277.ru		Добавлен RANGE
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.common;
+package ru.vm5277.j8b_compiler;
+
+import ru.vm5277.common.SourceBuffer;
 
 public enum Delimiter {
     // Группировка

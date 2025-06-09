@@ -10,9 +10,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import ru.vm5277.common.J8bKeyword;
-import ru.vm5277.common.Keyword;
-import ru.vm5277.common.TokenType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.MessageOwner;
@@ -20,7 +17,7 @@ import ru.vm5277.j8b_compiler.nodes.AstNode;
 import ru.vm5277.j8b_compiler.nodes.ClassNode;
 import ru.vm5277.j8b_compiler.nodes.ImportNode;
 import ru.vm5277.j8b_compiler.nodes.TokenBuffer;
-import ru.vm5277.common.tokens.Token;
+import ru.vm5277.j8b_compiler.tokens.Token;
 
 public class ASTParser extends AstNode {
 	private	final	FileImporter		fileImporter;
@@ -37,7 +34,7 @@ public class ASTParser extends AstNode {
 		
 		tb = new TokenBuffer(tokens.iterator());
 		// Обработка импортов		
-		while (tb.match(J8bKeyword.IMPORT) && !tb.match(TokenType.EOF)) {
+		while (tb.match(Keyword.IMPORT) && !tb.match(TokenType.EOF)) {
 			ImportNode importNode = new ImportNode(tb, mc);
 			imports.add(importNode);
 			
@@ -53,7 +50,7 @@ public class ASTParser extends AstNode {
 		}
 		
 		Set<Keyword> modifiers = collectModifiers(tb);
-		if(tb.match(TokenType.OOP, J8bKeyword.CLASS)) {
+		if(tb.match(TokenType.OOP, Keyword.CLASS)) {
 			try {
 				classNode = new ClassNode(tb, mc, modifiers, null, importedClasses);
 			}

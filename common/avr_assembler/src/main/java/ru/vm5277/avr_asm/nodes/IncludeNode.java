@@ -6,17 +6,15 @@
 package ru.vm5277.avr_asm.nodes;
 
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
-import ru.vm5277.avr_asm.AsmLexer;
+import ru.vm5277.avr_asm.Lexer;
 import ru.vm5277.avr_asm.Parser;
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
-import ru.vm5277.common.Lexer;
 import ru.vm5277.common.SourcePosition;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.avr_asm.TokenType;
 import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -42,7 +40,7 @@ public class IncludeNode {
 			SourcePosition sp = tb.getSP();
 
 			try {
-				Lexer lexer = new AsmLexer(sourceFile, scope, mc);
+				Lexer lexer = new Lexer(sourceFile, scope, mc);
 				Map<String, SourceType> innerSourcePaths = new HashMap<>(sourcePaths);
 				innerSourcePaths.put(sourceFile.getParent(), SourceType.LIB);
 				new Parser(lexer.getTokens(), scope, mc, innerSourcePaths);

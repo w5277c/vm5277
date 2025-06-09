@@ -10,9 +10,9 @@ import ru.vm5277.j8b_compiler.nodes.BlockNode;
 import ru.vm5277.j8b_compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b_compiler.nodes.VarNode;
 import ru.vm5277.j8b_compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.J8bKeyword;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.j8b_compiler.Delimiter;
+import ru.vm5277.j8b_compiler.Keyword;
+import ru.vm5277.j8b_compiler.TokenType;
 import ru.vm5277.common.j8b_compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.exceptions.SemanticException;
@@ -75,7 +75,7 @@ public class ForNode extends CommandNode {
 		tb.getLoopStack().remove(this);
        
         // Блок else (если есть)
-        if (tb.match(J8bKeyword.ELSE)) {
+        if (tb.match(Keyword.ELSE)) {
 			consumeToken(tb);
 			tb.getLoopStack().add(this);
 			try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement()));}

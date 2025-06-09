@@ -3,9 +3,18 @@
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 29.05.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.common;
+package ru.vm5277.avr_asm;
 
-public class AsmKeyword extends Keyword {
+import java.util.HashMap;
+import java.util.Map;
+
+public class Keyword {
+	private	static	final	Map<String, Keyword>	KEYWORDS	= new HashMap<>();	
+
+	// Литералы
+	public	static	final	Keyword					TRUE	= new Keyword("true", TokenType.LITERAL);
+	public	static	final	Keyword					FALSE	= new Keyword("false", TokenType.LITERAL);
+	public	static	final	Keyword					NULL	= new Keyword("null", TokenType.LITERAL);
 	// Константы
 	public	static	final	Keyword					EQU		= new Keyword(".equ", TokenType.DIRECTIVE);
 	public	static	final	Keyword					SET		= new Keyword(".set", TokenType.DIRECTIVE);
@@ -66,7 +75,34 @@ public class AsmKeyword extends Keyword {
 	public	static	final	Keyword					EXP2	= new Keyword("exp2", TokenType.COMMAND);
 	public	static	final	Keyword					LOG		= new Keyword("log", TokenType.COMMAND);
 	
-	public AsmKeyword(String name, TokenType tokenType) {
-		super(name, tokenType);
+	private	String		name;
+	private	TokenType	tokenType;
+	
+	protected Keyword(String name, TokenType tokenType) {
+		this.name = name;
+		this.tokenType = tokenType;
+		
+		KEYWORDS.put(name, this);
+	}
+	
+	public String getName() {
+		return name;
+	}
+	
+	public TokenType getTokenType() {
+		return tokenType;
+	}
+	
+	public static Keyword fromString(String name) {
+		return KEYWORDS.get(name);
+	}
+	
+	public static int getSize() {
+		return KEYWORDS.size();
+	}
+	
+	@Override
+	public String toString() {
+		return name;
 	}
 }

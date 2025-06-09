@@ -9,10 +9,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.j8b_compiler.CodeGenerator;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.J8bKeyword;
-import ru.vm5277.common.Keyword;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.j8b_compiler.Delimiter;
+import ru.vm5277.j8b_compiler.Keyword;
+import ru.vm5277.j8b_compiler.TokenType;
 import ru.vm5277.common.j8b_compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.exceptions.SemanticException;
@@ -46,7 +45,7 @@ public class MethodNode extends AstNode {
         consumeToken(tb); // Потребляем ')'
 		
 		// Проверяем наличие throws
-		if (tb.match(TokenType.OOP, J8bKeyword.THROWS)) {
+		if (tb.match(TokenType.OOP, Keyword.THROWS)) {
 			consumeToken(tb);
 			this.canThrow = true;
 		}
@@ -136,18 +135,18 @@ public class MethodNode extends AstNode {
 	}
 
 	public boolean isStatic() {
-		return modifiers.contains(J8bKeyword.STATIC);
+		return modifiers.contains(Keyword.STATIC);
 	}
 	public boolean isFinal() {
-		return modifiers.contains(J8bKeyword.FINAL);
+		return modifiers.contains(Keyword.FINAL);
 	}
 	public boolean isPublic() {
-		return modifiers.contains(J8bKeyword.PUBLIC);
+		return modifiers.contains(Keyword.PUBLIC);
 	}
 	
 	@Override
 	public boolean preAnalyze() {
-		try{validateModifiers(modifiers, J8bKeyword.PUBLIC, J8bKeyword.PRIVATE, J8bKeyword.STATIC, J8bKeyword.NATIVE);} catch(SemanticException e) {addMessage(e);}
+		try{validateModifiers(modifiers, Keyword.PUBLIC, Keyword.PRIVATE, Keyword.STATIC, Keyword.NATIVE);} catch(SemanticException e) {addMessage(e);}
 		
 		if(!isConstructor() && Character.isUpperCase(name.charAt(0))) {
 			addMessage(new WarningMessage("Method name should start with uppercase letter:" + name, sp));
@@ -176,8 +175,8 @@ public class MethodNode extends AstNode {
 		// Создаем MethodSymbol
 		try {
 			methodScope = new MethodScope(null, classScope);
-			methodSymbol = new MethodSymbol(	name, returnType, paramSymbols, modifiers.contains(J8bKeyword.FINAL),
-												modifiers.contains(J8bKeyword.STATIC),	modifiers.contains(J8bKeyword.NATIVE), canThrow, methodScope);
+			methodSymbol = new MethodSymbol(	name, returnType, paramSymbols, modifiers.contains(Keyword.FINAL),
+												modifiers.contains(Keyword.STATIC),	modifiers.contains(Keyword.NATIVE), canThrow, methodScope);
 			// Устанавливаем обратную ссылку
 			methodScope.setSymbol(methodSymbol);
 
@@ -206,7 +205,7 @@ public class MethodNode extends AstNode {
 
 	@Override
 	public boolean postAnalyze(Scope scope) {
-		if (modifiers.contains(J8bKeyword.NATIVE)) {
+		if (modifiers.contains(Keyword.NATIVE)) {
 			if (getBody() != null) {
 				markError("Native method cannot have a body");
 			}

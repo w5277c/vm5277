@@ -3,11 +3,11 @@
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 29.04.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.common.tokens;
+package ru.vm5277.j8b_compiler.tokens;
 
 import java.util.ArrayList;
 import java.util.List;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.j8b_compiler.TokenType;
 import ru.vm5277.common.SourceBuffer;
 import ru.vm5277.common.messages.MessageContainer;
 

@@ -52,13 +52,13 @@ public class CodeSegment implements Segment {
 	}
 	
 	public int writeOpcode(int opcode) {
-		int result = curBlock.getAddress();
+		int result = curBlock.getPC();
 		curBlock.writeOpcode(opcode);
 		return result;
 	}
 
 	@Override
-	public Block getCurrentBlock() {
+	public CodeBlock getCurrentBlock() {
 		return curBlock;
 	}
 }

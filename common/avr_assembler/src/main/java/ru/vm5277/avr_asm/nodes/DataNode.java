@@ -10,8 +10,8 @@ import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.avr_asm.semantic.LiteralExpression;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.avr_asm.Delimiter;
+import ru.vm5277.avr_asm.TokenType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.MessageContainer;
 
@@ -24,7 +24,7 @@ public class DataNode {
 				tmp = ((String)((LiteralExpression)expr).getValue()).getBytes(StandardCharsets.US_ASCII);
 			}
 			else {
-				long value = Node.getNumValue(expr, tb.getSP());
+				long value = Expression.getLong(expr, tb.getSP());
 				if(value >= (1<<(valueSize*8))) {
 					throw new ParseException("TODO значение больше, чем указанный тип данных:" + value + ", size:" + valueSize, tb.getSP());
 				}

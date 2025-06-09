@@ -8,9 +8,9 @@ package ru.vm5277.j8b_compiler.nodes.commands;
 import ru.vm5277.j8b_compiler.nodes.BlockNode;
 import ru.vm5277.j8b_compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b_compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.J8bKeyword;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.j8b_compiler.Delimiter;
+import ru.vm5277.j8b_compiler.Keyword;
+import ru.vm5277.j8b_compiler.TokenType;
 import ru.vm5277.common.j8b_compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.exceptions.SemanticException;
@@ -34,7 +34,7 @@ public class DoWhileNode extends CommandNode {
 		tb.getLoopStack().remove(this);
 
 		try {
-			consumeToken(tb, TokenType.COMMAND, J8bKeyword.WHILE);
+			consumeToken(tb, TokenType.COMMAND, Keyword.WHILE);
 			consumeToken(tb, Delimiter.LEFT_PAREN);
 			this.condition = new ExpressionNode(tb, mc).parse();
 			consumeToken(tb, Delimiter.RIGHT_PAREN);

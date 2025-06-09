@@ -9,8 +9,6 @@ import java.io.File;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
-import ru.vm5277.common.J8bKeyword;
-import ru.vm5277.common.Keyword;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageOwner;
 import ru.vm5277.j8b_compiler.nodes.ClassNode;
@@ -50,7 +48,7 @@ public class SemanticAnalyzer {
     }
 	
 	protected void validateModifiers(Set<Keyword> modifiers, Keyword... allowedModifiers) throws SemanticException {
-		if(modifiers.contains(J8bKeyword.PUBLIC) && modifiers.contains(J8bKeyword.PRIVATE)) {
+		if(modifiers.contains(Keyword.PUBLIC) && modifiers.contains(Keyword.PRIVATE)) {
 			throw new SemanticException("Conflicting access modifiers: cannot combine 'public' and 'private'");
 		}
 

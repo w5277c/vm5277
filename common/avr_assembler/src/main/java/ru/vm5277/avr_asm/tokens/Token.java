@@ -3,17 +3,17 @@
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 22.04.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.common.tokens;
+package ru.vm5277.avr_asm.tokens;
 
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.Locale;
 import javax.xml.bind.DatatypeConverter;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.avr_asm.TokenType;
 import ru.vm5277.common.SourceBuffer;
 import ru.vm5277.common.SourcePosition;
-import ru.vm5277.common.Keyword;
-import ru.vm5277.common.Lexer;
+import ru.vm5277.avr_asm.Keyword;
+import ru.vm5277.avr_asm.Lexer;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 

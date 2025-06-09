@@ -10,15 +10,18 @@ import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.avr_asm.semantic.LiteralExpression;
 import ru.vm5277.avr_asm.semantic.IdExpression;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.Operator;
+import ru.vm5277.avr_asm.Delimiter;
+import ru.vm5277.avr_asm.TokenType;
+import ru.vm5277.avr_asm.semantic.BinaryExpression;
+import ru.vm5277.avr_asm.semantic.UnaryExpression;
 import ru.vm5277.common.SourcePosition;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.common.Operator;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
-import ru.vm5277.common.tokens.Token;
+import ru.vm5277.avr_asm.tokens.Token;
+import static ru.vm5277.common.Operator.NOT;
 
 public class Node {
 	protected			TokenBuffer				tb;
@@ -81,30 +84,8 @@ public class Node {
 		return message;
 	}
 
-	public static Long getNumValue(Expression expr, SourcePosition sp) throws ParseException {
-		if(expr instanceof IdExpression) {
-			return ((IdExpression)expr).getNumericValue();
-		}
-		if(expr instanceof LiteralExpression) {
-			return getLong(((LiteralExpression)expr).getValue());
-		}
-		throw new ParseException("TODO не поддерживаемое выражение:" + expr, sp);
-	}
-
-	private static long getLong(Object obj) throws ParseException {
-		if(obj instanceof Integer) {
-			return ((Integer)obj).longValue();
-		}
-		if(obj instanceof Long) {
-			return (Long)obj;
-		}
-		if(obj instanceof Boolean) {
-			return ((Boolean)obj) ? 0x01l : 0x00l;
-		}
-		throw new ParseException("TODO не поддерживаемый тип значения:" + obj, null);
-	}
-	
 	public Scope getScope() {
 		return scope;
 	}
+	
 }

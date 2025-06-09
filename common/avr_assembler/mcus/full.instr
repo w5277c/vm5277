@@ -1,6 +1,6 @@
 # R	register 0≤d≤31
 # Rh	hight register 16≤d≤31
-# Ri	index register r24,r26,r28,r30
+# Ra	arithmetic register r24,r26,r28,r30
 # Re	even register r0,r2,r4,...,r30
 # A	I/O register address
 # RR	register for both operands
@@ -16,12 +16,12 @@
 # ============ ARITHMETIC AND LOGIC INSTRUCTIONS ============
 ADD	add	zcnvh	1	1	0x0c00	R,R	# Add two registers (Rd ← Rd + Rr), update Z,C,N,V,H
 ADC	adc	zcnvh	1	1	0x1c00	R,R	# Add with Carry (Rd ← Rd + Rr + C)
-ADIW	adiw	zcnvs	2	1	0x9600	Ri,k6	# Add immediate to word (Rdh:Rdl ← Rdh:Rdl + K)
+ADIW	adiw	zcnvs	2	1	0x9600	Ra,k6	# Add immediate to word (Rdh:Rdl ← Rdh:Rdl + K)
 SUB	sub	zcnvh	1	1	0x1800	R,R	# Subtract registers (Rd ← Rd - Rr)
 SUBI	subi	zcnvh	1	1	0x5000	Rh,k8	# Subtract immediate (Rd ← Rd - K)
 SBC	sbc	zcnvh	1	1	0x0800	R,R	# Subtract with Carry (Rd ← Rd - Rr - C)
 SBCI	sbci	zcnvh	1	1	0x4000	Rh,k8	# Subtract immediate with Carry (Rd ← Rd - K - C)
-SBIW	sbiw	zcnvs	2	1	0x9700	Ri,k6	# Subtract immediate from word (Rdh:Rdl ← Rdh:Rdl - K)
+SBIW	sbiw	zcnvs	2	1	0x9700	Ra,k6	# Subtract immediate from word (Rdh:Rdl ← Rdh:Rdl - K)
 AND	and	znv	1	1	0x2000	R,R	# Logical AND (Rd ← Rd & Rr), update Z,N,V
 ANDI	andi	znv	1	1	0x7000	Rh,k8	# Logical AND with immediate (Rd ← Rd & K)
 OR	or	znv	1	1	0x2800	R,R	# Logical OR (Rd ← Rd | Rr), update Z,N,V

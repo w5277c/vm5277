@@ -9,13 +9,33 @@ import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.nodes.Node;
 import ru.vm5277.avr_asm.scope.MacroCallSymbol;
 import ru.vm5277.avr_asm.scope.Scope;
-import ru.vm5277.common.AsmKeyword;
-import ru.vm5277.common.Delimiter;
+import ru.vm5277.avr_asm.Keyword;
+import ru.vm5277.avr_asm.Delimiter;
+import ru.vm5277.avr_asm.TokenType;
 import ru.vm5277.common.Operator;
-import ru.vm5277.common.TokenType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.common.tokens.Token;
+import ru.vm5277.avr_asm.tokens.Token;
+import static ru.vm5277.common.Operator.AND;
+import static ru.vm5277.common.Operator.BIT_AND;
+import static ru.vm5277.common.Operator.BIT_NOT;
+import static ru.vm5277.common.Operator.BIT_OR;
+import static ru.vm5277.common.Operator.BIT_XOR;
+import static ru.vm5277.common.Operator.DIV;
+import static ru.vm5277.common.Operator.EQ;
+import static ru.vm5277.common.Operator.GT;
+import static ru.vm5277.common.Operator.GTE;
+import static ru.vm5277.common.Operator.LT;
+import static ru.vm5277.common.Operator.LTE;
+import static ru.vm5277.common.Operator.MINUS;
+import static ru.vm5277.common.Operator.MULT;
+import static ru.vm5277.common.Operator.NEQ;
+import static ru.vm5277.common.Operator.NOT;
+import static ru.vm5277.common.Operator.OR;
+import static ru.vm5277.common.Operator.PLUS;
+import static ru.vm5277.common.Operator.SHL;
+import static ru.vm5277.common.Operator.SHR;
+import ru.vm5277.common.SourcePosition;
 
 public class Expression extends Node {
 	protected Expression() {
@@ -25,6 +45,7 @@ public class Expression extends Node {
 		return parseBinary(tb, scope, mc, 0);
 	}
 	
+	// TODO свертывание не выполняется для BinaryExpression из parseFunction
 	private static Expression parseBinary(TokenBuffer tb, Scope scope, MessageContainer mc, int minPrecedence) throws ParseException {
         Expression left = parseUnary(tb, scope, mc);
 
@@ -37,45 +58,12 @@ public class Expression extends Node {
 			}
             tb.consume();
 	
-			//TODO перейти на long
 			Expression right = parseBinary(tb, scope, mc, precedence + (operator.isAssignment() ? 0 : 1));
-			
-			Long leftVal = null;
-			Long rightVal = null;
-			try {leftVal = Node.getNumValue(left, null);} catch(ParseException e) {}
-			try {rightVal = Node.getNumValue(right, null);} catch(ParseException e) {}
-
-			if(null != leftVal && null != rightVal) {
-				switch (operator) {
-					case MULT:		left = new LiteralExpression(leftVal *	rightVal); break;
-					case DIV:		left = new LiteralExpression(leftVal /	rightVal); break;
-					case SHL:		left = new LiteralExpression(leftVal <<	rightVal); break;
-					case SHR:		left = new LiteralExpression(leftVal >>>	rightVal); break;
-					case BIT_OR:	left = new LiteralExpression(leftVal |	rightVal); break;
-					case BIT_AND:	left = new LiteralExpression(leftVal &	rightVal); break;
-					case BIT_XOR:	left = new LiteralExpression(leftVal ^	rightVal); break;
-					case PLUS:		left = new LiteralExpression(leftVal +	rightVal); break;
-					case MINUS:		left = new LiteralExpression(leftVal -	rightVal); break;
-					case EQ:		left = new LiteralExpression(leftVal.longValue() == rightVal); break;
-					case NEQ:		left = new LiteralExpression(leftVal.longValue() !=	rightVal); break;
-					case LT:		left = new LiteralExpression(leftVal <	rightVal); break;
-					case LTE:		left = new LiteralExpression(leftVal <=	rightVal); break;
-					case GT:		left = new LiteralExpression(leftVal >	rightVal); break;
-					case GTE:		left = new LiteralExpression(leftVal >=	rightVal); break;
-					case OR:		left = new LiteralExpression((leftVal != 0) || (rightVal != 0)); break;
-					case AND:		left = new LiteralExpression((leftVal != 0) && (rightVal != 0)); break;
-					case NOT:		left = new LiteralExpression(leftVal != rightVal); break;
-					default:		{
-						throw new ParseException("TODO не поддердживаемый тип операции:" + operator, null);
-					}
-				}
-			}
-			else {
-				return new BinaryExpression(tb, scope, mc,
-											null == leftVal ? left : new LiteralExpression(leftVal),
-											operator,
-											null == rightVal ? right : new LiteralExpression(rightVal));
-			}
+	
+			BinaryExpression binaryExpr = new BinaryExpression(tb, scope, mc, left, operator, right);
+			Expression folded = fold(binaryExpr);
+        
+			left = (null != folded ? folded : binaryExpr);
 		}
         return left;
     }
@@ -87,22 +75,10 @@ public class Expression extends Node {
 				tb.consume();
 
 				Expression expr = parsePrimary(tb, scope, mc);
-				if(expr instanceof LiteralExpression) {
-					Object value = ((LiteralExpression)expr).getValue();
-					if(value instanceof Number) {
-						long num = ((Number)value).longValue();
-						switch (operator) {
-							case BIT_NOT: return new LiteralExpression((~num) &0xffffffffl);
-							case MINUS:  return new LiteralExpression(-num);
-							case NOT:    return new LiteralExpression(num == 0 ? 1L : 0L);
-						}
-						
-					}
-					else if(value instanceof Boolean && Operator.NOT == operator) {
-						return new LiteralExpression(!(boolean)value);
-					}
-				}
-				return new UnaryExpression(tb, scope, mc, operator, parseUnary(tb, scope, mc));
+				UnaryExpression unaryExpr = new UnaryExpression(tb, scope, mc, operator, expr);
+				Expression folded = fold(unaryExpr);
+				return (null != folded ? folded : unaryExpr);
+//				return new UnaryExpression(tb, scope, mc, operator, parseUnary(tb, scope, mc));
 			}
 		}
 		return parsePrimary(tb, scope, mc);
@@ -160,16 +136,16 @@ public class Expression extends Node {
 		Expression expr = Expression.parse(tb, scope, mc);
 		
 		Long value = null;
-		try {value = Node.getNumValue(expr, null);} catch(ParseException e) {}
+		try {value = getLong(expr, null);} catch(ParseException e) {}
 		if(null != value) {
-			if(AsmKeyword.LOW.getName().equals(name) || AsmKeyword.BYTE1.getName().equals(name)) return new LiteralExpression(value & 0xff);
-			else if(AsmKeyword.HIGH.getName().equals(name) || AsmKeyword.BYTE2.getName().equals(name)) return new LiteralExpression((value >> 8) & 0xff);
-			else if(AsmKeyword.BYTE3.getName().equals(name) || AsmKeyword.PAGE.getName().equals(name)) return new LiteralExpression((value >> 16) & 0xff);
-			else if(AsmKeyword.BYTE4.getName().equals(name)) return new LiteralExpression((value >> 24) & 0xff);
-			else if(AsmKeyword.LWRD.getName().equals(name)) return new LiteralExpression(value & 0xffff);
-			else if(AsmKeyword.HWRD.getName().equals(name)) return new LiteralExpression((value >> 16) & 0xffff);
-			else if(AsmKeyword.EXP2.getName().equals(name)) return new LiteralExpression(1 << value);
-			else if(AsmKeyword.LOG.getName().equals(name)) {
+			if(Keyword.LOW.getName().equals(name) || Keyword.BYTE1.getName().equals(name)) return new LiteralExpression(value & 0xff);
+			else if(Keyword.HIGH.getName().equals(name) || Keyword.BYTE2.getName().equals(name)) return new LiteralExpression((value >> 8) & 0xff);
+			else if(Keyword.BYTE3.getName().equals(name) || Keyword.PAGE.getName().equals(name)) return new LiteralExpression((value >> 16) & 0xff);
+			else if(Keyword.BYTE4.getName().equals(name)) return new LiteralExpression((value >> 24) & 0xff);
+			else if(Keyword.LWRD.getName().equals(name)) return new LiteralExpression(value & 0xffff);
+			else if(Keyword.HWRD.getName().equals(name)) return new LiteralExpression((value >> 16) & 0xffff);
+			else if(Keyword.EXP2.getName().equals(name)) return new LiteralExpression(1 << value);
+			else if(Keyword.LOG.getName().equals(name)) {
 				long result = 0;
 				while (0x01 <= value) {
 					value = value >> 0x01;
@@ -182,10 +158,10 @@ public class Expression extends Node {
 			}
 		}
 		else {
-			if(AsmKeyword.LOW.getName().equals(name)) {
+			if(Keyword.LOW.getName().equals(name)) {
 				expr = new BinaryExpression(tb, scope, mc, expr, Operator.BIT_AND, new LiteralExpression(0xff));
 			}
-			else if(AsmKeyword.HIGH.getName().equals(name)) {
+			else if(Keyword.HIGH.getName().equals(name)) {
 				expr = new BinaryExpression(tb, scope, mc, expr, Operator.SHR, new LiteralExpression(8));
 				expr = new BinaryExpression(tb, scope, mc, expr, Operator.BIT_AND, new LiteralExpression(0xff));
 			}
@@ -194,5 +170,107 @@ public class Expression extends Node {
 			}
 		}
 		return expr;
+	}
+	
+	private static long getLong(Object obj) throws ParseException {
+		if(obj instanceof Integer) {
+			return ((Integer)obj).longValue();
+		}
+		if(obj instanceof Long) {
+			return (Long)obj;
+		}
+		if(obj instanceof Boolean) {
+			return ((Boolean)obj) ? 0x01l : 0x00l;
+		}
+		if(obj instanceof String && 0x01==((String)obj).length()) {
+			return ((String)obj).charAt(0);
+		}
+		throw new ParseException("TODO не поддерживаемый тип значения:" + obj, null);
+	}
+
+	public static Long getLong(Expression expr, SourcePosition sp) throws ParseException {
+		if(expr instanceof IdExpression) {
+			return ((IdExpression)expr).getNumericValue();
+		}
+		if(expr instanceof LiteralExpression) {
+			return Expression.getLong(((LiteralExpression)expr).getValue());
+		}
+		if (expr instanceof BinaryExpression || expr instanceof UnaryExpression) {
+			Expression folded = Expression.fold(expr);
+			if (null != folded && folded instanceof LiteralExpression) return Expression.getLong(((LiteralExpression)folded).getValue());
+		}
+		throw new ParseException("TODO не поддерживаемое выражение:" + expr, sp);
+	}
+
+	
+	public static Expression fold(Expression expr) throws ParseException {
+		if (expr instanceof BinaryExpression) {
+			BinaryExpression binaryExpr = (BinaryExpression)expr;
+			Operator operator = binaryExpr.getOp();
+			Expression folded = fold(binaryExpr.getLeftExpr());
+			Expression leftExpr = (null != folded ? folded : binaryExpr.getLeftExpr());
+			folded = fold(binaryExpr.getRightExpr());
+			Expression rightExpr = (null != folded ? folded : binaryExpr.getRightExpr());
+			if(null == leftExpr || null == rightExpr) return null;
+			try {
+				Long leftVal = getLong(leftExpr, null);
+				Long rightVal = getLong(rightExpr, null);
+				switch (operator) {
+					case MULT:		return new LiteralExpression(leftVal * rightVal);
+					case DIV:		return new LiteralExpression(leftVal / rightVal);
+					case SHL:		return new LiteralExpression(leftVal << rightVal);
+					case SHR:		return new LiteralExpression(leftVal >>> rightVal);
+					case BIT_OR:	return new LiteralExpression(leftVal | rightVal);
+					case BIT_AND:	return new LiteralExpression(leftVal & rightVal);
+					case BIT_XOR:	return new LiteralExpression(leftVal ^ rightVal);
+					case PLUS:		return new LiteralExpression(leftVal + rightVal);
+					case MINUS:		return new LiteralExpression(leftVal - rightVal);
+					case EQ:		return new LiteralExpression(leftVal.longValue() == rightVal);
+					case NEQ:		return new LiteralExpression(leftVal.longValue() != rightVal);
+					case LT:		return new LiteralExpression(leftVal < rightVal);
+					case LTE:		return new LiteralExpression(leftVal <= rightVal);
+					case GT:		return new LiteralExpression(leftVal > rightVal);
+					case GTE:		return new LiteralExpression(leftVal >= rightVal);
+					case OR:		return new LiteralExpression((leftVal != 0) || (rightVal != 0));
+					case AND:		return new LiteralExpression((leftVal != 0) && (rightVal != 0));
+					case NOT:		return new LiteralExpression(leftVal != rightVal);
+				}
+			}
+			catch (ParseException e) {}
+			return null;
+		}
+		
+		if (expr instanceof UnaryExpression) {
+			UnaryExpression unaryExpr = (UnaryExpression)expr;
+			Expression folded = fold(unaryExpr.getOperand());
+			Expression operandExpr = (null != folded ? folded : unaryExpr.getOperand());
+			if(null == operandExpr) return null;
+			if(operandExpr instanceof LiteralExpression) {
+				Object value =  ((LiteralExpression)operandExpr).getValue();
+				Operator operator = unaryExpr.getOperator();
+
+				if (value instanceof Number) {
+					long num = ((Number)value).longValue();
+					switch (operator) {
+						case BIT_NOT:	return new LiteralExpression((~num) & 0xffffffffL);
+						case MINUS:		return new LiteralExpression(-num);
+						case NOT:		return new LiteralExpression(num == 0 ? 1L : 0L);
+					}
+				}
+				else if (value instanceof Boolean && Operator.NOT == operator) {
+					return new LiteralExpression(!(boolean)value);
+				}
+			}
+			return null;
+		}
+		
+		if (expr instanceof IdExpression) {
+			try {
+				Long value = ((IdExpression)expr).getNumericValue();
+				return new LiteralExpression(value);
+			}
+			catch (ParseException e) {}
+		}
+		return null;
 	}
 }

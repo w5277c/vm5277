@@ -7,14 +7,14 @@ package ru.vm5277.j8b_compiler.nodes;
 
 import java.io.File;
 import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.tokens.Token;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.J8bKeyword;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.j8b_compiler.Delimiter;
+import ru.vm5277.j8b_compiler.Keyword;
+import ru.vm5277.j8b_compiler.TokenType;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.j8b_compiler.semantic.ClassScope;
 import ru.vm5277.j8b_compiler.semantic.Scope;
+import ru.vm5277.j8b_compiler.tokens.Token;
 
 public class ImportNode extends AstNode {
 	private	boolean	isStatic;
@@ -28,7 +28,7 @@ public class ImportNode extends AstNode {
 			// Пропуск import токена
 			consumeToken(tb);
 
-			if (tb.match(J8bKeyword.STATIC)) {
+			if (tb.match(Keyword.STATIC)) {
 				consumeToken(tb);
 				this.isStatic = true;
 			}
@@ -51,7 +51,7 @@ public class ImportNode extends AstNode {
 
 			this.importPath = path.toString();
 
-			if (tb.match(J8bKeyword.AS)) {
+			if (tb.match(Keyword.AS)) {
 				consumeToken(tb);
 				this.alias = (String)consumeToken(tb, TokenType.ID).getValue();
 			}

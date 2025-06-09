@@ -6,16 +6,13 @@
 package ru.vm5277.avr_asm;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 import ru.vm5277.avr_asm.nodes.MnemNode;
 import ru.vm5277.avr_asm.nodes.SourceType;
 import ru.vm5277.avr_asm.scope.Scope;
-import ru.vm5277.common.Lexer;
 import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.InfoMessage;
@@ -82,7 +79,7 @@ public class Main {
 		Scope scope = new Scope(sourceFile, instrReader);
 		if(null != mcu) scope.setDevice(mcu);
 		
-		Lexer lexer = new AsmLexer(sourceFile, scope, mc);
+		Lexer lexer = new Lexer(sourceFile, scope, mc);
 		//for(Token token : lexer.getTokens()) {
 			//System.out.print(token.toString());
 		//}

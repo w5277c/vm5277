@@ -12,10 +12,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.j8b_compiler.CodeGenerator;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.J8bKeyword;
-import ru.vm5277.common.Keyword;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.j8b_compiler.Delimiter;
+import ru.vm5277.j8b_compiler.Keyword;
+import ru.vm5277.j8b_compiler.TokenType;
 import ru.vm5277.common.j8b_compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -71,7 +70,7 @@ public class BlockNode extends AstNode {
 				} // Фиксируем ошибку(Unexpected command token)
 				continue;
 			}
-			if(tb.match(J8bKeyword.FREE)) {
+			if(tb.match(Keyword.FREE)) {
 				declarations.add(new FreeNode(tb, mc));
 				continue;
 			}
@@ -79,12 +78,12 @@ public class BlockNode extends AstNode {
 			Set<Keyword> modifiers = collectModifiers(tb);
 
 			// Обработка классов с модификаторами
-			if (tb.match(TokenType.OOP) && J8bKeyword.CLASS == tb.current().getValue()) {
+			if (tb.match(TokenType.OOP) && Keyword.CLASS == tb.current().getValue()) {
 				declarations.add(new ClassNode(tb, mc, modifiers, null, null));
 				continue;
 			}
 			// Обработка интерфейсов с модификаторами
-			if (tb.match(TokenType.OOP, J8bKeyword.INTERFACE)) {
+			if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
 				declarations.add(new InterfaceNode(tb, mc, modifiers, null));
 				continue;
 			}

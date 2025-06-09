@@ -3,7 +3,7 @@
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 22.04.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.common;
+package ru.vm5277.j8b_compiler;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -12,15 +12,17 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.List;
-import ru.vm5277.common.tokens.Token;
+import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.messages.ErrorMessage;
+import ru.vm5277.common.SourceBuffer;
 import ru.vm5277.common.messages.MessageOwner;
+import ru.vm5277.j8b_compiler.tokens.*;
 
 public class Lexer {
 	protected	final	MessageContainer	mc;
 	protected			SourceBuffer		sb;
 	protected	final	List<Token>			tokens	= new ArrayList<>();
-	
+
 	public Lexer(File sourceFile, MessageContainer mc) throws IOException {
 		mc.setOwner(MessageOwner.LEXER);
 		
@@ -33,6 +35,8 @@ public class Lexer {
 			sb = new SourceBuffer(sourceFile, stringBuilder.toString());
 		}
 		this.mc = mc;
+		
+		parse();
 	}
 
 	public Lexer(String source, MessageContainer mc) throws IOException {
@@ -40,8 +44,90 @@ public class Lexer {
 		
 		sb = new SourceBuffer(null, source);
 		this.mc = mc;
+		
+		parse();
 	}
 
+	private void parse() {
+		while (sb.hasNext()) {
+			// Пропускаем пробелы
+			if(skipWhiteSpaces(sb)) continue;
+			// Пропускаем комментарии
+			if(skipComment(sb, mc)) continue;
+			
+			char ch = sb.getChar();			
+			//Блок данных
+			if(sb.hasNext(1) && '#'==ch) {
+				sb.next();
+				SourcePosition sp = sb.snapSP();
+				char type = sb.getChar();
+				sb.next();
+				
+				switch(type) {
+					case 'p':
+						tokens.add(new TNote(sb, mc));
+						continue;
+					case ';':
+						mc.add(new ErrorMessage("Empty #block", sp));
+						continue;
+					default: {
+						mc.add(new ErrorMessage("Unsupported #block: '" + type + "'", sp));
+						TNote.skipToken(sb, mc);
+					}
+				}
+				continue;
+			}
+			
+			// Символ
+			if ('\''==ch) {
+				tokens.add(new TChar(sb, mc));
+				continue;
+			}
+			
+			// Строки
+			if ('"'==ch) {
+				tokens.add(new TString(sb, mc));
+				continue;
+			}
+			
+            // Числа
+            if (Character.isDigit(ch)) {
+				tokens.add(new TNumber(sb, mc));
+				continue;
+            }
+            
+			// Операторы
+			Token token = TOpearator.parse(sb);
+            if (null != token) {
+                tokens.add(token);
+                continue;
+            }
+
+			// Идентификаторы и ключевые слова
+			if (Character.isLetter(ch) || '_'==ch) {
+				token = new TKeyword(sb);
+
+				// Добавляем проверку на метку
+				if (!(token.getValue() instanceof Keyword) && sb.hasNext() && ':'==sb.getChar()) {
+					token = new TLabel(token.getStringValue(), sb);
+				}
+				tokens.add(token);
+				continue;
+			}
+			
+			// Разделители
+			token = TDelimiter.parse(sb);
+            if (null != token) {
+                tokens.add(token);
+                continue;
+            }
+			SourcePosition sp = sb.snapSP();
+			sb.next();
+			mc.add(new ErrorMessage("Unexpected character: '" + ch + "'", sp));
+        }
+        tokens.add(new Token(sb, TokenType.EOF, null));
+	}
+	
 	public List<Token> getTokens() {
 		return tokens;
 	}

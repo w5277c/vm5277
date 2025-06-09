@@ -8,8 +8,8 @@ package ru.vm5277.j8b_compiler.nodes.commands;
 import ru.vm5277.j8b_compiler.nodes.BlockNode;
 import ru.vm5277.j8b_compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b_compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.J8bKeyword;
+import ru.vm5277.j8b_compiler.Delimiter;
+import ru.vm5277.j8b_compiler.Keyword;
 import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.j8b_compiler.VarType;
@@ -38,11 +38,11 @@ public class SwitchNode extends CommandNode {
 		try {consumeToken(tb, Delimiter.LEFT_BRACE);} catch(ParseException e) {markFirstError(e);}
 		// Парсим case-блоки
 		while (!tb.match(Delimiter.RIGHT_BRACE)) {
-			if (tb.match(J8bKeyword.CASE)) {
+			if (tb.match(Keyword.CASE)) {
 				AstCase c = parseCase(tb, mc);
 				if(null != c) cases.add(c);
 			}
-			else if (tb.match(J8bKeyword.DEFAULT)) {
+			else if (tb.match(Keyword.DEFAULT)) {
 				consumeToken(tb); // Потребляем "default"
 				try {consumeToken(tb, Delimiter.COLON);} catch(ParseException e) {markFirstError(e);}
 				tb.getLoopStack().add(this);

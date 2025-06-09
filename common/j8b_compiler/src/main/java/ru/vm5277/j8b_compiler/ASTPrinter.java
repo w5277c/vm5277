@@ -7,7 +7,6 @@ package ru.vm5277.j8b_compiler;
 
 import java.util.List;
 import java.util.Set;
-import ru.vm5277.common.Keyword;
 import ru.vm5277.common.Operator;
 import ru.vm5277.j8b_compiler.nodes.ArrayDeclarationNode;
 import ru.vm5277.j8b_compiler.nodes.AstNode;
@@ -42,7 +41,7 @@ import ru.vm5277.j8b_compiler.nodes.expressions.TernaryExpression;
 import ru.vm5277.j8b_compiler.nodes.expressions.TypeReferenceExpression;
 import ru.vm5277.j8b_compiler.nodes.expressions.UnaryExpression;
 import ru.vm5277.j8b_compiler.nodes.expressions.VariableExpression;
-import ru.vm5277.common.tokens.Token;
+import ru.vm5277.j8b_compiler.tokens.Token;
 
 public class ASTPrinter {
 	private class Printer {

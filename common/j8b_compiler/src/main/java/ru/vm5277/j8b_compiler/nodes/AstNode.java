@@ -17,11 +17,8 @@ import ru.vm5277.j8b_compiler.nodes.commands.ReturnNode;
 import ru.vm5277.j8b_compiler.nodes.commands.WhileNode;
 import ru.vm5277.j8b_compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.j8b_compiler.nodes.expressions.MethodCallExpression;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.J8bKeyword;
-import ru.vm5277.common.Keyword;
+import ru.vm5277.j8b_compiler.Keyword;
 import ru.vm5277.common.Operator;
-import ru.vm5277.common.TokenType;
 import ru.vm5277.common.j8b_compiler.VarType;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.j8b_compiler.nodes.commands.BreakNode;
@@ -29,17 +26,19 @@ import ru.vm5277.j8b_compiler.nodes.commands.ContinueNode;
 import ru.vm5277.j8b_compiler.nodes.commands.DoWhileNode;
 import ru.vm5277.j8b_compiler.nodes.commands.ForNode;
 import ru.vm5277.j8b_compiler.nodes.commands.SwitchNode;
-import ru.vm5277.common.tokens.Token;
 import ru.vm5277.j8b_compiler.SemanticAnalyzer;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.Message;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
+import ru.vm5277.j8b_compiler.Delimiter;
+import ru.vm5277.j8b_compiler.TokenType;
 import ru.vm5277.j8b_compiler.nodes.commands.CommandNode.AstCase;
 import ru.vm5277.j8b_compiler.nodes.commands.ThrowNode;
 import ru.vm5277.j8b_compiler.nodes.commands.TryNode;
 import ru.vm5277.j8b_compiler.nodes.expressions.TypeReferenceExpression;
 import ru.vm5277.j8b_compiler.semantic.Scope;
+import ru.vm5277.j8b_compiler.tokens.Token;
 
 public abstract class AstNode extends SemanticAnalyzer {
 	protected			TokenBuffer				tb;
@@ -59,16 +58,16 @@ public abstract class AstNode extends SemanticAnalyzer {
 
 	protected AstNode parseCommand() throws ParseException {
 		Keyword kw = (Keyword)tb.current().getValue();
-		if(J8bKeyword.IF == kw) return new IfNode(tb, mc);
-		if(J8bKeyword.FOR == kw) return new ForNode(tb, mc);
-		if(J8bKeyword.DO == kw) return new DoWhileNode(tb, mc);
-		if(J8bKeyword.WHILE == kw) return new WhileNode(tb, mc);
-		if(J8bKeyword.CONTINUE == kw) return new ContinueNode(tb, mc);
-		if(J8bKeyword.BREAK == kw) return new BreakNode(tb, mc);
-		if(J8bKeyword.RETURN == kw) return new ReturnNode(tb, mc);
-		if(J8bKeyword.SWITCH == kw) return new SwitchNode(tb, mc);
-		if(J8bKeyword.TRY == kw) return new TryNode(tb, mc);
-		if(J8bKeyword.THROW == kw) return new ThrowNode(tb, mc);
+		if(Keyword.IF == kw) return new IfNode(tb, mc);
+		if(Keyword.FOR == kw) return new ForNode(tb, mc);
+		if(Keyword.DO == kw) return new DoWhileNode(tb, mc);
+		if(Keyword.WHILE == kw) return new WhileNode(tb, mc);
+		if(Keyword.CONTINUE == kw) return new ContinueNode(tb, mc);
+		if(Keyword.BREAK == kw) return new BreakNode(tb, mc);
+		if(Keyword.RETURN == kw) return new ReturnNode(tb, mc);
+		if(Keyword.SWITCH == kw) return new SwitchNode(tb, mc);
+		if(Keyword.TRY == kw) return new TryNode(tb, mc);
+		if(Keyword.THROW == kw) return new ThrowNode(tb, mc);
 		markFirstError(error);
 		throw new ParseException("Unexpected command token " + tb.current(), sp);
 	}
@@ -133,14 +132,14 @@ public abstract class AstNode extends SemanticAnalyzer {
 			Keyword kw = (Keyword)consumeToken(tb).getValue();
 			VarType type;
 			if (null == kw) type = VarType.UNKNOWN;
-			else if(J8bKeyword.VOID == kw) type = VarType.VOID;
-			else if(J8bKeyword.BOOL == kw) type = VarType.BOOL;
-			else if(J8bKeyword.BYTE == kw) type = VarType.BYTE;
-			else if(J8bKeyword.SHORT == kw) type = VarType.SHORT;
-			else if(J8bKeyword.INT == kw) type = VarType.INT;
-			else if(J8bKeyword.FIXED == kw) type = VarType.FIXED;
-			else if(J8bKeyword.CSTR == kw) type = VarType.CSTR;
-			else if(J8bKeyword.CLASS == kw) type = VarType.CLASS;
+			else if(Keyword.VOID == kw) type = VarType.VOID;
+			else if(Keyword.BOOL == kw) type = VarType.BOOL;
+			else if(Keyword.BYTE == kw) type = VarType.BYTE;
+			else if(Keyword.SHORT == kw) type = VarType.SHORT;
+			else if(Keyword.INT == kw) type = VarType.INT;
+			else if(Keyword.FIXED == kw) type = VarType.FIXED;
+			else if(Keyword.CSTR == kw) type = VarType.CSTR;
+			else if(Keyword.CLASS == kw) type = VarType.CLASS;
 			else type = VarType.UNKNOWN;
 			return checkArrayType(type);
 		}

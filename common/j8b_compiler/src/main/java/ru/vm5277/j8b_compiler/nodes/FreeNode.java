@@ -5,7 +5,7 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.j8b_compiler.nodes;
 
-import ru.vm5277.common.Delimiter;
+import ru.vm5277.j8b_compiler.Delimiter;
 import ru.vm5277.common.j8b_compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.exceptions.SemanticException;

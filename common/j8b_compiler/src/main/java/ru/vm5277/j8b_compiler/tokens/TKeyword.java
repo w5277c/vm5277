@@ -3,26 +3,31 @@
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
 22.04.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.common.tokens;
+package ru.vm5277.j8b_compiler.tokens;
 
 import ru.vm5277.common.SourceBuffer;
-import ru.vm5277.common.SourcePosition;
-import ru.vm5277.common.TokenType;
-import ru.vm5277.common.Delimiter;
+import ru.vm5277.j8b_compiler.TokenType;
+import ru.vm5277.j8b_compiler.Keyword;
 
-public class TDelimiter extends Token {
-	public TDelimiter(SourceBuffer sb, SourcePosition sp, Delimiter value) {
-		super(sb, sp);
-		this.type = TokenType.DELIMITER;
-		this.value = value;
-	}
-
-	public static TDelimiter parse(SourceBuffer sb) {
-		SourcePosition sp = sb.snapSP();
-		Delimiter delimiter = Delimiter.matchLongestDelimiter(sb);
-		if (null!=delimiter) {
-			return new TDelimiter(sb, sp, delimiter);
+public class TKeyword extends Token {
+	public TKeyword(SourceBuffer sb) {
+		super(sb);
+		
+		StringBuilder stringBuilder = new StringBuilder();
+        while (sb.hasNext() && (Character.isLetterOrDigit(sb.getChar()) || '_'==sb.getChar())) {
+            stringBuilder.append(sb.getChar());
+			sb.next();
+        }
+        String id = stringBuilder.toString();
+        Keyword keyword = Keyword.fromString(id);
+		
+		if(null != keyword) {
+			type = keyword.getTokenType();
+			value = keyword;
 		}
-	    return null;
+		else {
+			type = TokenType.ID;
+			value = id;
+		}
 	}
 }

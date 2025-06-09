@@ -13,12 +13,12 @@ import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.MacroDefSymbol;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.avr_asm.Delimiter;
+import ru.vm5277.avr_asm.TokenType;
 import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.common.tokens.Token;
+import ru.vm5277.avr_asm.tokens.Token;
 
 public class MacroNode {
 	public static void parseDef(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {

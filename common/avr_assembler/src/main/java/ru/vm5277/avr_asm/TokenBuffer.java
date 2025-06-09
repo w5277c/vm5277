@@ -7,11 +7,8 @@ package ru.vm5277.avr_asm;
 
 import java.util.Iterator;
 import ru.vm5277.common.SourcePosition;
-import ru.vm5277.common.tokens.Token;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.Keyword;
+import ru.vm5277.avr_asm.tokens.Token;
 import ru.vm5277.common.Operator;
-import ru.vm5277.common.TokenType;
 
 public class TokenBuffer {
 	private	Token	current;
@@ -36,10 +33,6 @@ public class TokenBuffer {
         return current.getType() == type;
     }
 
-	public boolean match(Keyword keyword) {
-        return TokenType.KEYWORD == current.getType() && current.getValue() == keyword;
-    }
-	
 	public boolean match(TokenType type, Keyword keyword) {
         return type == current.getType() && current.getValue() == keyword;
     }

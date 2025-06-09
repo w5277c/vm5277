@@ -10,10 +10,9 @@ import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.j8b_compiler.CodeGenerator;
 import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.J8bKeyword;
-import ru.vm5277.common.Keyword;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.j8b_compiler.Delimiter;
+import ru.vm5277.j8b_compiler.Keyword;
+import ru.vm5277.j8b_compiler.TokenType;
 import ru.vm5277.common.j8b_compiler.VarType;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -44,7 +43,7 @@ public class InterfaceNode extends AstNode {
 		catch(ParseException e) {markFirstError(e);} // ошибка в имени, оставляем null
 		
         // Парсинг интерфейсов (если есть)
-		if (tb.match(J8bKeyword.IMPLEMENTS)) {
+		if (tb.match(Keyword.IMPLEMENTS)) {
 			consumeToken(tb);
 			while(true) {
 				try {
@@ -93,7 +92,7 @@ public class InterfaceNode extends AstNode {
 			addMessage(new WarningMessage("Interface name should start with uppercase letter:" + name, sp));
 		}
 		
-		try{validateModifiers(modifiers, J8bKeyword.PUBLIC);} catch(SemanticException e) {addMessage(e);}
+		try{validateModifiers(modifiers, Keyword.PUBLIC);} catch(SemanticException e) {addMessage(e);}
 		
 		// Анализ тела интерфейса
 		blockNode.preAnalyze();
@@ -135,9 +134,9 @@ public class InterfaceNode extends AstNode {
 			if (decl instanceof FieldNode) { // Проверка что все поля - public static final и инициализированы
 				FieldNode field = (FieldNode)decl;
 
-				if (!field.getModifiers().contains(J8bKeyword.PUBLIC)) markError("Interface field '" + field.getName() + "' must be public");
-				if (!field.getModifiers().contains(J8bKeyword.STATIC)) markError("Interface field '" + field.getName() + "' must be static");
-				if (!field.getModifiers().contains(J8bKeyword.FINAL)) markError("Interface field '" + field.getName() + "' must be final");
+				if (!field.getModifiers().contains(Keyword.PUBLIC)) markError("Interface field '" + field.getName() + "' must be public");
+				if (!field.getModifiers().contains(Keyword.STATIC)) markError("Interface field '" + field.getName() + "' must be static");
+				if (!field.getModifiers().contains(Keyword.FINAL)) markError("Interface field '" + field.getName() + "' must be final");
 
 				if (null == field.getInitializer()) markError("Interface field '" + field.getName() + "' must be initialized");
 			}

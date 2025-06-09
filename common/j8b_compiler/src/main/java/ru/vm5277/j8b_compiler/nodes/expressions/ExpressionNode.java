@@ -9,12 +9,12 @@ import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.j8b_compiler.Operand;
 import ru.vm5277.common.j8b_compiler.OperandType;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.J8bKeyword;
+import ru.vm5277.j8b_compiler.Delimiter;
+import ru.vm5277.j8b_compiler.Keyword;
 import ru.vm5277.common.Operator;
 import static ru.vm5277.common.Operator.MINUS;
 import static ru.vm5277.common.Operator.PLUS;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.j8b_compiler.TokenType;
 import ru.vm5277.common.j8b_compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.exceptions.SemanticException;
@@ -23,7 +23,7 @@ import ru.vm5277.j8b_compiler.nodes.AstNode;
 import ru.vm5277.j8b_compiler.nodes.TokenBuffer;
 import ru.vm5277.j8b_compiler.semantic.Scope;
 import ru.vm5277.j8b_compiler.semantic.Symbol;
-import ru.vm5277.common.tokens.Token;
+import ru.vm5277.j8b_compiler.tokens.Token;
 
 public class ExpressionNode extends AstNode {
 	public ExpressionNode(TokenBuffer tb, MessageContainer mc) {
@@ -586,7 +586,7 @@ public class ExpressionNode extends AstNode {
 	private ExpressionNode parsePrimary() throws ParseException {
 		Token token = tb.current();
         
-		if(tb.match(J8bKeyword.NEW)) {
+		if(tb.match(Keyword.NEW)) {
 			consumeToken(tb); // Потребляем 'new'
 
 			// Парсим имя класса

@@ -21,6 +21,18 @@ public class BinaryExpression extends Expression {
 		this.rightExpr = right;
 	}
 	
+	public Expression getLeftExpr() {
+		return leftExpr;
+	}
+
+	public Operator getOp() {
+		return operator;
+	}
+	
+	public Expression getRightExpr() {
+		return rightExpr;
+	}
+	
 	@Override
 	public String toString() {
 		return leftExpr.toString() + operator.getSymbol() + rightExpr.toString();

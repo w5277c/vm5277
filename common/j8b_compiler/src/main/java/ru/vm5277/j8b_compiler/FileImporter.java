@@ -6,14 +6,13 @@
 package ru.vm5277.j8b_compiler;
 
 import java.io.File;
-import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
-import ru.vm5277.common.tokens.Token;
+import ru.vm5277.j8b_compiler.tokens.Token;
 
 public class FileImporter {
 	private	final	List<String>		importedFiles	= new ArrayList<>();
@@ -45,7 +44,7 @@ public class FileImporter {
 			}
 		}
 		if(null != file) {
-			J8bLexer lexer = new J8bLexer(file, mc);
+			Lexer lexer = new Lexer(file, mc);
 			return lexer.getTokens();
 		}
 		return new ArrayList<>();

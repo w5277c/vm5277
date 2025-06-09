@@ -24,5 +24,8 @@ public class CodeBlock extends Block {
 		bdata[0x03] = (byte)(opcode & 0xff);
 		write(bdata, 0x04);
 	}
-
+	
+	public int getPC() {
+		return (startAddr+offset)/2;
+	}
 }

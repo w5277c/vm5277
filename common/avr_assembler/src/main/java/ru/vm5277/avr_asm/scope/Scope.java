@@ -94,10 +94,10 @@ public class Scope {
 		if(name.equals("pc") || variables.keySet().contains(name)) throw new ParseException("TODO имя метки совпадает с переменной:" + name, sp);
 		if(isMacroCall()) {
 			MacroCallSymbol symbol = macroCallSymbols.lastElement();
-			symbol.addLabel(name, sp, getCSeg().getCurrentBlock().getAddress());
+			symbol.addLabel(name, sp, getCSeg().getCurrentBlock().getPC());
 		}
 		else {
-			labels.put(name, getCSeg().getCurrentBlock().getAddress());
+			labels.put(name, getCSeg().getCurrentBlock().getPC());
 		}
 	}
 	
@@ -111,7 +111,7 @@ public class Scope {
 		if(null != vs && vs.isConstant()) throw new ParseException("TODO Нельзя переписать значение константы:" + name, sp);
 		if(isMacroCall()) {
 			MacroCallSymbol symbol = macroCallSymbols.lastElement();
-			symbol.addVariable(variableSymbol, sp, getCSeg().getCurrentBlock().getAddress());
+			symbol.addVariable(variableSymbol, sp, getCSeg().getCurrentBlock().getPC());
 		}
 		else {
 			variables.put(name, variableSymbol);
@@ -120,7 +120,7 @@ public class Scope {
 
 	public VariableSymbol resolveVariable(String name) throws ParseException {
 		if(name.equals("pc")) {
-			return new VariableSymbol(name, getCSeg().getCurrentBlock().getAddress(), true);
+			return new VariableSymbol(name, getCSeg().getCurrentBlock().getPC(), true);
 		}
 		if(isMacroCall()) {
 			MacroCallSymbol symbol = macroCallSymbols.lastElement();

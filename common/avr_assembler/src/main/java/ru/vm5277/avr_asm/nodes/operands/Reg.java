@@ -7,6 +7,7 @@ package ru.vm5277.avr_asm.nodes.operands;
 
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
+import ru.vm5277.avr_asm.semantic.IRegExpression;
 import ru.vm5277.avr_asm.semantic.IdExpression;
 import ru.vm5277.avr_asm.semantic.LiteralExpression;
 import ru.vm5277.common.SourcePosition;
@@ -16,6 +17,10 @@ public class Reg {
 	protected	int	id;
 	protected	boolean	inc	= false;
 	protected	boolean	dec	= false;
+	
+	protected Reg(int id) {
+		this.id = id;
+	}
 	
 	public Reg(Scope scope, SourcePosition sp, Expression expr) throws ParseException {
 		if(expr instanceof LiteralExpression) {
@@ -41,6 +46,9 @@ public class Reg {
 				throw new ParseException("TODO ожидаем регистр, получили " + result, sp);
 			}
 			id = result;
+		}
+		else if(expr instanceof IRegExpression) {
+			id = ((IRegExpression)expr).getId();
 		}
 		else {
 			throw new ParseException("TODO ожидаем регистр, получили " + expr, sp);

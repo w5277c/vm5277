@@ -6,9 +6,8 @@
 package ru.vm5277.avr_asm.tokens;
 
 import ru.vm5277.common.SourceBuffer;
-import ru.vm5277.common.Keyword;
+import ru.vm5277.avr_asm.Keyword;
 import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.common.tokens.Token;
 
 public class TDirective extends Token {
 	public TDirective(SourceBuffer sb, MessageContainer mc) {

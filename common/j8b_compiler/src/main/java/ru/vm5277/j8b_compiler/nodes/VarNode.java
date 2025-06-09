@@ -9,9 +9,8 @@ import java.util.Set;
 import ru.vm5277.common.j8b_compiler.CodeGenerator;
 import ru.vm5277.common.j8b_compiler.Operand;
 import ru.vm5277.common.j8b_compiler.OperandType;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.J8bKeyword;
-import ru.vm5277.common.Keyword;
+import ru.vm5277.j8b_compiler.Delimiter;
+import ru.vm5277.j8b_compiler.Keyword;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.j8b_compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
@@ -70,7 +69,7 @@ public class VarNode extends AstNode {
 	}
 	
 	public boolean isFinal() {
-		return modifiers.contains(J8bKeyword.FINAL);
+		return modifiers.contains(Keyword.FINAL);
 	}
 
 	public Set<Keyword> getModifiers() {
@@ -99,8 +98,8 @@ public class VarNode extends AstNode {
 	public boolean declare(Scope scope) {
 		if(scope instanceof BlockScope) {
 			BlockScope blockScope = (BlockScope)scope;
-			boolean isFinal = modifiers.contains(J8bKeyword.FINAL);
-			symbol = new Symbol(name, type, isFinal, modifiers.contains(J8bKeyword.STATIC));
+			boolean isFinal = modifiers.contains(Keyword.FINAL);
+			symbol = new Symbol(name, type, isFinal, modifiers.contains(Keyword.STATIC));
 			if(isFinal && null != initializer) {
 				if(initializer instanceof LiteralExpression) {
 					LiteralExpression le = (LiteralExpression)initializer;

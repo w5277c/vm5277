@@ -12,9 +12,9 @@ import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.j8b_compiler.Case;
 import ru.vm5277.common.j8b_compiler.CodeGenerator;
-import ru.vm5277.common.Delimiter;
-import ru.vm5277.common.J8bKeyword;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.j8b_compiler.Delimiter;
+import ru.vm5277.j8b_compiler.Keyword;
+import ru.vm5277.j8b_compiler.TokenType;
 import ru.vm5277.common.j8b_compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.exceptions.SemanticException;
@@ -47,10 +47,10 @@ public class TryNode extends CommandNode {
 		else markError("Expected '{' after 'try'");
 
 		// Парсим параметр catch (byte errCode)
-		if (tb.match(J8bKeyword.CATCH)) {
+		if (tb.match(Keyword.CATCH)) {
 			consumeToken(tb); // Потребляем "catch"
 			try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(ParseException e) {markFirstError(e);}
-			if (tb.match(TokenType.TYPE, J8bKeyword.BYTE)) {tb.consume();} // Потребляем "byte"
+			if (tb.match(TokenType.TYPE, Keyword.BYTE)) {tb.consume();} // Потребляем "byte"
 			else markError("Expected 'byte' type in catch parameter");
 			if (tb.match(TokenType.ID)) {this.varName = consumeToken(tb).getStringValue();}
 			else markError("Expected variable name in catch parameter");
@@ -59,7 +59,7 @@ public class TryNode extends CommandNode {
 			try {consumeToken(tb, Delimiter.LEFT_BRACE);} catch(ParseException e) {markFirstError(e);}
 
 			// Если сразу идет код без case/default - считаем его default-блоком
-            if (!tb.match(J8bKeyword.CASE) && !tb.match(J8bKeyword.DEFAULT) && !tb.match(Delimiter.RIGHT_BRACE)) {
+            if (!tb.match(Keyword.CASE) && !tb.match(Keyword.DEFAULT) && !tb.match(Delimiter.RIGHT_BRACE)) {
 				tb.getLoopStack().add(this);
                 try {catchDefault = new BlockNode(tb, mc, true);} catch (ParseException e) {markFirstError(e);}
                 tb.getLoopStack().remove(this);
@@ -67,7 +67,7 @@ public class TryNode extends CommandNode {
 			else {
 				// Парсим case-блоки
 				while (!tb.match(Delimiter.RIGHT_BRACE)) {
-					if (tb.match(J8bKeyword.CASE)) {
+					if (tb.match(Keyword.CASE)) {
 						if (hasDefault) {
 							markError("'case' cannot appear after 'default' in catch block");
 							tb.skip(Delimiter.RIGHT_BRACE);
@@ -76,7 +76,7 @@ public class TryNode extends CommandNode {
 						AstCase c = parseCase(tb, mc);
 						if(null != c) catchCases.add(c);
 					}
-					else if (tb.match(J8bKeyword.DEFAULT)) {
+					else if (tb.match(Keyword.DEFAULT)) {
 						consumeToken(tb); // Потребляем "default"
 						try {consumeToken(tb, Delimiter.COLON);} catch(ParseException e) {markFirstError(e);}
 						tb.getLoopStack().add(this);

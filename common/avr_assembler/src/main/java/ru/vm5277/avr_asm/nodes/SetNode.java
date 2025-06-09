@@ -11,7 +11,7 @@ import ru.vm5277.avr_asm.scope.VariableSymbol;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.SourcePosition;
-import ru.vm5277.common.TokenType;
+import ru.vm5277.avr_asm.TokenType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.MessageContainer;
 
@@ -20,7 +20,7 @@ public class SetNode {
 		SourcePosition sp = tb.getSP();
 		String name = ((String)Node.consumeToken(tb, TokenType.ID).getValue()).toLowerCase();
 		Node.consumeToken(tb, Operator.ASSIGN);
-		scope.setVariable(new VariableSymbol(name, Node.getNumValue(Expression.parse(tb, scope, mc), tb.getSP()), false), sp);
+		scope.setVariable(new VariableSymbol(name, Expression.getLong(Expression.parse(tb, scope, mc), sp), false), sp);
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 }
