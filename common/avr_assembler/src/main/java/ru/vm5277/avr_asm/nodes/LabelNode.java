@@ -13,7 +13,10 @@ import ru.vm5277.common.messages.MessageContainer;
 
 public class LabelNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
-		scope.addLabel(((String)Node.consumeToken(tb, TokenType.LABEL).getValue()).toLowerCase(), tb.getSP());
+		String name = ((String)Node.consumeToken(tb, TokenType.LABEL).getValue()).toLowerCase();
+		int addr = scope.addLabel(name, tb.getSP());
+		scope.list(name + ": " + String.format("0x%04X", addr));
+		
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 }

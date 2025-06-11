@@ -23,7 +23,10 @@ import ru.vm5277.avr_asm.tokens.Token;
 public class MacroNode {
 	public static void parseDef(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
 		try{
-			scope.startMacro(new MacroDefSymbol(((String)Node.consumeToken(tb, TokenType.ID).getValue()).toLowerCase(), tb.getSP().getLine()), tb.getSP());
+			String name = ((String)Node.consumeToken(tb, TokenType.ID).getValue()).toLowerCase();
+			scope.startMacro(new MacroDefSymbol(name, tb.getSP().getLine()), tb.getSP());
+
+			scope.list(".MACRO " + name);
 		}
 		catch(ParseException e) {
 			mc.add(e.getErrorMessage());
@@ -44,6 +47,7 @@ public class MacroNode {
 			Node.consumeToken(tb, Delimiter.COMMA);
 		}
 
+		if(scope.isListMacEnabled()) scope.list("# MACRO IMPL " + macro.getName() + " BEGIN " + params);
 		scope.startMacroImpl(macro.getName(), params);
 		try {
 			for(Token token : macro.getTokens()) {
@@ -55,6 +59,7 @@ public class MacroNode {
 			}
 		}
 		finally {
+			if(scope.isListMacEnabled()) scope.list("# MACRO IMPL " + macro.getName() + " END");
 			scope.stopMacroImpl();
 		}
 		Node.consumeToken(tb, TokenType.NEWLINE);

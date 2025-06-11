@@ -68,6 +68,8 @@ public class MnemNode extends Node {
 				expr2 = Expression.parse(tb, scope, mc);
 			}
 		}
+		
+		scope.list(String.format("0x%04X", addr) + " " + mnemonic + (null != expr1 ? " " + expr1 : "") + (null != expr2 ? ", " + expr2 : ""));
 	}
 		
 	public void secondPass() {

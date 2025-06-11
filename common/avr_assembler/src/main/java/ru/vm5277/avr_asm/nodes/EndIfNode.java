@@ -15,6 +15,9 @@ import ru.vm5277.common.messages.MessageContainer;
 public class EndIfNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException, CriticalParseException {
 		scope.getIncludeSymbol().blockEnd(tb.getSP());
+
+		scope.list(".ENDIF");
+
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 }

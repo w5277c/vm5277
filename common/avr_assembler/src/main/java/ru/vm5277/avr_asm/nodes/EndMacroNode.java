@@ -14,6 +14,9 @@ import ru.vm5277.common.messages.MessageContainer;
 public class EndMacroNode extends Node {	
 	static public void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
 		scope.endMacro(tb.getSP());
+
+		scope.list(".ENDMACRO");
+
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 }

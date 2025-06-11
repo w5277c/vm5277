@@ -27,4 +27,9 @@ public class UnaryExpression extends Expression {
 	public Expression getOperand() {
 		return operand;
 	}
+	
+	@Override
+	public String toString() {
+		return operand.toString() + operator;
+	}
 }

@@ -39,6 +39,8 @@ public class IncludeNode {
 		else {
 			SourcePosition sp = tb.getSP();
 
+			scope.list(".INCLUDE " + sourceFile.getPath());
+			
 			try {
 				Lexer lexer = new Lexer(sourceFile, scope, mc);
 				Map<String, SourceType> innerSourcePaths = new HashMap<>(sourcePaths);

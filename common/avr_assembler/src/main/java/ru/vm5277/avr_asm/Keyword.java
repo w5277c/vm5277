@@ -53,6 +53,7 @@ public class Keyword {
 	public	static	final	Keyword					LIST	= new Keyword(".list", TokenType.DIRECTIVE);
 	public	static	final	Keyword					NOLIST	= new Keyword(".nolist", TokenType.DIRECTIVE);
 	public	static	final	Keyword					LISTMAC	= new Keyword(".listmac", TokenType.DIRECTIVE);
+	public	static	final	Keyword					NOLISTMAC= new Keyword(".nolistmac", TokenType.DIRECTIVE);
 	// Перекрытие адресов
 	public	static	final	Keyword					OVERLAP	= new Keyword(".overlap", TokenType.DIRECTIVE);
 	public	static	final	Keyword					NOOVERLAP= new Keyword(".noverlap", TokenType.DIRECTIVE);

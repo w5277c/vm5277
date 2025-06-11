@@ -5,7 +5,13 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.avr_asm.scope;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +38,10 @@ public class Scope {
 	private					String									name;
 	private			static	String									mcu				= null;
 	private			static	InstrReader								instrReader;
+	private	final			BufferedWriter							listWriter;
+	private					boolean									listEnabled		= true;
+	private					boolean									listMacEnabled	= true;
+	private					boolean									overlapAllowed	= true;
 	private			static	int										strictLevel		= STRICT_WARNING;
 	private	final			Map<String, Byte>						regAliases		= new HashMap<>();	// Алиасы регистров
 	private	final			Map<String, VariableSymbol>				variables		= new HashMap<>();
@@ -44,9 +54,10 @@ public class Scope {
 	private					MacroDefSymbol							currentMacroDef	= null;
 	private final			Stack<IncludeSymbol>					includeSymbols	= new Stack<>();
 
-	public Scope(File sourceFile, InstrReader instrReader) throws ParseException {
+	public Scope(File sourceFile, InstrReader instrReader, BufferedWriter listWriter) throws ParseException {
 		this.instrReader = instrReader;
 		addImport(sourceFile.getAbsolutePath());
+		this.listWriter = listWriter;
 	}
 	
 	public void setDevice(String device) throws ParseException {
@@ -73,7 +84,7 @@ public class Scope {
 		}
 	}
 	
-	public void addLabel(String name, SourcePosition sp) throws ParseException {
+	public int addLabel(String name, SourcePosition sp) throws ParseException {
 		if(null != currentMacroDef) throw new ParseException("TODO Метки не поддерживается в макросе", sp);
 		if(labels.keySet().contains(name)) throw new ParseException("Label already defined:" + name, sp); //TODO
 		if(null != registers.get(name)) throw new ParseException("TODO имя метки совпадает с регистром:" + name, sp);
@@ -81,13 +92,16 @@ public class Scope {
 			throw new ParseException("TODO имя метки совпадает с алиасом регистра:" + name, sp);
 		}
 		if(name.equals("pc") || variables.keySet().contains(name)) throw new ParseException("TODO имя метки совпадает с переменной:" + name, sp);
+		
+		int addr = cSeg.getPC();
 		if(isMacroCall()) {
 			MacroCallSymbol symbol = macroCallSymbols.lastElement();
-			symbol.addLabel(name, sp, cSeg.getPC());
+			symbol.addLabel(name, sp, addr);
 		}
 		else {
-			labels.put(name, cSeg.getPC());
+			labels.put(name, addr);
 		}
+		return addr;
 	}
 	
 	public void setVariable(VariableSymbol variableSymbol, SourcePosition sp) throws ParseException {
@@ -143,7 +157,10 @@ public class Scope {
 		if(regAliases.keySet().contains(alias)) throw new ParseException("TODO алиас уже занят:" + alias, sp);
 		regAliases.put(alias, regId);
 	}
-	
+	public void removeRegAlias(String alias) {
+		regAliases.remove(alias);
+	}
+
 	public void startMacro(MacroDefSymbol macro, SourcePosition sp) throws ParseException {
 		if(null != currentMacroDef || isMacroCall()) throw new ParseException("TODO Вложенные макросы не поддерживаются", sp);
 		currentMacroDef = macro;
@@ -215,4 +232,63 @@ public class Scope {
 	public static int getStrincLevel() {
 		return strictLevel;
 	}
+
+	public void makeMap(File mapFile) throws FileNotFoundException, IOException {
+		try (BufferedWriter bf = new BufferedWriter(new FileWriter(mapFile))) {
+			bf.write("\n# ==== Register aliases ====\n");
+			List<String> list = new ArrayList<>(regAliases.keySet());
+			Collections.sort(list);
+			for(String name : list) {
+				bf.write("R\tR" + regAliases.get(name) + "\t" + name + "\n");
+			}
+			
+			bf.write("\n# ==== Constants ====\n");
+			list = new ArrayList<>(variables.keySet());
+			Collections.sort(list);
+			for(String name : list) {
+				VariableSymbol symbol = variables.get(name);
+				if(symbol.isConstant()) {
+					bf.write("C\t" + symbol.getName() + " = " + symbol.getValue() + "\n");
+				}
+			}
+			
+			bf.write("\n# ==== Variables ====\n");
+			for(String name : list) {
+				VariableSymbol symbol = variables.get(name);
+				if(!symbol.isConstant()) {
+					bf.write("V\t" + symbol.getName() + " = " + symbol.getValue() + "\n");
+				}
+			}
+
+			bf.write("\n# ==== Labels ====\n");
+			list = new ArrayList<>(labels.keySet());
+			Collections.sort(list);
+			for(String name : list) {
+				bf.write("L\t" + name + " = " + labels.get(name) + "\n");
+			}
+		}
+	}
+	
+	public void list(String str) {
+		if(null != listWriter) try {listWriter.write(str + "\n");} catch(Exception e) {}
+	}
+	public void setListEnabled(boolean enabled) {
+		this.listEnabled = enabled;
+	}
+	public boolean isListEnabled() {
+		return null != listWriter && listEnabled;
+	}
+
+	public void setListMacEnabled(boolean enabled) {
+		this.listMacEnabled = enabled;
+	}
+	public boolean isListMacEnabled() {
+		return null != listWriter && listMacEnabled;
+	}
+	
+	// TODO необходимо реализовать проверку перекрытия кода с учетом этого признака
+	public void setOverlapAllowed(boolean allowed) {
+		this.overlapAllowed = allowed;
+	}
+
 }

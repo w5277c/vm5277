@@ -24,6 +24,9 @@ public class IfNode {
 			value = Expression.getLong(Expression.parse(tb, scope, mc), tb.getSP());
 		}
 		scope.getIncludeSymbol().blockStart(0x01!=value);
+		
+		scope.list(".IF " + " # " + (0 != value));
+		
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 }

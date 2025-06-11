@@ -48,6 +48,6 @@ public class IRegExpression extends Expression {
 	
 	@Override
 	public String toString() {
-		return (dec ? "-" : "") + id + (inc ? "+" : "");
+		return (dec ? "-" : "") + "r"+id + (inc ? "+" : "");
 	}
 }

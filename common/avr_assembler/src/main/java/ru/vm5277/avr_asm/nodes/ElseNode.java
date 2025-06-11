@@ -15,6 +15,9 @@ import ru.vm5277.common.messages.MessageContainer;
 public class ElseNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException, CriticalParseException {
 		scope.getIncludeSymbol().blockSkipInvert();
+		
+		scope.list(".ELSE");
+		
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 }

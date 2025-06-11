@@ -13,7 +13,11 @@ import ru.vm5277.common.messages.MessageContainer;
 
 public class DeviceNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
-		scope.setDevice((String)Node.consumeToken(tb, TokenType.ID).getValue());
+		String name = (String)Node.consumeToken(tb, TokenType.ID).getValue();
+		scope.setDevice(name);
+		
+		scope.list(".DEVICE " + name);
+		
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 }

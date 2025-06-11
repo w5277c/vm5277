@@ -7,6 +7,7 @@ package ru.vm5277.avr_asm.nodes;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import javax.xml.bind.DatatypeConverter;
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
@@ -61,6 +62,12 @@ public class DataNode {
 				int wSize = baos.size()/2;
 				scope.getCSeg().getCurrentBlock().write(baos.toByteArray(), wSize);
 				scope.getCSeg().movePC(wSize);
+			
+				if(scope.isListEnabled()) {
+					String text = "";
+					try {text = " #" + new String(baos.toByteArray(), "ASCII").replaceAll("\\r", "\\\\r").replaceAll("\\n", "\\\\n");}catch(Exception e) {}
+					scope.list(".DB 0x" + DatatypeConverter.printHexBinary(baos.toByteArray()) + text);
+				}
 			}
 			Node.consumeToken(tb, TokenType.NEWLINE);
 		}

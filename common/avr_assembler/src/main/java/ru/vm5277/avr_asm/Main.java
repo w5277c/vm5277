@@ -5,7 +5,9 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.avr_asm;
 
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.HashMap;
@@ -50,7 +52,9 @@ public class Main {
 		String mcu = null;
 		Map<String, SourceType> sourcePaths	= new HashMap<>();
 		int stirctLevel = Scope.STRICT_WARNING;
-
+		String mapFileName = null;
+		String listFileName = null;
+		
 		source = args[0x00];
 		for(int i=1; i<args.length; i++) {
 			String arg = args[i++];
@@ -61,6 +65,12 @@ public class Main {
 				else if(arg.equals("-t") || arg.equals("--tabsize")) {
 					tabSize = Integer.parseInt(args[i]);
 				}
+				else if(arg.equals("-m") || arg.equals("--map")) {
+					mapFileName = args[i];
+				}
+				else if(arg.equals("-l") || arg.equals("--list")) {
+					listFileName = args[i];
+				}
 				else if(arg.equals("-s") || arg.equals("--strict")) {
 					String strictStr = args[i];
 					if(strictStr.equalsIgnoreCase("error")) stirctLevel = Scope.STRICT_ERROR;
@@ -69,6 +79,11 @@ public class Main {
 						showInvalidStrictLevel(strictStr);
 						System.exit(0);
 					}
+				}
+				else {
+					System.err.println("[ERROR] TODO invalid parameter:" + arg + "\n");
+					showHelp();
+					System.exit(0);
 				}
 			}
 		}
@@ -80,10 +95,19 @@ public class Main {
 		File sourceFile = new File(source);
 		String baseDir = sourceFile.getParentFile().getAbsolutePath();
 		sourcePaths.put(baseDir, SourceType.BASE);
+		File mapFile = (null == mapFileName ? null : new File(mapFileName));
+		
+		BufferedWriter listWriter = null;
+		if(null != listFileName) {
+			try {listWriter = new BufferedWriter(new FileWriter(listFileName));}
+			catch(Exception e) {
+				e.printStackTrace();
+			}
+		}
 		
 		long timestamp = System.currentTimeMillis();
 		InstrReader instrReader = new InstrReader("./", mc);
-		Scope scope = new Scope(sourceFile, instrReader);
+		Scope scope = new Scope(sourceFile, instrReader, listWriter);
 		Scope.setStrictLevel(stirctLevel);
 		if(null != mcu) scope.setDevice(mcu);
 		
@@ -101,6 +125,9 @@ public class Main {
 		catch(ParseException e) {mc.add(e.getErrorMessage());}
 		catch(CriticalParseException e) {mc.add(e.getErrorMessage()); throw e;}
 
+		if(null != mapFile) try {scope.makeMap(mapFile);} catch(Exception e) {e.printStackTrace();}
+		if(null != listWriter) try {listWriter.close();} catch(Exception e) {e.printStackTrace();}
+		
 		System.out.println(System.currentTimeMillis()-timestamp);
     }
 	
@@ -118,17 +145,20 @@ public class Main {
 		System.out.println("Usage: avrasm" + (isWindows ? ".exe" : "") + " <input.asm> [options]");
 		System.out.println();
 		System.out.println("Options:");
-		System.out.println("  -o, --output <file>\tOutput HEX file (default: <input>.hex)");
-		System.out.println("  -d, --device <mcu>\tTarget MCU (e.g. atmega328p)");
-		System.out.println("  -H, --headers <dir>\tPath to MCU header files");
-		System.out.println("  -I, --include <dir>\tAdditional include path(s)");
-		System.out.println("  -t, --tabsize <num>\tTODO размер табуляции");
+		System.out.println("  -o, --output <file> Output HEX file (default: <input>.hex)");
+		System.out.println("  -d, --device <mcu>  Target MCU (e.g. atmega328p)");
+		System.out.println("  -H, --headers <dir> Path to MCU header files");
+		System.out.println("  -I, --include <dir> Additional include path(s)");
+		System.out.println("  -t, --tabsize <num> TODO размер табуляции");
 		System.out.println("  -s, --strict <error|warning|silent>\tTODO реакция на неоднозначности");
-		System.out.println("                error   - считать ошибкой");
-		System.out.println("                warning - предупреждать (по умолчанию)");
-		System.out.println("                silent  - не сообщать");
-		System.out.println("  -v, --version\t\tDisplay version");
-		System.out.println("  -h, --help\t\tShow this help");
+		System.out.println("                     error   - считать ошибкой");
+		System.out.println("                     warning - предупреждать (по умолчанию)");
+		System.out.println("                     silent  - не сообщать");
+		System.out.println("  -m, --map <file>   TODO имя файла map вывода");
+		System.out.println("  -l, --list <file>  TODO имя файла list вывода");
+		System.out.println();
+		System.out.println("  -v, --version      Display version");
+		System.out.println("  -h, --help         Show this help");
 		System.out.println();
 		System.out.println("Example:");
 		System.out.println("  avrasm main.asm -d atmega328p -o firmware.hex -I ./libs");

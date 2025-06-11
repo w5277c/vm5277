@@ -51,6 +51,11 @@ public class Parser {
 	void parse() throws CriticalParseException {
 		while(!tb.match(TokenType.EOF)) {
 			try {
+				if(tb.match(TokenType.DIRECTIVE) && Keyword.EXIT == ((Keyword)tb.current().getValue())) {
+					scope.list(".EXIT");
+					break;
+				}
+
 				if(scope.isMacroDef()) {
 					if(tb.match(TokenType.DIRECTIVE)) {
 						String kd = ((Keyword)tb.consume().getValue()).getName();
@@ -71,7 +76,9 @@ public class Parser {
 						if(Keyword.IF.getName().equals(kd)) {IfNode.parse(tb, scope, mc); continue;}
 						if(Keyword.ENDIF.getName().equals(kd)) {EndIfNode.parse(tb, scope, mc); continue;}
 						if(Keyword.IFDEF.getName().equals(kd)) {IfDefNode.parse(tb, scope, mc); continue;}
-						if(Keyword.ELSE.getName().equals(kd)) {ElseNode.parse(tb, scope, mc); continue;}						
+						if(Keyword.IFNDEF.getName().equals(kd)) {IfNDefNode.parse(tb, scope, mc); continue;}
+						if(Keyword.ELSE.getName().equals(kd)) {ElseNode.parse(tb, scope, mc); continue;}
+						if(Keyword.ELSEIF.getName().equals(kd) || Keyword.ELIF.getName().equals(kd)) {ElseIfNode.parse(tb, scope, mc); continue;}
 						//TODO остальные директивы с условиями
 					}
 					tb.skipLine(); continue;
@@ -87,17 +94,28 @@ public class Parser {
 							if(Keyword.MACRO.getName().equals(kd)) {MacroNode.parseDef(tb, scope, mc); continue;}
 						}
 						if(Keyword.DEF.getName().equals(kd)) {DefNode.parse(tb, scope, mc); continue;}
+						if(Keyword.UNDEF.getName().equals(kd)) {UndefNode.parse(tb, scope, mc); continue;}
 						if(Keyword.SET.getName().equals(kd))	{SetNode.parse(tb, scope, mc); continue;}
 						if(Keyword.IF.getName().equals(kd)) {IfNode.parse(tb, scope, mc); continue;}
 						if(Keyword.ENDIF.getName().equals(kd)) {EndIfNode.parse(tb, scope, mc); continue;}
 						if(Keyword.IFDEF.getName().equals(kd)) {IfDefNode.parse(tb, scope, mc); continue;}
+						if(Keyword.IFNDEF.getName().equals(kd)) {IfNDefNode.parse(tb, scope, mc); continue;}
 						if(Keyword.ELSE.getName().equals(kd)) {ElseNode.parse(tb, scope, mc); continue;}
+						if(Keyword.ELSEIF.getName().equals(kd) || Keyword.ELIF.getName().equals(kd)) {ElseIfNode.parse(tb, scope, mc); continue;}
 						if(Keyword.MESSAGE.getName().equals(kd)) {MessageNode.parse(tb, scope, mc); continue;}
+						if(Keyword.WARNING.getName().equals(kd)) {WarningNode.parse(tb, scope, mc); continue;}
+						if(Keyword.ERROR.getName().equals(kd)) {ErrorNode.parse(tb, scope, mc); continue;}
 						if(Keyword.DB.getName().equals(kd)) {DataNode.parse(tb, scope, mc, 1); continue;}
 						if(Keyword.DW.getName().equals(kd)) {DataNode.parse(tb, scope, mc, 2); continue;}
 						if(Keyword.DD.getName().equals(kd)) {DataNode.parse(tb, scope, mc, 4); continue;}
 						if(Keyword.DQ.getName().equals(kd)) {DataNode.parse(tb, scope, mc, 8); continue;}
-
+						if(Keyword.LIST.getName().equals(kd)) {scope.setListEnabled(true); continue;}
+						if(Keyword.NOLIST.getName().equals(kd)) {scope.setListEnabled(false); continue;}
+						if(Keyword.OVERLAP.getName().equals(kd)) {scope.setOverlapAllowed(true); continue;}
+						if(Keyword.NOOVERLAP.getName().equals(kd)) {scope.setOverlapAllowed(false); continue;}
+						if(Keyword.LISTMAC.getName().equals(kd)) {scope.setListMacEnabled(true); continue;}
+						if(Keyword.NOLISTMAC.getName().equals(kd)) {scope.setListMacEnabled(false); continue;}
+						
 						mc.add(new ErrorMessage("Unexpected directive: " + kd + (scope.isMacroDef() ? " in macro" : ""), tb.getSP()));
 						tb.skipLine();
 						continue;					

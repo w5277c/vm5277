@@ -14,16 +14,17 @@ import ru.vm5277.common.messages.MessageContainer;
 
 public class DefNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
-		String name = (String)Node.consumeToken(tb, TokenType.ID).getValue();
+		String alias = (String)Node.consumeToken(tb, TokenType.ID).getValue();
 		Node.consumeToken(tb, Operator.ASSIGN);
 		String str = (String)Node.consumeToken(tb, TokenType.ID).getValue();
 		Byte reg = scope.resolveReg(str);
 		if(null != reg) {
-			scope.addRegAlias(name, reg, tb.getSP());
+			scope.addRegAlias(alias, reg, tb.getSP());
 		}
 		else {
 			throw new ParseException("TODO не верно указан регистр:" + str, tb.getSP());
 		}
+		scope.list(".DEF " + alias + " = r" + reg);
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 }

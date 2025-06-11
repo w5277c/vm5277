@@ -22,6 +22,9 @@ public class OrgNode {
 		if(0>wAddr || wAddr>cSeg.getWSize()) throw new ParseException("TODO адрес за пределами flash памяти", sp);
 		
 		scope.getCSeg().setPC(wAddr);
+		
+		scope.list(".ORG " + wAddr);
+		
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 }

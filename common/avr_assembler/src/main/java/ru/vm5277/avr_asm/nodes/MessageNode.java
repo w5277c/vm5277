@@ -17,10 +17,10 @@ public class MessageNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
 		SourcePosition sp = tb.getSP();
 		String text = (String)Node.consumeToken(tb, TokenType.STRING).getValue();
-if(text.equalsIgnoreCase("bp1")) {
-	int t=34343;
-}
 		mc.add(new InfoMessage(text, sp));
+
+		scope.list(".MESSAGE " + text);
+
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 }
