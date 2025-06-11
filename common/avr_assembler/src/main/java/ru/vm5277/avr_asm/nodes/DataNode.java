@@ -5,6 +5,7 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.avr_asm.nodes;
 
+import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
@@ -12,33 +13,59 @@ import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.avr_asm.semantic.LiteralExpression;
 import ru.vm5277.avr_asm.Delimiter;
 import ru.vm5277.avr_asm.TokenType;
+import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.common.messages.WarningMessage;
 
 public class DataNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc, int valueSize) throws ParseException {
-		while(true) {
-			byte[] tmp = null;
-			Expression expr = Expression.parse(tb, scope, mc);
-			if(expr instanceof LiteralExpression && ((LiteralExpression)expr).getValue() instanceof String) {
-				tmp = ((String)((LiteralExpression)expr).getValue()).getBytes(StandardCharsets.US_ASCII);
-			}
-			else {
-				long value = Expression.getLong(expr, tb.getSP());
-				if(value >= (1<<(valueSize*8))) {
-					throw new ParseException("TODO значение больше, чем указанный тип данных:" + value + ", size:" + valueSize, tb.getSP());
+		SourcePosition sp = tb.getSP();
+		
+		try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+		
+			while(true) {
+				byte[] tmp = null;
+				Expression expr = Expression.parse(tb, scope, mc);
+				if(expr instanceof LiteralExpression && ((LiteralExpression)expr).getValue() instanceof String) {
+					tmp = ((String)((LiteralExpression)expr).getValue()).getBytes(StandardCharsets.US_ASCII);
 				}
-				tmp = new byte[valueSize];
-				for(int i=0; i<valueSize; i++) {
-					tmp[i] = (byte)(value & 0xff);
-					value >>>= 8;
+				else {
+					long value = Expression.getLong(expr, tb.getSP());
+					if(value >= (1<<(valueSize*8))) {
+						throw new ParseException("TODO значение больше, чем указанный тип данных:" + value + ", size:" + valueSize, tb.getSP());
+					}
+					tmp = new byte[valueSize];
+					for(int i=0; i<valueSize; i++) {
+						tmp[i] = (byte)(value & 0xff);
+						value >>>= 8;
+					}
 				}
+
+				baos.write(tmp);
+				
+				if(tb.match(TokenType.NEWLINE) || tb.match(TokenType.EOF)) break;
+				Node.consumeToken(tb, Delimiter.COMMA);
 			}
 			
-			scope.getCurrentSegment().getCurrentBlock().write(tmp, tmp.length);			
-			if(tb.match(TokenType.NEWLINE) || tb.match(TokenType.EOF)) break;
-			Node.consumeToken(tb, Delimiter.COMMA);
+			if(0 != baos.size()) {
+				if(0 != (baos.size()&0x01)) {
+					if(Scope.STRICT_ERROR == Scope.getStrincLevel()) {
+						throw new ParseException("TODO размер flash данных не четный", sp);
+					}
+					else if(Scope.STRICT_WARNING == Scope.getStrincLevel()) {
+						mc.add(new WarningMessage("TODO размер flash данных не четный", sp));
+					}
+					baos.write(0x00);
+				}
+				int wSize = baos.size()/2;
+				scope.getCSeg().getCurrentBlock().write(baos.toByteArray(), wSize);
+				scope.getCSeg().movePC(wSize);
+			}
+			Node.consumeToken(tb, TokenType.NEWLINE);
 		}
-		Node.consumeToken(tb, TokenType.NEWLINE);
+		catch(Exception e) {
+			throw new ParseException(e.getMessage(), sp);
+		}
 	}
 }

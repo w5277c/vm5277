@@ -49,7 +49,10 @@ public class MacroNode {
 			for(Token token : macro.getTokens()) {
 				token.getSP().setMacroOffset(macro.getName(), tb.getSP().getLine());
 			}
-			new Parser(macro.getTokens(), scope, mc, sourcePaths);
+			Parser parser = new Parser(macro.getTokens(), scope, mc, sourcePaths);
+			for(MnemNode node : parser.getSecondPassNodes()) {
+				try {node._secondPass();} catch(Exception e) {}
+			}
 		}
 		finally {
 			scope.stopMacroImpl();

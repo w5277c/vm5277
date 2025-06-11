@@ -39,6 +39,10 @@ public class SourcePosition implements Cloneable {
 		return column;
 	}
 
+	public File getSourceFile() {
+		return sourceFile;
+	}
+	
 	@Override
 	public String toString() {
 		if(null == macroName) {

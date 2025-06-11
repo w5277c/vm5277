@@ -31,9 +31,10 @@ public class MnemNode extends Node {
 	private	Expression		expr1;
 	private	Expression		expr2;
 	
-	private	String						mnemonic;
-	private	Map<String, Instruction>	supported	= new HashMap<>();
-	private	int							addr;
+	private final	String						mnemonic;
+	private final	Map<String, Instruction>	supported	= new HashMap<>();
+	private			CodeBlock					block;
+	private			int							addr;
 	
 	public MnemNode(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
 		super(tb, scope, mc);
@@ -51,9 +52,13 @@ public class MnemNode extends Node {
 
 		Instruction instr = (Instruction)supported.values().toArray()[0x00];
 		// выделяем память записывая опкоды(в дальнейшем могут быть изменены)
-		addr = scope.getCSeg().writeOpcode(instr.getOpcode());
+		block = scope.getCSeg().getCurrentBlock();
+		addr = scope.getCSeg().getPC();
+		block.writeOpcode(instr.getOpcode());
+		scope.getCSeg().movePC(1);
 		if(0x02 == instr.getWSize()) {
-			scope.getCSeg().writeOpcode(0x0000);
+			block.writeOpcode(0x0000);
+			scope.getCSeg().movePC(1);
 		}
 
 		if(!tb.match(TokenType.NEWLINE)) {
@@ -75,10 +80,9 @@ public class MnemNode extends Node {
 			mc.add(new ErrorMessage("//TODO ошибка парсинга мнемоники " + mnemonic + ": " + e.getMessage(), sp));
 		}
 	}
-	private boolean _secondPass() throws Exception {
-		scope.getCSeg().setAddr((long)addr);
-
+	public boolean _secondPass() throws Exception {
 		if(!supported.isEmpty()) {
+			block.setOffset(addr);
 			Instruction instr = (Instruction)supported.values().toArray()[0x00];
 			String[] operands = instr.getOperands();
 
@@ -262,7 +266,7 @@ public class MnemNode extends Node {
 
 	private void parse(Instruction instr, Reg reg) throws Exception {
 		if(0x01 != instr.getWSize()) throw new Exception();
-		scope.getCSeg().writeOpcode(instr.getOpcode() | reg.getId()<<4);
+		block.writeOpcode(instr.getOpcode() | reg.getId()<<4);
 	}
 
 	private void parse(Instruction instr, Const k) throws Exception {
@@ -289,27 +293,27 @@ public class MnemNode extends Node {
 		}
 		
 		if(0x02==instr.getWSize()) {
-			((CodeBlock)scope.getCSeg().getCurrentBlock()).writeDoubleOpcode(opcode);
+			block.writeDoubleOpcode(opcode);
 		}
 		else {
-			((CodeBlock)scope.getCSeg().getCurrentBlock()).writeOpcode((int)opcode);
+			block.writeOpcode((int)opcode);
 		}
 	}
 	
 	private void parse(Instruction instr, EReg rd, EReg rr) throws Exception {
 		if(0x01 != instr.getWSize()) throw new Exception();
 		
-		scope.getCSeg().writeOpcode(instr.getOpcode() | rr.getId()>>1 | (rd.getId()>>1)<<4);
+		block.writeOpcode(instr.getOpcode() | rr.getId()>>1 | (rd.getId()>>1)<<4);
 	}
 
 	private void parse(Instruction instr, Reg rd, Reg rr) throws Exception {
 		if(0x01 != instr.getWSize()) throw new Exception();
-		scope.getCSeg().writeOpcode(instr.getOpcode() | rd.getId()<<4 | (rr.getId()&0x0f) | (rr.getId()&0x10<<9));
+		block.writeOpcode(instr.getOpcode() | rd.getId()<<4 | (rr.getId()&0x0f) | (rr.getId()&0x10<<9));
 	}
 	private void parse(Instruction instr, HReg rd, Const k) throws Exception {
 		if(0x01 != instr.getWSize()) throw new Exception();
 		if(8==k.getBits()) {
-			scope.getCSeg().writeOpcode((int)(instr.getOpcode() | (rd.getId()&0x0f)<<4 | k.getValue() & 0x0f | (k.getValue() & 0xf0) << 8));
+			block.writeOpcode((int)(instr.getOpcode() | (rd.getId()&0x0f)<<4 | k.getValue() & 0x0f | (k.getValue() & 0xf0) << 8));
 		}
 		else throw new Exception("");
 	}
@@ -317,16 +321,16 @@ public class MnemNode extends Node {
 		switch (k.getBits()) {
 			case 3:
 				if(0x01 != instr.getWSize()) throw new Exception();
-				scope.getCSeg().writeOpcode((int)(instr.getOpcode() | rd.getId()<<4 | k.getValue()&0x07));
+				block.writeOpcode((int)(instr.getOpcode() | rd.getId()<<4 | k.getValue()&0x07));
 				break;
 			case 6:
 				if(0x01 != instr.getWSize()) throw new Exception();
 				byte id = (byte)((rd.getId()-24)/2);
-				scope.getCSeg().writeOpcode((int)(instr.getOpcode() | id<<4 | k.getValue()&0x0f | (k.getValue()&0x30)<<6));
+				block.writeOpcode((int)(instr.getOpcode() | id<<4 | k.getValue()&0x0f | (k.getValue()&0x30)<<6));
 				break;
 			case 16:
 				long opcode = (((long)instr.getOpcode())<<16) | k.getValue() | (rd.getId() << 20);
-				((CodeBlock)scope.getCSeg().getCurrentBlock()).writeDoubleOpcode(opcode);
+				block.writeDoubleOpcode(opcode);
 				break;
 			default:
 				throw new Exception("");
@@ -337,7 +341,7 @@ public class MnemNode extends Node {
 		switch (k.getBits()) {
 			case 3:
 				if(0x01 != instr.getWSize()) throw new Exception();
-				scope.getCSeg().writeOpcode((int)(instr.getOpcode() | rd.getId()<<3 | k.getValue()&0x07));
+				block.writeOpcode((int)(instr.getOpcode() | rd.getId()<<3 | k.getValue()&0x07));
 				break;
 			default:
 				throw new Exception("");
@@ -348,7 +352,7 @@ public class MnemNode extends Node {
 		if(0x01 != instr.getWSize()) throw new Exception();
 		if(3==k1.getBits() && 7==k2.getBits()) {
 			long opcode = instr.getOpcode() | k1.getValue()&0x07;
-			scope.getCSeg().writeOpcode((int)(opcode | (0<=k2.getValue() ? (k2.getValue()&0x3f)<<3 : 0x0200) | (((k2.getValue()*(-1))-1)&0x3f)<<3));
+			block.writeOpcode((int)(opcode | (0<=k2.getValue() ? (k2.getValue()&0x3f)<<3 : 0x0200) | (((k2.getValue()*(-1))-1)&0x3f)<<3));
 		}
 		else throw new Exception();
 	}
@@ -356,12 +360,12 @@ public class MnemNode extends Node {
 	private void parse(Instruction instr, Const k, Reg rd) throws Exception {
 		if(16==k.getBits()) {
 			long opcode = (((long)instr.getOpcode())<<16) | k.getValue() | (rd.getId() << 20);
-			((CodeBlock)scope.getCSeg().getCurrentBlock()).writeDoubleOpcode(opcode);
+			block.writeDoubleOpcode(opcode);
 		}
 		else throw new Exception();
 	}
 
 	private void parseQ(Instruction instr, Reg rd, Const k) throws Exception {
-		scope.getCSeg().writeOpcode((int)(instr.getOpcode() | rd.getId()<<4 | k.getValue()&0x07 | (k.getValue()&0x18)<<7 | (k.getValue()&0x20)<<8));
+		block.writeOpcode((int)(instr.getOpcode() | rd.getId()<<4 | k.getValue()&0x07 | (k.getValue()&0x18)<<7 | (k.getValue()&0x20)<<8));
 	}
 }

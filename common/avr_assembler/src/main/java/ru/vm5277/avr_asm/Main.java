@@ -49,21 +49,27 @@ public class Main {
 
 		String mcu = null;
 		Map<String, SourceType> sourcePaths	= new HashMap<>();
-		
-		for(int i=0; i<args.length; i++) {
+		int stirctLevel = Scope.STRICT_WARNING;
+
+		source = args[0x00];
+		for(int i=1; i<args.length; i++) {
 			String arg = args[i++];
-			if(args.length > i+1) {
+			if(args.length > i) {
 				if(arg.equals("-I") || arg.equals("--include")) {
 					sourcePaths.put(args[i], SourceType.LIB);
 				}
 				else if(arg.equals("-t") || arg.equals("--tabsize")) {
 					tabSize = Integer.parseInt(args[i]);
 				}
-			}
-			else {
-				source = arg;
-//				System.err.println("[ERROR] Invalid parameter:" + arg);
-//				System.exit(0);
+				else if(arg.equals("-s") || arg.equals("--strict")) {
+					String strictStr = args[i];
+					if(strictStr.equalsIgnoreCase("error")) stirctLevel = Scope.STRICT_ERROR;
+					else if(strictStr.equalsIgnoreCase("ignore")) stirctLevel = Scope.STRICT_IGNORE;
+					else if(!strictStr.equalsIgnoreCase("warning")) {
+						showInvalidStrictLevel(strictStr);
+						System.exit(0);
+					}
+				}
 			}
 		}
  
@@ -75,8 +81,10 @@ public class Main {
 		String baseDir = sourceFile.getParentFile().getAbsolutePath();
 		sourcePaths.put(baseDir, SourceType.BASE);
 		
+		long timestamp = System.currentTimeMillis();
 		InstrReader instrReader = new InstrReader("./", mc);
 		Scope scope = new Scope(sourceFile, instrReader);
+		Scope.setStrictLevel(stirctLevel);
 		if(null != mcu) scope.setDevice(mcu);
 		
 		Lexer lexer = new Lexer(sourceFile, scope, mc);
@@ -85,7 +93,7 @@ public class Main {
 		//}
 		Parser parser = new Parser(lexer.getTokens(), scope, mc, sourcePaths, tabSize);
 		mc.add(new InfoMessage("---Second pass---", null));
-		for(MnemNode mnemNode : scope.getMnemNodes()) {
+		for(MnemNode mnemNode : parser.getSecondPassNodes()) {
 			mnemNode.secondPass();
 		}
 
@@ -93,6 +101,7 @@ public class Main {
 		catch(ParseException e) {mc.add(e.getErrorMessage());}
 		catch(CriticalParseException e) {mc.add(e.getErrorMessage()); throw e;}
 
+		System.out.println(System.currentTimeMillis()-timestamp);
     }
 	
 	private static void showHelp() {
@@ -114,6 +123,10 @@ public class Main {
 		System.out.println("  -H, --headers <dir>\tPath to MCU header files");
 		System.out.println("  -I, --include <dir>\tAdditional include path(s)");
 		System.out.println("  -t, --tabsize <num>\tTODO размер табуляции");
+		System.out.println("  -s, --strict <error|warning|silent>\tTODO реакция на неоднозначности");
+		System.out.println("                error   - считать ошибкой");
+		System.out.println("                warning - предупреждать (по умолчанию)");
+		System.out.println("                silent  - не сообщать");
 		System.out.println("  -v, --version\t\tDisplay version");
 		System.out.println("  -h, --help\t\tShow this help");
 		System.out.println();
@@ -121,6 +134,10 @@ public class Main {
 		System.out.println("  avrasm main.asm -d atmega328p -o firmware.hex -I ./libs");
 	}
 	
+	private static void showInvalidStrictLevel(String invalidParam) {
+		System.err.println("[ERROR] TODO Invalid strict(-s) level:" + invalidParam + ", expected error|warning|ignore");
+	}
+
 	private static void showInvalidDeviceFormat(String invalidParam) {
 		System.err.println("[ERROR] Invalid device format. Expected: <platform>:<mcu>");
 		System.err.println("Examples:");

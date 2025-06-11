@@ -7,13 +7,8 @@ package ru.vm5277.avr_asm.nodes;
 
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
-import ru.vm5277.avr_asm.semantic.Expression;
-import ru.vm5277.avr_asm.semantic.LiteralExpression;
-import ru.vm5277.avr_asm.semantic.IdExpression;
 import ru.vm5277.avr_asm.Delimiter;
 import ru.vm5277.avr_asm.TokenType;
-import ru.vm5277.avr_asm.semantic.BinaryExpression;
-import ru.vm5277.avr_asm.semantic.UnaryExpression;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.exceptions.ParseException;
@@ -21,7 +16,6 @@ import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.avr_asm.tokens.Token;
-import static ru.vm5277.common.Operator.NOT;
 
 public class Node {
 	protected			TokenBuffer				tb;
@@ -87,5 +81,8 @@ public class Node {
 	public Scope getScope() {
 		return scope;
 	}
-	
+
+	public SourcePosition getSP() {
+		return sp;
+	}
 }

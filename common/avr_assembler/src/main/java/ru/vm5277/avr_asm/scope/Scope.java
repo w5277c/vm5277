@@ -6,14 +6,12 @@
 package ru.vm5277.avr_asm.scope;
 
 import java.io.File;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
 import ru.vm5277.avr_asm.InstrReader;
 import static ru.vm5277.avr_asm.Main.tabSize;
-import ru.vm5277.avr_asm.nodes.MnemNode;
 import ru.vm5277.avr_asm.nodes.Node;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.SourcePosition;
@@ -28,23 +26,23 @@ public class Scope {
 			registers.put("r"+i, i);
 		}
 	}
+	public	final	static	int										STRICT_ERROR	= 1;
+	public	final	static	int										STRICT_WARNING	= 2;
+	public	final	static	int										STRICT_IGNORE	= 3;
 	private					String									name;
-	private			static	int										TABSIZE			= 4;
 	private			static	String									mcu				= null;
 	private			static	InstrReader								instrReader;
-	private			static	boolean									isPedantic		= false;
+	private			static	int										strictLevel		= STRICT_WARNING;
 	private	final			Map<String, Byte>						regAliases		= new HashMap<>();	// Алиасы регистров
 	private	final			Map<String, VariableSymbol>				variables		= new HashMap<>();
 	private	final			Map<String, Integer>					labels			= new HashMap<>();
 	private	final			Map<String, MacroDefSymbol>				macros			= new HashMap<>();
-	private					Stack<MacroCallSymbol>					macroCallSymbols= new Stack<>();
+	private final			Stack<MacroCallSymbol>					macroCallSymbols= new Stack<>();
 	private					CodeSegment								cSeg;
 	private					List<Node>								dSeg;
 	private					List<Node>								eSeg;
-	private					Segment									currentSegment;
 	private					MacroDefSymbol							currentMacroDef	= null;
-	private					Stack<IncludeSymbol>					includeSymbols	= new Stack<>();
-	private					List<MnemNode>							mnemNodes		= new ArrayList<>();
+	private final			Stack<IncludeSymbol>					includeSymbols	= new Stack<>();
 
 	public Scope(File sourceFile, InstrReader instrReader) throws ParseException {
 		this.instrReader = instrReader;
@@ -75,15 +73,6 @@ public class Scope {
 		}
 	}
 	
-	public void addSecondPassNode(MnemNode mnemNode) {
-		if(null != mnemNode) {
-			mnemNodes.add(mnemNode);
-		}
-	}
-	public List<MnemNode> getMnemNodes() {
-		return mnemNodes;
-	}
-	
 	public void addLabel(String name, SourcePosition sp) throws ParseException {
 		if(null != currentMacroDef) throw new ParseException("TODO Метки не поддерживается в макросе", sp);
 		if(labels.keySet().contains(name)) throw new ParseException("Label already defined:" + name, sp); //TODO
@@ -94,33 +83,33 @@ public class Scope {
 		if(name.equals("pc") || variables.keySet().contains(name)) throw new ParseException("TODO имя метки совпадает с переменной:" + name, sp);
 		if(isMacroCall()) {
 			MacroCallSymbol symbol = macroCallSymbols.lastElement();
-			symbol.addLabel(name, sp, getCSeg().getCurrentBlock().getPC());
+			symbol.addLabel(name, sp, cSeg.getPC());
 		}
 		else {
-			labels.put(name, getCSeg().getCurrentBlock().getPC());
+			labels.put(name, cSeg.getPC());
 		}
 	}
 	
 	public void setVariable(VariableSymbol variableSymbol, SourcePosition sp) throws ParseException {
 		if(null != currentMacroDef) throw new ParseException("TODO переменные не поддерживаются в макросе", sp);
-		String name = variableSymbol.getName();
-		if(name.equals("pc")) throw new ParseException("TODO нельзя использовать регистр PC в качестве переменной", sp);
-		if(null != registers.get(name)) throw new ParseException("TODO имя переменной совпадает с регистром:" + name, sp);
-		if(regAliases.keySet().contains(name)) throw new ParseException("TODO имя переменной совпадает с алиасом регистра:" + name, sp);
-		VariableSymbol vs = variables.get(name);
-		if(null != vs && vs.isConstant()) throw new ParseException("TODO Нельзя переписать значение константы:" + name, sp);
+		String varName = variableSymbol.getName();
+		if(varName.equals("pc")) throw new ParseException("TODO нельзя использовать регистр PC в качестве переменной", sp);
+		if(null != registers.get(varName)) throw new ParseException("TODO имя переменной совпадает с регистром:" + varName, sp);
+		if(regAliases.keySet().contains(varName)) throw new ParseException("TODO имя переменной совпадает с алиасом регистра:" + varName, sp);
+		VariableSymbol vs = variables.get(varName);
+		if(null != vs && vs.isConstant()) throw new ParseException("TODO Нельзя переписать значение константы:" + varName, sp);
 		if(isMacroCall()) {
 			MacroCallSymbol symbol = macroCallSymbols.lastElement();
-			symbol.addVariable(variableSymbol, sp, getCSeg().getCurrentBlock().getPC());
+			symbol.addVariable(variableSymbol, sp, cSeg.getPC());
 		}
 		else {
-			variables.put(name, variableSymbol);
+			variables.put(varName, variableSymbol);
 		}
 	}
 
 	public VariableSymbol resolveVariable(String name) throws ParseException {
 		if(name.equals("pc")) {
-			return new VariableSymbol(name, getCSeg().getCurrentBlock().getPC(), true);
+			return new VariableSymbol(name, cSeg.getPC(), true);
 		}
 		if(isMacroCall()) {
 			MacroCallSymbol symbol = macroCallSymbols.lastElement();
@@ -213,22 +202,17 @@ public class Scope {
 		if(null == cSeg) {
 			VariableSymbol vs = resolveVariable("flash_size");
 			if(null != vs) {
-				cSeg = new CodeSegment((int)vs.getValue());
-				currentSegment = cSeg;
+				cSeg = new CodeSegment(((int)vs.getValue())/2);
 			}
 			else throw new ParseException("TODO не найдена константа FLASH_SIZE", null);
 		}
 		return cSeg;
 	}
 	
-	public Segment getCurrentSegment() {
-		return currentSegment;
+	public static void setStrictLevel(int _strinctLevel) {
+		strictLevel = _strinctLevel;
 	}
-	
-	public static void setPedantic(boolean _isPedantic) {
-		isPedantic = _isPedantic;
-	}
-	public static boolean isPedantic() {
-		return isPedantic;
+	public static int getStrincLevel() {
+		return strictLevel;
 	}
 }

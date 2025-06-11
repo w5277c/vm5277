@@ -5,6 +5,7 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.avr_asm;
 
+import java.util.ArrayList;
 import ru.vm5277.avr_asm.nodes.DataNode;
 import ru.vm5277.avr_asm.nodes.*;
 import java.util.List;
@@ -23,6 +24,7 @@ public class Parser {
 	private	final	Scope					scope;
 	private	final	MessageContainer		mc;
 	private	final	Map<String, SourceType>	sourcePaths;
+	private	final	List<MnemNode>			secondPassNodes	= new ArrayList<>();
 	
 	public Parser(List<Token> tokens, Scope scope, MessageContainer mc, Map<String, SourceType> sourcePaths, int tabSize) throws CriticalParseException {
 		this.tb = new TokenBuffer(tokens.iterator());
@@ -101,7 +103,7 @@ public class Parser {
 						continue;					
 					}
 					if(tb.match(TokenType.MNEMONIC)) {
-						try {scope.addSecondPassNode(new MnemNode(tb, scope, mc));}
+						try {secondPassNodes.add(new MnemNode(tb, scope, mc));}
 						catch(ParseException e) {
 							mc.add(e.getErrorMessage());
 						}
@@ -131,5 +133,9 @@ public class Parser {
 				tb.skipLine();
 			}
 		}
+	}
+	
+	public List<MnemNode> getSecondPassNodes() {
+		return secondPassNodes;
 	}
 }
