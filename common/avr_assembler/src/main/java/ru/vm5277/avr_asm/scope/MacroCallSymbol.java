@@ -5,18 +5,21 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.avr_asm.scope;
 
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import ru.vm5277.avr_asm.nodes.Node;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.exceptions.ParseException;
 
 public class MacroCallSymbol extends Symbol {
 	private	final	List<Expression>			params;
-	private	final	Map<String, VariableSymbol>	variables	= new HashMap<>();
-	private	final	Map<String, Integer>		labels		= new HashMap<>();
-
+	private	final	Map<String, VariableSymbol>	variables		= new HashMap<>();
+	private	final	Map<String, Integer>		labels			= new HashMap<>();
+	private			List<Node>					secondPassNodes;
+	
 	public MacroCallSymbol(String name, List<Expression> params) {
 		super(name);
 		
@@ -47,5 +50,17 @@ public class MacroCallSymbol extends Symbol {
 
 	public Integer resolveLabel(String name) {
 		return labels.get(name);
+	}
+
+	public void setSecondPartNodes(List<Node> secondPassNodes) {
+		this.secondPassNodes = secondPassNodes;
+	}
+	public List<Node> getSecondPartNodes() {
+		return secondPassNodes;
+	}
+	
+	@Override
+	public String toString() {
+		return name + ":" + params;
 	}
 }

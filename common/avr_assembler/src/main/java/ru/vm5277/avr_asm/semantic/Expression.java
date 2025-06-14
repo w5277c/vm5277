@@ -88,7 +88,7 @@ public class Expression extends Node {
 		Token token = tb.current();
 		
 		if(tb.match(TokenType.MACRO_PARAM)) {
-			if(scope.isMacroCall()) {
+			if(scope.isMacroDeploy()) {
 				tb.consume();
 				Integer index = (Integer)(consumeToken(tb, TokenType.NUMBER)).getValue();
 				MacroCallSymbol marcoCall = scope.getMarcoCall();
@@ -115,7 +115,7 @@ public class Expression extends Node {
 				return expr;
 			}
 			return new BinaryExpression(tb, scope, mc, new IRegExpression(expr.getId(), false, false),
-										expr.isDec() ? Operator.MINUS : Operator.PLUS, parsePrimary(tb, scope, mc));
+										expr.isDec() ? Operator.MINUS : Operator.PLUS, parseBinary(tb, scope, mc, 0));
 		}
 		else if(tb.match(TokenType.ID)) {
 			String name = ((String)tb.consume().getValue()).toLowerCase();

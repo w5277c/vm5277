@@ -7,11 +7,12 @@ package ru.vm5277.avr_asm.tokens;
 
 import ru.vm5277.common.SourceBuffer;
 import ru.vm5277.avr_asm.Keyword;
+import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class TDirective extends Token {
-	public TDirective(SourceBuffer sb, MessageContainer mc) {
-		super(sb);
+	public TDirective(SourceBuffer sb, SourcePosition sp, MessageContainer mc) {
+		super(sb, sp);
 		
 		StringBuilder stringBuilder = new StringBuilder(".");
         while (sb.hasNext() && (Character.isLetterOrDigit(sb.getChar()))) {

@@ -7,24 +7,29 @@ package ru.vm5277.avr_asm.scope;
 
 import java.util.ArrayList;
 import java.util.List;
+import ru.vm5277.avr_asm.nodes.MnemNode;
 import ru.vm5277.avr_asm.tokens.Token;
+import ru.vm5277.common.SourcePosition;
 
 public class MacroDefSymbol extends Symbol {
-	private	int			firstLine;
-	private	List<Token> tokens		= new ArrayList<>();
+	private	SourcePosition	defineSP;
+	private	List<Token>		tokens		= new ArrayList<>();
 	
-	public MacroDefSymbol(String name, int firstLine) {
+	public MacroDefSymbol(String name, SourcePosition sp) {
 		super(name);
 		
-		this.firstLine = firstLine;
+		this.defineSP = sp;
 	}
 	
 	public void addToken(Token token) {
-		token.getSP().updateLine(firstLine);
 		tokens.add(token);
 	}
 	
 	public List<Token> getTokens() {
 		return tokens;
+	}
+	
+	public SourcePosition getDefineSP() {
+		return defineSP;
 	}
 }

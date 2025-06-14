@@ -1,18 +1,12 @@
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------
 Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-31.05.2025	konstantin@5277.ru		Начало
+12.06.2025	konstantin@5277.ru		Взято из проекта javra
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.avr_asm.scope;
+package ru.vm5277.avr_asm.output;
 
-public abstract class Symbol {
-	protected	String	name;
-	
-	public Symbol(String name) {
-		this.name = name;
-	}
-	
-	public String getName() {
-		return name;
-	}
+import java.io.IOException;
+
+public interface Builder {
+	public void push(byte[] data, int address, int length) throws IOException;
 }

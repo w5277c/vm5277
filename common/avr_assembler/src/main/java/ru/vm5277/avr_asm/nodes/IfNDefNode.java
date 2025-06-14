@@ -15,7 +15,7 @@ import ru.vm5277.common.messages.MessageContainer;
 public class IfNDefNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException, CriticalParseException {
 		String id = (String)Node.consumeToken(tb,TokenType.ID).getValue();
-		scope.getIncludeSymbol().blockStart(null != scope.resolveVariable(id));
+		scope.getIncludeSymbol().blockStart(null != scope.resolveVariable(id) || null != scope.resolveLabel(id));
 
 		scope.list(".IFNDEF " + id + " # " + !scope.getIncludeSymbol().isBlockSkip());
 

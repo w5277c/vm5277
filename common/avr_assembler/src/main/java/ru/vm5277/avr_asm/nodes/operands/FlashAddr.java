@@ -10,6 +10,7 @@ import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.common.messages.WarningMessage;
 
 public class FlashAddr extends Const {
 	public FlashAddr(MessageContainer mc, Scope scope, SourcePosition sp, Expression expr, int min, int max, int bits, int addr) throws ParseException {
@@ -17,7 +18,9 @@ public class FlashAddr extends Const {
 		value = Expression.getLong(expr, sp) - addr;
 		
 		if(min>value || max<value) {
-			throw new ParseException("TODO значение вне диапазона " + min + "<=" + value + "<" + max, sp);
+			mc.add(new WarningMessage("значение вне диапазона " + min + "<=" + value + "<" + max, sp));
+			value = 0;
+//throw new ParseException("TODO значение вне диапазона " + min + "<=" + value + "<" + max, sp);
 		}
 	}	
 }

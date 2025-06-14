@@ -69,6 +69,10 @@ public class SourceBuffer extends SourcePosition {
 		return src.charAt(pos+offset);
 	}
 	
+	public int getLineQnt() {
+		return line;
+	}
+	
 	@Override
 	public String toString() {
 		return "[" + line + ":" + column + "]";

@@ -24,7 +24,7 @@ public class Parser {
 	private	final	Scope					scope;
 	private	final	MessageContainer		mc;
 	private	final	Map<String, SourceType>	sourcePaths;
-	private	final	List<MnemNode>			secondPassNodes	= new ArrayList<>();
+	private	final	List<Node>				secondPassNodes	= new ArrayList<>();
 	
 	public Parser(List<Token> tokens, Scope scope, MessageContainer mc, Map<String, SourceType> sourcePaths, int tabSize) throws CriticalParseException {
 		this.tb = new TokenBuffer(tokens.iterator());
@@ -86,8 +86,12 @@ public class Parser {
 				else {
 					if(tb.match(TokenType.DIRECTIVE)) {
 						String kd = ((Keyword)tb.consume().getValue()).getName();
-						if(!scope.isMacroCall()) {
-							if(Keyword.INCLUDE.getName().equals(kd))	{IncludeNode.parse(tb, scope, mc, sourcePaths); continue;}
+						if(!scope.isMacroDeploy()) {
+							if(Keyword.INCLUDE.getName().equals(kd))	{
+								Parser parser = IncludeNode.parse(tb, scope, mc, sourcePaths);
+								if(null != parser) secondPassNodes.addAll(parser.getSecondPassNodes());
+								continue;
+							}
 							if(Keyword.ORG.getName().equals(kd)) {OrgNode.parse(tb, scope, mc); continue;}
 							if(Keyword.DEVICE.getName().equals(kd)) {DeviceNode.parse(tb, scope, mc); continue;}
 							if(Keyword.EQU.getName().equals(kd)) {EquNode.parse(tb, scope, mc); continue;}
@@ -134,7 +138,8 @@ public class Parser {
 						String str = ((String)tb.current().getValue()).toLowerCase();
 						MacroDefSymbol macro = scope.resolveMacro(str);
 						if(null != macro) {
-							MacroNode.parseCall(tb, scope, mc, sourcePaths, macro);
+							MacroNode node = MacroNode.parseCall(tb, scope, mc, sourcePaths, macro);
+							secondPassNodes.add(node);
 							continue;
 						}
 					}
@@ -153,7 +158,7 @@ public class Parser {
 		}
 	}
 	
-	public List<MnemNode> getSecondPassNodes() {
+	public List<Node> getSecondPassNodes() {
 		return secondPassNodes;
 	}
 }

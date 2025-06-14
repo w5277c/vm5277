@@ -14,23 +14,24 @@ public class CodeBlock {
 	private					int					offset		= 0;
 	private					int					length;
 	private					byte[]				data		= new byte[PART_SIZE];
-
+	private					int					overlap		= 0;
+	
 	public CodeBlock(int startWAddress) {
 		this.startWAddress = startWAddress;
 	}
 
 	public void writeOpcode(int opcode) throws ParseException {
 		byte[] bdata = new byte[0x02];
-		bdata[0x00] = (byte)((opcode >> 0x08) & 0xff);
-		bdata[0x01] = (byte)(opcode & 0xff);
+		bdata[0x01] = (byte)((opcode >> 0x08) & 0xff);
+		bdata[0x00] = (byte)(opcode & 0xff);
 		write(bdata, 0x01);
 	}
 	public void writeDoubleOpcode(long opcode) throws ParseException {
 		byte[] bdata = new byte[0x04];
-		bdata[0x00] = (byte)((opcode >> 0x18) & 0xff);
-		bdata[0x01] = (byte)((opcode >> 0x10) & 0xff);
-		bdata[0x02] = (byte)((opcode >> 0x08) & 0xff);
-		bdata[0x03] = (byte)(opcode & 0xff);
+		bdata[0x01] = (byte)((opcode >> 0x18) & 0xff);
+		bdata[0x00] = (byte)((opcode >> 0x10) & 0xff);
+		bdata[0x03] = (byte)((opcode >> 0x08) & 0xff);
+		bdata[0x02] = (byte)(opcode & 0xff);
 		write(bdata, 0x02);
 	}
 	
@@ -67,11 +68,18 @@ public class CodeBlock {
 		offset = (wAddr-startWAddress)*2;	
 	}
 	
-	public int getLength() {
-		return length;
+	public int getWSize() {
+		return length/2;
 	}
 	
 	public byte[] getData() {
 		return data;
+	}
+
+	public void setOverlap(int overtlap) {
+		this.overlap = overtlap;
+	}
+	public int getOverlap() {
+		return overlap;
 	}
 }

@@ -27,12 +27,13 @@ public class SourcePosition implements Cloneable {
 	public int getLine() {
 		return line;
 	}
-	public void setMacroOffset(String macroName, int macroLine) {
+	public void setMacroOffset(SourcePosition callSP, String macroName) {
 		this.macroName = macroName;
-		this.macroLine = macroLine;
-	}
-	public void updateLine(int macroFirstLine) {
-		line -= (macroFirstLine+1);
+		this.macroLine = line;
+
+		this.sourceFile = callSP.getSourceFile();
+		this.line = callSP.getLine();
+		this.column = callSP.getColumn();
 	}
 
 	public int getColumn() {
@@ -45,10 +46,14 @@ public class SourcePosition implements Cloneable {
 	
 	@Override
 	public String toString() {
-		if(null == macroName) {
-			return line + ":" + column + " " + (null == sourceFile ? "" : sourceFile.getAbsolutePath()) + "\t";
+		StringBuilder sb = new StringBuilder(line + ":" + column);
+		if(null != macroName) {
+			sb.append("|").append(macroName.toUpperCase()).append(":").append(macroLine);
 		}
-		return	macroLine + ":" + column + "|MACRO:" + macroName.toUpperCase() + ":" + line + " " +
-				(null == sourceFile ? "" : sourceFile.getAbsolutePath()) + "\t";
+		sb.append(" ");
+		if(null != sourceFile) sb.append(sourceFile.getAbsolutePath());
+		sb.append("\t");
+		return sb.toString();
+		
 	}
 }

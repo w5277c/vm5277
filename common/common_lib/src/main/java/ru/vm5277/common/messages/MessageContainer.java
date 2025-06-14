@@ -5,9 +5,6 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.common.messages;
 
-import ru.vm5277.common.messages.ErrorMessage;
-import ru.vm5277.common.messages.MessageOwner;
-import ru.vm5277.common.messages.Message;
 import ru.vm5277.common.exceptions.MessageContainerIsFullException;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,8 +13,10 @@ import ru.vm5277.common.exceptions.CompilationAbortedException;
 public class MessageContainer {
 	
 	private	final	List<Message>	messages		= new ArrayList<>();
-	private			int				maxErrQnt		= 8;
-	private			int				errCntr			= 0;
+	private			int				maxErrorQnt		= 8;
+	private			int				errorCntr		= 0;
+	private			int				warningCntr		= 0;
+	private			int				lineQnt			= 0;
 	private			boolean			showImmeditly	= false;
 	private			boolean			stopImmeditly	= false;
 	private			MessageOwner	currentOwner	= MessageOwner.OTHER;
@@ -26,11 +25,11 @@ public class MessageContainer {
 	}
 
 	public MessageContainer(int maxErrQnt) {
-		this.maxErrQnt = maxErrQnt;
+		this.maxErrorQnt = maxErrQnt;
 	}
 
-	public MessageContainer(int maxErrQnt, boolean showImmeditly, boolean stopImmeditly) {
-		this.maxErrQnt = maxErrQnt;
+	public MessageContainer(int maxErrorQnt, boolean showImmeditly, boolean stopImmeditly) {
+		this.maxErrorQnt = maxErrorQnt;
 		this.showImmeditly = showImmeditly;
 		this.stopImmeditly = stopImmeditly;
 	}
@@ -45,11 +44,14 @@ public class MessageContainer {
 			System.out.println(message.toStrig());
 		}
 		if(message instanceof ErrorMessage) {
-			errCntr++;
+			errorCntr++;
 			if(stopImmeditly) throw new CompilationAbortedException(message.toStrig());
 		}
+		else if(message instanceof WarningMessage) {
+			warningCntr++;
+		}
 		messages.add(message);
-		if(errCntr == maxErrQnt) {
+		if(errorCntr == maxErrorQnt) {
 			StringBuilder sb = new StringBuilder();
 			if(!showImmeditly) {
 				for(Message m : messages) {
@@ -73,7 +75,19 @@ public class MessageContainer {
 		}
 		return result;
 	}
+	
+	public int getErrorCntr() {
+		return errorCntr;
+	}
+	
+	public int getWarningCntr() {
+		return warningCntr;
+	}
 
+	public int getMaxErrorQnt() {
+		return maxErrorQnt;
+	}
+	
 	public boolean hasErrors() {
 		for(Message message : messages) {
 			if(message instanceof ErrorMessage) {
@@ -81,5 +95,12 @@ public class MessageContainer {
 			}
 		}
 		return false;
+	}
+
+	public void addLineQnt(int lineQnt) {
+		this.lineQnt += lineQnt;
+	}
+	public int getLineQnt() {
+		return lineQnt;
 	}
 }

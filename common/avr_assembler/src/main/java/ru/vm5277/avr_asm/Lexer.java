@@ -44,6 +44,8 @@ public class Lexer {
 		}
 
 		while (sb.hasNext()) {
+			SourcePosition sp = sb.snapSP();
+			
 			// Пропускаем комментарий
 			if(';'==sb.getChar() || '#'==sb.getChar()) {
 				while (sb.hasNext() && '\n'!=sb.getChar()) {
@@ -76,7 +78,7 @@ public class Lexer {
 				}
 				sb.incLine();
 				sb.next();
-				tokens.add(new Token(sb, TokenType.NEWLINE, null));
+				tokens.add(new Token(sb, sp, TokenType.NEWLINE, null));
 				continue;
 			}
 
@@ -88,7 +90,7 @@ public class Lexer {
 			// Макро параметер
 			if ('@'==ch) {
 				sb.next();
-				tokens.add(new Token(sb, TokenType.MACRO_PARAM, null));
+				tokens.add(new Token(sb, sp, TokenType.MACRO_PARAM, null));
 				continue;
 			}
 
@@ -115,7 +117,7 @@ public class Lexer {
 				ch = (char)(sb.getChar(1)|0x20);
 				if ('x'==ch || 'y'==ch || 'z'==ch) {
 					sb.next(2);
-					Token token = new Token(sb, TokenType.INDEX_REG, "-"+ch);
+					Token token = new Token(sb, sp, TokenType.INDEX_REG, "-"+ch);
 					tokens.add(token);
 					continue;
 				}
@@ -130,13 +132,11 @@ public class Lexer {
 
 			if('.'==ch && sb.hasNext()) {
 				sb.next();
-				token = new TDirective(sb, mc);
+				token = new TDirective(sb, sp, mc);
 				tokens.add(token);
 				continue;
 			}
 
-
-			
 			// Идентификаторы и ключевые слова
 			if (Character.isLetter(ch) || '_'==ch) {
 				StringBuilder stringBuilder = new StringBuilder();
@@ -147,24 +147,24 @@ public class Lexer {
 				
 				String str = stringBuilder.toString().toLowerCase();
 				if(null != scope.getInstrReader().getInstrById().get(str) || null != scope.getInstrReader().getInstrByMn().get(str)) {
-					token = new Token(sb, TokenType.MNEMONIC, str.toLowerCase());
+					token = new Token(sb, sp, TokenType.MNEMONIC, str.toLowerCase());
 				}
 				else if (sb.hasNext() && ':'==sb.getChar()) {
-					token = new Token(sb, TokenType.LABEL, str);
+					token = new Token(sb, sp, TokenType.LABEL, str);
 					sb.next();
 				}
 				// Проверка на индексные регистры X+,Y+,Z+
 				else if (str.equals("x") || str.equals("y") || str.equals("z")) {
 					if (sb.hasNext() && '+'==sb.getChar()) {
 						sb.next();
-						token = new Token(sb, TokenType.INDEX_REG, str+"+");
+						token = new Token(sb, sp, TokenType.INDEX_REG, str+"+");
 					}
 					else {
-						token = new Token(sb, TokenType.INDEX_REG, str);
+						token = new Token(sb, sp, TokenType.INDEX_REG, str);
 					}
 				}
 				else {
-					token = new Token(sb, TokenType.ID, str);
+					token = new Token(sb, sp, TokenType.ID, str);
 				}
 				tokens.add(token);
 				continue;
@@ -176,12 +176,13 @@ public class Lexer {
                 tokens.add(token);
                 continue;
             }
-			SourcePosition sp = sb.snapSP();
 			sb.next();
 			mc.add(new ErrorMessage("Unexpected character: '" + ch + "'", sp));
         }
         tokens.add(new Token(sb, TokenType.NEWLINE, null));
 		tokens.add(new Token(sb, TokenType.EOF, null));
+		
+		mc.addLineQnt(sb.getLineQnt());
 	}
 	
 	public List<Token> getTokens() {

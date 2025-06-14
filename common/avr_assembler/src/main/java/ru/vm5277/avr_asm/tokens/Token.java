@@ -24,7 +24,7 @@ public class Token {
 	protected					SourceBuffer	sb;
 	protected					SourcePosition	sp;
 	private						ErrorMessage	error;
-	
+
 	public Token(SourceBuffer sb) {
 		this.sb = sb;
 		this.sp = sb.snapSP();
@@ -37,6 +37,13 @@ public class Token {
 	public Token(SourceBuffer sb, TokenType type, Object value) {
 		this.sb = sb;
 		this.sp = null == sb ? null : sb.snapSP();
+		this.type = type;
+		this.value = value;
+	}
+
+	public Token(SourceBuffer sb, SourcePosition sp, TokenType type, Object value) {
+		this.sb = sb;
+		this.sp = sp;
 		this.type = type;
 		this.value = value;
 	}

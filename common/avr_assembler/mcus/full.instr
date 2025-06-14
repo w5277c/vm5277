@@ -34,7 +34,7 @@ CBR	cbr	znv	1	1	0x7000	Rh,k8	# Clear bits in register (alias for ANDI with ~K)
 INC	inc	znv	1	1	0x9403	R	# Increment (Rd ← Rd + 1), update Z,N,V
 DEC	dec	znv	1	1	0x940a	R	# Decrement (Rd ← Rd - 1), update Z,N,V
 TST	tst	znvs	1	1	0x2000	RR	# Tests if a register is zero or negative Rd ← Rd • Rd, update Z,N,V,S
-CLR	clr	znv	1	1	0x2400	R	# Clear register (Rd ← 0, alias for EOR Rd,Rd)
+CLR	clr	znv	1	1	0x2400	RR	# Clear register (Rd ← 0, alias for EOR Rd,Rd)
 SER	ser	none	1	1	0xef0f	Rh	# Set register (Rd ← 0xFF, alias for LDI Rd, 0xFF)
 MUL	mul	zc	2	1	0x9c00	R,R	# Multiply unsigned (R1:R0 ← Rd × Rr), update Z,C
 MULS	muls	zc	2	1	0x0200	R,R	# Multiply signed (R1:R0 ← Rd × Rr), update Z,C
@@ -84,9 +84,9 @@ BRID	brid	none	1/2	1	0xf407	k7s	# Branch if interrupts disabled (I == 0)
 # ============ BIT AND BIT-TEST INSTRUCTIONS ============
 SBI	sbi	none	2	1	0x9a00	A,k3	# Set bit in I/O register (I/O(b) ← 1)
 CBI	cbi	none	2	1	0x9800	A,k3	# Clear bit in I/O register (I/O(b) ← 0)
-LSL	lsl	zcnv	1	1	0x0c00	R	# Logical shift left (Rd ← Rd << 1), update Z,C,N,V
+LSL	lsl	zcnv	1	1	0x0c00	RR	# Logical shift left (Rd ← Rd << 1), update Z,C,N,V
 LSR	lsr	zcnv	1	1	0x9406	R	# Logical shift right (Rd ← Rd >> 1), update Z,C,N,V
-ROL	rol	zcnv	1	1	0x1c00	R	# Rotate left through carry (Rd ← (Rd << 1) | C), update Z,C,N,V
+ROL	rol	zcnv	1	1	0x1c00	RR	# Rotate left through carry (Rd ← (Rd << 1) | C), update Z,C,N,V
 ROR	ror	zcnv	1	1	0x9407	R	# Rotate right through carry (Rd ← (Rd >> 1) | (C << 7)), update Z,C,N,V
 ASR	asr	zcnv	1	1	0x9405	R	# Arithmetic shift right (Rd ← Rd >> 1, MSB preserved), update Z,C,N,V
 SWAP	swap	none	1	1	0x9402	R	# Swap nibbles (Rd ← (Rd << 4) | (Rd >> 4))

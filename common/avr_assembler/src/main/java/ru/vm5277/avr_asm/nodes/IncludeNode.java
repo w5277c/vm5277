@@ -21,10 +21,10 @@ import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 
 public class IncludeNode {
-	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc, Map<String, SourceType> sourcePaths)
+	public static Parser parse(TokenBuffer tb, Scope scope, MessageContainer mc, Map<String, SourceType> sourcePaths)
 																												throws ParseException, CriticalParseException {
 		String importPath = (String)Node.consumeToken(tb, TokenType.STRING).getValue();
-
+		Parser parser = null;
 
 		File sourceFile = null;
 		for(String path : sourcePaths.keySet()) {
@@ -45,7 +45,8 @@ public class IncludeNode {
 				Lexer lexer = new Lexer(sourceFile, scope, mc);
 				Map<String, SourceType> innerSourcePaths = new HashMap<>(sourcePaths);
 				innerSourcePaths.put(sourceFile.getParent(), SourceType.LIB);
-				new Parser(lexer.getTokens(), scope, mc, innerSourcePaths);
+				parser = new Parser(lexer.getTokens(), scope, mc, innerSourcePaths);
+				
 			}
 			catch(IOException e) {
 				throw new ParseException("TODO " + e.getMessage(), sp);
@@ -55,5 +56,7 @@ public class IncludeNode {
 			catch(CriticalParseException e) {mc.add(e.getErrorMessage()); throw e;}
 		}
 		Node.consumeToken(tb, TokenType.NEWLINE);
+		
+		return parser;
 	}
 }

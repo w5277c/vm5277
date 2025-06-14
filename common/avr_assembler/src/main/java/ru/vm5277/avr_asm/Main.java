@@ -11,17 +11,23 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import ru.vm5277.avr_asm.nodes.MacroNode;
 import ru.vm5277.avr_asm.nodes.MnemNode;
+import ru.vm5277.avr_asm.nodes.Node;
 import ru.vm5277.avr_asm.nodes.SourceType;
+import ru.vm5277.avr_asm.output.IntelHexBuilder;
+import ru.vm5277.avr_asm.scope.MacroCallSymbol;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.messages.InfoMessage;
+import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class Main {
-    public	final	static	String	VERSION		= "0.0.1";
+	public	final	static	String	VERSION		= "0.1.0";
 	public			static	int		tabSize		= 4;
 	public			static	boolean	isWindows;
 	public			static	String	toolkitPath;
@@ -52,8 +58,10 @@ public class Main {
 		String mcu = null;
 		Map<String, SourceType> sourcePaths	= new HashMap<>();
 		int stirctLevel = Scope.STRICT_WARNING;
+		String format = "hex";
 		String mapFileName = null;
 		String listFileName = null;
+		String outputFileName = null;
 		
 		source = args[0x00];
 		for(int i=1; i<args.length; i++) {
@@ -71,12 +79,22 @@ public class Main {
 				else if(arg.equals("-l") || arg.equals("--list")) {
 					listFileName = args[i];
 				}
+				else if(arg.equals("-o") || arg.equals("--output")) {
+					outputFileName = args[i];
+				}
 				else if(arg.equals("-s") || arg.equals("--strict")) {
 					String strictStr = args[i];
 					if(strictStr.equalsIgnoreCase("error")) stirctLevel = Scope.STRICT_ERROR;
 					else if(strictStr.equalsIgnoreCase("ignore")) stirctLevel = Scope.STRICT_IGNORE;
 					else if(!strictStr.equalsIgnoreCase("warning")) {
 						showInvalidStrictLevel(strictStr);
+						System.exit(0);
+					}
+				}
+				else if(arg.equals("-f") || arg.equals("--format")) {
+					format = args[i].toLowerCase();
+					if(!format.equals("hex") && !format.equals("bin")) {
+						showInvalidStrictLevel("-f " + format);
 						System.exit(0);
 					}
 				}
@@ -95,15 +113,23 @@ public class Main {
 		File sourceFile = new File(source);
 		String baseDir = sourceFile.getParentFile().getAbsolutePath();
 		sourcePaths.put(baseDir, SourceType.BASE);
-		File mapFile = (null == mapFileName ? null : new File(mapFileName));
+
+		File mapFile = null;
+		if(null != mapFileName) {
+			mapFile = (1<Paths.get(mapFileName).getNameCount()) ? new File(mapFileName) : new File(baseDir, mapFileName);
+		}
 		
 		BufferedWriter listWriter = null;
 		if(null != listFileName) {
-			try {listWriter = new BufferedWriter(new FileWriter(listFileName));}
+			File listFile = (1<Paths.get(listFileName).getNameCount()) ? new File(listFileName) : new File(baseDir, listFileName);
+			try {listWriter = new BufferedWriter(new FileWriter(listFile));}
 			catch(Exception e) {
 				e.printStackTrace();
 			}
 		}
+
+		if(null == outputFileName) outputFileName = sourceFile.getName();
+		if(1==Paths.get(outputFileName).getNameCount()) outputFileName = baseDir + File.separator + outputFileName;
 		
 		long timestamp = System.currentTimeMillis();
 		InstrReader instrReader = new InstrReader("./", mc);
@@ -115,12 +141,14 @@ public class Main {
 		//for(Token token : lexer.getTokens()) {
 			//System.out.print(token.toString());
 		//}
-		Parser parser = new Parser(lexer.getTokens(), scope, mc, sourcePaths, tabSize);
-		mc.add(new InfoMessage("---Second pass---", null));
-		for(MnemNode mnemNode : parser.getSecondPassNodes()) {
-			mnemNode.secondPass();
+		try {
+			Parser parser = new Parser(lexer.getTokens(), scope, mc, sourcePaths, tabSize);
+			secondPass(scope, mc, parser.getSecondPassNodes());
 		}
-
+		catch(Exception e) {
+			mc.add(new ErrorMessage(e.getMessage(), null));
+		}
+		
 		try {scope.leaveImport();} //TODO не проверяю на MessageContainerIsFullException
 		catch(ParseException e) {mc.add(e.getErrorMessage());}
 		catch(CriticalParseException e) {mc.add(e.getErrorMessage()); throw e;}
@@ -128,8 +156,46 @@ public class Main {
 		if(null != mapFile) try {scope.makeMap(mapFile);} catch(Exception e) {e.printStackTrace();}
 		if(null != listWriter) try {listWriter.close();} catch(Exception e) {e.printStackTrace();}
 		
+		
+		if(0 != mc.getErrorCntr()) {
+			System.out.println("\nBuild FAIL, warnings:" + mc.getWarningCntr() + ", errors:" + mc.getErrorCntr() + "/" + mc.getMaxErrorQnt());
+			System.exit(1);
+		}
+		else {
+			System.out.println();
+			if(!scope.getCSeg().isEmpty()) {
+				IntelHexBuilder hexBuilder = new IntelHexBuilder(new File(outputFileName + "_cseg.hex"));
+				scope.getCSeg().build(hexBuilder);
+				hexBuilder.close();
+				scope.getCSeg().printStat();
+			}
+
+			float time = (System.currentTimeMillis() - timestamp) / 1000f;
+			System.out.println("\nparsed: " + mc.getLineQnt() + " lines, total time: " + String.format(Locale.US, "%.2f", time) + " s");
+			System.out.println("Build SUCCESS, warnings:" + mc.getWarningCntr());
+			System.exit(0);
+		}
+
 		System.out.println(System.currentTimeMillis()-timestamp);
-    }
+	}
+
+
+	private static void secondPass(Scope scope, MessageContainer mc, List<Node> nodes) {
+		for(Node node : nodes) {
+			if(node instanceof MnemNode) {
+				((MnemNode)node).secondPass();
+			}
+			else if(node instanceof MacroNode) {
+				MacroCallSymbol callSymbol = ((MacroNode)node).getCallSymbol();
+				scope.beginMacroSecondPass(callSymbol);
+				secondPass(scope, mc, callSymbol.getSecondPartNodes());
+				scope.endMacroSecondPass();
+			}
+			else {
+				mc.add(new ErrorMessage("TODO ожиаем MnemNode или MacroNode, получен:" + node, null));
+			}
+		}
+	}
 	
 	private static void showHelp() {
 		System.out.println("AVR assembler for vm5277 Embedded Toolkit");
@@ -146,6 +212,9 @@ public class Main {
 		System.out.println();
 		System.out.println("Options:");
 		System.out.println("  -o, --output <file> Output HEX file (default: <input>.hex)");
+		System.out.println("  -f, --format <fmt>  Output format (hex, bin)");
+		System.out.println("                     hex     - Intel HEX (default)");
+		System.out.println("                     bin     - Raw binary");
 		System.out.println("  -d, --device <mcu>  Target MCU (e.g. atmega328p)");
 		System.out.println("  -H, --headers <dir> Path to MCU header files");
 		System.out.println("  -I, --include <dir> Additional include path(s)");

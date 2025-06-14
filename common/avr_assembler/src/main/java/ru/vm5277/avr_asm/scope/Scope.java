@@ -10,9 +10,12 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Deque;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
@@ -47,7 +50,9 @@ public class Scope {
 	private	final			Map<String, VariableSymbol>				variables		= new HashMap<>();
 	private	final			Map<String, Integer>					labels			= new HashMap<>();
 	private	final			Map<String, MacroDefSymbol>				macros			= new HashMap<>();
-	private final			Stack<MacroCallSymbol>					macroCallSymbols= new Stack<>();
+	private final			Deque<MacroCallSymbol>					macroDeploys	= new ArrayDeque<>();
+	private final			Deque<MacroCallSymbol>					macroSecondPass	= new ArrayDeque<>();
+	
 	private					CodeSegment								cSeg;
 	private					List<Node>								dSeg;
 	private					List<Node>								eSeg;
@@ -67,7 +72,7 @@ public class Scope {
 	}
 	
 	public boolean addImport(String fullPath) throws ParseException {
-		if(null != currentMacroDef || isMacroCall()) throw new ParseException("TODO Import не поддерживается в макросе", null);
+		if(null != currentMacroDef || isMacroDeploy()) throw new ParseException("TODO Import не поддерживается в макросе", null);
 		
 		for(IncludeSymbol symbol : includeSymbols) {
 			if(symbol.getName().equals(fullPath)) return false;
@@ -94,8 +99,8 @@ public class Scope {
 		if(name.equals("pc") || variables.keySet().contains(name)) throw new ParseException("TODO имя метки совпадает с переменной:" + name, sp);
 		
 		int addr = cSeg.getPC();
-		if(isMacroCall()) {
-			MacroCallSymbol symbol = macroCallSymbols.lastElement();
+		if(isMacroDeploy()) {
+			MacroCallSymbol symbol = macroDeploys.getLast();
 			symbol.addLabel(name, sp, addr);
 		}
 		else {
@@ -112,8 +117,8 @@ public class Scope {
 		if(regAliases.keySet().contains(varName)) throw new ParseException("TODO имя переменной совпадает с алиасом регистра:" + varName, sp);
 		VariableSymbol vs = variables.get(varName);
 		if(null != vs && vs.isConstant()) throw new ParseException("TODO Нельзя переписать значение константы:" + varName, sp);
-		if(isMacroCall()) {
-			MacroCallSymbol symbol = macroCallSymbols.lastElement();
+		if(isMacroDeploy()) {
+			MacroCallSymbol symbol = macroDeploys.getLast();
 			symbol.addVariable(variableSymbol, sp, cSeg.getPC());
 		}
 		else {
@@ -123,12 +128,19 @@ public class Scope {
 
 	public VariableSymbol resolveVariable(String name) throws ParseException {
 		if(name.equals("pc")) {
-			return new VariableSymbol(name, cSeg.getPC(), true);
+			return new VariableSymbol(name, cSeg.getPC()-1, true); //TODO Костыль?
 		}
-		if(isMacroCall()) {
-			MacroCallSymbol symbol = macroCallSymbols.lastElement();
-			VariableSymbol result = symbol.resolveVariable(name);
-			if(null != result) return result;
+		if(isMacroSecondPass()) {
+			Iterator<MacroCallSymbol> it = macroDeploys.descendingIterator();
+			while (it.hasNext()) {
+				VariableSymbol result = it.next().resolveVariable(name);
+				if(null != result) return result;
+			}
+			it = macroSecondPass.descendingIterator();
+			while (it.hasNext()) {
+				VariableSymbol result = it.next().resolveVariable(name);
+				if(null != result) return result;
+			}
 		}
 		return variables.get(name);
 	}
@@ -144,10 +156,17 @@ public class Scope {
 	}
 	
 	public Integer resolveLabel(String name) {
-		if(isMacroCall()) {
-			MacroCallSymbol symbol = macroCallSymbols.lastElement();
-			Integer result = symbol.resolveLabel(name);
-			if(null != result) return result;
+		if(isMacroSecondPass()) {
+			Iterator<MacroCallSymbol> it = macroDeploys.descendingIterator();
+			while (it.hasNext()) {
+				Integer result = it.next().resolveLabel(name);
+				if(null != result) return result;
+			}
+			it = macroSecondPass.descendingIterator();
+			while (it.hasNext()) {
+				Integer result = it.next().resolveLabel(name);
+				if(null != result) return result;
+			}
 		}
 		return labels.get(name);
 	}
@@ -161,8 +180,8 @@ public class Scope {
 		regAliases.remove(alias);
 	}
 
-	public void startMacro(MacroDefSymbol macro, SourcePosition sp) throws ParseException {
-		if(null != currentMacroDef || isMacroCall()) throw new ParseException("TODO Вложенные макросы не поддерживаются", sp);
+	public void beginMacro(MacroDefSymbol macro, SourcePosition sp) throws ParseException {
+		if(null != currentMacroDef || isMacroDeploy()) throw new ParseException("TODO Вложенные макросы не поддерживаются", sp);
 		currentMacroDef = macro;
 		if(macros.keySet().contains(macro.getName())) {
 			throw new ParseException("TODO максрос с таким именем уже существует:" + macro.getName(), sp);
@@ -190,18 +209,17 @@ public class Scope {
 		return includeSymbols.lastElement();
 	}
 
-	public void startMacroImpl(String name, List<Expression> macroParams) {
-		MacroCallSymbol symbol = new MacroCallSymbol(name, macroParams);
-		macroCallSymbols.add(symbol);
+	public void beginMacroDeploy(MacroCallSymbol symbol) {
+		macroDeploys.add(symbol);
 	}
-	public boolean isMacroCall() {
-		return !macroCallSymbols.isEmpty();
+	public boolean isMacroDeploy() {
+		return !macroDeploys.isEmpty();
 	}
-	public void stopMacroImpl() {
-		macroCallSymbols.pop();
+	public void endMacroDeploy() {
+		macroDeploys.removeLast();
 	}
 	public MacroCallSymbol getMarcoCall() {
-		return macroCallSymbols.lastElement();
+		return macroDeploys.getLast();
 	}
 	
 	public boolean isMacroDef() {
@@ -209,6 +227,16 @@ public class Scope {
 	}
 	public MacroDefSymbol getMacroDef() {
 		return currentMacroDef;
+	}
+
+	public void beginMacroSecondPass(MacroCallSymbol symbol) {
+		macroSecondPass.add(symbol);
+	}
+	public boolean isMacroSecondPass() {
+		return !macroSecondPass.isEmpty();
+	}
+	public void endMacroSecondPass() {
+		macroSecondPass.removeLast();
 	}
 	
 	public InstrReader getInstrReader() {
@@ -290,5 +318,4 @@ public class Scope {
 	public void setOverlapAllowed(boolean allowed) {
 		this.overlapAllowed = allowed;
 	}
-
 }

@@ -5,7 +5,15 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.avr_asm.scope;
 
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedList;
+import java.util.List;
+import ru.vm5277.avr_asm.output.Builder;
+import ru.vm5277.avr_asm.output.IntelHexBuilder;
 import ru.vm5277.common.exceptions.ParseException;
 
 public class CodeSegment {
@@ -38,7 +46,7 @@ public class CodeSegment {
 
 		CodeBlock db = null;
 		for(CodeBlock _db : blocksByStartAddr.values()) {
-			if(_db.getStartWAddress() <= PCReg && (_db.getStartWAddress()+_db.getLength()/2) > PCReg) {
+			if(_db.getStartWAddress() <= PCReg && (_db.getStartWAddress()+_db.getWSize()) > PCReg) {
 				db = _db;
 				break;
 			}
@@ -48,7 +56,7 @@ public class CodeSegment {
 			curBlock = db;
 			curBlock.setOffset(PCReg);
 		}
-		else if((curBlock.getStartWAddress() + curBlock.getLength()/2) == PCReg) {
+		else if((curBlock.getStartWAddress() + curBlock.getWSize()) == PCReg) {
 			// Адрес вне блоков, но находится сразу за этим блоком(расширим блок)
 			curBlock.setOffset(PCReg);
 		}
@@ -64,5 +72,48 @@ public class CodeSegment {
 	
 	public int getWSize() {
 		return wSize;
+	}
+	
+	public boolean isEmpty() {
+		return blocksByStartAddr.isEmpty();
+	}
+
+	public void printStat() {
+		int total = 0;
+		System.out.println("--CODE-----------------------------------");
+		for(Integer startAddr : blocksByStartAddr.keySet()) {
+			CodeBlock block = blocksByStartAddr.get(startAddr);
+			System.out.println( " Start\t= " + String.format("%04X", block.getStartWAddress()) +
+								", End = " + String.format("%04X", block.getStartWAddress() + block.getWSize() - 0x01) +
+								", Length = " + String.format("%04X", block.getWSize()) + 
+								(0x00 == block.getOverlap() ? "" : " [Overlap: " + String.format("%04X", block.getOverlap()) + "]"));
+			total += (block.getWSize() - block.getOverlap());
+		}
+		System.out.println(" -----");
+		System.out.println(" Total\t:  " + total + " words (" + (total*2) + " bytes)");
+	}
+
+	public void build(Builder builder) throws IOException {
+		List<CodeBlock> sorted = new ArrayList<>(blocksByStartAddr.values());
+		Collections.sort(sorted, new Comparator<CodeBlock>() {
+			@Override
+			public int compare(CodeBlock cb1, CodeBlock cb2) {
+				if(cb1.getStartWAddress() == cb2.getStartWAddress()) {
+					return Integer.compare(cb1.getWSize(), cb2.getWSize());
+				}
+				return Integer.compare(cb1.getStartWAddress(), cb2.getStartWAddress());
+			}
+		});
+		for(int index=0; index<(sorted.size()-0x01);index++) {
+			CodeBlock cb1 = sorted.get(index);
+			CodeBlock cb2 = sorted.get(index+0x01);
+			if((cb1.getStartWAddress() + cb1.getWSize()-0x01) >= cb2.getStartWAddress()) {
+				cb1.setOverlap(cb2.getStartWAddress());
+			}
+		}
+
+		for(CodeBlock block : blocksByStartAddr.values()) {
+			builder.push(block.getData(), block.getStartWAddress()*2, block.getWSize()*2 - block.getOverlap()*2);
+		}
 	}
 }

@@ -46,6 +46,17 @@ public class IRegExpression extends Expression {
 		return inc;
 	}
 	
+	public String getMnemPart() {
+		switch(id) {
+			case 26:
+				return (dec ? "m" : "") + "x" + (inc ? "p" : "");
+			case 28:
+				return (dec ? "m" : "") + "y" + (inc ? "p" : "");
+			default:
+				return (dec ? "m" : "") + "z" + (inc ? "p" : "");
+		}
+	}
+	
 	@Override
 	public String toString() {
 		return (dec ? "-" : "") + "r"+id + (inc ? "+" : "");

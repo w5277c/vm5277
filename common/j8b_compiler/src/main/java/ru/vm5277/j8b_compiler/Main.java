@@ -110,7 +110,7 @@ public class Main {
 		new SemanticAnalyzer(runtimeDir, parser.getClazz());
 		new ASTPrinter(parser.getClazz());
 
-		if(!mc.hasErrors()) {
+		if(0 == mc.getErrorCntr()) {
 			clazz.codeGen(cg);
 		}
     }
