@@ -9,6 +9,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
@@ -21,6 +22,7 @@ import ru.vm5277.avr_asm.nodes.SourceType;
 import ru.vm5277.avr_asm.output.IntelHexBuilder;
 import ru.vm5277.avr_asm.scope.MacroCallSymbol;
 import ru.vm5277.avr_asm.scope.Scope;
+import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.ErrorMessage;
@@ -30,18 +32,19 @@ public class Main {
 	public	final	static	String	VERSION		= "0.1.0";
 	public			static	int		tabSize		= 4;
 	public			static	boolean	isWindows;
-	public			static	String	toolkitPath;
+	public			static	Path	VM5277_PATH;
 	
 	public static void main(String[] args) throws IOException, Exception {
 		isWindows = (null != System.getProperty("os.name") && System.getProperty("os.name").toLowerCase().contains("windows"));
 
-		Map<String, String> tmp = System.getenv();
-		toolkitPath = System.getenv("VM5277_HOME");
+		String toolkitPath = System.getenv("VM5277");
 		if(null == toolkitPath || toolkitPath.isEmpty()) {
 			File currentDir = new File("").getAbsoluteFile();
 			File parentDir = currentDir.getParentFile().getParentFile();
 			toolkitPath = parentDir.getAbsolutePath();
 		}
+		VM5277_PATH = Paths.get(toolkitPath).normalize().toAbsolutePath();
+		
 		
 		String source = null;
 		if(0x00 == args.length) {
@@ -56,8 +59,8 @@ public class Main {
 		}
 
 		String mcu = null;
-		Map<String, SourceType> sourcePaths	= new HashMap<>();
-		int stirctLevel = Scope.STRICT_WARNING;
+		Map<Path, SourceType> sourcePaths	= new HashMap<>();
+		int stirctLevel = Scope.STRICT_LIGHT;
 		String format = "hex";
 		String mapFileName = null;
 		String listFileName = null;
@@ -68,7 +71,7 @@ public class Main {
 			String arg = args[i++];
 			if(args.length > i) {
 				if(arg.equals("-I") || arg.equals("--include")) {
-					sourcePaths.put(args[i], SourceType.LIB);
+					sourcePaths.put(FSUtils.resolve(VM5277_PATH, args[i]), SourceType.LIB);
 				}
 				else if(arg.equals("-t") || arg.equals("--tabsize")) {
 					tabSize = Integer.parseInt(args[i]);
@@ -84,9 +87,9 @@ public class Main {
 				}
 				else if(arg.equals("-s") || arg.equals("--strict")) {
 					String strictStr = args[i];
-					if(strictStr.equalsIgnoreCase("error")) stirctLevel = Scope.STRICT_ERROR;
-					else if(strictStr.equalsIgnoreCase("ignore")) stirctLevel = Scope.STRICT_IGNORE;
-					else if(!strictStr.equalsIgnoreCase("warning")) {
+					if(strictStr.equalsIgnoreCase("strong")) stirctLevel = Scope.STRICT_STRONG;
+					else if(strictStr.equalsIgnoreCase("none")) stirctLevel = Scope.STRICT_NONE;
+					else if(!strictStr.equalsIgnoreCase("light")) {
 						showInvalidStrictLevel(strictStr);
 						System.exit(0);
 					}
@@ -99,7 +102,7 @@ public class Main {
 					}
 				}
 				else {
-					System.err.println("[ERROR] TODO invalid parameter:" + arg + "\n");
+					System.err.println("[ERROR] Invalid parameter:" + arg + "\n");
 					showHelp();
 					System.exit(0);
 				}
@@ -108,36 +111,40 @@ public class Main {
  
 		MessageContainer mc = new MessageContainer(16, true, false);
 		
-		String rtosPath = toolkitPath + File.separator + "platform" + File.separator + "avr" + File.separator + "rtos";
+		Path rtosPath = VM5277_PATH.resolve("rtos").resolve("avr");
 		sourcePaths.put(rtosPath, SourceType.RTOS);
-		File sourceFile = new File(source);
-		String baseDir = sourceFile.getParentFile().getAbsolutePath();
+
+		Path sourcePath = FSUtils.resolve(VM5277_PATH, source);
+		Path baseDir = sourcePath.getParent();
 		sourcePaths.put(baseDir, SourceType.BASE);
 
 		File mapFile = null;
 		if(null != mapFileName) {
-			mapFile = (1<Paths.get(mapFileName).getNameCount()) ? new File(mapFileName) : new File(baseDir, mapFileName);
+			Path path = FSUtils.resolve(VM5277_PATH, mapFileName);
+			mapFile = (1<path.getNameCount() ? path.toFile() : baseDir.resolve(path).normalize().toFile());
 		}
 		
 		BufferedWriter listWriter = null;
 		if(null != listFileName) {
-			File listFile = (1<Paths.get(listFileName).getNameCount()) ? new File(listFileName) : new File(baseDir, listFileName);
+			Path path = FSUtils.resolve(VM5277_PATH, listFileName);
+			File listFile = (1<path.getNameCount() ? path.toFile() : baseDir.resolve(path).normalize().toFile());
 			try {listWriter = new BufferedWriter(new FileWriter(listFile));}
 			catch(Exception e) {
 				e.printStackTrace();
 			}
 		}
 
-		if(null == outputFileName) outputFileName = sourceFile.getName();
+		if(null == outputFileName) outputFileName = FSUtils.getBaseName(sourcePath);
 		if(1==Paths.get(outputFileName).getNameCount()) outputFileName = baseDir + File.separator + outputFileName;
 		
 		long timestamp = System.currentTimeMillis();
-		InstrReader instrReader = new InstrReader("./", mc);
-		Scope scope = new Scope(sourceFile, instrReader, listWriter);
+		Path instrPath = VM5277_PATH.resolve("defs").resolve("avr");
+		InstrReader instrReader = new InstrReader(instrPath, mc);
+		Scope scope = new Scope(sourcePath.toFile(), instrReader, listWriter);
 		Scope.setStrictLevel(stirctLevel);
 		if(null != mcu) scope.setDevice(mcu);
 		
-		Lexer lexer = new Lexer(sourceFile, scope, mc);
+		Lexer lexer = new Lexer(sourcePath.toFile(), scope, mc);
 		//for(Token token : lexer.getTokens()) {
 			//System.out.print(token.toString());
 		//}
@@ -149,7 +156,7 @@ public class Main {
 			mc.add(new ErrorMessage(e.getMessage(), null));
 		}
 		
-		try {scope.leaveImport();} //TODO не проверяю на MessageContainerIsFullException
+		try {scope.leaveImport(null);} //TODO не проверяю на MessageContainerIsFullException
 		catch(ParseException e) {mc.add(e.getErrorMessage());}
 		catch(CriticalParseException e) {mc.add(e.getErrorMessage()); throw e;}
 
@@ -219,10 +226,10 @@ public class Main {
 		System.out.println("  -H, --headers <dir> Path to MCU header files");
 		System.out.println("  -I, --include <dir> Additional include path(s)");
 		System.out.println("  -t, --tabsize <num> TODO размер табуляции");
-		System.out.println("  -s, --strict <error|warning|silent>\tTODO реакция на неоднозначности");
-		System.out.println("                     error   - считать ошибкой");
-		System.out.println("                     warning - предупреждать (по умолчанию)");
-		System.out.println("                     silent  - не сообщать");
+		System.out.println("  -s, --strict <strong|light|none>\tTODO реакция на неоднозначности");
+		System.out.println("                     strong  - считать ошибкой");
+		System.out.println("                     light   - предупреждать (по умолчанию)");
+		System.out.println("                     none    - не сообщать");
 		System.out.println("  -m, --map <file>   TODO имя файла map вывода");
 		System.out.println("  -l, --list <file>  TODO имя файла list вывода");
 		System.out.println();

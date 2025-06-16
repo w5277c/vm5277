@@ -22,7 +22,6 @@ import java.util.Stack;
 import ru.vm5277.avr_asm.InstrReader;
 import static ru.vm5277.avr_asm.Main.tabSize;
 import ru.vm5277.avr_asm.nodes.Node;
-import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.ParseException;
@@ -35,9 +34,9 @@ public class Scope {
 			registers.put("r"+i, i);
 		}
 	}
-	public	final	static	int										STRICT_ERROR	= 1;
-	public	final	static	int										STRICT_WARNING	= 2;
-	public	final	static	int										STRICT_IGNORE	= 3;
+	public	final	static	int										STRICT_STRONG	= 1;
+	public	final	static	int										STRICT_LIGHT	= 2;
+	public	final	static	int										STRICT_NONE		= 3;
 	private					String									name;
 	private			static	String									mcu				= null;
 	private			static	InstrReader								instrReader;
@@ -45,7 +44,7 @@ public class Scope {
 	private					boolean									listEnabled		= true;
 	private					boolean									listMacEnabled	= true;
 	private					boolean									overlapAllowed	= true;
-	private			static	int										strictLevel		= STRICT_WARNING;
+	private			static	int										strictLevel		= STRICT_LIGHT;
 	private	final			Map<String, Byte>						regAliases		= new HashMap<>();	// Алиасы регистров
 	private	final			Map<String, VariableSymbol>				variables		= new HashMap<>();
 	private	final			Map<String, Integer>					labels			= new HashMap<>();
@@ -57,7 +56,8 @@ public class Scope {
 	private					List<Node>								dSeg;
 	private					List<Node>								eSeg;
 	private					MacroDefSymbol							currentMacroDef	= null;
-	private final			Stack<IncludeSymbol>					includeSymbols	= new Stack<>();
+	private final			List<IncludeSymbol>						includeSymbols	= new ArrayList<>();
+	private					IncludeSymbol							currentInclude	= null;
 
 	public Scope(File sourceFile, InstrReader instrReader, BufferedWriter listWriter) throws ParseException {
 		this.instrReader = instrReader;
@@ -72,31 +72,31 @@ public class Scope {
 	}
 	
 	public boolean addImport(String fullPath) throws ParseException {
-		if(null != currentMacroDef || isMacroDeploy()) throw new ParseException("TODO Import не поддерживается в макросе", null);
+		if(null != currentMacroDef || isMacroDeploy()) throw new ParseException("Imports not allowed inside macro definitions", null);
 		
 		for(IncludeSymbol symbol : includeSymbols) {
 			if(symbol.getName().equals(fullPath)) return false;
 		}
-		IncludeSymbol includeSymbol = new IncludeSymbol(fullPath);
-		includeSymbols.add(includeSymbol);
+		currentInclude = new IncludeSymbol(fullPath);
+		includeSymbols.add(currentInclude);
 		return true;
 	}
-	public void leaveImport() throws CriticalParseException, ParseException {
-		if(0 >= includeSymbols.size()) throw new CriticalParseException("TODO список import файлов пуст", null);
-		IncludeSymbol includeSymbol = includeSymbols.pop();
-		if(0 != includeSymbol.getBlockCntr()) {
-			throw new ParseException("TODO нарушена стрктура условных блоков, не закрытых блоков:" + includeSymbol.getBlockCntr(), null);
+	public void leaveImport(SourcePosition sp) throws CriticalParseException, ParseException {
+		if(0 >= includeSymbols.size()) throw new CriticalParseException("TODO список import файлов пуст", sp);
+		IncludeSymbol cur = currentInclude;
+		currentInclude = includeSymbols.get(includeSymbols.indexOf(currentInclude)-1);
+		if(0 != cur.getBlockCntr()) {
+			throw new ParseException("Unbalanced conditional blocks (expected" + cur.getBlockCntr() + "more END directives)", sp);
 		}
 	}
 	
 	public int addLabel(String name, SourcePosition sp) throws ParseException {
-		if(null != currentMacroDef) throw new ParseException("TODO Метки не поддерживается в макросе", sp);
-		if(labels.keySet().contains(name)) throw new ParseException("Label already defined:" + name, sp); //TODO
+		if(labels.keySet().contains(name)) throw new ParseException("Label '" + name + "' already defined", sp); //TODO
 		if(null != registers.get(name)) throw new ParseException("TODO имя метки совпадает с регистром:" + name, sp);
 		if(regAliases.keySet().contains(name)) {
 			throw new ParseException("TODO имя метки совпадает с алиасом регистра:" + name, sp);
 		}
-		if(name.equals("pc") || variables.keySet().contains(name)) throw new ParseException("TODO имя метки совпадает с переменной:" + name, sp);
+		if(name.equals("pc") || variables.keySet().contains(name)) throw new ParseException("Symbol '" + name + "' already defined as variable", sp);
 		
 		int addr = cSeg.getPC();
 		if(isMacroDeploy()) {
@@ -110,7 +110,6 @@ public class Scope {
 	}
 	
 	public void setVariable(VariableSymbol variableSymbol, SourcePosition sp) throws ParseException {
-		if(null != currentMacroDef) throw new ParseException("TODO переменные не поддерживаются в макросе", sp);
 		String varName = variableSymbol.getName();
 		if(varName.equals("pc")) throw new ParseException("TODO нельзя использовать регистр PC в качестве переменной", sp);
 		if(null != registers.get(varName)) throw new ParseException("TODO имя переменной совпадает с регистром:" + varName, sp);
@@ -172,7 +171,7 @@ public class Scope {
 	}
 	
 	public void addRegAlias(String alias, byte regId, SourcePosition sp) throws ParseException {
-		if(null != currentMacroDef) throw new ParseException("TODO Алиасы не поддерживаются в макросе", sp);
+		if(null != currentMacroDef) throw new ParseException("Regster aliases not allowed inside macro definitions", sp);
 		if(regAliases.keySet().contains(alias)) throw new ParseException("TODO алиас уже занят:" + alias, sp);
 		regAliases.put(alias, regId);
 	}
@@ -206,7 +205,7 @@ public class Scope {
 	
 	public IncludeSymbol getIncludeSymbol() throws CriticalParseException {
 		if(0 >= includeSymbols.size()) throw new CriticalParseException("TODO список import файлов пуст", null);
-		return includeSymbols.lastElement();
+		return currentInclude;
 	}
 
 	public void beginMacroDeploy(MacroCallSymbol symbol) {

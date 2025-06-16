@@ -5,6 +5,7 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.avr_asm;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import ru.vm5277.avr_asm.nodes.DataNode;
 import ru.vm5277.avr_asm.nodes.*;
@@ -18,15 +19,16 @@ import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.MessageOwner;
 import ru.vm5277.avr_asm.tokens.Token;
+import ru.vm5277.common.SourcePosition;
 
 public class Parser {
 	private	final	TokenBuffer				tb;
 	private	final	Scope					scope;
 	private	final	MessageContainer		mc;
-	private	final	Map<String, SourceType>	sourcePaths;
+	private	final	Map<Path, SourceType>	sourcePaths;
 	private	final	List<Node>				secondPassNodes	= new ArrayList<>();
 	
-	public Parser(List<Token> tokens, Scope scope, MessageContainer mc, Map<String, SourceType> sourcePaths, int tabSize) throws CriticalParseException {
+	public Parser(List<Token> tokens, Scope scope, MessageContainer mc, Map<Path, SourceType> sourcePaths, int tabSize) throws CriticalParseException {
 		this.tb = new TokenBuffer(tokens.iterator());
 		this.scope = scope;
 		this.mc = mc;
@@ -38,7 +40,7 @@ public class Parser {
 		parse();
 	}
 	
-	public Parser(List<Token> tokens, Scope scope, MessageContainer mc, Map<String, SourceType> sourcePaths) throws CriticalParseException {
+	public Parser(List<Token> tokens, Scope scope, MessageContainer mc, Map<Path, SourceType> sourcePaths) throws CriticalParseException {
 		this.tb = new TokenBuffer(tokens.iterator());
 		this.scope = scope;
 		this.mc = mc;
@@ -135,11 +137,17 @@ public class Parser {
 						LabelNode.parse(tb, scope, mc); continue;
 					}
 					if(tb.match(TokenType.ID)) {
+						SourcePosition sp = tb.getSP();
 						String str = ((String)tb.current().getValue()).toLowerCase();
 						MacroDefSymbol macro = scope.resolveMacro(str);
 						if(null != macro) {
 							MacroNode node = MacroNode.parseCall(tb, scope, mc, sourcePaths, macro);
 							secondPassNodes.add(node);
+							continue;
+						}
+						else {
+							mc.add(new ErrorMessage("Unable to resolve macro: '" + str + "'", sp));
+							tb.skipLine();
 							continue;
 						}
 					}

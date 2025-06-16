@@ -24,17 +24,23 @@ public class DataNode {
 		SourcePosition sp = tb.getSP();
 		
 		try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-		
+
 			while(true) {
+				SourcePosition _sp = tb.getSP();
 				byte[] tmp = null;
 				Expression expr = Expression.parse(tb, scope, mc);
 				if(expr instanceof LiteralExpression && ((LiteralExpression)expr).getValue() instanceof String) {
 					tmp = ((String)((LiteralExpression)expr).getValue()).getBytes(StandardCharsets.US_ASCII);
 				}
 				else {
-					long value = Expression.getLong(expr, tb.getSP());
+					Long value = Expression.getLong(expr, tb.getSP());
+					if(null == value) {
+						tb.skipLine();
+						throw new ParseException("TODO не могу разрезолвить '" + expr + "'", _sp);
+					}
 					if(value >= (1<<(valueSize*8))) {
-						throw new ParseException("TODO значение больше, чем указанный тип данных:" + value + ", size:" + valueSize, tb.getSP());
+						tb.skipLine();
+						throw new ParseException("TODO значение больше, чем указанный тип данных:" + value + ", size:" + valueSize, _sp);
 					}
 					tmp = new byte[valueSize];
 					for(int i=0; i<valueSize; i++) {
@@ -51,10 +57,10 @@ public class DataNode {
 			
 			if(0 != baos.size()) {
 				if(0 != (baos.size()&0x01)) {
-					if(Scope.STRICT_ERROR == Scope.getStrincLevel()) {
+					if(Scope.STRICT_STRONG == Scope.getStrincLevel()) {
 						throw new ParseException("TODO размер flash данных не четный", sp);
 					}
-					else if(Scope.STRICT_WARNING == Scope.getStrincLevel()) {
+					else if(Scope.STRICT_LIGHT == Scope.getStrincLevel()) {
 						mc.add(new WarningMessage("TODO размер flash данных не четный", sp));
 					}
 					baos.write(0x00);

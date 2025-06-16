@@ -46,7 +46,7 @@ public class Instruction {
 	public Instruction(String line) throws ParseException {
 		String parts[] = line.trim().toLowerCase().split("\\s+");
 		if(0x07!=parts.length) {
-			throw new ParseException("TODO Incorrect params quantity in instructions row:" + line, 0);
+			throw new ParseException("Expected 7 parameters for instruction, got [" + parts.length + "] in: " + line, 0);
 		}
 		
 		id = parts[0x00];
@@ -55,7 +55,7 @@ public class Instruction {
 		
 		flags = parts[0x02];
 		if(!flags.equals(FLAGS_NONE) && !flags.equals(FLAGS_SREGS) && !flags.replaceAll("[zcnvtish]", "").isEmpty()) {
-			throw new ParseException("TODO Unknown flag[s] in instructions row:" + line, 0);
+			throw new ParseException("Unknown flag[s] in:" + line, 0);
 		}
 		
 		if(!parts[0x03].equals("-")) {

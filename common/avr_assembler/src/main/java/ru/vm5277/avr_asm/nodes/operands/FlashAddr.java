@@ -15,12 +15,17 @@ import ru.vm5277.common.messages.WarningMessage;
 public class FlashAddr extends Const {
 	public FlashAddr(MessageContainer mc, Scope scope, SourcePosition sp, Expression expr, int min, int max, int bits, int addr) throws ParseException {
 		this.bits = bits;
-		value = Expression.getLong(expr, sp) - addr;
+		
+		Long _value = Expression.getLong(expr, sp);
+		if(null == _value) {
+			throw new ParseException("Unable to resolve address: " + expr, sp);
+		}
+		value = _value - addr;
 		
 		if(min>value || max<value) {
-			mc.add(new WarningMessage("значение вне диапазона " + min + "<=" + value + "<" + max, sp));
+			mc.add(new WarningMessage("Value " + value + " out of valid range [" + min + ".." + max + "]", sp));
 			value = 0;
-//throw new ParseException("TODO значение вне диапазона " + min + "<=" + value + "<" + max, sp);
+//throw new ParseException("Value " + value + " out of valid range [" + min + ".." + max + "]", sp);
 		}
 	}	
 }

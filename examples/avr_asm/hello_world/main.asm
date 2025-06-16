@@ -1,12 +1,12 @@
 
 	.SET	CORE_FREQ = 8
 
-	.include "../devices/atmega328.asm"
-	.include "./core/core.asm"
-	.include "./io/port_mode_out.asm"
-	.include "./io/port_set_hi.asm"
-	.include "./io/port_set_lo.asm"
-	.include "./core/wait_ms.asm"
+	.include "devices/atmega328.def"
+	.include "core/core.asm"
+	.include "io/port_mode_out.asm"
+	.include "io/port_set_hi.asm"
+	.include "io/port_set_lo.asm"
+	.include "core/wait_ms.asm"
 
 	.EQU LED_PORT = PB0
 

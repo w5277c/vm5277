@@ -18,12 +18,17 @@ public class OrgNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
 		SourcePosition sp = tb.getSP();
 		CodeSegment cSeg = scope.getCSeg();
-		int wAddr = Expression.getLong(Expression.parse(tb, scope, mc), tb.getSP()).intValue();
-		if(0>wAddr || wAddr>cSeg.getWSize()) throw new ParseException("TODO адрес за пределами flash памяти", sp);
+		Expression expr = Expression.parse(tb, scope, mc);
+		Long value = Expression.getLong(expr, sp);
+		if(null == value) {
+			tb.skipLine();
+			throw new ParseException("Cannot resolve constant '" + expr + "'", sp);
+		}
+		if(0>value || value>cSeg.getWSize()) throw new ParseException("Address 0x" + Long.toHexString(value) + " exceeds flash memory size", sp);
 		
-		scope.getCSeg().setPC(wAddr);
+		scope.getCSeg().setPC(value.intValue());
 		
-		scope.list(".ORG " + wAddr);
+		scope.list(".ORG " + value.intValue());
 		
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}

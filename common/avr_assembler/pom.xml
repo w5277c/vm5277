@@ -24,7 +24,7 @@
 				            <goal>copy-resources</goal>
 					    </goals>
 						<configuration>
-	                        <outputDirectory>${project.basedir}/../../bin/libs</outputDirectory>
+							<outputDirectory>${project.basedir}/../../bin/libs</outputDirectory>
 		                    <resources>
 			                    <resource>
 				                    <directory>${project.build.directory}</directory>

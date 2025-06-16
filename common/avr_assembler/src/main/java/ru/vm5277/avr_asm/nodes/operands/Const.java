@@ -22,22 +22,27 @@ public class Const {
 	
 	public Const(MessageContainer mc, Scope scope, SourcePosition sp, Expression expr, int min, int max, int bits) throws ParseException {
 		this.bits = bits;
-		value = Expression.getLong(expr, sp);
+		Long _value = Expression.getLong(expr, sp);
+		if(null == _value) {
+			throw new ParseException("Cannot resolve constant '" + expr + "'", sp);
+		}
+
 		long mask = (1<<bits)-1;
-		if(Scope.STRICT_ERROR != Scope.getStrincLevel() && 0==min && value>max) {
-			long new_value = value & mask;
+		if(Scope.STRICT_STRONG != Scope.getStrincLevel() && 0==min && _value>max) {
+			long new_value = _value & mask;
 			if(new_value<=max) {
-				if(Scope.STRICT_IGNORE != Scope.getStrincLevel()) {
-					mc.add(new WarningMessage("TODO константа " + value + " превышает размер, обрезано до " + bits + " бит:" + new_value, sp));
+				if(Scope.STRICT_NONE != Scope.getStrincLevel()) {
+					mc.add(new WarningMessage("Constant value " + _value + " exceeds " + bits + "-bit range. Truncated to: " + new_value, sp));
 				}
-				value = new_value;
+				_value = new_value;
 			}
 		}
 		
-		if(min>value || max<value) {
-			mc.add(new ErrorMessage("TODO значение вне диапазона " + min + "<=" + value + "<" + max, sp));
-			value &= mask;
+		if(min>_value || max<_value) {
+			mc.add(new ErrorMessage("Constant value out of range (" + _value + "), expected " + min + "≤ value <" + max, sp));
+			_value &= mask;
 		}
+		value = _value;
 	}	
 
 	public int getBits() {

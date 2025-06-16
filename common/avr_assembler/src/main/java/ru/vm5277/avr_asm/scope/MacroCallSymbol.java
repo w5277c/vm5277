@@ -31,8 +31,8 @@ public class MacroCallSymbol extends Symbol {
 	}
 
 	public void addLabel(String name, SourcePosition sp, int address) throws ParseException {
-		if(labels.keySet().contains(name)) throw new ParseException("Label already defined:" + name, sp); //TODO
-		if(variables.keySet().contains(name)) throw new ParseException("TODO имя метки совпадает с переменной:" + name, sp);
+		if(labels.keySet().contains(name)) throw new ParseException("Label '" + name + "' already defined", sp);
+		if(variables.keySet().contains(name)) throw new ParseException("Symbol '" + name + "' already defined as variable", sp);
 		labels.put(name, address);
 	}
 

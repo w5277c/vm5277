@@ -5,10 +5,12 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.avr_asm.nodes;
 
+import ru.vm5277.avr_asm.Delimiter;
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.avr_asm.TokenType;
+import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.InfoMessage;
 import ru.vm5277.common.messages.MessageContainer;
@@ -16,10 +18,18 @@ import ru.vm5277.common.messages.MessageContainer;
 public class MessageNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
 		SourcePosition sp = tb.getSP();
-		String text = (String)Node.consumeToken(tb, TokenType.STRING).getValue();
-		mc.add(new InfoMessage(text, sp));
+		
+		Expression expr = Expression.parse(tb, scope, mc);
+		StringBuilder sb = new StringBuilder(expr.toString());
+		while(tb.match(Delimiter.COMMA)) {
+			tb.consume();
+			expr = Expression.parse(tb, scope, mc);
+			sb.append(expr.toString());
+			if(tb.match(TokenType.EOF) || tb.match(TokenType.NEWLINE)) break;
+		}
+		mc.add(new InfoMessage(sb.toString(), sp));
 
-		scope.list(".MESSAGE " + text);
+		scope.list(".MESSAGE " + sb.toString());
 
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}

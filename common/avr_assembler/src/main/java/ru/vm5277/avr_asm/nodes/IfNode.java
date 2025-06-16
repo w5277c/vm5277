@@ -9,19 +9,29 @@ import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.avr_asm.TokenType;
+import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class IfNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException, CriticalParseException {
 		Long value = 0x00l;
+		SourcePosition sp = tb.getSP();
 		if(scope.getIncludeSymbol().isBlockSkip()) {
 			try{Expression.parse(tb, scope, mc);} catch(ParseException e) {};
 			//TODO должно быть везде, где вычисляются выражения. Так как переменные и метки могут отсутствовать
 		}
 		else {
-			value = Expression.getLong(Expression.parse(tb, scope, mc), tb.getSP());
+			Expression expr = Expression.parse(tb, scope, mc);
+			Long _value = Expression.getLong(expr, sp);
+			if(null == _value) {
+				mc.add(new ErrorMessage("TODO не могу разрезолвить условие '" + expr + "'", sp));
+			}
+			else {
+				value = _value;
+			}
 		}
 		scope.getIncludeSymbol().blockStart(0x01!=value);
 		

@@ -1,0 +1,200 @@
+;-----------------------------------------------------------------------------------------------------------------------
+;Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
+;-----------------------------------------------------------------------------------------------------------------------
+;16.06.2025	konstantin@5277.ru		Взят с проекта core5277
+;-----------------------------------------------------------------------------------------------------------------------
+	.EQU	_OS_TIMER_FREQ							= (3125*CORE_FREQ*2)/1000
+
+	.EQU	PINx									= 0x00
+	.EQU	DDRx									= 0x01
+	.EQU	PORTx									= 0x02
+
+	.SET	JMP_SUPPORT								= 0x00	; Поддержка инструкций JMP и CALL(0 - не поддерживает)
+
+	.EQU	PA0										= (0x00<<4)|0x00
+	.EQU	PA1										= (0x00<<4)|0x01
+	.EQU	PA2										= (0x00<<4)|0x02
+	.EQU	PA3										= (0x00<<4)|0x03
+	.EQU	PA4										= (0x00<<4)|0x04
+	.EQU	PA5										= (0x00<<4)|0x05
+	.EQU	PA6										= (0x00<<4)|0x06
+	.EQU	PA7										= (0x00<<4)|0x07
+	.EQU	PB0										= (0x01<<4)|0x00
+	.EQU	PB1										= (0x01<<4)|0x01
+	.EQU	PB2										= (0x01<<4)|0x02
+	.EQU	PB3										= (0x01<<4)|0x03
+	.EQU	PB4										= (0x01<<4)|0x04
+	.EQU	PB5										= (0x01<<4)|0x05
+	.EQU	PB6										= (0x01<<4)|0x06
+	.EQU	PB7										= (0x01<<4)|0x07
+	.EQU	PC0										= (0x02<<4)|0x00
+	.EQU	PC1										= (0x02<<4)|0x01
+	.EQU	PC2										= (0x02<<4)|0x02
+	.EQU	PC3										= (0x02<<4)|0x03
+	.EQU	PC4										= (0x02<<4)|0x04
+	.EQU	PC5										= (0x02<<4)|0x05
+	.EQU	PC6										= (0x02<<4)|0x06
+	.EQU	PC7										= (0x02<<4)|0x07
+	.EQU	PD0										= (0x03<<4)|0x00
+	.EQU	PD1										= (0x03<<4)|0x01
+	.EQU	PD2										= (0x03<<4)|0x02
+	.EQU	PD3										= (0x03<<4)|0x03
+	.EQU	PD4										= (0x03<<4)|0x04
+	.EQU	PD5										= (0x03<<4)|0x05
+	.EQU	PD6										= (0x03<<4)|0x06
+	.EQU	PD7										= (0x03<<4)|0x07
+	.EQU	PE0										= (0x04<<4)|0x00
+	.EQU	PE1										= (0x04<<4)|0x01
+	.EQU	PE2										= (0x04<<4)|0x02
+	.EQU	PE3										= (0x04<<4)|0x03
+	.EQU	PE4										= (0x04<<4)|0x04
+	.EQU	PE5										= (0x04<<4)|0x05
+	.EQU	PE6										= (0x04<<4)|0x06
+	.EQU	PE7										= (0x04<<4)|0x07
+	.EQU	PF0										= (0x05<<4)|0x00
+	.EQU	PF1										= (0x05<<4)|0x01
+	.EQU	PF2										= (0x05<<4)|0x02
+	.EQU	PF3										= (0x05<<4)|0x03
+	.EQU	PF4										= (0x05<<4)|0x04
+	.EQU	PF5										= (0x05<<4)|0x05
+	.EQU	PF6										= (0x05<<4)|0x06
+	.EQU	PF7										= (0x05<<4)|0x07
+	.EQU	PG0										= (0x06<<4)|0x00
+	.EQU	PG1										= (0x06<<4)|0x01
+	.EQU	PG2										= (0x06<<4)|0x02
+	.EQU	PG3										= (0x06<<4)|0x03
+	.EQU	PG4										= (0x06<<4)|0x04
+	.EQU	PG5										= (0x06<<4)|0x05
+	.EQU	PG6										= (0x06<<4)|0x06
+	.EQU	PG7										= (0x06<<4)|0x07
+
+	.EQU	ISC_LOW_LEVEL							= 0x00
+	.EQU	ISC_ANY_CHANGE							= 0x01
+	.EQU	ISC_FALLING_EDGE						= 0x02
+	.EQU	ISC_RISING_EDGE							= 0x03
+
+	.SET	INT0_PORT								= 0xff
+	.SET	INT1_PORT								= 0xff
+	.SET	INT2_PORT								= 0xff
+	.SET	INT3_PORT								= 0xff
+	.SET	INT4_PORT								= 0xff
+	.SET	INT5_PORT								= 0xff
+	.SET	INT6_PORT								= 0xff
+	.SET	INT7_PORT								= 0xff
+
+	.DEF	_CORE_REG_L								= r9
+	.DEF	_CORE_REG_H								= r10
+	.DEF	C0x00									= r11	;Константа 0x00
+	.DEF	C0x01									= r12	;Константа 0x01
+	.DEF	C0xff									= r13	;Константа 0xff
+	.DEF	ID_L									= r14
+	.DEF	ID_H									= r15
+	.DEF	ACCUM_L									= r16
+	.DEF	ACCUM_H									= r17
+	.DEF	ACCUM_EL								= r18
+	.DEF	ACCUM_EH								= r19
+	.DEF	FLAGS									= r20	;Регистр флагов
+	.DEF	LOOP_CNTR								= r21	;Регистр цикла
+	.DEF	TEMP_L									= r22
+	.DEF	TEMP_H									= r23
+	.DEF	TEMP_EL									= r24
+	.DEF	TEMP_EH									= r25
+
+
+.MACRO PUSH_X
+	PUSH XL
+	PUSH XH
+.ENDMACRO
+.MACRO POP_X
+	POP XH
+	POP XL
+.ENDMACRO
+.MACRO PUSH_Y
+	PUSH YL
+	PUSH YH
+.ENDMACRO
+.MACRO POP_Y
+	POP YH
+	POP YL
+.ENDMACRO
+.MACRO PUSH_Z
+	PUSH ZL
+	PUSH ZH
+.ENDMACRO
+.MACRO POP_Z
+	POP ZH
+	POP ZL
+.ENDMACRO
+
+.MACRO LDI_X
+	LDI XL,low(@0)
+	LDI XH,high(@0)
+.ENDMACRO
+.MACRO LDI_Y
+	LDI YL,low(@0)
+	LDI YH,high(@0)
+.ENDMACRO
+.MACRO LDI_Z
+	LDI ZL,low(@0)
+	LDI ZH,high(@0)
+.ENDMACRO
+.MACRO LDI_T16
+	LDI TEMP_L,low(@0)
+	LDI TEMP_H,high(@0)
+.ENDMACRO
+.MACRO LDI_T32
+	LDI TEMP_L,byte1(@0)
+	LDI TEMP_H,byte2(@0)
+	LDI TEMP_EL,byte3(@0)
+	LDI TEMP_EH,byte4(@0)
+.ENDMACRO
+.MACRO PUSH_T16
+	PUSH TEMP_L
+	PUSH TEMP_H
+.ENDMACRO
+.MACRO POP_T16
+	POP TEMP_H
+	POP TEMP_L
+.ENDMACRO
+.MACRO PUSH_T32
+	PUSH TEMP_L
+	PUSH TEMP_H
+	PUSH TEMP_EL
+	PUSH TEMP_EH
+.ENDMACRO
+.MACRO POP_T32
+	POP TEMP_EH
+	POP TEMP_EL
+	POP TEMP_L
+	POP TEMP_H
+.ENDMACRO
+.MACRO LDI_A16
+	LDI ACCUM_L,low(@0)
+	LDI ACCUM_H,high(@0)
+.ENDMACRO
+.MACRO LDI_A32
+	LDI ACCUM_L,byte1(@0)
+	LDI ACCUM_H,byte2(@0)
+	LDI ACCUM_EL,byte3(@0)
+	LDI ACCUM_EH,byte4(@0)
+.ENDMACRO
+.MACRO PUSH_A16
+	PUSH ACCUM_L
+	PUSH ACCUM_H
+.ENDMACRO
+.MACRO POP_A16
+	POP ACCUM_H
+	POP ACCUM_L
+.ENDMACRO
+.MACRO PUSH_A32
+	PUSH ACCUM_L
+	PUSH ACCUM_H
+	PUSH ACCUM_EL
+	PUSH ACCUM_EH
+.ENDMACRO
+.MACRO POP_A32
+	POP ACCUM_EH
+	POP ACCUM_EL
+	POP ACCUM_H
+	POP ACCUM_L
+.ENDMACRO

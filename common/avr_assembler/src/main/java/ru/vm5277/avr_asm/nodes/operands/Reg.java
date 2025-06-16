@@ -42,8 +42,8 @@ public class Reg {
 		else if(expr instanceof IdExpression) {
 			String str = (String)((IdExpression)expr).getId();
 			Byte result = scope.resolveReg(str);
-			if(null==result || 0x00>result || 0x1f<result) {
-				throw new ParseException("TODO ожидаем регистр, получили " + result, sp);
+			if(null == result) {
+				throw new ParseException("Unable to resolve register '" + str + "'", sp); 
 			}
 			id = result;
 		}

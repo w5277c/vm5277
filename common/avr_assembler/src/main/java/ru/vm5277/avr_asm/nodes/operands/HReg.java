@@ -15,7 +15,7 @@ public class HReg extends Reg {
 		super(scope, sp, expr);
 		
 		if(0x10>id || 0x1f<id) {
-			throw new ParseException("TODO ожидаем старший регистр, получили " + id, sp);
+			throw new ParseException("Expected high register (R16-R31), but got R" + id, sp);
 		}
 	}
 }

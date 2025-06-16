@@ -20,7 +20,12 @@ public class SetNode {
 		SourcePosition sp = tb.getSP();
 		String name = ((String)Node.consumeToken(tb, TokenType.ID).getValue()).toLowerCase();
 		Node.consumeToken(tb, Operator.ASSIGN);
-		Long value = Expression.getLong(Expression.parse(tb, scope, mc), sp);
+		Expression expr = Expression.parse(tb, scope, mc);
+		Long value = Expression.getLong(expr, sp);
+		if(null == value) {
+			tb.skipLine();
+			throw new ParseException("Cannot resolve constant '" + expr + "'", sp);
+		}
 		scope.setVariable(new VariableSymbol(name, value, false), sp);
 
 		scope.list(".SET " + name + " = " + value);

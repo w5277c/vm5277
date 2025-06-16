@@ -7,27 +7,30 @@ package ru.vm5277.avr_asm;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class InstrReader {
-	private	final	static	String									PATH		= "mcus";
 	private					MessageContainer						mc;
-	private					String									basePath;
+	private					Path									basePath;
 	private					Map<String, Instruction>				instrById	= new HashMap<>();
 	private					Map<String, Map<String, Instruction>>	instrByMn	= new HashMap<>();
 	private					Set<String>								supported;	// Поддерживаемые инструкции
 	
-	public InstrReader(String basePath, MessageContainer mc) {
+	public InstrReader(Path instrPath, MessageContainer mc) {
 		this.mc = mc;
-		this.basePath = basePath;
+		this.basePath = instrPath;
 		
-		try(BufferedReader br = new BufferedReader(new FileReader(basePath + File.separator + PATH + File.separator + "full.instr"))) {
+		try(BufferedReader br = new BufferedReader(new FileReader(basePath.resolve("full.instr").normalize().toFile()))) {
 			while(true) {
 				String line = br.readLine();
 				if(null == line) break;
@@ -56,14 +59,14 @@ public class InstrReader {
 			}
 		}
 		catch(Exception ex) {
-			mc.add(new ErrorMessage("TODO can't read instructions, path:" + basePath, null));
+			mc.add(new ErrorMessage("Cannot read AVR instruction definitions file:" + instrPath, null));
 		}
 	}
 
 	public void setMCU(String mcu) {
 		if(null == supported) {
 			supported = new HashSet<>();
-			try(BufferedReader br = new BufferedReader(new FileReader(basePath + File.separator + PATH + File.separator + mcu + ".instr"))) {
+			try(BufferedReader br = new BufferedReader(new FileReader(basePath.resolve(mcu + ".instr").normalize().toFile()))) {
 				while(true) {
 					String line = br.readLine();
 					if(null == line) break;
@@ -87,11 +90,11 @@ public class InstrReader {
 				}
 			}
 			catch(Exception ex) {
-				mc.add(new ErrorMessage("TODO can't read '" + mcu + "' instructions, path:" + basePath, null));
+				mc.add(new ErrorMessage("Failed to load instruction set for " + mcu + " (file: " + basePath + ")", null));
 			}
 		}
 		else {
-			mc.add(new ErrorMessage("TODO МК уже задан", null));
+			mc.add(new ErrorMessage("MCU already specified, .DEVICE cannot be redefined", null));
 		}
 	}
 	

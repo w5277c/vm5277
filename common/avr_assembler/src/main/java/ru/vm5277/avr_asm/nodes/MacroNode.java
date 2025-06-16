@@ -5,6 +5,7 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.avr_asm.nodes;
 
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -48,7 +49,7 @@ public class MacroNode extends Node {
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 	
-	public static MacroNode parseCall(TokenBuffer tb, Scope scope, MessageContainer mc, Map<String, SourceType> sourcePaths, MacroDefSymbol macro)
+	public static MacroNode parseCall(TokenBuffer tb, Scope scope, MessageContainer mc, Map<Path, SourceType> sourcePaths, MacroDefSymbol macro)
 																												throws ParseException, CriticalParseException {
 		SourcePosition callSP = tb.getSP();
 		MacroCallSymbol symbol = null;

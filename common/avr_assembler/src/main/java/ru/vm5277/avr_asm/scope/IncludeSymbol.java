@@ -52,7 +52,7 @@ public class IncludeSymbol extends Symbol {
 			blockSkip.pop();
 		}
 		else {
-			throw new ParseException("TODO конец блока без его начала", sp);
+			throw new ParseException("END directive without matching block (no IF/IFDEF/etc opened)", sp);
 		}
 	}
 	

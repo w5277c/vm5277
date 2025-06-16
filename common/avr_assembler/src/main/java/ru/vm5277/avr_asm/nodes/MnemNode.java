@@ -77,11 +77,11 @@ public class MnemNode extends Node {
 	public void secondPass() {
 		try {
 			if(!_secondPass()) {
-				mc.add(new ErrorMessage("//TODO не поддерживаемая мнемоника " + mnemonic, sp));
+				mc.add(new ErrorMessage("Unsupported insctruction '" + mnemonic + "'", sp));
 			}
 		}
 		catch(Exception e) {
-			mc.add(new ErrorMessage("//TODO ошибка парсинга мнемоники " + mnemonic + ": " + e.getMessage(), sp));
+			mc.add(new ErrorMessage("Failed to parse '" + mnemonic + "' instruction: " + e.getMessage(), null));
 		}
 	}
 	public boolean _secondPass() throws Exception {
@@ -99,7 +99,7 @@ public class MnemNode extends Node {
 				if(null != operands[0x00]) switch (operands[0x00]) {
 					case Instruction.OPERAND_NONE: return true; // Чистый opcode уже записан
 					case Instruction.OPERAND_R:
-					case Instruction.OPERAND_RH:	parse(instr, new Reg(scope, sp, expr1)); return true;
+					case Instruction.OPERAND_RH:	parse(instr, new HReg(scope, sp, expr1)); return true;
 					case Instruction.OPERAND_RR:	parse(instr, new Reg(scope, sp, expr1), new Reg(scope, sp, expr1)); return true;
 					case Instruction.OPERAND_K7S:	parse(instr, new FlashAddr(mc, scope, sp, expr1, -64, 63, 7, addr)); return true;
 					case Instruction.OPERAND_K12S:	parse(instr, new FlashAddr(mc, scope, sp, expr1, -2048, 2047, 12, addr)); return true;
@@ -144,10 +144,10 @@ public class MnemNode extends Node {
 						Reg reg = new Reg(scope, sp, expr2);
 						if(null != i) {
 							if(ire.getId() == (reg.getId()&0x01) && (ire.isDec() || ire.isInc())) {
-								if(Scope.STRICT_ERROR == Scope.getStrincLevel()) {
+								if(Scope.STRICT_STRONG == Scope.getStrincLevel()) {
 									mc.add(new ErrorMessage("TODO undefined combination " + ire + " with " + expr2, sp));
 								}
-								else if(Scope.STRICT_WARNING == Scope.getStrincLevel()) {
+								else if(Scope.STRICT_LIGHT == Scope.getStrincLevel()) {
 									mc.add(new WarningMessage("TODO undefined combination " + ire + " with " + expr2, sp));
 								}
 							}
@@ -164,10 +164,10 @@ public class MnemNode extends Node {
 						Reg reg = new Reg(scope, sp, expr1);
 						if(null != i) {
 							if(ire.getId() == (reg.getId()&0x01) && (ire.isDec() || ire.isInc())) {
-								if(Scope.STRICT_ERROR == Scope.getStrincLevel()) {
+								if(Scope.STRICT_STRONG == Scope.getStrincLevel()) {
 									mc.add(new ErrorMessage("TODO undefined combination " + ire + " with " + expr1, sp));
 								}
-								else if(Scope.STRICT_WARNING == Scope.getStrincLevel()) {
+								else if(Scope.STRICT_LIGHT == Scope.getStrincLevel()) {
 									mc.add(new WarningMessage("TODO undefined combination " + ire + " with " + expr1, sp));
 								}
 							}

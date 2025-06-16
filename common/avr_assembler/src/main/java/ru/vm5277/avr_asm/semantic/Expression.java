@@ -199,7 +199,7 @@ public class Expression extends Node {
 			Expression folded = Expression.fold(expr);
 			if (null != folded && folded instanceof LiteralExpression) return Expression.getLong(((LiteralExpression)folded).getValue());
 		}
-		throw new ParseException("TODO не поддерживаемое выражение:" + expr, sp);
+		throw new ParseException("Expression '" + expr + "' with type '" + expr.getClass().getSimpleName() + "' is not supported", sp);
 	}
 
 	
