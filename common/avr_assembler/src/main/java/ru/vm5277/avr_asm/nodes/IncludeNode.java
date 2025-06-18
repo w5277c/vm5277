@@ -5,7 +5,6 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.avr_asm.nodes;
 
-import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -18,6 +17,7 @@ import ru.vm5277.common.SourcePosition;
 import ru.vm5277.avr_asm.TokenType;
 import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 
@@ -35,7 +35,7 @@ public class IncludeNode {
 				break;
 			}
 		}
-		if(null == sourcePath) throw new ParseException("TODO Imported file not found: " + importPath, tb.getSP());
+		if(null == sourcePath) throw new ParseException("Import file not found: " + importPath, tb.getSP());
 
 		if(!scope.addImport(sourcePath.toString())) {
 			if(Scope.STRICT_STRONG == Scope.getStrincLevel()) {
@@ -55,11 +55,17 @@ public class IncludeNode {
 				
 			}
 			catch(IOException e) {
-				throw new ParseException("TODO " + e.getMessage(), sp);
+				mc.add(new ErrorMessage(e.getMessage(), sp));
 			}
-			try {scope.leaveImport(sp);}
-			catch(ParseException e) {mc.add(e.getErrorMessage());}
-			catch(CriticalParseException e) {mc.add(e.getErrorMessage()); throw e;}
+			finally {
+				try {scope.leaveImport(sp);}
+				catch(ParseException e) {mc.add(e.getErrorMessage());}
+				catch(CriticalParseException e) {
+					mc.add(e.getErrorMessage()); 
+					Node.consumeToken(tb, TokenType.NEWLINE);
+					throw e;
+				}
+			}
 		}
 		Node.consumeToken(tb, TokenType.NEWLINE);
 		

@@ -33,6 +33,7 @@ import ru.vm5277.j8b_compiler.nodes.commands.TryNode;
 import ru.vm5277.j8b_compiler.nodes.commands.WhileNode;
 import ru.vm5277.j8b_compiler.nodes.expressions.BinaryExpression;
 import ru.vm5277.j8b_compiler.nodes.expressions.ExpressionNode;
+import ru.vm5277.j8b_compiler.nodes.expressions.FieldAccessExpression;
 import ru.vm5277.j8b_compiler.nodes.expressions.InstanceOfExpression;
 import ru.vm5277.j8b_compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.j8b_compiler.nodes.expressions.MethodCallExpression;
@@ -450,6 +451,10 @@ public class ASTPrinter {
 		else if(expr instanceof TypeReferenceExpression) {
 			TypeReferenceExpression te = (TypeReferenceExpression)expr;
 			out.put(te.getClassName());
+		}
+		else if(expr instanceof FieldAccessExpression) {
+			FieldAccessExpression fae = (FieldAccessExpression)expr;
+			out.put(fae.getClassName() + "." + fae.getFieldName());
 		}
 		else {
 			out.put("!unknown expr:" + expr); out.print();

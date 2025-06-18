@@ -36,11 +36,11 @@ public class DataNode {
 					Long value = Expression.getLong(expr, tb.getSP());
 					if(null == value) {
 						tb.skipLine();
-						throw new ParseException("TODO не могу разрезолвить '" + expr + "'", _sp);
+						throw new ParseException("Cannot resolve expression: '" + expr + "'", _sp);
 					}
 					if(value >= (1<<(valueSize*8))) {
 						tb.skipLine();
-						throw new ParseException("TODO значение больше, чем указанный тип данных:" + value + ", size:" + valueSize, _sp);
+						throw new ParseException("Value " + value + " exceeds " + valueSize*8 + "-bit range", _sp);
 					}
 					tmp = new byte[valueSize];
 					for(int i=0; i<valueSize; i++) {
@@ -58,10 +58,10 @@ public class DataNode {
 			if(0 != baos.size()) {
 				if(0 != (baos.size()&0x01)) {
 					if(Scope.STRICT_STRONG == Scope.getStrincLevel()) {
-						throw new ParseException("TODO размер flash данных не четный", sp);
+						throw new ParseException("Odd-sized FLASH data", sp);
 					}
 					else if(Scope.STRICT_LIGHT == Scope.getStrincLevel()) {
-						mc.add(new WarningMessage("TODO размер flash данных не четный", sp));
+						mc.add(new WarningMessage("Odd-sized FLASH data", sp));
 					}
 					baos.write(0x00);
 				}

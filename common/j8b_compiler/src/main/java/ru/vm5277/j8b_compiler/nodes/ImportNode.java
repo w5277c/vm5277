@@ -18,7 +18,7 @@ import ru.vm5277.j8b_compiler.tokens.Token;
 
 public class ImportNode extends AstNode {
 	private	boolean	isStatic;
-	private	String	importPath;
+	private	String	importStr;
 	private	String	alias;
 
 	public ImportNode(TokenBuffer tb, MessageContainer mc) {
@@ -49,7 +49,7 @@ public class ImportNode extends AstNode {
 				path.append(".").append(part.getValue());
 			}
 
-			this.importPath = path.toString();
+			this.importStr = path.toString();
 
 			if (tb.match(Keyword.AS)) {
 				consumeToken(tb);
@@ -70,12 +70,12 @@ public class ImportNode extends AstNode {
     }
 
 	public String getImportFilePath() {
-		return importPath.replace(".", File.separator) + ".j8b";
+		return (importStr.replace(".", File.separator) + ".j8b").toLowerCase();
 	}
 	
     // Геттеры
-    public String getImportPath() {
-        return importPath;
+    public String getImport() {
+        return importStr;
     }
 
     public boolean isStatic() {
@@ -93,17 +93,17 @@ public class ImportNode extends AstNode {
 
 	@Override
 	public String toString() {
-		return getClass().getSimpleName() + ": " + importPath;
+		return getClass().getSimpleName() + ": " + importStr;
 	}
 
 	@Override
 	public boolean preAnalyze() {
-		if (importPath == null || importPath.isEmpty()) markError("Import path cannot be empty");
+		if (importStr == null || importStr.isEmpty()) markError("Import path cannot be empty");
 		else {
 			// Проверяем статический импорт
 			if (isStatic) {
 				// Можно добавить дополнительные проверки для статического импорта
-				if (!importPath.contains(".")) 	markError("Static import must specify full class path and member");
+				if (!importStr.contains(".")) 	markError("Static import must specify full class path and member");
 			}
 		}
 		return true;
@@ -117,10 +117,10 @@ public class ImportNode extends AstNode {
 			// Регистрируем импорт в классе
 			try {
 				if (isStatic) {
-					classScope.addStaticImport(importPath, alias);
+					classScope.addStaticImport(importStr, alias);
 				}
 				else {
-					classScope.addImport(importPath, alias);
+					classScope.addImport(importStr, alias);
 				}
 			}
 			catch(SemanticException e) {markError(e);}
@@ -136,13 +136,13 @@ public class ImportNode extends AstNode {
 			ClassScope classScope = (ClassScope)scope;
 			if (isStatic) {
 				// Проверяем существование статического члена
-				if (!classScope.checkStaticImportExists(importPath)) {
-					markError("Static import not found: " + importPath);
+				if (!classScope.checkStaticImportExists(importStr)) {
+					markError("Static import not found: " + importStr);
 				}
 			} else {
 				// Проверяем существование класса
-				if (classScope.resolveClass(importPath) == null) {
-					markError("Imported class not found: " + importPath);
+				if (classScope.resolveClass(importStr) == null) {
+					markError("Imported class not found: " + importStr);
 				}
 			}
 		}

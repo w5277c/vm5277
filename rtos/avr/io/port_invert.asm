@@ -3,27 +3,27 @@
 ;-----------------------------------------------------------------------------------------------------------------------
 ;17.06.2025	konstantin@5277.ru		Взят из проекта core5277
 ;-----------------------------------------------------------------------------------------------------------------------
-.include "stdio/out_char.asm"
-.IFNDEF OS_OUT_CSTR
+.IFNDEF PORT_INVERT
+.include "io/_port_offset.inc"
+.include "io/reg_bit_inv.inc"
 ;--------------------------------------------------------
-OS_OUT_CSTR:
+PORT_INVERT:
 ;--------------------------------------------------------
-;Логирование строки, конец определяется по 0x00
-;IN: Z-адрес FLASH на строку
-;--------------------------------------------------------
-	PUSH TEMP_L
+;Инвертирование состояния порта
+;IN: ACCUM_L адрес регистра PORTx
+;OUT: flag C-состояние бита(true = HI)
+;--------------------------------------------------------;
+	CPI ACCUM_L,0xff
+	BRNE PC+0x02
+	RET
+
 	PUSH_Z
+	PUSH ACCUM_L
 
-_OS_OUT_CSTR__LOOP:
-	;Считываем байт
-	LPM TEMP_L,Z+
-	CPI TEMP_L,0x00
-	BREQ _OS_OUT_CSTR__END
-	MCALL OS_OUT_CHAR
-	RJMP _OS_OUT_CSTR__LOOP
+	MCALL _PORT_OFFSET
+	MCALL REG_BIT_INV
 
-_OS_OUT_CSTR__END:
+	POP ACCUM_L
 	POP_Z
-	POP TEMP_L
 	RET
 .ENDIF

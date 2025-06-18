@@ -8,6 +8,7 @@
 package ru.vm5277.j8b_compiler.nodes.expressions;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import ru.vm5277.common.j8b_compiler.CodeGenerator;
 import ru.vm5277.common.j8b_compiler.Operand;
@@ -231,8 +232,15 @@ public class MethodCallExpression extends ExpressionNode {
 		}
 		
 		if(symbol.isNative()) {
+			VarType[] params = null;
+			if(!args.isEmpty()) {
+				params = new VarType[args.size()];
+				for(int i=0; i<args.size(); i++) {
+					params[i] = args.get(i).getType(symbol.getScope());
+				}
+			}
 			String className = ((ClassScope)symbol.getScope().getParent()).getName();
-			cg.invokeNative(className + "." + symbol.getName(), type.getId(), operands);
+			cg.invokeNative(className + "." + symbol.getName() + " " + Arrays.toString(params), type.getId(), operands);
 		}
 		else {
 			cg.invokeMethod(symbol.getRuntimeId(), type.getId(), operands);

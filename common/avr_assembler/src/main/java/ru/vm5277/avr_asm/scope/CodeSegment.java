@@ -10,10 +10,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import ru.vm5277.avr_asm.output.Builder;
-import ru.vm5277.avr_asm.output.IntelHexBuilder;
 import ru.vm5277.common.exceptions.ParseException;
 
 public class CodeSegment {
@@ -90,7 +88,7 @@ public class CodeSegment {
 			total += (block.getWSize() - block.getOverlap());
 		}
 		System.out.println(" -----");
-		System.out.println(" Total\t:  " + total + " words (" + (total*2) + " bytes)");
+		System.out.println(" Total\t:  " + total + " words (" + (total*2) + " bytes) " + (int)(100d/wSize*total) + "%");
 	}
 
 	public void build(Builder builder) throws IOException {

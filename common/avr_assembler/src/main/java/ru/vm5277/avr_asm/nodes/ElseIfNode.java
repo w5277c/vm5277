@@ -19,21 +19,17 @@ public class ElseIfNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException, CriticalParseException {
 		SourcePosition sp = tb.getSP();
 		Long value = 0x00l;
-		if(scope.getIncludeSymbol().isBlockSkip()) {
-			try{Expression.parse(tb, scope, mc);} catch(ParseException e) {};
-			//TODO должно быть везде, где вычисляются выражения. Так как переменные и метки могут отсутствовать
-		}
-		else {
-			Expression expr = Expression.parse(tb, scope, mc);
+		Expression expr = Expression.parse(tb, scope, mc);
+		if(!scope.getIncludeSymbol().isBlockSkip()) {
 			Long _value = Expression.getLong(expr, sp);
 			if(null == _value) {
-				mc.add(new ErrorMessage("TODO не могу разрезолвить условие '" + expr + "'", sp));
+				mc.add(new ErrorMessage("Could not resolve condition: '" + expr + "'", sp));
 			}
 			else {
 				value = _value;
 			}
 		}
-		scope.getIncludeSymbol().blockElseIf(0x01!=value);
+		scope.getIncludeSymbol().blockElseIf(0x01!=value, sp);
 		
 		scope.list(".ELSEIF " + " # " + (0 != value));
 		

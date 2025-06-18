@@ -14,25 +14,28 @@ public class IncludeSymbol extends Symbol {
 	private					boolean									blockSuccess	= false;
 	private					boolean									elseIfSkip		= false;
 	private					Stack<Boolean>							blockSkip		= new Stack<>();
-
-	public IncludeSymbol(String name) {
+	private					IncludeSymbol							parent;
+	
+	public IncludeSymbol(String name, IncludeSymbol parent) {
 		super(name);
+		
+		this.parent = parent;
 	}
 
-	public void blockStart(boolean skip) {
+	public void blockStart(boolean skip, SourcePosition sp) {
 		blockSuccess |= !skip;
 		
 		blockSkip.add(skip);
 		blockCntr++;
 	}
 
-	public void blockSkipInvert() {
+	public void blockSkipInvert(SourcePosition sp) {
 		if(!blockSkip.isEmpty()) {
 			blockSkip.add(!blockSkip.pop());
 		}
 	}
 
-	public void blockElseIf(boolean skip) {
+	public void blockElseIf(boolean skip, SourcePosition sp) {
 		if(!blockSuccess) {
 			elseIfSkip = skip;
 			blockSuccess |= !skip;
@@ -62,5 +65,9 @@ public class IncludeSymbol extends Symbol {
 			result |=skip;
 		}
 		return result;
+	}
+	
+	public IncludeSymbol getParent() {
+		return parent;
 	}
 }

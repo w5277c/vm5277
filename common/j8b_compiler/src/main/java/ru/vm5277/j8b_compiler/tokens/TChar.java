@@ -51,6 +51,6 @@ public class TChar extends Token {
 		else {
 			sb.next();
 		}
-		value = String.valueOf(ch);
+		value = ch;
 	}
 }

@@ -7,12 +7,12 @@ package ru.vm5277.j8b_compiler;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.common.messages.MessageOwner;
 import ru.vm5277.j8b_compiler.nodes.AstNode;
 import ru.vm5277.j8b_compiler.nodes.ClassNode;
 import ru.vm5277.j8b_compiler.nodes.ImportNode;
@@ -25,10 +25,9 @@ public class ASTParser extends AstNode {
 	private			List<ClassNode>		importedClasses	= new ArrayList<>();
 	private			ClassNode			classNode;
 
-	public ASTParser(File runtimeDir, File baseDir, List<Token> tokens, MessageContainer mc) throws IOException {
-		this.fileImporter = new FileImporter(runtimeDir, baseDir, mc);
+	public ASTParser(Path runtimePath, Path basePath, List<Token> tokens, MessageContainer mc) throws IOException {
+		this.fileImporter = new FileImporter(runtimePath, basePath, mc);
 		this.mc = mc;
-		mc.setOwner(MessageOwner.PARSER);
 		
 		if(tokens.isEmpty()) return;
 		
@@ -39,10 +38,10 @@ public class ASTParser extends AstNode {
 			imports.add(importNode);
 			
 			// Загрузка импортируемого файла
-			List<Token> importedTokens = fileImporter.importFile(importNode.getImportPath());
+			List<Token> importedTokens = fileImporter.importFile(importNode.getImportFilePath());
 			if (!importedTokens.isEmpty()) {
 				// Рекурсивный парсинг импортированного файла
-				ASTParser importedParser = new ASTParser(runtimeDir, baseDir, importedTokens, mc);
+				ASTParser importedParser = new ASTParser(runtimePath, basePath, importedTokens, mc);
 				if (null != importedParser.getClazz()) {
 					importedClasses.add(importedParser.getClazz());
 				}

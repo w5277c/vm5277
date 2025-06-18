@@ -10,19 +10,20 @@ import java.lang.reflect.Constructor;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.util.Map;
+import ru.vm5277.common.NativeBinding;
+import ru.vm5277.common.SystemParam;
 import ru.vm5277.common.j8b_compiler.CodeGenerator;
-import ru.vm5277.common.j8b_compiler.RegisterMap;
 
 public class PlatformLoader {
 	private	static	final	String	LIB_POSTFIX		= "_codegen";
 	private	static	final	String	LIB_CLASSPREFIX	= "ru.vm5277.j8b_compiler.";
 	private	static	final	String	LIB_CLASSPOSTFIX= "_codegen.Generator";
 	
-	public static CodeGenerator loadGenerator(String platform, File platformsDir, Map<String, RegisterMap> regMap, Map<String, String> params)
-																																			throws Exception {
+	public static CodeGenerator loadGenerator(	String platform, File libsDir, Map<String, NativeBinding> nbMap,
+												Map<SystemParam, Object> params) throws Exception {
 		// Формируем имя JAR-файла (например, "codegen-avr.jar")
 		String jarName =  platform + LIB_POSTFIX + ".jar";
-		File jarFile = new File(platformsDir + File.separator + jarName);
+		File jarFile = new File(libsDir + File.separator + jarName);
 
 		if (!jarFile.exists()) throw new RuntimeException("Library not found: " + jarFile.getAbsolutePath());
 
@@ -32,9 +33,9 @@ public class PlatformLoader {
 		// Загружаем класс-генератор (ожидаемое имя: ru.vm5277.j8b.compiler.codegen.platform.Generator)
 		String className = LIB_CLASSPREFIX + platform + LIB_CLASSPOSTFIX;
 		Class<?> generatorClass = classLoader.loadClass(className);
-		Constructor<?> constructor = generatorClass.getConstructor(Map.class, Map.class);
+		Constructor<?> constructor = generatorClass.getConstructor(String.class, Map.class, Map.class);
 
 		// Создаем экземпляр, передавая параметры
-		return (CodeGenerator) constructor.newInstance(regMap, params);
+		return (CodeGenerator) constructor.newInstance(platform + LIB_POSTFIX, nbMap, params);
 	}
 }

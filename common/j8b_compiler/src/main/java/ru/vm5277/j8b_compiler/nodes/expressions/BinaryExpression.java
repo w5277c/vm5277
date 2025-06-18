@@ -117,11 +117,11 @@ public class BinaryExpression extends ExpressionNode {
 						return false;
 					}
 				}
-				else if (left instanceof MemberAccessExpression) {
+				else if (left instanceof FieldAccessExpression) {
 					// Для полей классов проверяем final (если нужно)
-					MemberAccessExpression memberExpr = (MemberAccessExpression) left;
+					FieldAccessExpression memberExpr = (FieldAccessExpression) left;
 					ExpressionNode target = memberExpr.getTarget();
-					String fieldName = memberExpr.getMemberName();
+					String fieldName = memberExpr.getFieldName();
 
 					// Получаем тип объекта
 					VarType targetType = target.getType(scope);
@@ -271,8 +271,8 @@ public class BinaryExpression extends ExpressionNode {
 					cg.storeAcc(varExpr.getSymbol().getRuntimeId());
 				}
 				// Если левый операнд — доступ к полю (x.y), генерируем putfield
-				else if (left instanceof MemberAccessExpression) {
-					MemberAccessExpression memberExpr = (MemberAccessExpression) left;
+				else if (left instanceof FieldAccessExpression) {
+					FieldAccessExpression memberExpr = (FieldAccessExpression) left;
 					//TODO cg.emitFieldStore(memberExpr.getTarget().getType(cg.getCurrentScope()).getClassName(),memberExpr.getMemberName(),leftType);
 				}
 			}

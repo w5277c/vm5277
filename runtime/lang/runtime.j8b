@@ -2,6 +2,4 @@ public final class Runtime {
     public static native int getObjHash(Object obj);
     public static native cstr getObjName(Object obj);
     public static native bool compareObjs(Object a, Object b);
-
-    public static native void out(byte b);
 }

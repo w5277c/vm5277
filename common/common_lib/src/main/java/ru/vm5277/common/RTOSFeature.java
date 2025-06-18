@@ -1,32 +1,15 @@
 /*--------------------------------------------------------------------------------------------------------------------------------------------------------------
 Файл распространяется под лицензией GPL-3.0-or-later, https://www.gnu.org/licenses/gpl-3.0.txt
 ----------------------------------------------------------------------------------------------------------------------------------------------------------------
-02.05.2025	konstantin@5277.ru		Начало
+18.06.2025	konstantin@5277.ru		Начало
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
-package ru.vm5277.common.messages;
+package ru.vm5277.common;
 
-import ru.vm5277.common.SourcePosition;
-
-public class Message {
-	private			String			type;
-	private	final	String			text;
-	private	final	SourcePosition	sp;
-	
-	Message(String type, String text, SourcePosition sp) {
-		this.type = type;
-		this.text = text;
-		this.sp = sp;
-	}
-
-	public String getText() {
-		return text;
-	}
-	
-	public SourcePosition getSP() {
-		return sp;
-	}
-	
-	public String toStrig() {
-		return type.toUpperCase() + "|" + (null == sp ? "" : sp) + "\t"  + text;
-	}
+public enum RTOSFeature {
+	OS_FT_IR_TABLE,
+	OS_FT_STDOUT,
+	OS_FT_WELCOME,
+	OS_FT_DIAG,
+	OS_FT_TIMER1,
+	OS_FT_TIMER2;
 }

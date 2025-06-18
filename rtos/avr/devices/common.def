@@ -3,6 +3,40 @@
 ;-----------------------------------------------------------------------------------------------------------------------
 ;16.06.2025	konstantin@5277.ru		Взят с проекта core5277
 ;-----------------------------------------------------------------------------------------------------------------------
+
+;---OS-FEATURES---------------------------------------------
+.IFNDEF OS_FT_IR_TABLE
+	.EQU	OS_FT_IR_TABLE							= 0x00	;Таблица прерываний
+.ENDIF
+.IFNDEF OS_FT_STDOUT
+	.EQU	OS_FT_STDOUT							= 0x00	;Вывод
+.ENDIF
+.IFNDEF OS_FT_WELCOME
+	.EQU	OS_FT_WELCOME							= 0x00	;Логировать приветственное сообщение
+.ENDIF
+.IFNDEF OS_FT_INIT_DIAG
+	.EQU	OS_FT_DIAG								= 0x00	;Логировать диагностику при инициализации
+.ENDIF
+.IFNDEF OS_FT_TIMER1
+	.EQU	OS_FT_TIMER1							= 0x00	;Таймер системного тика и механизма Threading
+.ENDIF
+.IFNDEF OS_FT_TIMER2
+	.EQU	OS_FT_TIMER2							= 0x00	;Таймер для реализации программных таймеров драйверов
+.ENDIF
+
+.IF OS_FT_WELCOME == 0x01
+	.SET	OS_FT_STDOUT 							= 0x01
+.ENDIF
+.IF OS_FT_TIMER1 == 0x01 || OS_FT_TIMER2 == 0x01
+	.SET	OS_FT_IR_TABLE							= 0x01
+.ENDIF
+
+
+
+.IFNDEF CORE_FREQ
+	.EQU	CORE_FREQ								= 8
+.ENDIF
+
 	.EQU	_OS_TIMER_FREQ							= (3125*CORE_FREQ*2)/1000
 
 	.EQU	PINx									= 0x00

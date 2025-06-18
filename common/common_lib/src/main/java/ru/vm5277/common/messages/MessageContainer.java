@@ -19,7 +19,6 @@ public class MessageContainer {
 	private			int				lineQnt			= 0;
 	private			boolean			showImmeditly	= false;
 	private			boolean			stopImmeditly	= false;
-	private			MessageOwner	currentOwner	= MessageOwner.OTHER;
 	
 	public MessageContainer() {
 	}
@@ -34,12 +33,7 @@ public class MessageContainer {
 		this.stopImmeditly = stopImmeditly;
 	}
 
-	public void setOwner(MessageOwner owner) {
-		this.currentOwner = owner;
-	}
-	
 	public void add(Message message) {
-		message.setMessageOwnerIfNull(currentOwner);
 		if(showImmeditly) {
 			System.out.println(message.toStrig());
 		}

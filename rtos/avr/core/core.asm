@@ -5,21 +5,26 @@
 ;-----------------------------------------------------------------------------------------------------------------------
 .IFNDEF _OS_INIT
 .include "mem/ram_fill.asm"
-.IFDEF LOGGING_PORT
-.include "stdout/out_cstr.asm"
+.IF OS_FT_STDOUT == 0x01
+.include "stdio/out_init.asm"
+.ENDIF
+.IF OS_FT_WELCOME == 0x01 || OS_FT_DIAG == 0x01
+.include "stdio/out_cstr.asm"
 .ENDIF
 
 ;---CONSTANTS-----------------------------------------------
 	.EQU	_OS_TIMER_TICK_PERIOD				= 0x14		;20, т.е. 0.000050*20=0.001=1мс
 
 ;---TEXT-CONSTANTS------------------------------------------
-.IFDEF LOGGING_PORT
 	.MESSAGE "######## LOGGING ENABLED"
 	.MESSAGE "######## IO BAUDRATE:",14400*CORE_FREQ
+.IF OS_FT_WELCOME == 0x01
 CSTR_OSNAME:
-	.db	"vm5277.avr v0.1"
+	.db	"vm5277.avr v0.1",0x00
 CSTR_OSMSG1:
 	.db	0x0d,0x0a,"Powered by ",0x00
+.ENDIF
+.IF OS_FT_DIAG == 0x01
 CSTR_OSMSG2:
 	.db	" [",0x00,0x00
 CSTR_MCUSR_NO:
@@ -37,10 +42,17 @@ CSTR_MCUSR_RESET:
 .ENDIF
 
 ;---RAM-OFFSETS---------------------------------------------
-	.EQU	_OS_UPTIME					= SRAM_START					;5B,LE-отсчет времени каждую в тиках(0.001с), ~34 года
+	.SET	_OS_ROTO					= SRAM_START					;RAM OFFSETS TABLE OFFSET - временная переменная для отслеживания смещения в таблице
+.IF OS_FT_TIMER1 == 0x01
+	.EQU	_OS_UPTIME					= _OS_ROTO						;5B,LE-отсчет времени каждую в тиках(0.001с), ~34 года
 	.EQU	_OS_TIMER1_CNTR				= _OS_UPTIME+0x05				;2B-16 бит счтетчик таймера1
 	.EQU	_OS_TIMER_TICK_THRESHOLD	= _OS_TIMER1_CNTR+0x02			;1B-порог срабатывания таймера1(для отсчета 1 тика)
-	.EQU	_OS_IR_VECTORS_TABLE		= _OS_TIMER_TICK_THRESHOLD+1	;Таблица прерываний (_OS_IR_QNT*3 для каждого прерывания, исключая RESET)
+	.SET	_OS_ROTO					= _OS_TIMER_TICK_THRESHOLD+0x01
+.ENDIF
+.IF OS_FT_IR_TABLE == 0x01
+	.EQU	_OS_IR_VECTORS_TABLE		= _OS_ROTO						;Таблица прерываний (OS_IR_QNT*3 для каждого прерывания, исключая RESET)
+	.SET	_OS_ROTO					= OS_IR_QNT*3
+.ENDIF
 
 _OS_INIT:
 	CLI
@@ -68,16 +80,18 @@ _OS_INIT:
 	LDI TEMP_L,(0<<WDE)
 	STS WDTCR,TEMP_L
 
-.IFDEF LOGGING_PORT
+.IF OS_FT_STDOUT == 0x01
 	MCALL OS_OUT_INIT
-
+.ENDIF
+.IF OS_FT_WELCOME == 0x01
 	LDI_Z CSTR_OSMSG1
 	MCALL OS_OUT_CSTR
 	LDI_Z CSTR_OSNAME
 	MCALL OS_OUT_CSTR
-	LDI_Z CSTR_OSMSG1
+.ENDIF
+.IF OS_FT_DIAG == 0x01
+	LDI_Z CSTR_OSMSG2
 	MCALL OS_OUT_CSTR
-
 	SBRS FLAGS,WDRF
 	RJMP PC+0x03+_MCALL_SIZE
 	LDI_Z CSTR_MCUSR_WD
@@ -94,11 +108,11 @@ _OS_INIT:
 	RJMP PC+0x03+_MCALL_SIZE
 	LDI_Z CSTR_MCUSR_PO
 	MCALL OS_OUT_CSTR
-	MOV TEMP,FLAGS
-	ANDI TEMP,(1<<WDRF)|(1<<BORF)|(1<<EXTRF)|(1<<PORF)
+	MOV TEMP_L,FLAGS
+	ANDI TEMP_L,(1<<WDRF)|(1<<BORF)|(1<<EXTRF)|(1<<PORF)
 	BRNE PC+0x03+_MCALL_SIZE
 	LDI_Z CSTR_MCUSR_NO
-	MCALL OS_OUT_STR
+	MCALL OS_OUT_CSTR
 	LDI_Z CSTR_MCUSR_RESET
 	MCALL OS_OUT_CSTR
 .ENDIF
@@ -106,25 +120,32 @@ _OS_INIT:
 	;Сбрасываем флаги причины сброса
 	STS MCUSR,C0x00
 
+.IF OS_FT_DIAG == 0x01
 	;Заполнение всей памяти 0x52 значением (для диагностики)
 	LDI ACCUM_L,0x52
 	LDI_X SRAM_START
 	LDI_Y SRAM_SIZE-0x0f
 	MCALL RAM_FILL_NR
+.ENDIF
 
+.IF OS_FT_TIMER1 == 0x01
 	;Сброс счетчика времени
 	LDI ACCUM_L,0x00
 	LDI_X _OS_UPTIME
 	LDI_Y 0x0005
 	MCALL RAM_FILL_NR
+.ENDIF
 
 OS_SOFTRESET:
+.IF OS_FT_IR_TABLE == 0x01
 	;Чистка таблицы прерываний
 	LDI ACCUM_L,0xff
 	LDI_X _OS_IR_VECTORS_TABLE
 	LDI_Y OS_IR_QNT*3
 	MCALL RAM_FILL_NR
+.ENDIF
 
+.IF OS_FT_TIMER1 == 0x01
 	;Задаем счетчик основному таймеру
 	STS _OS_TIMER1_CNTR+0x00,C0x00
 	STS _OS_TIMER1_CNTR+0x01,C0x00
@@ -133,7 +154,7 @@ OS_SOFTRESET:
 
 	;Запуск таймеров
 	_OS_TIMERS_RESTART
-
+.ENDIF
 	;Разрешаем прерывания и переходим на основную программу
 	SEI
 	JMP MAIN
@@ -145,6 +166,7 @@ _OS_IR_HANDLER:
 ;-----------------------------------------------------------
 	RETI
 
+.IF OS_FT_TIMER1 == 0x01
 ;-----------------------------------------------------------
 _OS_TIMER1_HANDLER:
 ;-----------------------------------------------------------
@@ -186,11 +208,14 @@ _OS_TIMER1_HANDLER__END:
 	POP_Z
 	POP_T32
 	RETI
+.ENDIF
 
+.IF OS_FT_TIMER2 == 0x01
 ;-----------------------------------------------------------
 _OS_TIMER2_HANDLER:
 ;-----------------------------------------------------------
 ;Обработчик прерывания основного таймера2
 ;-----------------------------------------------------------
 	RETI
+.ENDIF
 .ENDIF

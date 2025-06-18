@@ -15,9 +15,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Stack;
 import ru.vm5277.avr_asm.InstrReader;
 import static ru.vm5277.avr_asm.Main.tabSize;
@@ -56,7 +58,7 @@ public class Scope {
 	private					List<Node>								dSeg;
 	private					List<Node>								eSeg;
 	private					MacroDefSymbol							currentMacroDef	= null;
-	private final			List<IncludeSymbol>						includeSymbols	= new ArrayList<>();
+	private final			Set<String>								includePaths	= new HashSet<>();
 	private					IncludeSymbol							currentInclude	= null;
 
 	public Scope(File sourceFile, InstrReader instrReader, BufferedWriter listWriter) throws ParseException {
@@ -74,19 +76,16 @@ public class Scope {
 	public boolean addImport(String fullPath) throws ParseException {
 		if(null != currentMacroDef || isMacroDeploy()) throw new ParseException("Imports not allowed inside macro definitions", null);
 		
-		for(IncludeSymbol symbol : includeSymbols) {
-			if(symbol.getName().equals(fullPath)) return false;
-		}
-		currentInclude = new IncludeSymbol(fullPath);
-		includeSymbols.add(currentInclude);
+		if(!includePaths.add(fullPath)) return false;
+		
+		currentInclude = new IncludeSymbol(fullPath, currentInclude);
 		return true;
 	}
 	public void leaveImport(SourcePosition sp) throws CriticalParseException, ParseException {
-		if(0 >= includeSymbols.size()) throw new CriticalParseException("TODO список import файлов пуст", sp);
 		IncludeSymbol cur = currentInclude;
-		currentInclude = includeSymbols.get(includeSymbols.indexOf(currentInclude)-1);
+		currentInclude = currentInclude.getParent();
 		if(0 != cur.getBlockCntr()) {
-			throw new ParseException("Unbalanced conditional blocks (expected" + cur.getBlockCntr() + "more END directives)", sp);
+			throw new ParseException("Unbalanced conditional blocks (expected " + cur.getBlockCntr() + " more END directives)", sp);
 		}
 	}
 	
@@ -204,7 +203,6 @@ public class Scope {
 	}
 	
 	public IncludeSymbol getIncludeSymbol() throws CriticalParseException {
-		if(0 >= includeSymbols.size()) throw new CriticalParseException("TODO список import файлов пуст", null);
 		return currentInclude;
 	}
 

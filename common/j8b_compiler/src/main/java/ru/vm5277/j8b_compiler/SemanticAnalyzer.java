@@ -10,7 +10,6 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import ru.vm5277.common.exceptions.SemanticException;
-import ru.vm5277.common.messages.MessageOwner;
 import ru.vm5277.j8b_compiler.nodes.ClassNode;
 import ru.vm5277.j8b_compiler.semantic.ClassScope;
 import ru.vm5277.j8b_compiler.semantic.InterfaceSymbol;
@@ -18,25 +17,18 @@ import ru.vm5277.j8b_compiler.semantic.MethodScope;
 import ru.vm5277.j8b_compiler.semantic.Scope;
 
 public class SemanticAnalyzer {
-	private	ClassScope	globalScope;
-	
 	protected SemanticAnalyzer() {
 	}
 
-	public SemanticAnalyzer(File runtimeDir, ClassNode clazz) throws SemanticException {
-		clazz.getMessageContainer().setOwner(MessageOwner.SEMANTIC);
-		globalScope = new ClassScope();
-		
-		//TODO runtime
-		globalScope.addInterface(new InterfaceSymbol("Object"));
-		
+	public static void analyze(ClassScope globalScope, ClassNode clazz) {
 		if(clazz.preAnalyze()) {
 			if(clazz.declare(globalScope)) {
 				clazz.postAnalyze(globalScope);
 			}
 		}
 	}
-
+	
+	
 	public boolean preAnalyze() {return false;}
 	public boolean declare(Scope scope)  {return false;}
 	public boolean postAnalyze(Scope scope)  {return false;}
@@ -78,9 +70,5 @@ public class SemanticAnalyzer {
 			scope = scope.getParent();
 		}
 		return null;
-	}
-	
-	public ClassScope getGlobalScope() {
-		return globalScope;
 	}
 }

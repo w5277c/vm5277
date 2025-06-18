@@ -154,7 +154,7 @@ public class Expression extends Node {
 				return new LiteralExpression(result);
 			}
 			else {
-				throw new ParseException("TODO не поддерживаемая функция:" + name, tb.getSP());
+				throw new ParseException("Unsupported function: " + name, tb.getSP());
 			}
 		}
 		else {
@@ -165,8 +165,11 @@ public class Expression extends Node {
 				expr = new BinaryExpression(tb, scope, mc, expr, Operator.SHR, new LiteralExpression(8));
 				expr = new BinaryExpression(tb, scope, mc, expr, Operator.BIT_AND, new LiteralExpression(0xff));
 			}
+			else if(Keyword.EXP2.getName().equals(name)) {
+				expr = new BinaryExpression(tb, scope, mc, new LiteralExpression(1), Operator.SHL, expr);
+			}
 			else {
-				throw new ParseException("TODO не поддерживаемая функция:" + name, tb.getSP());
+				throw new ParseException("Unsupported function: " + name, tb.getSP());
 			}
 		}
 		return expr;

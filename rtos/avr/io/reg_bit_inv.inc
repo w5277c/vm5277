@@ -3,27 +3,25 @@
 ;-----------------------------------------------------------------------------------------------------------------------
 ;17.06.2025	konstantin@5277.ru		Взят из проекта core5277
 ;-----------------------------------------------------------------------------------------------------------------------
-.include "stdio/out_char.asm"
-.IFNDEF OS_OUT_CSTR
+.IFNDEF REG_BIT_INV
 ;--------------------------------------------------------
-OS_OUT_CSTR:
+REG_BIT_INV:
 ;--------------------------------------------------------
-;Логирование строки, конец определяется по 0x00
-;IN: Z-адрес FLASH на строку
+;Инвертируем бит регистра и возвращаем его новое значение
+;IN: Z-адрес,ACCUM_L-число бита
+;OUT: flag C-состояние бита(true = HI)
 ;--------------------------------------------------------
-	PUSH TEMP_L
-	PUSH_Z
+	PUSH_T16
 
-_OS_OUT_CSTR__LOOP:
-	;Считываем байт
-	LPM TEMP_L,Z+
-	CPI TEMP_L,0x00
-	BREQ _OS_OUT_CSTR__END
-	MCALL OS_OUT_CHAR
-	RJMP _OS_OUT_CSTR__LOOP
+	LDS TEMP_H,SREG
+	CLI
+	LD TEMP_L,Z
+	EOR TEMP_L,ACCUM_L
+	ST Z,TEMP_L
+	AND TEMP_L,ACCUM_L
+	STS SREG,TEMP_H
+	ADD TEMP_L,C0xff
 
-_OS_OUT_CSTR__END:
-	POP_Z
-	POP TEMP_L
+	POP_T16
 	RET
 .ENDIF

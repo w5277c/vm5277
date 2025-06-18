@@ -60,6 +60,9 @@ public class Token {
 		if(value instanceof Number) return ((Number)value).toString();
 		if(value instanceof Boolean) return ((Boolean)value).toString();
 		if(value instanceof byte[]) return "0x" + DatatypeConverter.printHexBinary((byte[])value);
+		if(value instanceof Character) {
+			return "'" + ((Character)value).toString() + "'"; // TODO экранирующие символы
+		}
 		return (String)value;
 	}
 

@@ -7,3 +7,4 @@
 /platform/stm8/codegen/target/
 *.lst
 *.map
+/docs/

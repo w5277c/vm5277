@@ -639,7 +639,7 @@ public class ExpressionNode extends AstNode {
 			String name = consumeToken(tb, TokenType.ID).getValue().toString();
 
 			// Создаем цепочку доступов
-			expr = new MemberAccessExpression(tb, mc, expr, name);
+			expr = new FieldAccessExpression(tb, mc, expr, name);
 		}
 
 		return expr;
@@ -648,9 +648,9 @@ public class ExpressionNode extends AstNode {
 	private ExpressionNode parseMethodCall(ExpressionNode target) throws ParseException {
 		// Проверяем, является ли target MemberAccessExpression или VariableExpression
 		String methodName;
-		if(target instanceof MemberAccessExpression) {
-			methodName = ((MemberAccessExpression)target).getMemberName();
-			target = ((MemberAccessExpression)target).getTarget();
+		if(target instanceof FieldAccessExpression) {
+			methodName = ((FieldAccessExpression)target).getFieldName();
+			target = ((FieldAccessExpression)target).getTarget();
 		}
 		else if(target instanceof VariableExpression) {
 			methodName = ((VariableExpression)target).getValue();

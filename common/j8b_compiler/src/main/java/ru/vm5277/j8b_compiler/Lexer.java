@@ -15,7 +15,6 @@ import java.util.List;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.SourceBuffer;
-import ru.vm5277.common.messages.MessageOwner;
 import ru.vm5277.j8b_compiler.tokens.*;
 
 public class Lexer {
@@ -24,8 +23,6 @@ public class Lexer {
 	protected	final	List<Token>			tokens	= new ArrayList<>();
 
 	public Lexer(File sourceFile, MessageContainer mc) throws IOException {
-		mc.setOwner(MessageOwner.LEXER);
-		
 		try (InputStreamReader isr = new InputStreamReader(new FileInputStream(sourceFile))) {
 			StringBuilder stringBuilder = new StringBuilder();
 			char[] buffer = new char[4*1024];
@@ -40,8 +37,6 @@ public class Lexer {
 	}
 
 	public Lexer(String source, MessageContainer mc) throws IOException {
-		mc.setOwner(MessageOwner.LEXER);
-		
 		sb = new SourceBuffer(null, source);
 		this.mc = mc;
 		

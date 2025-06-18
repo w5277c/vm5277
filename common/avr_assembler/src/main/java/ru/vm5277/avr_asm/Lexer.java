@@ -23,7 +23,6 @@ import ru.vm5277.avr_asm.tokens.TString;
 import ru.vm5277.avr_asm.tokens.Token;
 import ru.vm5277.common.SourceBuffer;
 import ru.vm5277.common.messages.ErrorMessage;
-import ru.vm5277.common.messages.MessageOwner;
 
 public class Lexer {
 	protected	final	MessageContainer	mc;
@@ -32,7 +31,6 @@ public class Lexer {
 	
 	public Lexer(File sourceFile, Scope scope, MessageContainer mc) throws IOException {
 		this.mc = mc;
-		mc.setOwner(MessageOwner.LEXER);
 		
 		try (InputStreamReader isr = new InputStreamReader(new FileInputStream(sourceFile))) {
 			StringBuilder stringBuilder = new StringBuilder();

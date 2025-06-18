@@ -17,7 +17,6 @@ import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.common.messages.MessageOwner;
 import ru.vm5277.avr_asm.tokens.Token;
 import ru.vm5277.common.SourcePosition;
 
@@ -36,7 +35,6 @@ public class Parser {
 		
 		scope.setTabSize(tabSize);
 		
-		mc.setOwner(MessageOwner.PARSER);
 		parse();
 	}
 	
@@ -46,7 +44,6 @@ public class Parser {
 		this.mc = mc;
 		this.sourcePaths = sourcePaths;
 		
-		mc.setOwner(MessageOwner.PARSER);
 		parse();
 	}
 	

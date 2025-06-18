@@ -6,31 +6,29 @@
 package ru.vm5277.j8b_compiler;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
+import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.HashMap;
 import java.util.Map;
+import ru.vm5277.common.FSUtils;
+import ru.vm5277.common.SystemParam;
 import ru.vm5277.common.j8b_compiler.CodeGenerator;
 import ru.vm5277.j8b_compiler.codegen.PlatformLoader;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.j8b_compiler.nodes.ClassNode;
+import ru.vm5277.j8b_compiler.semantic.ClassScope;
+import ru.vm5277.j8b_compiler.semantic.InterfaceSymbol;
 
 public class Main {
     public	final	static	String	VERSION		= "0.0.23";
 	public			static	boolean	isWindows;
-	public			static	String	toolkitPath;
+	public			static	Path	toolkitPath;
 
 	public static void main(String[] args) throws IOException, Exception {
 		isWindows = (null != System.getProperty("os.name") && System.getProperty("os.name").toLowerCase().contains("windows"));
 
-		Map<String, String> tmp = System.getenv();
-		toolkitPath = System.getenv("VM5277_HOME");
-		if(null == toolkitPath || toolkitPath.isEmpty()) {
-			File currentDir = new File("").getAbsoluteFile();
-			File parentDir = currentDir.getParentFile().getParentFile();
-			toolkitPath = parentDir.getAbsolutePath();
-		}
+		toolkitPath = FSUtils.getToolkitPath();
 		
 		if(0x00 == args.length) {
 			showHelp();
@@ -45,10 +43,10 @@ public class Main {
 			}
 			System.exit(0);
 		}
-
-		String platformsPath = (null != toolkitPath && !toolkitPath.isEmpty() ? toolkitPath + File.separator + "platform" : null);
+		
 		String platform = null;
 		String mcu = null;
+		Integer	core_freq = null;
 		String source = null;
 		
 		if(0x02 <= args.length) {
@@ -62,12 +60,24 @@ public class Main {
 			for(int i=2; i< args.length; i++) {
 				String arg = args[i];
 				if(args.length > i+1) {
-					if(arg.equalsIgnoreCase("--platformspath") || arg.equals("-P")) {
-						platformsPath = args[++i];
+					if(arg.equalsIgnoreCase("-P") || arg.equals("--path")) {
+						toolkitPath = FSUtils.resolveWithEnv(args[++i]);
+					}
+					else if(arg.equalsIgnoreCase("-F") || arg.equals("--freq")) {
+						String value = args[++i];
+						try {
+							core_freq = Integer.parseInt(value);
+							if(0>=core_freq || 255<core_freq) {
+								System.err.println("[ERROR] Invalid parameter " + arg + " value: " + value);
+							}
+						}
+						catch(Exception e) {
+							System.err.println("[ERROR] Invalid parameter " + arg + " value: " + value);
+						}
 					}
 				}
 				else {
-					System.err.println("[ERROR] Invalid parameter:" + arg);
+					System.err.println("[ERROR] Invalid parameter: " + arg);
 					System.exit(0);
 				}
 			}
@@ -82,36 +92,42 @@ public class Main {
 			System.exit(0);
 		}
 		
-		File platformsDir = null;
-		if(null != platformsPath && !platformsPath.isEmpty()) {
-			platformsDir = new File(platformsPath);
-		}
-
-		if(null == platformsDir || !platformsDir.exists()) {
-			showInvalidPlatformDir(platformsPath);
+		Path rtosPath = toolkitPath.resolve("rtos").resolve(platform).normalize();
+		if(!rtosPath.toFile().exists()) {
+			showInvalidRTOSDir(rtosPath);
 			System.exit(0);
 		}
 		
-		
 		MessageContainer mc = new MessageContainer(8, true, false);
 		
-		File runtimeDir = new File(toolkitPath + File.separator + "runtime");
-		RegisterMapLoader rml = new RegisterMapLoader(runtimeDir, mc);
-		
-		File libDir = new File(toolkitPath + File.separator + "bin" + File.separator + "libs");
-		CodeGenerator cg = PlatformLoader.loadGenerator(platform, libDir, rml.getMap(), null);
-		
+		Path runtimePath = toolkitPath.resolve("runtime").normalize();
 		File sourceFile = new File(source);
-		File baseDir = sourceFile.getParentFile();
+		Path basePath = sourceFile.getParentFile().toPath();
 		Lexer lexer = new Lexer(sourceFile, mc);
-		ASTParser parser = new ASTParser(runtimeDir, baseDir, lexer.getTokens(), mc);
+		
+		ClassScope globalScope = new ClassScope();
+		globalScope.addInterface(new InterfaceSymbol("Object"));
+		
+		ASTParser parser = new ASTParser(runtimePath, basePath, lexer.getTokens(), mc);
 		ClassNode clazz = parser.getClazz();
-//			new ASTPrinter(parser.getClazz());
-		new SemanticAnalyzer(runtimeDir, parser.getClazz());
+		SemanticAnalyzer.analyze(globalScope, parser.getClazz());
 		new ASTPrinter(parser.getClazz());
 
 		if(0 == mc.getErrorCntr()) {
+			File libDir = toolkitPath.resolve("bin").resolve("libs").normalize().toFile();
+			NativeBindingsReader nbr = new NativeBindingsReader(runtimePath, mc);
+			
+			Map<SystemParam, Object> params = new HashMap<>();
+			params.put(SystemParam.MCU, mcu);
+			if(null != core_freq) {
+				params.put(SystemParam.CORE_FREQ, core_freq);
+			}
+			CodeGenerator cg = PlatformLoader.loadGenerator(platform, libDir, nbr.getMap(), params);
 			clazz.codeGen(cg);
+			cg.postBuild();
+			
+			System.out.println();
+			System.out.println(cg.getAsm());
 		}
     }
 	
@@ -130,13 +146,14 @@ public class Main {
 		System.out.println();
 		System.out.println("Options:");
 		System.out.println("  -o, --output <file>\tOutput HEX file (default: <input>.hex)");
-		System.out.println("  -P, --platform <dir>\tCustom platforms directory path");
+		System.out.println("  -F, --freq <MHz>\tMCU clock frequency in MHz (default: platform specific)");
+		System.out.println("  -P, --path <dir>\tCustom toolkit directory path");
 		System.out.println("  -I, --include <dir>\tAdditional include path(s)");
 		System.out.println("  -v, --version\t\tDisplay version");
 		System.out.println("  -h, --help\t\tShow this help");
 		System.out.println();
 		System.out.println("Example:");
-		System.out.println("  j8bc avr:atmega328p main.j8b -o firmware.hex -I ./libs");
+		System.out.println("  j8bc avr:atmega328p main.j8b -f 8 -o firmware.hex -I ./libs");
 	}
 	
 	private static void showInvalidDeviceFormat(String invalidParam) {
@@ -150,14 +167,14 @@ public class Main {
 		System.err.println("Project location: " + Paths.get("").toAbsolutePath().resolve("platform"));
 	}
 	
-	private static void showInvalidPlatformDir(String platformPath) {
-		System.err.println("[ERROR] Platform directory not found or empty");
+	private static void showInvalidRTOSDir(Path platformPath) {
+		System.err.println("[ERROR] Toolkit directory not found or empty");
 		System.err.println();
-		System.err.println("Tried to access: " + platformPath);
+		System.err.println("Tried to access: " + platformPath.toString());
 		System.err.println();
 		System.err.println("Possible solutions:");
-		System.err.println("1. Specify custom path with --platformspath (-P) option");
-		System.err.println("2. Add platform directory(VM5277_PLATFORM) to system environment variables");
+		System.err.println("1. Specify custom path with --path (-P) option");
+		System.err.println("2. Add toolkit directory(VM5277) to system environment variables");
 		System.err.println("3. Check project source or documentation at https://github.com/w5277c/vm5277");
 	}
 }

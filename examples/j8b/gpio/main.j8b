@@ -1,0 +1,27 @@
+import rtos.System;
+import rtos.RTOSParam;
+import hal.gpio;
+
+class Main {
+    public static void main() {
+		System.setParam(RTOSParam.CORE_FREQ, 8);
+		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB1);
+		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
+
+		byte port = GPIO.PB2;
+		GPIO.modeOut(port);
+		while(true) {
+			System.waitMS(250);
+			GPIO.invert(port);
+		}
+    }
+
+    /* TODO ввести class:
+    GPIOPin pin = new GPIOPin(GPIO.PB3);
+    pin.setHi();
+    pin.setLo();
+    pin.invert();
+    bool isHi = pin.isHi();
+    bool isOutMode = pin.isOutMode();
+    */
+}

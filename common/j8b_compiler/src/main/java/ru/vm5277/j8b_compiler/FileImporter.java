@@ -7,6 +7,7 @@ package ru.vm5277.j8b_compiler;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.messages.ErrorMessage;
@@ -16,13 +17,14 @@ import ru.vm5277.j8b_compiler.tokens.Token;
 
 public class FileImporter {
 	private	final	List<String>		importedFiles	= new ArrayList<>();
-	private	final	String				runtimePath;
-	private	final	String				basePath;
+	private	final	Path				runtimePath;
+	private	final	Path				basePath;
 	private	final	MessageContainer	mc;
 
-	public FileImporter(File runtimeDir, File baseDir, MessageContainer mc) {
-		this.runtimePath = null == runtimeDir ? null : runtimeDir.getAbsolutePath();
-		this.basePath = null == baseDir ? null : baseDir.getAbsolutePath();
+	public FileImporter(Path runtimePath, Path basePath, MessageContainer mc) {
+		this.runtimePath = runtimePath;
+		this.basePath = basePath;
+		
 		this.mc = mc;
 	}
 
@@ -35,9 +37,9 @@ public class FileImporter {
 			importedFiles.add(importPath);
 		}
 
-		File file = new File(runtimePath + File.separator + importPath.replace('.', File.separatorChar) + ".j8b");
+		File file = runtimePath.resolve(importPath).normalize().toFile();
 		if (!file.exists()) {
-			file = new File(basePath + File.separator + importPath.replace('.', File.separatorChar) + ".j8b");
+			file = basePath.resolve(importPath).normalize().toFile();
 			if(!file.exists()) {
 				mc.add(new ErrorMessage("Imported file not found: " + importPath, null));
 				file = null;

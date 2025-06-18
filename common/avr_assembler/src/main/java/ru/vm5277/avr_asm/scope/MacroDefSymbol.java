@@ -22,6 +22,7 @@ public class MacroDefSymbol extends Symbol {
 	}
 	
 	public void addToken(Token token) {
+//		token.getSP().updateLine(firstLine);
 		tokens.add(token);
 	}
 	

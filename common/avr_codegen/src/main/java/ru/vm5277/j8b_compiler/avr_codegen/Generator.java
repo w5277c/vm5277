@@ -9,22 +9,22 @@ package ru.vm5277.j8b_compiler.avr_codegen;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import ru.vm5277.common.NativeBinding;
 import ru.vm5277.common.j8b_compiler.Case;
 import ru.vm5277.common.j8b_compiler.CodeGenerator;
 import ru.vm5277.common.j8b_compiler.Operand;
-import ru.vm5277.common.j8b_compiler.RegisterMap;
 import ru.vm5277.common.j8b_compiler.OperandType;
 import ru.vm5277.common.Operator;
+import ru.vm5277.common.RTOSFeature;
+import ru.vm5277.common.SystemParam;
 import ru.vm5277.common.j8b_compiler.VarType;
 
 public class Generator extends CodeGenerator {
-	private	final	Map<String, RegisterMap> regMap;
-	private			Operand acc;	//TODO похоже будет не нужен
-	private			StringBuilder	asmSource	= new StringBuilder();
+	private	final	static	String				VERSION		= "0.1";
+	private					Operand				acc;		//TODO похоже будет не нужен
 	
-	public Generator(Map<String, RegisterMap> regMap, Map<String, String> params) {
-		this.regMap = regMap;
-		
+	public Generator(String genName, Map<String, NativeBinding> nbMap, Map<SystemParam, Object> params) {
+		super(genName, nbMap, params);
 		// Собираем RTOS
 		
 	}
@@ -116,41 +116,76 @@ public class Generator extends CodeGenerator {
 	public void invokeNative(String methodQName, int typeId, Operand[] parameters) throws Exception {
 		System.out.println("CG:invokeNative " + methodQName + ", typeId:" + typeId + ", params" + Arrays.toString(parameters));
 		
-		RegisterMap rm = regMap.get(methodQName);
-		if(null == rm) throw new Exception("CG:InvokeNative, register map record not found for method: " + methodQName);
-		byte[][] regIds = rm.getRegIds();
-		if(parameters.length != regIds.length) {
-			throw new Exception("CG:InvokeNative, invalid parameter count for method " + methodQName + ", expected " + regIds.length + ", got " +
-								parameters.length);
+		if(methodQName.equals("System.setParam [byte, byte]")) {
+			SystemParam sp = SystemParam.values()[(int)parameters[0x00].getValue()];
+			switch(sp) {
+				case CORE_FREQ:
+					params.put(sp, (int)parameters[0x01].getValue());
+					break;
+				case STDOUT_PORT:
+					params.put(sp, (int)parameters[0x01].getValue());
+					break;
+				case SHOW_WELCOME:
+					if(0x00 == (int)parameters[0x01].getValue()) {
+						RTOSFeatures.remove(RTOSFeature.OS_FT_WELCOME);
+					}
+					else {
+						RTOSFeatures.add(RTOSFeature.OS_FT_WELCOME);
+					}
+					break;
+			}
 		}
+		else {
+			NativeBinding nb = nbMap.get(methodQName);
+			if(null == nb) {
+				throw new Exception("CG:InvokeNative, not found native binding for method: " + methodQName);
+			}
+			byte[][] regIds = nb.getRegs();
+			if(	null == parameters && null != regIds || null != parameters && null == regIds ||
+				(null != parameters && null != regIds && parameters.length != regIds.length)) {
+				throw new Exception("CG:InvokeNative, invalid parameter count for method " + methodQName + ", expected " + regIds.length + ", got " +
+									parameters.length);
+			}
 
-		StringBuilder sb = new StringBuilder();
-		for(int i=0; i<parameters.length; i++) {
-			byte[] registers = regIds[i];
-			if(0 == registers.length || 4 < registers.length) throw new Exception("CG:Invalid parameters for invoke method " + methodQName);
-			
-			long value = 0;
-			Operand op = parameters[i];
-			if(OperandType.VARIABLE == op.getOperandType()) {
-				throw new UnsupportedOperationException("Variable parameters not implemented yet");
-			}
-			else if(OperandType.LITERAL == op.getOperandType()) {
-				if(op.getValue() instanceof Number) {
-					value = ((Number)op.getValue()).longValue();
+			includes.add(nb.getRTOSFilePath());
+
+			if(null != nb.getRTOSFeatures()) {
+				for(RTOSFeature feature : nb.getRTOSFeatures()) {
+					RTOSFeatures.add(feature);
 				}
-				else throw new Exception("CG:InvokeNative: literal must be a number for method " + methodQName);
 			}
-			for(int j=0; j<registers.length; j++) {
-				int reg = registers[j] & 0xFF;
-				if (reg<16 || reg>31) throw new Exception("CG:InvokeNative: invalid register R" + reg + " for method " + methodQName);
-				sb.append("LDI R").append(reg).append(",").append(value&0xff).append("\n");
-				value >>>= 8;
+
+			StringBuilder sb = new StringBuilder();
+			if(null != parameters) {
+				for(int i=0; i<parameters.length; i++) {
+					byte[] registers = regIds[i];
+					if(0 == registers.length || 4 < registers.length) throw new Exception("CG:Invalid parameters for invoke method " + methodQName);
+
+					long value = 0;
+					Operand op = parameters[i];
+					if(OperandType.VARIABLE == op.getOperandType()) {
+						throw new UnsupportedOperationException("Variable parameters not implemented yet");
+					}
+					else if(OperandType.LITERAL == op.getOperandType()) {
+						if(op.getValue() instanceof Number) {
+							value = ((Number)op.getValue()).longValue();
+						}
+						else if(op.getValue() instanceof Character) {
+							value = ((Character)op.getValue());
+						}
+						else throw new Exception("CG:InvokeNative: literal must be a number for method " + methodQName);
+					}
+					for(int j=0; j<registers.length; j++) {
+						int reg = registers[j] & 0xFF;
+						if (reg<16 || reg>31) throw new Exception("CG:InvokeNative: invalid register R" + reg + " for method " + methodQName);
+						sb.append("ldi r").append(reg).append(",").append(value&0xff).append("\n");
+						value >>>= 8;
+					}
+				}
 			}
-			sb.append("CALL ").append(rm.getRtosFunction()).append("\n");
+			sb.append("call ").append(nb.getRTOSFunction()).append("\n");
+			asmSource.append(sb);
 		}
-		asmSource.append(sb);
-		
-		System.out.println("CG:invokeNative asm:\n" + sb.toString());
 	}
 	
 	@Override
@@ -187,5 +222,10 @@ public class Generator extends CodeGenerator {
 	@Override
 	public void eThrow() {
 		System.out.println("CG:throw");
+	}
+	
+	@Override
+	public String getVersion() {
+		return VERSION;
 	}
 }

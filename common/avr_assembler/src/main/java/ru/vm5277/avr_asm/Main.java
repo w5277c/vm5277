@@ -32,19 +32,12 @@ public class Main {
 	public	final	static	String	VERSION		= "0.1.0";
 	public			static	int		tabSize		= 4;
 	public			static	boolean	isWindows;
-	public			static	Path	VM5277_PATH;
+	public			static	Path	toolkitPath;
 	
 	public static void main(String[] args) throws IOException, Exception {
 		isWindows = (null != System.getProperty("os.name") && System.getProperty("os.name").toLowerCase().contains("windows"));
 
-		String toolkitPath = System.getenv("VM5277");
-		if(null == toolkitPath || toolkitPath.isEmpty()) {
-			File currentDir = new File("").getAbsoluteFile();
-			File parentDir = currentDir.getParentFile().getParentFile();
-			toolkitPath = parentDir.getAbsolutePath();
-		}
-		VM5277_PATH = Paths.get(toolkitPath).normalize().toAbsolutePath();
-		
+		toolkitPath = FSUtils.getToolkitPath();
 		
 		String source = null;
 		if(0x00 == args.length) {
@@ -71,7 +64,7 @@ public class Main {
 			String arg = args[i++];
 			if(args.length > i) {
 				if(arg.equals("-I") || arg.equals("--include")) {
-					sourcePaths.put(FSUtils.resolve(VM5277_PATH, args[i]), SourceType.LIB);
+					sourcePaths.put(FSUtils.resolve(toolkitPath, args[i]), SourceType.LIB);
 				}
 				else if(arg.equals("-t") || arg.equals("--tabsize")) {
 					tabSize = Integer.parseInt(args[i]);
@@ -111,22 +104,19 @@ public class Main {
  
 		MessageContainer mc = new MessageContainer(16, true, false);
 		
-		Path rtosPath = VM5277_PATH.resolve("rtos").resolve("avr");
-		sourcePaths.put(rtosPath, SourceType.RTOS);
-
-		Path sourcePath = FSUtils.resolve(VM5277_PATH, source);
+		Path sourcePath = FSUtils.resolve(toolkitPath, source);
 		Path baseDir = sourcePath.getParent();
 		sourcePaths.put(baseDir, SourceType.BASE);
 
 		File mapFile = null;
 		if(null != mapFileName) {
-			Path path = FSUtils.resolve(VM5277_PATH, mapFileName);
+			Path path = FSUtils.resolve(baseDir, mapFileName);
 			mapFile = (1<path.getNameCount() ? path.toFile() : baseDir.resolve(path).normalize().toFile());
 		}
 		
 		BufferedWriter listWriter = null;
 		if(null != listFileName) {
-			Path path = FSUtils.resolve(VM5277_PATH, listFileName);
+			Path path = FSUtils.resolve(baseDir, listFileName);
 			File listFile = (1<path.getNameCount() ? path.toFile() : baseDir.resolve(path).normalize().toFile());
 			try {listWriter = new BufferedWriter(new FileWriter(listFile));}
 			catch(Exception e) {
@@ -135,10 +125,10 @@ public class Main {
 		}
 
 		if(null == outputFileName) outputFileName = FSUtils.getBaseName(sourcePath);
-		if(1==Paths.get(outputFileName).getNameCount()) outputFileName = baseDir + File.separator + outputFileName;
+		if(1==Paths.get(outputFileName).getNameCount()) outputFileName = baseDir.resolve(outputFileName).normalize().toString();
 		
 		long timestamp = System.currentTimeMillis();
-		Path instrPath = VM5277_PATH.resolve("defs").resolve("avr");
+		Path instrPath = toolkitPath.resolve("defs").resolve("avr");
 		InstrReader instrReader = new InstrReader(instrPath, mc);
 		Scope scope = new Scope(sourcePath.toFile(), instrReader, listWriter);
 		Scope.setStrictLevel(stirctLevel);
@@ -199,7 +189,7 @@ public class Main {
 				scope.endMacroSecondPass();
 			}
 			else {
-				mc.add(new ErrorMessage("TODO ожиаем MnemNode или MacroNode, получен:" + node, null));
+				mc.add(new ErrorMessage("Unexpected node type, expected MnemNode or MacroNode, got: " + node, null));
 			}
 		}
 	}
@@ -223,15 +213,14 @@ public class Main {
 		System.out.println("                     hex     - Intel HEX (default)");
 		System.out.println("                     bin     - Raw binary");
 		System.out.println("  -d, --device <mcu>  Target MCU (e.g. atmega328p)");
-		System.out.println("  -H, --headers <dir> Path to MCU header files");
 		System.out.println("  -I, --include <dir> Additional include path(s)");
-		System.out.println("  -t, --tabsize <num> TODO размер табуляции");
-		System.out.println("  -s, --strict <strong|light|none>\tTODO реакция на неоднозначности");
-		System.out.println("                     strong  - считать ошибкой");
-		System.out.println("                     light   - предупреждать (по умолчанию)");
-		System.out.println("                     none    - не сообщать");
-		System.out.println("  -m, --map <file>   TODO имя файла map вывода");
-		System.out.println("  -l, --list <file>  TODO имя файла list вывода");
+		System.out.println("  -t, --tabsize <num> Tab size in spaces (default: 4)");
+		System.out.println("  -s, --strict <strong|light|none> Ambiguity handling level");
+		System.out.println("                     strong  - Treat as error");
+		System.out.println("                     light   - Show warning (default)");
+		System.out.println("                     none    - Silent mode");
+		System.out.println("  -m, --map <file>   Generate memory map file");
+		System.out.println("  -l, --list <file>  Generate assembly listing file");
 		System.out.println();
 		System.out.println("  -v, --version      Display version");
 		System.out.println("  -h, --help         Show this help");

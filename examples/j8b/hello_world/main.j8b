@@ -1,8 +1,19 @@
-import lang.runtime;
+import rtos.System;
+import rtos.RTOSParam;
+import hal.gpio;
 
 class Main {
     public static void main() {
-	byte t=8;
-	Runtime.out(t);
+		System.setParam(RTOSParam.CORE_FREQ, 8);
+		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB1);
+		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
+
+		//TODO cstr text="Hello world!\n";
+		//TODO System.outCStr(text);
+
+		byte char = '!';
+		System.outChar(char);
+
+		System.stop();
     }
 }

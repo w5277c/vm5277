@@ -36,6 +36,7 @@ public class LiteralExpression extends ExpressionNode {
 			if(l<=65535) return VarType.SHORT;
 			return VarType.INT;
 		}
+		if (value instanceof Character) return VarType.BYTE;
 		if (value instanceof String) return VarType.CSTR;
 		return VarType.UNKNOWN;
 	}	
@@ -96,6 +97,7 @@ public class LiteralExpression extends ExpressionNode {
 	
 	@Override
 	public void codeGen(CodeGenerator cg) {
+		//TODO нужно предварительно обработать как cstr=byte[]
 		cg.setAcc(new Operand(getType(null).getId(), OperandType.LITERAL, value));
 	}
 }

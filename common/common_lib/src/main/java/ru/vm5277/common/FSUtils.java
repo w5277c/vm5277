@@ -5,12 +5,24 @@
 --------------------------------------------------------------------------------------------------------------------------------------------------------------*/
 package ru.vm5277.common;
 
+import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class FSUtils {
+	
+	public static Path getToolkitPath() {
+		String toolkitPath = System.getenv("VM5277");
+		if(null == toolkitPath || toolkitPath.isEmpty()) {
+			File currentDir = new File("").getAbsoluteFile();
+			File parentDir = currentDir.getParentFile().getParentFile();
+			toolkitPath = parentDir.getAbsolutePath();
+		}
+		return Paths.get(toolkitPath).normalize().toAbsolutePath();
+	}
+
 	public static Path resolve(Path home, String path) {
 		Path resolvedPath = resolveWithEnv(path);
 		if (resolvedPath.isAbsolute()) return resolvedPath.normalize();
@@ -30,7 +42,7 @@ public class FSUtils {
 			}
 		}
 		matcher.appendTail(resolved);
-		return Paths.get(resolved.toString()).toAbsolutePath().normalize();
+		return Paths.get(resolved.toString()).normalize();
 	}
 	
 	public static String getBaseName(Path path) {

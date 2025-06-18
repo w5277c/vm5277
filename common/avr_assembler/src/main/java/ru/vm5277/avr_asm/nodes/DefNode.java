@@ -22,7 +22,7 @@ public class DefNode {
 			scope.addRegAlias(alias, reg, tb.getSP());
 		}
 		else {
-			throw new ParseException("TODO не верно указан регистр:" + str, tb.getSP());
+			throw new ParseException("Invalid register expression: " + str, tb.getSP());
 		}
 		scope.list(".DEF " + alias + " = r" + reg);
 		Node.consumeToken(tb, TokenType.NEWLINE);
