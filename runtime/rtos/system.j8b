@@ -1,8 +1,0 @@
-public final class System {
-	public static native void setParam(byte paramId, byte value);
-
-	public static native void outChar(byte b);
-	public static native void outCStr(cstr text);
-
-    public static native void stop();
-}
