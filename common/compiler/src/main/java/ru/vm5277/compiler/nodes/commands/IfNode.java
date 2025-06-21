@@ -222,31 +222,31 @@ public class IfNode extends CommandNode {
 		if(alwaysTrue) {
 			cg.enterBlock();
 			getThenBlock().codeGen(cg);
-			cg.leave();
+			cg.leaveBlock();
 			return;
 		}
 		if(alwaysFalse()) {
 			if (getElseBlock() != null) {
 				cg.enterBlock();
 				getElseBlock().codeGen(cg);
-				cg.leave();
+				cg.leaveBlock();
 			}
 			return;
 		}
 		
 		int condBlockId = cg.enterBlock();
 		condition.codeGen(cg);
-		cg.leave();
+		cg.leaveBlock();
 		
 		int thenBlockId = cg.enterBlock();
 		getThenBlock().codeGen(cg);
-		cg.leave();
+		cg.leaveBlock();
 
 		Integer elseBlockId = null;
 		if(null != getElseBlock()) {
 			elseBlockId = cg.enterBlock();
 			getElseBlock().codeGen(cg);
-			cg.leave();
+			cg.leaveBlock();
 		}
 		
 		cg.eIf(condBlockId, thenBlockId, elseBlockId);

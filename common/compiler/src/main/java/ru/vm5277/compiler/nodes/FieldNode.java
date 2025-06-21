@@ -160,12 +160,12 @@ public class FieldNode extends AstNode {
 	
 	@Override
 	public void codeGen(CodeGenerator cg) throws Exception {
-		symbol.setRuntimeId(cg.enterFiled(type.getId(), name));
+		symbol.setRuntimeId(cg.enterFiled(type.getId(), type.getSize(), isFinal(), name));
 		try {
 			initializer.codeGen(cg);
 		}
 		finally {
-			cg.leave();
+			cg.leaveField();
 		}
 	}
 }

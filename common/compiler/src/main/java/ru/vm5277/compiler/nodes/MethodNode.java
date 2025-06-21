@@ -264,7 +264,7 @@ public class MethodNode extends AstNode {
 			methodSymbol.setRuntimeId(cg.enterConstructor(typeIds));
 		}
 		else {
-			methodSymbol.setRuntimeId(cg.enterMethod(returnType.getId(), typeIds));
+			methodSymbol.setRuntimeId(cg.enterMethod(returnType.getId(), typeIds, name));
 		}
 		
 		try {
@@ -272,7 +272,7 @@ public class MethodNode extends AstNode {
 			if(null != body) body.codeGen(cg);
 		}
 		finally {
-			cg.leave();
+			cg.leaveMethod();
 		}
 	}
 }

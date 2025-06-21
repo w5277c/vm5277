@@ -13,22 +13,37 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-.include "./core/wait_ms.asm"
-
-.IFNDEF C5_WAIT
+.IFNDEF STK_FREE
 ;--------------------------------------------------------
-C5_WAIT:
+STK_FREE:
 ;--------------------------------------------------------
-;Ждем 5ms
+;Освобождаем в стеке блок памяти
+;OUT: Y-восстановленный Y, сохраненный перед
+;вызовом STK_ALLOC!
 ;--------------------------------------------------------
-	PUSH ACCUM_H
-	PUSH ACCUM_L
+	PUSH TEMP_L
+	LDS TEMP_L,SREG
+	CLI
 
-	LDI ACCUM_H,0x00
-	LDI ACCUM_L,0x05
-	MCALL WAIT_MS
+	POP ATOM_EL
+	POP ATOM_L
+	POP ATOM_H
 
-	POP ACCUM_L
-	POP ACCUM_H
+.IFDEF SPH
+	POP YH
+.ENDIF
+	POP YL
+
+	OUT SPL,_SPL
+.IFDEF SPH
+	OUT SPH,_SPH
+.ENDIF
+
+	PUSH ATOM_H
+	PUSH ATOM_L
+	PUSH ATOM_EL
+
+	STS SREG,TEMP_L
+	POP TEMP_L
 	RET
 .ENDIF

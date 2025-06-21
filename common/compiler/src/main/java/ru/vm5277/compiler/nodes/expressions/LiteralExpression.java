@@ -107,7 +107,12 @@ public class LiteralExpression extends ExpressionNode {
 	
 	@Override
 	public void codeGen(CodeGenerator cg) {
-		//TODO нужно предварительно обработать как cstr=byte[]
-		cg.setAcc(new Operand(getType(null).getId(), OperandType.LITERAL, value));
+		if(VarType.CSTR == getType(null)) {
+			int addr = cg.defineData(new Operand(VarType.CSTR.getId(), OperandType.CONSTANT, value));
+			cg.setAcc(new Operand(0, OperandType.ADDR, addr));
+		}
+		else {
+			cg.setAcc(new Operand(getType(null).getId(), OperandType.LITERAL, value));
+		}
 	}
 }

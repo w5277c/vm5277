@@ -30,61 +30,43 @@ import ru.vm5277.common.compiler.VarType;
 
 public class Generator extends CodeGenerator {
 	private	final	static	String				VERSION		= "0.1";
-	private					Operand				acc;		//TODO похоже будет не нужен
+	private	final	static	boolean				def_sph		= true; // TODO нерератор avr должен знать характеристики МК(чтобы не писать асм код с .ifdef)
+	private	final	static	boolean				def_call	= true; // TODO нерератор avr должен знать характеристики МК(чтобы не писать асм код с .ifdef)
 	
 	public Generator(String genName, Map<String, NativeBinding> nbMap, Map<SystemParam, Object> params) {
 		super(genName, nbMap, params);
 		// Собираем RTOS
-		
 	}
 	
+//---------- геттеры ассемблерных инструкций ----------
 	@Override
-	public int enterClass(int typeId, int[] intrerfaceIds) {
-		int id = genId();
-		System.out.println("CG:enterClass, typeId:" + typeId + ", interfaces id:" + Arrays.toString(intrerfaceIds));
-		return id;
+	public String stackAllocAsm(int size) {
+		StringBuilder sb = new StringBuilder();
+		if(def_sph) {
+			sb.append("push_y\n");
+			sb.append("ldi_y ").append(size).append("\n");
+		}
+		else {
+			sb.append("push yl\n");
+			sb.append("ldi yl,").append(size).append("\n");
+		}
+		sb.append(def_call ? "call" : "rcall").append(" stk_alloc\n"); //mcall макрос
+		return sb.toString();
 	}
-
 	@Override
-	public int enterFiled(int typeId, String name) {
-		int id = genId();
-		System.out.println("CG:enterField, id:" + id + ", typeId:" + typeId + ", name:" + name);
-		return id;
+	public String stackFreeAsm() {
+		StringBuilder sb = new StringBuilder();
+		sb.append(def_call ? "call" : "rcall").append(" stk_free\n"); //mcall макрос
+		return sb.toString();
 	}
-
 	@Override
-	public int enterConstructor(int[] typeIds) {
-		int id = genId();
-		System.out.println("CG:enterConstructor, id:" + id + ", parameters:" + Arrays.toString(typeIds));
-		return id;
-	}
-
+	public String pushRegAsm(int reg) {return "push r"+reg;}
 	@Override
-	public int enterMethod(int typeId, int[] typeIds) {
-		int id = genId();
-		System.out.println("CG:enterMehod, id:" + id + ", typeId:" + typeId + ", parameters:" + Arrays.toString(typeIds));
-		return id;
-	}
+	public String popRegAsm(int reg) {return "pop r"+reg;}
 
-	@Override
-	public int enterLocal(int typeId, String name) {
-		int id = genId();
-		System.out.println("CG:enterLocal, id:" + id + ", typeId:" + typeId + ", name:" + name);
-		return id;
-	}
-
-	@Override
-	public int enterBlock() {
-		int id = genId();
-		System.out.println("CG:enterBlock, id:" + id);
-		return id;
-	}
-
-	@Override
-	public void leave() {
-		System.out.println("CG:Leave");
-	}
-
+	
+//--------------------	
+	
 	@Override
 	public void eNew(int typeId, Operand[] parameters, boolean canThrow) {
 		System.out.println("CG:eNew, " + typeId +", params:" + Arrays.toString(parameters));
@@ -95,26 +77,6 @@ public class Generator extends CodeGenerator {
 		throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
 	}
 
-	@Override
-	public void setAcc(Operand source) {
-		System.out.println("CG:setAcc, op:" + source);
-		acc = source;
-	}
-	@Override
-	public Operand getAcc() {
-		System.out.println("CG:getAcc, acc:" + acc);
-		return acc;
-	}
-
-	@Override
-	public void loadAcc(int id) { //Загружаем значение переменной в acc
-		System.out.println("CG:loadAcc, srcId:" + id);
-	}
-	@Override
-	public void storeAcc(int id) { //Записываем acc в переменную
-		System.out.println("CG:storeAcc, dstId:" + id);
-		
-	}
 
 	@Override
 	public void invokeMethod(int id, int typeId, Operand[] args) {
@@ -170,12 +132,9 @@ public class Generator extends CodeGenerator {
 					byte[] registers = regIds[i];
 					if(0 == registers.length || 4 < registers.length) throw new Exception("CG:Invalid parameters for invoke method " + methodQName);
 
-					long value = 0;
 					Operand op = parameters[i];
-					if(OperandType.VARIABLE == op.getOperandType()) {
-						throw new UnsupportedOperationException("Variable parameters not implemented yet");
-					}
-					else if(OperandType.LITERAL == op.getOperandType()) {
+					if(OperandType.LITERAL == op.getOperandType()) {
+						long value = 0;
 						if(op.getValue() instanceof Number) {
 							value = ((Number)op.getValue()).longValue();
 						}
@@ -183,17 +142,35 @@ public class Generator extends CodeGenerator {
 							value = ((Character)op.getValue());
 						}
 						else throw new Exception("CG:InvokeNative: literal must be a number for method " + methodQName);
+						
+						for(int j=0; j<registers.length; j++) {
+							int reg = registers[j] & 0xff;
+							if (reg<16 || reg>31) throw new Exception("CG:InvokeNative: invalid register R" + reg + " for method " + methodQName);
+							scope.getMethodScope().putReg(reg);
+							sb.append("ldi r").append(reg).append(",").append(value&0xff).append("\n");
+							value >>>= 8;
+						}
 					}
-					for(int j=0; j<registers.length; j++) {
-						int reg = registers[j] & 0xFF;
-						if (reg<16 || reg>31) throw new Exception("CG:InvokeNative: invalid register R" + reg + " for method " + methodQName);
-						sb.append("ldi r").append(reg).append(",").append(value&0xff).append("\n");
-						value >>>= 8;
+					else if(OperandType.ADDR == op.getOperandType()) {
+						int resId = (int)op.getValue();
+						String value = flashData.get(resId).getLabel();
+						if(0x02 != registers.length) throw new Exception("CG:InvokeNative: expected 16b reg. pair for method " + methodQName);
+						int regL = registers[0x00] & 0xff;
+						int regH = registers[0x01] & 0xff;
+						if (regL<16 || regL>31) throw new Exception("CG:InvokeNative: invalid first register R" + regL + " for method " + methodQName);
+						if (regH<16 || regH>31) throw new Exception("CG:InvokeNative: invalid second register R" + regH + " for method " + methodQName);
+						if(regL == regH) throw new Exception("CG:InvokeNative: registers is equlas, R" + regL + " for method " + methodQName);
+						scope.getMethodScope().putReg(regL);
+						scope.getMethodScope().putReg(regH);
+						sb.append("ldi r").append(regL).append(",").append("low(").append(value).append(")\n");
+						sb.append("ldi r").append(regH).append(",").append("high(").append(value).append(")\n");
 					}
+					else throw new Exception("CG:InvokeNative: unsupported operand type: " + op.getOperandType());
+					
 				}
 			}
 			sb.append("call ").append(nb.getRTOSFunction()).append("\n");
-			asmSource.append(sb);
+			scope.asmAppend(sb.toString());
 		}
 	}
 	
@@ -232,6 +209,14 @@ public class Generator extends CodeGenerator {
 	public void eThrow() {
 		System.out.println("CG:throw");
 	}
+	
+	@Override
+	public int getRefSize() {
+		return 0x02;
+		//TODO для МК с памятью <= 256 нужно возвращать 0x01;
+	}
+	
+	
 	
 	@Override
 	public String getVersion() {

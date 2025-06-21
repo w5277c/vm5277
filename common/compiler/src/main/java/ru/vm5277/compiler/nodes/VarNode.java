@@ -108,7 +108,7 @@ public class VarNode extends AstNode {
 	public boolean declare(Scope scope) {
 		if(scope instanceof BlockScope) {
 			BlockScope blockScope = (BlockScope)scope;
-			boolean isFinal = modifiers.contains(Keyword.FINAL);
+			boolean isFinal = modifiers.contains(Keyword.FINAL) || VarType.CSTR == type;
 			symbol = new Symbol(name, type, isFinal, modifiers.contains(Keyword.STATIC));
 			if(isFinal && null != initializer) {
 				if(initializer instanceof LiteralExpression) {
@@ -156,12 +156,12 @@ public class VarNode extends AstNode {
 	
 	@Override
 	public void codeGen(CodeGenerator cg) throws Exception {
-		symbol.setRuntimeId(cg.enterFiled(type.getId(), name));
+		symbol.setRuntimeId(cg.enterLocal(type.getId(), type.getSize(), isFinal() || VarType.CSTR == type, name));
 		try {
 			initializer.codeGen(cg);
 		}
 		finally {
-			cg.leave();
+			cg.leaveLocal();
 		}
 	}
 }

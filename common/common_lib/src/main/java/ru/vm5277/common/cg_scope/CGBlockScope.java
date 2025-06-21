@@ -1,34 +1,32 @@
 /*
  * Copyright 2025 konstantin@5277.ru
- *
+ * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * 
  *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import rtos.System;
-import rtos.RTOSParam;
-import hal.gpio;
+package ru.vm5277.common.cg_scope;
 
-class Main {
-    public static void main() {
-		System.setParam(RTOSParam.CORE_FREQ, 8);
-		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB1);
-		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
+import java.util.HashMap;
+import java.util.Map;
 
-		//TODO cstr text="Hello world!\n";
-		//TODO System.outCStr(text);
+public class CGBlockScope extends CGScope {
+	private	final	Map<Integer, CGLocalScope>	locals	= new HashMap<>();
+			
+	public CGBlockScope(CGScope parent, int id) {
+		super(parent, id, "");
+	}
+	
+	public void addLocal(CGLocalScope local) {
+		locals.put(local.getId(), local);
+	}
 
-		byte char = '!';
-		System.outChar(char);
-
-		System.stop();
-    }
 }

@@ -1,5 +1,5 @@
 /common/common_lib/target/
-/common/j8b_compiler/target/
+/common/compiler/target/
 /common/avr_assembler/target/
 /common/avr_codegen/target/
 /platform/avr/codegen/target/

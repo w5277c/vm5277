@@ -163,12 +163,14 @@ public class VarType {
 		}
 	}
 	
-	public int getSize() {
+	public int getSize() throws SemanticException {
 		if (this == BYTE) return 1;
 		if (this == SHORT) return 2;
 		if (this == FIXED) return 2;
 		if (this == INT) return 4;
-		return 0;
+		if (this == CSTR) return -1;
+		//TODO -1 - даем знать кодогенератору, что это ссылка, он сам должен определить используемый размер
+		throw new SemanticException("getSize() unsupported for VarType: " + toString());
 	}
 
 	public boolean isArray() {

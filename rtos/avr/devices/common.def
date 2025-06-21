@@ -33,6 +33,9 @@
 .IFNDEF OS_FT_TIMER2
 	.EQU	OS_FT_TIMER2							= 0x00	;Таймер для реализации программных таймеров драйверов
 .ENDIF
+.IFNDEF OS_FT_DRAM
+	.EQU	OS_FT_DRAM								= 0x00	;Функционал динамического выделения памяти
+.ENDIF
 
 .IF OS_FT_WELCOME == 0x01
 	.SET	OS_FT_STDOUT 							= 0x01
@@ -126,11 +129,19 @@
 	.SET	INT6_PORT								= 0xff
 	.SET	INT7_PORT								= 0xff
 
-	.DEF	_CORE_REG_L								= r9
-	.DEF	_CORE_REG_H								= r10
-	.DEF	C0x00									= r11	;Константа 0x00
-	.DEF	C0x01									= r12	;Константа 0x01
-	.DEF	C0xff									= r13	;Константа 0xff
+	;...
+	.DEF	ATOM_L									= r2	;r2:r5 используются для атомарных операций(разрешено использовать только в блоках CLI-SEI)
+	.DEF	ATOM_H									= r3
+	.DEF	ATOM_EL									= r4
+	.DEF	ATOM_EH									= r5
+	.DEF	_CORE_REG_L								= r6
+	.DEF	_CORE_REG_H								= r7
+	.DEF	C0x00									= r8	;Константа 0x00
+	.DEF	C0x01									= r9	;Константа 0x01
+	.DEF	C0xff									= r10	;Константа 0xff
+	;...
+	.DEF	_SPL									= r12	;Альтернативный SPL
+	.DEF	_SPH									= r13	;Альтернативный SPH
 	.DEF	ID_L									= r14
 	.DEF	ID_H									= r15
 	.DEF	ACCUM_L									= r16

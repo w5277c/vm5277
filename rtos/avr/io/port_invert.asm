@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 .IFNDEF PORT_INVERT
-.include "io/_port_offset.inc"
-.include "io/reg_bit_inv.inc"
+.include "io/_port_offset.asm"
+.include "io/reg_bit_inv.asm"
 ;--------------------------------------------------------
 PORT_INVERT:
 ;--------------------------------------------------------

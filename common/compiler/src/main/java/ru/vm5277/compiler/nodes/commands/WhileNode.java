@@ -115,11 +115,11 @@ public class WhileNode extends CommandNode {
 	public void codeGen(CodeGenerator cg) throws Exception {
 		int condBlockId = cg.enterBlock();
 		condition.codeGen(cg);
-		cg.leave();
+		cg.leaveBlock();
 
 		int bodyBlockId = cg.enterBlock();
 		body.codeGen(cg);
-		cg.leave();
+		cg.leaveBlock();
 
 		cg.eWhile(condBlockId, bodyBlockId);
 	}

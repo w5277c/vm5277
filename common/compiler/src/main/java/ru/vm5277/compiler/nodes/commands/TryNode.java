@@ -215,13 +215,13 @@ public class TryNode extends CommandNode {
 	public void codeGen(CodeGenerator cg) throws Exception {
 		int blockId = cg.enterBlock();
 		tryBlock.codeGen(cg);
-		cg.leave();
+		cg.leaveBlock();
 		
 		List<Case> cases = new ArrayList<>();
 		for(AstCase astCase : catchCases) {
 			int caseBlockId = cg.enterBlock();
 			astCase.getBlock().codeGen(cg);
-			cg.leave();
+			cg.leaveBlock();
 			cases.add(new Case(astCase.getFrom(), astCase.getTo(), caseBlockId));
 		}
 			
@@ -229,7 +229,7 @@ public class TryNode extends CommandNode {
 		if(null != catchDefault) {
 			defaultBlockId = cg.enterBlock();
 			catchDefault.codeGen(cg);
-			cg.leave();
+			cg.leaveBlock();
 		}
 		
 		cg.eTry(blockId, cases, defaultBlockId);

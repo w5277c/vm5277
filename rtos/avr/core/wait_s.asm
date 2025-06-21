@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-.include "./core/wait_ms.inc"
+.include "./core/wait_ms.asm"
 .IFNDEF WAIT_S
 ;--------------------------------------------------------
 WAIT_S:

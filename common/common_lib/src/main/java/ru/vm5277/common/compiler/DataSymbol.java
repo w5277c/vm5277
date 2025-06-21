@@ -12,13 +12,24 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */
-package ru.vm5277.common.compiler;
+ */package ru.vm5277.common.compiler;
 
-public enum OperandType {
-	LITERAL,
-	VARIABLE,
-	TYPE,
-	CONSTANT,
-	ADDR;
+public class DataSymbol {
+	private	int		resId;
+	private	String	label;
+	private	Operand	op;
+	
+	public DataSymbol(int resId, String label, Operand op) {
+		this.resId = resId;
+		this.label = label;
+		this.op = op;
+	}
+	
+	public String getLabel() {
+		return label;
+	}
+	
+	public Operand getOperand() {
+		return op;
+	}
 }

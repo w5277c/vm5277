@@ -178,12 +178,12 @@ public class InterfaceNode extends AstNode {
 			}
 		}
 			
-		cg.enterClass(VarType.fromClassName(name).getId(), interfaceIds);
+		cg.enterInterface(VarType.fromClassName(name).getId(), interfaceIds, name);
 		try {
 			blockNode.codeGen(cg);
 		}
 		finally {
-			cg.leave();
+			cg.leaveInterface();
 		}
 	}
 }
