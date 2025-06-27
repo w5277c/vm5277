@@ -20,7 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import ru.vm5277.common.compiler.CodeGenerator;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
@@ -35,6 +35,7 @@ import ru.vm5277.compiler.nodes.commands.ReturnNode;
 import ru.vm5277.compiler.nodes.commands.SwitchNode;
 import ru.vm5277.compiler.nodes.commands.TryNode;
 import ru.vm5277.compiler.nodes.commands.WhileNode;
+import ru.vm5277.compiler.nodes.expressions.BinaryExpression;
 import ru.vm5277.compiler.nodes.expressions.MethodCallExpression;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
@@ -299,7 +300,14 @@ public class BlockNode extends AstNode {
 	@Override
 	public void codeGen(CodeGenerator cg) throws Exception {
 		for(AstNode decl : declarations) {
-			decl.codeGen(cg);
+			if(decl instanceof BinaryExpression) {
+				cg.enterExpression();
+				decl.codeGen(cg);
+				cg.leaveExpression();
+			}
+			else {
+				decl.codeGen(cg);
+			}
 		}
 	}
 	

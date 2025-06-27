@@ -24,7 +24,7 @@
 .IFNDEF OS_FT_WELCOME
 	.EQU	OS_FT_WELCOME							= 0x00	;Логировать приветственное сообщение
 .ENDIF
-.IFNDEF OS_FT_INIT_DIAG
+.IFNDEF OS_FT_DIAG
 	.EQU	OS_FT_DIAG								= 0x00	;Логировать диагностику при инициализации
 .ENDIF
 .IFNDEF OS_FT_TIMER1

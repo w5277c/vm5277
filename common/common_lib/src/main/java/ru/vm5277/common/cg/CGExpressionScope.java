@@ -13,22 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import rtos.System;
-import rtos.RTOSParam;
-import hal.gpio;
+package ru.vm5277.common.cg;
 
-class Main {
-    public static void main() {
-		System.setParam(RTOSParam.CORE_FREQ, 8);
-		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB1);
-		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
-
-		cstr text="Hello world!";
-		System.outCStr(text);
-
-		final byte newLine = '\n';
-		System.outChar(newLine);
-
-		System.stop();
-    }
+public class CGExpressionScope extends CGScope {
+	public CGExpressionScope(CGScope parent, int resId) {
+		super(parent, resId, "");
+	}
 }

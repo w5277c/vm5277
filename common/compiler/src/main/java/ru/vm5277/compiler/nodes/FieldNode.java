@@ -17,7 +17,7 @@ package ru.vm5277.compiler.nodes;
 
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import java.util.Set;
-import ru.vm5277.common.compiler.CodeGenerator;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.Operand;
 import ru.vm5277.common.compiler.OperandType;
 import ru.vm5277.compiler.Delimiter;
@@ -118,11 +118,11 @@ public class FieldNode extends AstNode {
 			if(isFinal && null != initializer) {
 				if(initializer instanceof LiteralExpression) {
 					LiteralExpression le = (LiteralExpression)initializer;
-					symbol.setConstantOperand(new Operand(le.getType(scope).getId(), OperandType.LITERAL, le.getValue()));
+					symbol.setConstantOperand(new Operand(le.getType(scope), OperandType.LITERAL, le.getValue()));
 				}
 				else if(initializer instanceof VariableExpression) {
 					VariableExpression ve = (VariableExpression)initializer;
-					symbol.setConstantOperand(new Operand(ve.getType(scope).getId(), OperandType.TYPE, ve.getValue()));
+					symbol.setConstantOperand(new Operand(ve.getType(scope), OperandType.TYPE, ve.getValue()));
 				}
 			}
 			

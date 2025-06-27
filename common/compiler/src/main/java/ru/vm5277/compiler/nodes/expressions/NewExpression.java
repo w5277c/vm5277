@@ -17,7 +17,7 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.ArrayList;
 import java.util.List;
-import ru.vm5277.common.compiler.CodeGenerator;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.Operand;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.SemanticException;
@@ -133,10 +133,10 @@ public class NewExpression extends ExpressionNode {
 	
 	@Override
 	public void codeGen(CodeGenerator cg) throws Exception {
-		Operand[] operands = null;
+		long[] operands = null;
 		if(!args.isEmpty()) {
 			
-			operands = new Operand[args.size()];
+			operands = new long[args.size()];
 			for(int i=0; i<args.size(); i++) {
 				args.get(i).codeGen(cg);
 				operands[i] = cg.getAcc();

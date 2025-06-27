@@ -15,9 +15,7 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
-import ru.vm5277.common.compiler.CodeGenerator;
-import ru.vm5277.common.compiler.Operand;
-import ru.vm5277.common.compiler.OperandType;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -63,7 +61,10 @@ public class LiteralExpression extends ExpressionNode {
 		return value instanceof String;
 	}
 	
-	public long toLong() {
+	public long getNumValue() {
+		if(value instanceof Character) {
+			return (int)(Character)value;
+		}
 		return ((Number)value).longValue();
 	}
 	
@@ -106,13 +107,23 @@ public class LiteralExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) {
-		if(VarType.CSTR == getType(null)) {
-			int addr = cg.defineData(new Operand(VarType.CSTR.getId(), OperandType.CONSTANT, value));
-			cg.setAcc(new Operand(0, OperandType.ADDR, addr));
+	public void codeGen(CodeGenerator cg) throws Exception {
+		VarType type = getType(null);
+//		if(VarType.CSTR == type) {
+//			int resId = cg.defineData(new Operand(VarType.CSTR, OperandType.CONSTANT, value));
+//			cg.setAcc(resId);
+//		}
+//		else
+		if(VarType.NULL == type) {
+			cg.setAcc(0x01, 0);
 		}
 		else {
-			cg.setAcc(new Operand(getType(null).getId(), OperandType.LITERAL, value));
+			if(value instanceof Character) {
+				cg.setAcc(0x01, (int)(Character)value);
+			}
+			else {
+				cg.setAcc(type.getSize(), ((Number)value).longValue());
+			}
 		}
 	}
 }

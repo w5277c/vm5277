@@ -24,7 +24,7 @@ public class Symbol {
 	protected			boolean	isStatic;
 	protected			boolean	isFinal;
 	protected			boolean	isNative;
-	protected			int		runtimeId;
+	protected			int		runtimeId	= -1;
 	protected			Operand	constOp;
 	
 	protected Symbol(String name) {

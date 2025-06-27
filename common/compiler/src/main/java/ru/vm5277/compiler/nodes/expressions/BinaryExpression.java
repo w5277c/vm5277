@@ -15,8 +15,7 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
-import ru.vm5277.common.compiler.CodeGenerator;
-import ru.vm5277.common.compiler.Operand;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.common.Operator;
@@ -266,12 +265,16 @@ public class BinaryExpression extends ExpressionNode {
 	public void codeGen(CodeGenerator cg) throws Exception {
 		// Генерация кода для левого и правого операндов
 		left.codeGen(cg);
-		Operand leftOp = cg.getAcc();
-		right.codeGen(cg);
+		if(right instanceof VariableExpression) {
+			VariableExpression ve = (VariableExpression)right;
+			
+			cg.localAction(operator, ve.getSymbol().getRuntimeId(), null);
+		}
+		
 		//Operand rightOp = cg.getAcc();
 
 		// Обработка операторов присваивания (=, +=, -=, и т.д.)
-		if (operator.isAssignment()) {
+/*		if (operator.isAssignment()) {
 			// Для простого присваивания (=) генерируем сохранение значения
 			if (operator == Operator.ASSIGN) {
 				// Если левый операнд — переменная, генерируем store
@@ -301,12 +304,12 @@ public class BinaryExpression extends ExpressionNode {
 						leftType
 					);
 				}*/
-			}
-		}
+//			}
+//		}
 		// Обработка арифметических, логических и битовых операций
-		else {
+//		else {
 			//cg.emitBinaryOp(operator, leftType, rightType);
-		}
+//		}
 	}
 	
 	@Override

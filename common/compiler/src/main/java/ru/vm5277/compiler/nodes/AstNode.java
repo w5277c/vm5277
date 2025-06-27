@@ -19,7 +19,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import ru.vm5277.common.compiler.CodeGenerator;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.compiler.nodes.commands.IfNode;
@@ -305,6 +305,9 @@ public abstract class AstNode extends SemanticAnalyzer {
 		// Проверка одинаковых типов
 		if (left == right) return true;
 
+		//TODO Любой тип данных можно привести к Object?
+		if ("Object".equals(right.getClassName())) return true;
+		
 		// Специальные случаи для NULL
 		if (VarType.NULL == left || VarType.NULL == right) return left.isReferenceType() || right.isReferenceType();
 

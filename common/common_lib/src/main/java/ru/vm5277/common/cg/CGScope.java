@@ -13,27 +13,27 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ru.vm5277.common.cg_scope;
+package ru.vm5277.common.cg;
 
 public class CGScope {
 	private		final			String			name;
 	private						CGScope			parent;
-	protected					int				id;
+	protected					int				resId;
 	private						int				sbPos	= 0;
 	protected					StringBuilder	sb		= new StringBuilder();
 	
-	public CGScope(CGScope parent, int id, String name) {
+	public CGScope(CGScope parent, int resId, String name) {
 		this.parent = parent;
 		this.name = name;
-		this.id = id;
+		this.resId = resId;
 	}
 	
 	public CGScope getParent() {
 		return parent;
 	}
 	
-	public int getId() {
-		return id;
+	public int getResId() {
+		return resId;
 	}
 	
 	public void asmAppend(String str) {
@@ -78,6 +78,7 @@ public class CGScope {
 		CGScope _scope = this;
 		while(null != _scope) {
 			if(_scope instanceof CGMethodScope) return (CGMethodScope)_scope;
+			_scope = _scope.getParent();
 		}
 		return null;
 	}

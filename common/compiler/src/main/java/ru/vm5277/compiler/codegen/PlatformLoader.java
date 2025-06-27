@@ -22,7 +22,7 @@ import java.net.URLClassLoader;
 import java.util.Map;
 import ru.vm5277.common.NativeBinding;
 import ru.vm5277.common.SystemParam;
-import ru.vm5277.common.compiler.CodeGenerator;
+import ru.vm5277.common.cg.CodeGenerator;
 
 public class PlatformLoader {
 	private	static	final	String	LIB_POSTFIX		= "_codegen";

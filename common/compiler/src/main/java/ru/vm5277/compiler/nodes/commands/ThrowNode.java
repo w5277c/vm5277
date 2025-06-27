@@ -15,7 +15,7 @@
  */
 package ru.vm5277.compiler.nodes.commands;
 
-import ru.vm5277.common.compiler.CodeGenerator;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.Delimiter;

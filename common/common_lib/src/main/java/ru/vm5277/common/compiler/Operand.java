@@ -15,38 +15,86 @@
  */
 package ru.vm5277.common.compiler;
 
+import java.util.Map;
+import ru.vm5277.common.cg.DataSymbol;
+import static ru.vm5277.common.compiler.OperandType.ADDR_OFFSET;
+import static ru.vm5277.common.compiler.OperandType.LOCAL_RESID;
+
 public class Operand {
-	private	int			Id;
+	private	VarType		varType;
 	private	OperandType	opType;
 	private	Object		value;
+	private	Integer		resId;
 	
-	public Operand(int typeId, OperandType opType, Object value) {
-		this.Id = typeId;
+	public Operand(VarType varType, OperandType opType, Object value) {
+		this.varType = varType;
 		this.opType = opType;
 		this.value = value;
 	}
 	
-	public Operand(int Id, OperandType opType) {
-		this.Id = Id;
+	public Operand(VarType varType, OperandType opType) {
+		this.varType = varType;
 		this.opType = opType;
 		this.value = null;
 	}
 
-	public int getId() {
-		return Id;
+	public VarType getVarType() {
+		return varType;
 	}
 	
 	public OperandType getOperandType() {
 		return opType;
 	}	
 	
+	public void setResId(int resId)  {
+		this.resId = resId;
+	}
+	public Integer getResId() {
+		return resId;
+	}
+	
 	public Object getValue() {
 		return value;
 	}
 	
+/*	public String[] getParams(int size, Map<Integer, DataSymbol> flashData) throws Exception {
+		String[] result = new String[size];
+		
+		switch (opType) {
+			case ADDR_OFFSET:
+			case LITERAL:
+				long numValue = 0;
+				if(value instanceof Number) {
+					numValue = ((Number)value).longValue();
+				}
+				else if(value instanceof Character) {
+					numValue = ((Character)value);
+				}
+				else throw new Exception("CG: literal must be a number, operand: " + toString());
+				
+				for(int i=0; i<size; i++) {
+					result[i] = Long.toString(numValue&0xff);
+					numValue >>>= 8;
+				}
+				break;
+			case LOCAL_RESID:
+				if(0x02 != size) throw new Exception("CG: incorrect size, operand: " + toString());
+				
+				int resId = (int)value;
+				String strValue = flashData.get(resId).getLabel();
+				result[0x00] = "low(" + strValue + ")";
+				result[0x01] = "high(" + strValue + ")";
+				break;
+			default:
+				throw new Exception("CG: unsupported operand type: " + opType);
+		}
+		return result;
+	}
+	*/
+	
 	@Override
 	public String toString() {
-		return opType + "[id:" + Id + "]" + (null == value ? "" : "=" + value);
+		return opType + "[id:" + varType + "]" + (null == value ? "" : "=" + value); //TODO экранировать символы типа \n
 	}
 	
 }

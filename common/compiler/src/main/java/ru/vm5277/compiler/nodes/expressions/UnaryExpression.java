@@ -15,7 +15,7 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
-import ru.vm5277.common.compiler.CodeGenerator;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.compiler.VarType;
@@ -149,7 +149,12 @@ public class UnaryExpression extends ExpressionNode {
 		// Генерация кода для операнда (например, переменной или другого выражения)
 		operand.codeGen(cg);
 
-		cg.emitUnary(operator);
+		if(operand instanceof VariableExpression) {
+			cg.emitUnary(operator, ((VariableExpression)operand).getSymbol().getRuntimeId()); //Работаем с переменной
+		}
+		else {
+			cg.emitUnary(operator, null); //TODO Работаем с уже загруженным Accum
+		}
 	}
 	
 	@Override

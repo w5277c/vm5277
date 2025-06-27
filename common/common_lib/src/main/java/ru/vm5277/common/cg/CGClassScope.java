@@ -13,20 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ru.vm5277.common.cg_scope;
+package ru.vm5277.common.cg;
 
 import java.util.HashMap;
 import java.util.Map;
 
-public class CGBlockScope extends CGScope {
+public class CGClassScope extends CGScope {
+	private	final	int							typeId;
+	private	final	int[]						intrerfaceIds;
 	private	final	Map<Integer, CGLocalScope>	locals	= new HashMap<>();
-			
-	public CGBlockScope(CGScope parent, int id) {
-		super(parent, id, "");
-	}
 	
-	public void addLocal(CGLocalScope local) {
-		locals.put(local.getId(), local);
+	public CGClassScope(CGScope parent, int id, int typeId, int[] intrerfaceIds, String name) {
+		super(parent, id, name);
+		
+		this.typeId = typeId;
+		this.intrerfaceIds = intrerfaceIds;
 	}
 
+	public void addField(CGLocalScope local) {
+		locals.put(local.getResId(), local);
+	}
 }

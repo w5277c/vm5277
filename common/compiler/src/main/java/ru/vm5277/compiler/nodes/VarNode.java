@@ -16,7 +16,7 @@
 package ru.vm5277.compiler.nodes;
 
 import java.util.Set;
-import ru.vm5277.common.compiler.CodeGenerator;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.Operand;
 import ru.vm5277.common.compiler.OperandType;
 import ru.vm5277.compiler.Delimiter;
@@ -27,6 +27,7 @@ import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
+import ru.vm5277.compiler.nodes.expressions.BinaryExpression;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.nodes.expressions.VariableExpression;
@@ -113,11 +114,11 @@ public class VarNode extends AstNode {
 			if(isFinal && null != initializer) {
 				if(initializer instanceof LiteralExpression) {
 					LiteralExpression le = (LiteralExpression)initializer;
-					symbol.setConstantOperand(new Operand(le.getType(scope).getId(), OperandType.LITERAL, le.getValue()));
+					symbol.setConstantOperand(new Operand(le.getType(scope), OperandType.LITERAL, le.getValue()));
 				}
 				else if(initializer instanceof VariableExpression) {
 					VariableExpression ve = (VariableExpression)initializer;
-					symbol.setConstantOperand(new Operand(ve.getType(scope).getId(), OperandType.TYPE, ve.getValue()));
+					symbol.setConstantOperand(new Operand(ve.getType(scope), OperandType.TYPE, ve.getValue()));
 				}
 			}
 
@@ -156,12 +157,39 @@ public class VarNode extends AstNode {
 	
 	@Override
 	public void codeGen(CodeGenerator cg) throws Exception {
-		symbol.setRuntimeId(cg.enterLocal(type.getId(), type.getSize(), isFinal() || VarType.CSTR == type, name));
-		try {
-			initializer.codeGen(cg);
+		boolean isConstant = isFinal() || VarType.CSTR == type;
+		int runtimeId = cg.enterLocal(type.getId(), type.getSize(), isConstant, name);
+		symbol.setRuntimeId(runtimeId);
+		if(isConstant) {
+			if(initializer instanceof LiteralExpression) {
+				LiteralExpression le = (LiteralExpression)initializer;
+				if(VarType.CSTR == le.getType(null)) {
+					cg.defineStr(runtimeId, (String)le.getValue());
+				}
+				else {
+//TODO вроде как не нужно					cg.defineData(runtimeId, type.getSize(), le.getNumValue());
+				}
+			}
+			else throw new Exception("unexpected expression:" + initializer + " for constant");
 		}
-		finally {
-			cg.leaveLocal();
+		else {
+			if(initializer instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
+				cg.localStore(runtimeId, ((LiteralExpression)initializer).getNumValue());
+			}
+			else {
+				if(initializer instanceof BinaryExpression) {
+					cg.enterExpression();
+					initializer.codeGen(cg);
+					cg.storeAcc(runtimeId);
+					cg.leaveExpression();
+				}
+				else {
+					initializer.codeGen(cg);
+					cg.loadRegs(type.getSize());
+					cg.storeAcc(runtimeId);
+				}
+			}
 		}
+		cg.leaveLocal();
 	}
 }

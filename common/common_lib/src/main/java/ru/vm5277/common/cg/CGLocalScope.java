@@ -13,26 +13,42 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ru.vm5277.common.cg_scope;
-
-import ru.vm5277.common.compiler.Operand;
+package ru.vm5277.common.cg;
 
 public class CGLocalScope extends CGScope {
 	private	final	int						typeId;
 	private	final	int						size;
 	private			boolean					isConstant;
-	private			Operand					value;
+	private			int						stackOffset;
+	private			DataSymbol				dataSymbol;
+	private			CGCell[]				cells;
 			
-	public CGLocalScope(CGScope parent, int id, int typeId, int size, boolean isConstant, String name) {
-		super(parent, id, name);
+	public CGLocalScope(CGScope parent, int resId, int typeId, int size, boolean isConstant, String name, CGCell[] cells) {
+		super(parent, resId, name);
 		
 		this.typeId = typeId;
 		this.size = size;
 		this.isConstant = isConstant;
+		this.cells = cells;
 	}
 	
-	public void setValue(Operand value) {
-		this.value = value;
+	public CGCell[] getCells() {
+		return cells;
+	}
+	
+	public void setDataSymbol(DataSymbol dataSymbol) {
+		this.dataSymbol = dataSymbol;
+	}
+	public DataSymbol getDataSymbol() {
+		return dataSymbol;
+	}
+	
+	
+	public void setStackOffset(int offset) {
+		this.stackOffset = offset;
+	}
+	public int getStackOffset() {
+		return stackOffset;
 	}
 	
 	public int getSize() {
@@ -43,7 +59,11 @@ public class CGLocalScope extends CGScope {
 		return isConstant;
 	}
 	
-	public Operand getValue() {
-		return value;
+	public Integer getRegCellPos(byte reg) {
+		for(int pos=0; pos<cells.length;pos++) {
+			CGCell cell = cells[pos];
+			if(CGCell.Type.REG == cell.getType() && cell.getNum() == reg) return pos;
+		}
+		return null;
 	}
 }

@@ -95,7 +95,14 @@ public class ExpressionNode extends AstNode {
 				if (minPrecedence > Operator.PRECEDENCE.get(operator)) {
 					break;
 				}
-				ExpressionNode typeExpr = parseTypeReference(); // Разбираем выражение типа
+				
+				ExpressionNode typeExpr = null;
+				if(tb.match(TokenType.TYPE)) {
+					typeExpr = new LiteralExpression(tb, mc, tb.consume().getValue());
+				}
+				else {
+					typeExpr = parseTypeReference(); // Разбираем выражение типа
+				}
 				return optimizeExpression(new InstanceOfExpression(tb, mc, left, typeExpr));
 			}
 			
@@ -156,7 +163,7 @@ public class ExpressionNode extends AstNode {
 					VariableExpression ve = (VariableExpression)(bRight.getLeft() instanceof VariableExpression ? bRight.getLeft() : bRight.getRight());
 					LiteralExpression le = (LiteralExpression)(bRight.getLeft() instanceof VariableExpression ? bRight.getRight(): bRight.getLeft());
 					if(	ve.getValue().equals(((VariableExpression)left).getValue()) && le.isInteger()) {
-						long num = le.toLong();
+						long num = le.getNumValue();
 						if(-1 == num || 1 == num) {
 							return new UnaryExpression(tb, mc, (Operator.PLUS==bRight.getOperator()^(-1==num)) ? Operator.PRE_INC : Operator.PRE_DEC, left);
 						}					

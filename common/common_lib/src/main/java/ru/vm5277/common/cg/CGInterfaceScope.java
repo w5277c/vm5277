@@ -13,13 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ru.vm5277.common.compiler;
+package ru.vm5277.common.cg;
 
-public enum OperandType {
-	LITERAL,
-	VARIABLE,
-	TYPE,
-	CONSTANT,
-	LOCAL_RESID,
-	ADDR_OFFSET;
+public class CGInterfaceScope extends CGScope {
+	private	final	int		typeId;
+	private	final	int[]	intrerfaceIds;
+			
+	public CGInterfaceScope(CGScope parent, int id, int typeId, int[] intrerfaceIds, String name) {
+		super(parent, id, name);
+		
+		this.typeId = typeId;
+		this.intrerfaceIds = intrerfaceIds;
+	}
 }

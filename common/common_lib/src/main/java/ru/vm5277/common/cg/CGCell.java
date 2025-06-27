@@ -12,24 +12,29 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */package ru.vm5277.common.compiler;
+ */
+package ru.vm5277.common.cg;
 
-public class DataSymbol {
-	private	int		resId;
-	private	String	label;
-	private	Operand	op;
-	
-	public DataSymbol(int resId, String label, Operand op) {
-		this.resId = resId;
-		this.label = label;
-		this.op = op;
+public class CGCell {
+	public static enum Type {
+		REG,
+		STACK,
+		RAM;
 	}
 	
-	public String getLabel() {
-		return label;
+	private	Type	type;
+	private	int		num;
+	
+	public CGCell(Type type, int num) {
+		this.type = type;
+		this.num = num;
 	}
 	
-	public Operand getOperand() {
-		return op;
+	public Type getType() {
+		return type;
+	}
+	
+	public int getNum() {
+		return num;
 	}
 }

@@ -15,8 +15,7 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
-import ru.vm5277.common.compiler.CodeGenerator;
-import ru.vm5277.common.compiler.Operand;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -125,10 +124,9 @@ public class InstanceOfExpression extends ExpressionNode {
 	@Override
 	public void codeGen(CodeGenerator cg) throws Exception {
 		left.codeGen(cg);
-		Operand objectOp = cg.getAcc();
+		long objectOp = cg.getAcc();
 		rightExpr.codeGen(cg);
-		Operand result = cg.emitInstanceof(objectOp, (int)cg.getAcc().getValue());
-		cg.setAcc(result);
+		cg.setAcc(0x01, cg.emitInstanceof(objectOp, (int)cg.getAcc()) ? 0x01 : 0x00);
 	}
 	
 	@Override

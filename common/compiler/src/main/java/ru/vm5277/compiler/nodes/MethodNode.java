@@ -18,7 +18,7 @@ package ru.vm5277.compiler.nodes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import ru.vm5277.common.compiler.CodeGenerator;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
@@ -267,12 +267,8 @@ public class MethodNode extends AstNode {
 			methodSymbol.setRuntimeId(cg.enterMethod(returnType.getId(), typeIds, name));
 		}
 		
-		try {
-			BlockNode body = blocks.get(0);
-			if(null != body) body.codeGen(cg);
-		}
-		finally {
-			cg.leaveMethod();
-		}
+		BlockNode body = blocks.get(0);
+		if(null != body) body.codeGen(cg);
+		cg.leaveMethod();
 	}
 }

@@ -21,7 +21,7 @@ import ru.vm5277.compiler.nodes.TokenBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.compiler.Case;
-import ru.vm5277.common.compiler.CodeGenerator;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;

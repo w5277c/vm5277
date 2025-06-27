@@ -15,7 +15,7 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
-import ru.vm5277.common.compiler.CodeGenerator;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -84,8 +84,10 @@ public class VariableExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) {
-		cg.loadAcc(symbol.getRuntimeId());
+	public void codeGen(CodeGenerator cg) throws Exception {
+		if(cg.isExpressionScope()) {
+			cg.loadAcc(symbol.getRuntimeId());
+		}
 	}
 	
 	public Symbol getSymbol() {

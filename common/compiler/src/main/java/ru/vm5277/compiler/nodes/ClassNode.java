@@ -19,7 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import ru.vm5277.common.compiler.CodeGenerator;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
@@ -207,11 +207,7 @@ public class ClassNode extends AstNode {
 		}
 			
 		cg.enterClass(VarType.fromClassName(name).getId(), interfaceIds, name);
-		try {
-			blockNode.codeGen(cg);
-		}
-		finally {
-			cg.leaveClass();
-		}
+		blockNode.codeGen(cg);
+		cg.leaveClass();
 	}
 }

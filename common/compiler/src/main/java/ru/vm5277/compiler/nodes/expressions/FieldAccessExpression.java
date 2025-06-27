@@ -16,7 +16,7 @@
 package ru.vm5277.compiler.nodes.expressions;
 
 import ru.vm5277.common.exceptions.SemanticException;
-import ru.vm5277.common.compiler.CodeGenerator;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -59,6 +59,10 @@ public class FieldAccessExpression extends ExpressionNode {
 		return null == fieldSymbol ? null : fieldSymbol.getType();
 	}
 
+	public Symbol getSymbol() {
+		return fieldSymbol;
+	}
+	
 	public Object getValue() {
 		return null == fieldSymbol ? null : fieldSymbol;
 	}
@@ -87,6 +91,5 @@ public class FieldAccessExpression extends ExpressionNode {
 	
 	@Override
 	public void codeGen(CodeGenerator cg) throws Exception {
-		cg.setAcc(fieldSymbol.getConstantOperand());
 	}
 }

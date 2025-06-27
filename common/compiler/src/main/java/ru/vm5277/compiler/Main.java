@@ -23,7 +23,7 @@ import java.util.HashMap;
 import java.util.Map;
 import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.SystemParam;
-import ru.vm5277.common.compiler.CodeGenerator;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.codegen.PlatformLoader;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.ClassNode;
@@ -133,8 +133,13 @@ public class Main {
 				params.put(SystemParam.CORE_FREQ, core_freq);
 			}
 			CodeGenerator cg = PlatformLoader.loadGenerator(platform, libDir, nbr.getMap(), params);
-			clazz.codeGen(cg);
-			cg.postBuild();
+			try {
+				clazz.codeGen(cg);
+				cg.postBuild();
+			}
+			catch(Exception e) {
+				e.printStackTrace();
+			}
 			
 			System.out.println();
 			System.out.println(cg.getAsm());

@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ru.vm5277.common.compiler;
+package ru.vm5277.common.cg;
 
 import java.util.Arrays;
 import java.util.Date;
@@ -26,12 +26,10 @@ import ru.vm5277.common.NativeBinding;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.RTOSFeature;
 import ru.vm5277.common.SystemParam;
-import ru.vm5277.common.cg_scope.CGBlockScope;
-import ru.vm5277.common.cg_scope.CGClassScope;
-import ru.vm5277.common.cg_scope.CGInterfaceScope;
-import ru.vm5277.common.cg_scope.CGLocalScope;
-import ru.vm5277.common.cg_scope.CGMethodScope;
-import ru.vm5277.common.cg_scope.CGScope;
+import ru.vm5277.common.compiler.Case;
+import ru.vm5277.common.compiler.Operand;
+import static ru.vm5277.common.compiler.OperandType.LITERAL;
+import ru.vm5277.common.compiler.VarType;
 
 public abstract class CodeGenerator {
 //TODO модель пока не использует регистры МК для оптимизации(использует выделение памяти в стеке)
@@ -45,8 +43,8 @@ public abstract class CodeGenerator {
 	protected	final	Map<SystemParam, Object>	params;
 	protected	final	Map<Integer, DataSymbol>	flashData			= new HashMap<>();
 	protected			CGScope						scope				= null;
-	protected			Operand						acc;		//TODO похоже будет не нужен
-	protected			boolean						dp_stack_alloc		= false; // зависимость от процедур выделения и освобождения памяти в стеке
+	protected	final	CGAccum						accum				= new CGAccum();
+	protected			boolean						dpStackAlloc		= false; // зависимость от процедур выделения и освобождения памяти в стеке
 
 	public CodeGenerator(String genName, Map<String, NativeBinding> nbMap, Map<SystemParam, Object> params) {
 		this.genName = genName;
@@ -89,7 +87,7 @@ public abstract class CodeGenerator {
 	public int enterConstructor(int[] typeIds) {
 		int id = genId();
 		System.out.println("CG:enterConstructor, id:" + id + ", parameters:" + Arrays.toString(typeIds));
-		scope = new CGMethodScope(scope, id, VarType.NULL.getId(), typeIds, "contr");
+		scope = new CGMethodScope(scope, id, VarType.NULL.getId(), typeIds, "contr", buildRegsPool());
 		return id;
 	}
 	public void leaveConstructor() {
@@ -102,7 +100,7 @@ public abstract class CodeGenerator {
 	public int enterMethod(int typeId, int[] typeIds, String name) {
 		int id = genId();
 		System.out.println("CG:enterMethod, id:" + id + ", typeId:" + typeId + ", parameters:" + Arrays.toString(typeIds));
-		scope = new CGMethodScope(scope, id, typeId, typeIds, name);
+		scope = new CGMethodScope(scope, id, typeId, typeIds, name, buildRegsPool());
 		//asmSource.append("markStack\n");
 		return id;
 	}
@@ -118,9 +116,9 @@ public abstract class CodeGenerator {
 			mScope.asmInsert("\n");
 		}
 		
-		int size = mScope.getStackSize();
+		int size = mScope.getStackBlockSize();
 		if(0x00 != size) {
-			dp_stack_alloc = true;
+			dpStackAlloc = true;
 			mScope.asmInsert(stackAllocAsm(size));
 		}
 		
@@ -154,38 +152,50 @@ public abstract class CodeGenerator {
 	}
 
 	
-	public int enterLocal(int typeId, int size, boolean isConstant, String name) { //TODO сделать индексацию вместо имен
-		int id = genId();
+	public int enterLocal(int typeId, int size, boolean isConstant, String name) throws Exception { //TODO сделать индексацию вместо имен
+		int resId = genId();
 		
 		if(-1 == size) size = getRefSize(); // ссылка, записываем реальный размер для текущего чипа
 
-		System.out.println("CG:enterLocal, id:" + id + ", size:" + size + ", typeId:" + typeId + ", name:" + name);
+		System.out.println("CG:enterLocal, id:" + resId + ", size:" + size + ", typeId:" + typeId + ", name:" + name);
 		
 		
 		CGScope parentScope = scope;
 		// проверка на константу, нет необходимости выделять память
-		scope = new CGLocalScope(scope, id, typeId, size, isConstant, name);
-		if(!isConstant) {
-			if(parentScope instanceof CGMethodScope) {
-				((CGMethodScope)parentScope).addLocal((CGLocalScope)scope);
-			}
-			else if(parentScope instanceof CGBlockScope) {
-				((CGBlockScope)parentScope).addLocal((CGLocalScope)scope);
-			}
-			else {
-				System.err.println("Try to put local to " + scope);
-			}
+		if(parentScope instanceof CGMethodScope) {
+			CGMethodScope mScope = (CGMethodScope)parentScope;
+			CGCell[] cells = (isConstant ? null : mScope.memAllocate(size));
+			scope = new CGLocalScope(scope, resId, typeId, size, isConstant, name, cells);
+			mScope.addLocal((CGLocalScope)scope);
+//				setValueByIndex(op, size, null);
+		}
+		else if(parentScope instanceof CGBlockScope) {
+			CGBlockScope bScope = (CGBlockScope)parentScope;
+			bScope.addLocal((CGLocalScope)scope);
+		}
+		else {
+			System.err.println("Try to put local to " + scope);
 		}
 
-		return id;
+		return resId;
 	}
-	public void leaveLocal() {
-		((CGLocalScope)scope).setValue(acc);
+	public void leaveLocal() throws Exception {
+		CGLocalScope lScope = (CGLocalScope)scope;
+		if(lScope.isConstant()) {
+			lScope.setDataSymbol(flashData.get(lScope.getResId()));
+		}
+		else {
+//			lScope.setValue(accum.getValue());
+//			loadRegs(lScope.getSize());
+//			storeAcc(lScope.getResId());
+		}
+		
 		scope = scope.free();
 		//TODO
 		System.out.println("CG:LeaveLocal");
 	}
-
+	public abstract void localStore(int resId, long value) throws Exception;
+	
 	public int enterFiled(int typeId, int size, boolean isConstant, String name) {
 		int id = genId();
 
@@ -193,7 +203,7 @@ public abstract class CodeGenerator {
 		
 		System.out.println("CG:enterField, id:" + id + ", size:" + size + ", typeId:" + typeId + ", name:" + name);
 		CGScope parentScope = scope;
-		scope = new CGLocalScope(scope, id, typeId, size, isConstant, name);
+		scope = new CGLocalScope(scope, id, typeId, size, isConstant, name, null);
 		if(!isConstant) {
 			if(parentScope instanceof CGClassScope) {
 				((CGClassScope)parentScope).addField((CGLocalScope)scope);
@@ -210,36 +220,72 @@ public abstract class CodeGenerator {
 		//TODO
 		System.out.println("CG:LeaveField");
 	}
+	
+	
+	public int enterExpression() throws Exception {
+		if(isExpressionScope()) throw new Exception("CG:exterExpression, already in expression:" + scope);
 
-	public int defineData(Operand constant) { // формируем блок данных константы во FLASH
 		int resId = genId();
-		flashData.put(resId, new DataSymbol(resId, scope.getParent().getPath()+"_resid_"+resId, constant));
+		System.out.println("CG:enterExpression, id:" + resId);
+
+		accum.set(0x01, 0x00, resId); // Сброс аккумулятора
+		
+		scope = new CGExpressionScope(scope, resId);
 		return resId;
 	}
-	
-	public void setAcc(Operand source) {
-		System.out.println("CG:setAcc, op:" + source);
-		acc = source;
+	public void leaveExpression() {
+		scope = scope.free();
+		//TODO
+		System.out.println("CG:LeaveExpression");
 	}
-	public Operand getAcc() {
-		System.out.println("CG:getAcc, acc:" + acc);
-		return acc;
+
+	public void setAcc(int size, long value) throws Exception {
+		System.out.println("CG:setAcc, op:" + value);
+		accum.set(size, value);
+//		VarType vt = value.getVarType();
+		//Long value = ((Number)value.getValue()).longValue();
+//		if(VarType.BYTE == vt || VarType.SHORT == vt || VarType.INT == vt || VarType.CLASS==vt) {
+//			if(source.getValue() instanceof Number) {
+//				value = ((Number)source.getValue()).longValue();
+//			}
+//			else if(source.getValue() instanceof Character) {
+//				value = (long)(Character)source.getValue();
+//			}
+//		}
+
+/*ЭТО КОД ДЛЯ loadAcc!!!		if(null != value) {
+			scope.asmAppend("ldi r16," + (value&0xff) + "\n"); value >>= 0x08;
+			if(vt.getSize()>1) scope.asmAppend("ldi r17," + (value&0xff) + "\n"); value >>= 0x08;
+			if(vt.getSize()>2) scope.asmAppend("ldi r18," + (value&0xff) + "\n"); value >>= 0x08;
+			if(vt.getSize()>3) scope.asmAppend("ldi r19," + (value&0xff) + "\n"); value >>= 0x08;
+		}
+		else {
+			System.out.println("Unexpected value for set accum:" + source.toString());
+		}*/
 	}
-	public void loadAcc(int id) { //Загружаем значение переменной в acc
-		System.out.println("CG:loadAcc, srcId:" + id);
+
+	public long getAcc() {
+		System.out.println("CG:getAcc, acc:" + accum);
+		return accum.getValue();
 	}
-	public void storeAcc(int id) { //Записываем acc в переменную
-		System.out.println("CG:storeAcc, dstId:" + id);
+	public abstract void loadAcc(int resId) throws Exception;
+	public abstract void storeAcc(int resId) throws Exception;
 		
+	public abstract void emitUnary(Operator op, Integer resId) throws Exception ;
+	
+	public void defineStr(int resId, String text) {
+		flashData.put(resId, new DataSymbol(resId, scope.getParent().getPath()+"_resid_"+resId, -1, text));
+	}
+	public void defineData(int resId, int size, long value) {
+		flashData.put(resId, new DataSymbol(resId, scope.getParent().getPath()+"_resid_"+resId, size, value));
 	}
 	
-	public abstract void invokeMethod(int id, int typeId, Operand[] args);
-	public abstract void invokeNative(String methodQName, int typeId, Operand[] parameters) throws Exception; 
-	public abstract Operand emitInstanceof(Operand op, int typeId);	//todo может быть поросто boolean?
-	public abstract void emitUnary(Operator op); //PLUS, MINUS, BIT_NOT, NOT, PRE_INC, PRE_DEC, POST_INC, POST_DEC
+	public abstract void invokeMethod(String methodQName, int id, int typeId, Operand[] operands);
+	public abstract void invokeNative(String methodQName, int typeId, Operand[] operands) throws Exception; 
+	public abstract boolean emitInstanceof(long op, int typeId);
 	
 	//TODO набор методов для реализации команд if, switch, for, loop и .т.д
-	public abstract void eNew(int typeId, Operand[] parameters, boolean canThrow);
+	public abstract void eNew(int typeId, long[] parameters, boolean canThrow);
 	public abstract void eFree(Operand op);
 	
 	public abstract void eIf(int conditionBlockId, int thenBlockId, Integer elseBlockId);
@@ -249,13 +295,25 @@ public abstract class CodeGenerator {
 	public abstract void eThrow();
 	
 	public abstract int getRefSize();
+	public abstract void loadRegs(int size);
+	
+	public abstract List<Byte> buildRegsPool();
 	public abstract String pushRegAsm(int reg);
 	public abstract String popRegAsm(int reg);
+//	public abstract void setValueByIndex(Operand op, int size, List<Byte> tempRegs) throws Exception;
 	public abstract String stackAllocAsm(int size);
 	public abstract String stackFreeAsm();
 	public abstract String getVersion();
 
-	public void postBuild() {
+	public abstract void localAction(Operator op, int resId, Long k) throws Exception;
+	public abstract void localLoadRegs(CGLocalScope lScope, byte[] registers) throws Exception;
+	public abstract void localStoreRegs(int stackOffset, int size);
+	public abstract void loadRegsConst(byte[] regs, long value);
+	public abstract void constLoadRegs(String label, byte[] registers);
+	public abstract void addAccum(int value);
+	public abstract void subAccum(int value);
+	
+	public void postBuild() throws Exception {
 		StringBuilder asmHeaders = new StringBuilder();
 		asmHeaders.append("; vm5277.").append(genName).append(" v").append(getVersion()).append(" at ").append(new Date().toString()).append("\n");
 		asmHeaders.append("\n");
@@ -276,7 +334,7 @@ public abstract class CodeGenerator {
 		asmHeaders.append(".include \"devices/").append(params.get(SystemParam.MCU)).append(".def").append("\"\n");
 		asmHeaders.append(".include \"core/core.asm\"\n");		
 
-		if(dp_stack_alloc) {
+		if(dpStackAlloc) {
 			asmHeaders.append(".include \"sys/stack_alloc.asm\"\n");
 			asmHeaders.append(".include \"sys/stack_free.asm\"\n");	
 		}
@@ -289,9 +347,21 @@ public abstract class CodeGenerator {
 		for(int resId : flashData.keySet()) {
 			DataSymbol ds = flashData.get(resId);
 			asmHeaders.append(ds.getLabel()).append(":\n");
-			String value = ds.getOperand().getValue().toString();
-			asmHeaders.append(".db \"").append(value).append("\",0x00");
-			if(0x00==(value.length()&0x01)) asmHeaders.append(",0x00"); 
+			if(ds.getValue() instanceof String) {
+				asmHeaders.append(CGKOI8R.decode(ds.getValue().toString()));
+			}
+			else if(ds.getValue() instanceof Number) {
+				StringBuilder sb = new StringBuilder(".db ");
+				long value = ((Number)ds.getValue()).longValue();
+				for(int i=0; i<ds.getSize(); i++) {
+					sb.append((value&0xff)).append(",");
+					value >>= 0x08;
+				}
+				sb.deleteCharAt(sb.length()-1);
+				if(0 != (ds.getSize()&0x01)) sb.append(",0x00");
+				asmHeaders.append(sb.toString());
+			}
+			else throw new Exception("CG: postBuild, unsupported value:" + ds.getValue());
 			asmHeaders.append("\n");
 		}
 		
@@ -300,7 +370,35 @@ public abstract class CodeGenerator {
 		scope.asmPrepend(asmHeaders.toString());
 	}
 	
+	protected long getNum(Operand op) throws Exception {
+		switch(op.getOperandType()) {
+			case LITERAL:
+				if(op.getValue() instanceof Character) {
+					return (long)(Character)op.getValue();
+				}
+				return ((Number)op.getValue()).longValue();
+			default: throw new Exception("CG: getNum, unsupported operand:" + op);
+		}
+	}
+
+	protected CGLocalScope getLocal(int resId) throws Exception {
+		CGMethodScope mScope = scope.getMethodScope();
+		if(null != mScope) {
+			return mScope.getLocal(resId);
+		}
+		else throw new Exception("CG: getNum, can't access to method scope, for resId:" + resId);
+	}
+	
 	public String getAsm() {
 		return scope.getAsm();
 	}
+	
+	public boolean isExpressionScope() {
+		return (scope instanceof CGExpressionScope);
+	}
+	
+	protected boolean isEven(int reg) {
+		return 0 == (reg&0x01);
+	}
+
 }

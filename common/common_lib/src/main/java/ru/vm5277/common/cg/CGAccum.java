@@ -13,13 +13,36 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ru.vm5277.common.compiler;
+package ru.vm5277.common.cg;
 
-public enum OperandType {
-	LITERAL,
-	VARIABLE,
-	TYPE,
-	CONSTANT,
-	LOCAL_RESID,
-	ADDR_OFFSET;
+public class CGAccum {
+	private	int		size	= 1;
+	private	long	value	= 0;
+	private	Integer	localResId;
+	
+	public CGAccum() {
+	}
+	
+	public void set(int size, long value, Integer localResId) {
+		this.size = size;
+		this.value = value;
+		this.localResId = localResId;
+	}
+
+	public void set(int size, long value) {
+		this.size = size;
+		this.value = value;
+	}
+
+	public void set(long value) {
+		this.value = value;
+	}
+	public long getValue() {
+		return value;
+	}
+	
+	public int getSize() {
+		return size;
+	}
+
 }

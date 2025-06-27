@@ -15,7 +15,7 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
-import ru.vm5277.common.compiler.CodeGenerator;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.Operand;
 import ru.vm5277.common.compiler.OperandType;
 import ru.vm5277.common.compiler.VarType;
@@ -79,7 +79,7 @@ public class TypeReferenceExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) {
-		cg.setAcc(new Operand(0, OperandType.TYPE, varType.getId()));
+	public void codeGen(CodeGenerator cg) throws Exception {
+		//cg.setAcc(new Operand(VarType.CLASS, OperandType.TYPE, varType.getId()));
 	}
 }

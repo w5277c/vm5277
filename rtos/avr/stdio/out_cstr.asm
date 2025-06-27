@@ -21,19 +21,19 @@ OS_OUT_CSTR:
 ;Логирование строки, конец определяется по 0x00
 ;IN: Z-адрес FLASH на строку
 ;--------------------------------------------------------
-	PUSH TEMP_L
+	PUSH ACCUM_L
 	PUSH_Z
 
 _OS_OUT_CSTR__LOOP:
 	;Считываем байт
-	LPM TEMP_L,Z+
-	CPI TEMP_L,0x00
+	LPM ACCUM_L,Z+
+	CPI ACCUM_L,0x00
 	BREQ _OS_OUT_CSTR__END
 	MCALL OS_OUT_CHAR
 	RJMP _OS_OUT_CSTR__LOOP
 
 _OS_OUT_CSTR__END:
 	POP_Z
-	POP TEMP_L
+	POP ACCUM_L
 	RET
 .ENDIF

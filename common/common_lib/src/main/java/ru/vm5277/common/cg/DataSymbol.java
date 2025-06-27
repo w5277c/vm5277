@@ -12,25 +12,31 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
- */
-package ru.vm5277.common.cg_scope;
+ */package ru.vm5277.common.cg;
 
-import java.util.HashMap;
-import java.util.Map;
 
-public class CGClassScope extends CGScope {
-	private	final	int							typeId;
-	private	final	int[]						intrerfaceIds;
-	private	final	Map<Integer, CGLocalScope>	locals	= new HashMap<>();
+public class DataSymbol {
+	private	int		resId;
+	private	String	label;
+	private	int		size;
+	private	Object	value;
 	
-	public CGClassScope(CGScope parent, int id, int typeId, int[] intrerfaceIds, String name) {
-		super(parent, id, name);
-		
-		this.typeId = typeId;
-		this.intrerfaceIds = intrerfaceIds;
+	public DataSymbol(int resId, String label, int size, Object value) {
+		this.resId = resId;
+		this.label = label;
+		this.size = size;
+		this.value = value;
+	}
+	
+	public String getLabel() {
+		return label;
 	}
 
-	public void addField(CGLocalScope local) {
-		locals.put(local.getId(), local);
+	public int getSize() {
+		return size;
+	}
+	
+	public Object getValue() {
+		return value;
 	}
 }
