@@ -13,56 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ru.vm5277.common.cg;
+package ru.vm5277.common.cg.scopes;
 
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
+import ru.vm5277.common.cg.CGCell;
 
-public class CGMethodScope extends CGScope {
+public class CGMethodScope extends CGBlockScope {
+	private	final	int							lId;
 	private	final	int							typeId;
 	private	final	int[]						typeIds;
-	private	final	Map<Integer, CGLocalScope>	locals		= new HashMap<>();
-	private			int							stackBlockOffset	= 0;
 	private	final	List<Byte>					regsPool;
-	private	final	List<Byte>					userRegs	= new ArrayList<>();
 	
-	public CGMethodScope(CGScope parent, int id, int typeId, int[] typeIds, String name, List<Byte> regsPool) {
+	public CGMethodScope(CGScope parent, int lId, int id, int typeId, int[] typeIds, String name, List<Byte> regsPool) {
 		super(parent, id, name);
 		
+		this.lId = lId;
 		this.typeId = typeId;
 		this.typeIds = typeIds;
 		this.regsPool = regsPool;
 	}
 	
-	public void addLocal(CGLocalScope lScope) {
-		locals.put(lScope.getResId(), lScope);
-		//if(!lScope.isConstant()) {
-//			lScope.setStackOffset(stackBlockOffset);
-//			stackBlockOffset += lScope.getSize();
-		//}
-	}
-	public CGLocalScope getLocal(int resId) {
-		return locals.get(resId);
-	}
-	
-	public int getStackBlockSize() {
-		return stackBlockOffset;
-	}
-	
-	public void putUsedReg(byte reg) {
-		if(!userRegs.contains(reg)) userRegs.add(reg);
-	}
-	public void putUsedRegs(byte[] regs) {
-		for(byte reg : regs) {
-			putUsedReg(reg);
-		}
-	}
-	
-	public List<Byte> getUsedRegs() { // только для чтения!
-		return userRegs;
-	}
 	
 	public Byte reserveReg() {
 		if(!regsPool.isEmpty()) {
@@ -78,6 +48,7 @@ public class CGMethodScope extends CGScope {
 		}
 	}
 
+	@Override
 	public CGCell[] memAllocate(int size) {
 		CGCell[] cells = new CGCell[size];
 		for(int i=0; i<size; i++) {

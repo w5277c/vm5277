@@ -271,7 +271,7 @@ public class MethodCallExpression extends ExpressionNode {
 		if(!args.isEmpty()) {
 			params = new VarType[args.size()];
 			for(int i=0; i<args.size(); i++) {
-				params[i] = args.get(i).getType(symbol.getScope());
+				params[i] = symbol.getParameters().get(i).getType();
 			}
 		}
 

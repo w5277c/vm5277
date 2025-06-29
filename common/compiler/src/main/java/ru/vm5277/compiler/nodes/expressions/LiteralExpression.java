@@ -65,6 +65,9 @@ public class LiteralExpression extends ExpressionNode {
 		if(value instanceof Character) {
 			return (int)(Character)value;
 		}
+		else if(value instanceof Boolean) {
+			return ((Boolean)value) ? 0x01 : 0x00;
+		}
 		return ((Number)value).longValue();
 	}
 	
@@ -119,7 +122,10 @@ public class LiteralExpression extends ExpressionNode {
 		}
 		else {
 			if(value instanceof Character) {
-				cg.setAcc(0x01, (int)(Character)value);
+				cg.setAcc(type.getSize(), (int)(Character)value);
+			}
+			if(value instanceof Boolean) {
+				cg.setAcc(type.getSize(), ((Boolean)value) ? 0x01 : 0x00);
 			}
 			else {
 				cg.setAcc(type.getSize(), ((Number)value).longValue());

@@ -13,20 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ru.vm5277.common.cg;
+package ru.vm5277.common.cg.items;
 
-import java.util.HashMap;
-import java.util.Map;
-
-public class CGBlockScope extends CGScope {
-	private	final	Map<Integer, CGLocalScope>	locals	= new HashMap<>();
-			
-	public CGBlockScope(CGScope parent, int id) {
-		super(parent, id, "");
+public class CGIText implements CGItem {
+	private	final	String	text;
+	
+	public CGIText(String text) {
+		this.text = text;
 	}
 	
-	public void addLocal(CGLocalScope local) {
-		locals.put(local.getResId(), local);
+	@Override
+	public String build() {
+		return text + "\n";
 	}
-
 }

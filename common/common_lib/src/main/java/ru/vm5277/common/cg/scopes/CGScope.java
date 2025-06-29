@@ -13,19 +13,42 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ru.vm5277.common.cg;
+package ru.vm5277.common.cg.scopes;
 
-public class CGScope {
-	private		final			String			name;
-	private						CGScope			parent;
-	protected					int				resId;
-	private						int				sbPos	= 0;
-	protected					StringBuilder	sb		= new StringBuilder();
+import java.util.HashMap;
+import java.util.Map;
+import ru.vm5277.common.cg.items.CGIContainer;
+import ru.vm5277.common.cg.items.CGIText;
+
+public class CGScope extends CGIContainer {
+	private				static	int						idCntr		= 0;
+	private		final			String					name;
+	protected					CGScope					parent;
+	protected	final	static	Map<Integer, CGScope>	scopesMap	= new HashMap<>();
+
+	protected					int						resId;
+	private						int						sbPos		= 0;
+	private						boolean					verbose		= false;
+	
+	
+	public static int genId() {
+		return idCntr++;
+	}
+
+	public CGScope() {
+		name = "root";
+	}
 	
 	public CGScope(CGScope parent, int resId, String name) {
 		this.parent = parent;
 		this.name = name;
 		this.resId = resId;
+		
+		if(null != parent) {
+			parent.append(this);
+			scopesMap.put(resId, this);
+		}
+		if(verbose) append(new CGIText(";======== enter " + toString() + " ========"));
 	}
 	
 	public CGScope getParent() {
@@ -36,25 +59,14 @@ public class CGScope {
 		return resId;
 	}
 	
-	public void asmAppend(String str) {
-		sb.append(str);
-		sbPos = sb.length()-1;
-	}
-	public void asmInsert(String str) {
-		sb.insert(sbPos, str);
-		sbPos += str.length();
-	}
-	public void asmPrepend(String str) {
-		sb.insert(0, str);
-		sbPos = str.length();
-	}
-	public String getAsm() {
-		return sb.toString();
+	public CGScope free() {
+		if(verbose) append(new CGIText(";======== leave " + toString() + " ========"));
+//!!!		parent.asmAppend(cgb);
+		return parent;
 	}
 	
-	public CGScope free() {
-		parent.asmAppend(sb.toString());
-		return parent;
+	public CGScope getScope(int resId) {
+		return scopesMap.get(resId);
 	}
 	
 	public String getPath() {
@@ -74,12 +86,17 @@ public class CGScope {
 		return name;
 	}
 	
-	public CGMethodScope getMethodScope() {
+	public CGBlockScope getBlockScope() {
 		CGScope _scope = this;
 		while(null != _scope) {
-			if(_scope instanceof CGMethodScope) return (CGMethodScope)_scope;
+			if(_scope instanceof CGBlockScope) return (CGBlockScope)_scope;
 			_scope = _scope.getParent();
 		}
 		return null;
+	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + ":" + name;
 	}
 }

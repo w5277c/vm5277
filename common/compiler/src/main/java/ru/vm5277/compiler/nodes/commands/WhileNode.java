@@ -113,14 +113,35 @@ public class WhileNode extends CommandNode {
 	
 	@Override
 	public void codeGen(CodeGenerator cg) throws Exception {
-		int condBlockId = cg.enterBlock();
-		condition.codeGen(cg);
-		cg.leaveBlock();
+		if(condition instanceof LiteralExpression) {
+			LiteralExpression le = (LiteralExpression)condition;
+			if(0x00 != le.getNumValue()) {
+				int labelBodyResId = cg.makeLabel("bwhile");
+				int bodyResId = cg.enterBlock();
+				body.codeGen(cg);
+				cg.leaveBlock();
+				int labelEndResId = cg.makeLabel("ewhile");
+				cg.eWhile(null, null, labelBodyResId, bodyResId, labelEndResId);
+			}
+		}
+		else {
+			int labelCondResId = cg.makeLabel("cwhile");
+			int condResId = cg.enterBlock();
+			condition.codeGen(cg);
+			cg.leaveBlock();
+			int labelBodyResId = cg.makeLabel("bwhile");
+			int bodyResId = cg.enterBlock();
+			body.codeGen(cg);
+			cg.leaveBlock();
+			int labelEndResId = cg.makeLabel("ewhile");
+			cg.eWhile(labelCondResId, condResId, labelBodyResId, bodyResId, labelEndResId);
+		}
+		
 
-		int bodyBlockId = cg.enterBlock();
-		body.codeGen(cg);
-		cg.leaveBlock();
+//		int bodyBlockId = cg.enterBlock();
+//		body.codeGen(cg);
+//		cg.leaveBlock();
 
-		cg.eWhile(condBlockId, bodyBlockId);
+//		cg.eWhile(condBlockId, bodyBlockId);
 	}
 }

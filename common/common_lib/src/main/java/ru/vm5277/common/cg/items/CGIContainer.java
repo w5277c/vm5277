@@ -13,31 +13,39 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ru.vm5277.common.cg;
+package ru.vm5277.common.cg.items;
 
+import java.util.ArrayList;
+import java.util.List;
 
-public class DataSymbol {
-	private	int		resId;
-	private	String	label;
-	private	int		size;
-	private	Object	value;
+public class CGIContainer implements CGItem {
+	private	final	List<CGItem>	items	= new ArrayList<>();
+	private			int				pos		= 0;
 	
-	public DataSymbol(int resId, String label, int size, Object value) {
-		this.resId = resId;
-		this.label = label;
-		this.size = size;
-		this.value = value;
-	}
-	
-	public String getLabel() {
-		return label;
+	public void begin() {
+		pos = 0;
 	}
 
-	public int getSize() {
-		return size;
+	public void append(CGItem item) {
+		items.add(item);
+		pos = items.size()-1;
 	}
 	
-	public Object getValue() {
-		return value;
+	public void prepend(CGItem item) {
+		items.add(0, item);
+		pos = 1;
+	}
+
+	public void insert(CGItem item) {
+		items.add(pos++, item);
+	}
+	
+	@Override
+	public String build() {
+		StringBuilder sb = new StringBuilder();
+		for(CGItem item : items) {
+			sb.append(item.build());
+		}
+		return sb.toString();
 	}
 }

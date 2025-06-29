@@ -73,4 +73,10 @@ public final class GPIO {
 	public	final	static	byte	PG5	= 0x65;
 	public	final	static	byte	PG6	= 0x66;
 	public	final	static	byte	PG7	= 0x67;
+
+	public static native void setHi(byte port);
+	public static native void setLo(byte port);
+	public static native void invert(byte port);
+	public static native void modeOut(byte port);
+	public static native void modeIn(byte port);
 }

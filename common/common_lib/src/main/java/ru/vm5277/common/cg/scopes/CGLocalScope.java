@@ -13,7 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ru.vm5277.common.cg;
+package ru.vm5277.common.cg.scopes;
+
+import ru.vm5277.common.cg.CGCell;
+import ru.vm5277.common.cg.DataSymbol;
 
 public class CGLocalScope extends CGScope {
 	private	final	int						typeId;

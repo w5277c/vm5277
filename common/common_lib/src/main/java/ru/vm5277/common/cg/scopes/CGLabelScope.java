@@ -13,10 +13,15 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ru.vm5277.common.cg;
+package ru.vm5277.common.cg.scopes;
 
-public class CGExpressionScope extends CGScope {
-	public CGExpressionScope(CGScope parent, int resId) {
-		super(parent, resId, "");
+import ru.vm5277.common.cg.items.CGIText;
+
+public class CGLabelScope extends CGScope {
+	public CGLabelScope(CGScope parent, int resId, String name) {
+		super(parent, resId, name);
+
+		append(new CGIText(name + ":"));
+//		parent.asmAppend(cgb);
 	}
 }

@@ -164,6 +164,7 @@ public class VarType {
 	}
 	
 	public int getSize() throws SemanticException {
+		if (this == BOOL) return 1;
 		if (this == BYTE) return 1;
 		if (this == SHORT) return 2;
 		if (this == FIXED) return 2;

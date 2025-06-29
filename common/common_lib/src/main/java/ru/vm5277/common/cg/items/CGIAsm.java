@@ -13,31 +13,29 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ru.vm5277.common.cg;
+package ru.vm5277.common.cg.items;
 
-
-public class DataSymbol {
-	private	int		resId;
-	private	String	label;
-	private	int		size;
-	private	Object	value;
+public class CGIAsm implements CGItem {
+	private	String	text;
+	private	int		wSize;
 	
-	public DataSymbol(int resId, String label, int size, Object value) {
-		this.resId = resId;
-		this.label = label;
-		this.size = size;
-		this.value = value;
-	}
 	
-	public String getLabel() {
-		return label;
+	public CGIAsm(String text) {
+		wSize = 0x01;
+		this.text = text;
 	}
 
-	public int getSize() {
-		return size;
+	public CGIAsm(String text, int wSize) {
+		this.text = text;
+		this.wSize = wSize;
 	}
 	
-	public Object getValue() {
-		return value;
+	public int getWSize() {
+		return wSize;
+	}
+
+	@Override
+	public String build() {
+		return text + "\n";
 	}
 }

@@ -29,6 +29,7 @@ import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.nodes.expressions.BinaryExpression;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
+import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.nodes.expressions.VariableExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
@@ -176,18 +177,20 @@ public class VarNode extends AstNode {
 			if(initializer instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
 				cg.localStore(runtimeId, ((LiteralExpression)initializer).getNumValue());
 			}
+			else if(initializer instanceof BinaryExpression) {
+				cg.enterExpression();
+				initializer.codeGen(cg);
+				cg.storeAcc(runtimeId);
+				cg.leaveExpression();
+			}
+			else if(initializer instanceof FieldAccessExpression) {
+				FieldAccessExpression fae = (FieldAccessExpression)initializer;
+				cg.localStore(runtimeId, ((Number)fae.getSymbol().getConstantOperand().getValue()).longValue());
+			}
 			else {
-				if(initializer instanceof BinaryExpression) {
-					cg.enterExpression();
-					initializer.codeGen(cg);
-					cg.storeAcc(runtimeId);
-					cg.leaveExpression();
-				}
-				else {
-					initializer.codeGen(cg);
-					cg.loadRegs(type.getSize());
-					cg.storeAcc(runtimeId);
-				}
+				initializer.codeGen(cg);
+				cg.loadRegs(type.getSize());
+				cg.storeAcc(runtimeId);
 			}
 		}
 		cg.leaveLocal();
