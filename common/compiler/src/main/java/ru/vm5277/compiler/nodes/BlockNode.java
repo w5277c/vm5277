@@ -301,9 +301,7 @@ public class BlockNode extends AstNode {
 	public void codeGen(CodeGenerator cg) throws Exception {
 		for(AstNode decl : declarations) {
 			if(decl instanceof BinaryExpression) {
-				cg.enterExpression();
 				decl.codeGen(cg);
-				cg.leaveExpression();
 			}
 			else {
 				decl.codeGen(cg);

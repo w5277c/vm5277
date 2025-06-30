@@ -15,13 +15,13 @@
  */
 package ru.vm5277.common.cg.scopes;
 
-import ru.vm5277.common.cg.items.CGIText;
-
 public class CGLabelScope extends CGScope {
 	public CGLabelScope(CGScope parent, int resId, String name) {
 		super(parent, resId, name);
-
-		append(new CGIText(name + ":"));
-//		parent.asmAppend(cgb);
+	}
+	
+	@Override
+	public String build() {
+		return name + ":\n";
 	}
 }

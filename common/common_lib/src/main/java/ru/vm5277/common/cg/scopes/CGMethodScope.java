@@ -19,15 +19,15 @@ import java.util.List;
 import ru.vm5277.common.cg.CGCell;
 
 public class CGMethodScope extends CGBlockScope {
-	private	final	int							lId;
+	private	final	CGLabelScope				lbScope;
 	private	final	int							typeId;
 	private	final	int[]						typeIds;
 	private	final	List<Byte>					regsPool;
 	
-	public CGMethodScope(CGScope parent, int lId, int id, int typeId, int[] typeIds, String name, List<Byte> regsPool) {
+	public CGMethodScope(CGScope parent, CGLabelScope lbScope, int id, int typeId, int[] typeIds, String name, List<Byte> regsPool) {
 		super(parent, id, name);
 		
-		this.lId = lId;
+		this.lbScope = lbScope;
 		this.typeId = typeId;
 		this.typeIds = typeIds;
 		this.regsPool = regsPool;

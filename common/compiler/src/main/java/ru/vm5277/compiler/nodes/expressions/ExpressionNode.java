@@ -98,7 +98,7 @@ public class ExpressionNode extends AstNode {
 				
 				ExpressionNode typeExpr = null;
 				if(tb.match(TokenType.TYPE)) {
-					typeExpr = new LiteralExpression(tb, mc, tb.consume().getValue());
+					typeExpr = new LiteralExpression(tb, mc, checkPrimtiveType());
 				}
 				else {
 					typeExpr = parseTypeReference(); // Разбираем выражение типа
@@ -319,10 +319,16 @@ public class ExpressionNode extends AstNode {
 			// Оптимизация через флаг из postAnalyze
 			if (ioe.isFulfillsContract()) return new LiteralExpression(tb, mc, true);
 
-			// Оптимизация для final переменных с известными типами
+			// Оптимизация для final объектов
 			if (ioe.getLeft() instanceof VariableExpression) {
+				if(ioe.getLeftType().isPrimitive() && ioe.getLeftType() == ioe.getRightType()) {
+					return new LiteralExpression(tb, mc, true);
+				}
+
 				VariableExpression varExpr = (VariableExpression)ioe.getLeft();
 				Symbol symbol = varExpr.getSymbol();
+
+
 				if (null != symbol && symbol.isFinal() && ioe.getLeftType() != null && ioe.getRightType() != null) {
 					VarType leftType = ioe.getLeftType();
 					Operand op = symbol.getConstantOperand();

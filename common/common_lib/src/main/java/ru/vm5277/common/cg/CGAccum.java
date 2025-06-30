@@ -40,7 +40,10 @@ public class CGAccum {
 	public long getValue() {
 		return value;
 	}
-	
+
+	public void setSize(int size)  {
+		this.size = size;
+	}
 	public int getSize() {
 		return size;
 	}

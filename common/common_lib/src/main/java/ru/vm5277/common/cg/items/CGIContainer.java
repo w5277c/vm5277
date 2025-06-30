@@ -40,6 +40,10 @@ public class CGIContainer implements CGItem {
 		items.add(pos++, item);
 	}
 	
+	public void remove(CGItem item)  {
+		items.remove(item);
+	}
+	
 	@Override
 	public String build() {
 		StringBuilder sb = new StringBuilder();

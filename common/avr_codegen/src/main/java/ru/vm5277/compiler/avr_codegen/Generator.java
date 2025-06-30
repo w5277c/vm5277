@@ -138,6 +138,7 @@ public class Generator extends CodeGenerator {
 	@Override
 	public void localLoadRegs(CGLocalScope lScope, byte[] registers) throws Exception {
 		if(registers.length != lScope.getSize()) throw new Exception("TODO Different size");
+		accum.setSize(lScope.getSize());
 		scope.append(new CGIText(";local " + lScope.getName() + " -> accum"));
 		//Map<Byte, String> popRegs = new HashMap<>();
 		LinkedList<Byte> popRegs = new LinkedList<>();
@@ -332,7 +333,7 @@ public class Generator extends CodeGenerator {
 		
 	// Работаем с аккумулятором!
 	@Override
-	public void localAction(Operator op, int resId, Long k) throws Exception {
+	public void localAction(Operator op, int resId) throws Exception {
 		CGLocalScope lScope = getLocal(resId);
 		scope.append(new CGIText(";accum " + op + " local " + lScope.getName() + " -> accum"));
 
@@ -352,6 +353,110 @@ public class Generator extends CodeGenerator {
 				break;
 			case BIT_XOR:
 				localActionAsm(lScope, (int sn, String reg) -> new CGIAsm("eor " + getRightOp(sn, null) + ", " + reg));
+				break;
+			default:
+				throw new Exception("CG:localAction: unsupported operator: " + op);
+		}
+	}
+
+	// Работаем с аккумулятором!
+	// Оптиммизировано для экономии памяти, для экономии FLASH можно воспользоваться CPC инструкцией
+	@Override
+	public void constAction(Operator op, long k) throws Exception {
+		scope.append(new CGIText(";accum " + op + " " + k + " -> accum"));
+
+		System.out.println("CG:localAction, op:" + op);
+		switch(op) {
+			case PLUS:
+				constActionAsm(~k, (int sn, String rOp) -> new CGIAsm((0 == sn ? "subi " : "sbci ") + getRightOp(sn, null) + ", " + rOp));
+				break;
+			case MINUS:
+				constActionAsm(k, (int sn, String rOp) -> new CGIAsm((0 == sn ? "subi " : "sbci ") + getRightOp(sn, null) + ", " + rOp));
+			case LT:
+				CGIContainer cont = new CGIContainer();
+				CGLabelScope lbScope = makeLabel("end");
+				for(int i=accum.getSize()-1; i>=0; i--) {
+					cont.append(new CGIAsm("cpi " + getRightOp(i, null) + ", " + ((k>>(i*8))&0xff)));
+					if(i!=0) {
+						cont.append(new CGIAsm("brcs " + lbScope.getName()));
+						cont.append(new CGIAsm("brne " + lbScope.getName()));
+					}
+				}
+				if(1!=accum.getSize()) {
+					cont.append(lbScope);
+				}
+				cont.append(new CGIAsm("rol r16"));
+				scope.append(cont);
+				break;
+			case LTE:
+				cont = new CGIContainer();
+				lbScope = makeLabel("end");
+				for(int i=accum.getSize()-1; i>=0; i--) {
+					cont.append(new CGIAsm("cpi " + getRightOp(i, null) + ", " + ((k>>(i*8))&0xff)));
+					if(i!=0) {
+						cont.append(new CGIAsm("brcs " + lbScope.getName()));
+						cont.append(new CGIAsm("brne " + lbScope.getName()));
+					}
+					else {
+						cont.append(new CGIAsm("brne " + lbScope.getName())); //TODO не нужно?
+					}
+				}
+				cont.append(lbScope);
+				cont.append(new CGIAsm("rol r16"));
+				scope.append(cont);
+				break;
+			case GTE:
+				cont = new CGIContainer();
+				lbScope = makeLabel("end");
+				for(int i=accum.getSize()-1; i>=0; i--) {
+					cont.append(new CGIAsm("cpi " + getRightOp(i, null) + ", " + ((k>>(i*8))&0xff)));
+					if(i!=0) {
+						cont.append(new CGIAsm("brcs " + lbScope.getName()));
+						cont.append(new CGIAsm("brne " + lbScope.getName()));
+					}
+					if(1!=accum.getSize()) {
+						cont.append(lbScope);
+					}
+					cont.append(new CGIAsm("rol r16"));
+					cont.append(new CGIAsm("com r16"));
+				}
+				scope.append(cont);
+				break;
+			case GT:
+				cont = new CGIContainer();
+				lbScope = makeLabel("end");
+				for(int i=accum.getSize()-1; i>=0; i--) {
+					cont.append(new CGIAsm("cpi " + getRightOp(i, null) + ", " + ((k>>(i*8))&0xff)));
+					if(i!=0) {
+						cont.append(new CGIAsm("brcs " + lbScope.getName()));
+						cont.append(new CGIAsm("brne " + lbScope.getName()));
+					}
+					else {
+						cont.append(new CGIAsm("brne " + lbScope.getName()));
+					}
+				}
+				cont.append(lbScope);
+				cont.append(new CGIAsm("rol r16"));
+				cont.append(new CGIAsm("com r16"));
+				scope.append(cont);
+				break;
+			case EQ:
+			case NEQ:
+				cont = new CGIContainer();
+				lbScope = makeLabel("end");
+				for(int i=accum.getSize()-1; i>=0; i--) {
+					cont.append(new CGIAsm("cpi " + getRightOp(i, null) + ", " + ((k>>(i*8))&0xff)));
+					if(i!=0) {
+						cont.append(new CGIAsm("brne " + lbScope.getName()));
+					}
+					else {
+						cont.append(lbScope);
+						cont.append(new CGIAsm("ldi r16," + (Operator.EQ == op ? "0x00" : "0x01")));
+						cont.append(new CGIAsm("brne pc+0x02"));
+						cont.append(new CGIAsm("ldi r16," + (Operator.EQ == op ? "0x01" : "0x00")));
+					}
+				}
+				scope.append(cont);
 				break;
 			default:
 				throw new Exception("CG:localAction: unsupported operator: " + op);
@@ -413,6 +518,13 @@ public class Generator extends CodeGenerator {
 			scope.append(new CGIAsm("pop yl"));
 		}
 	};
+	
+	public void constActionAsm(long k, CGActionHandler handler) throws Exception {
+		for(int i=0; i<accum.getSize(); i++) {
+			scope.append(handler.action(i, Long.toString((k>>(i*8))&0xff)));
+		}
+	};
+
 //--------------------	
 	
 	@Override
@@ -529,8 +641,30 @@ public class Generator extends CodeGenerator {
 	}
 	
 	@Override
-	public void eIf(int conditionBlockId, int thenBlockId, Integer elseBlockId) {
-		System.out.println("CG:if, condBlockId:" + conditionBlockId + ", thenBlockId:" + thenBlockId + ", elseBlockId:" + elseBlockId);
+	public void eIf(int condBlockResId, int thenBlockResId, Integer elseBlockResId) {
+		System.out.println("CG:if, condBlockId:" + condBlockResId + ", thenBlockId:" + thenBlockResId + ", elseBlockId:" + elseBlockResId);
+		CGBlockScope condBScope = (CGBlockScope)scope.getScope(condBlockResId);
+		CGBlockScope thenBScope = (CGBlockScope)scope.getScope(thenBlockResId);
+		CGBlockScope elseBScope = (null == elseBlockResId ? null : (CGBlockScope)scope.getScope(elseBlockResId));
+		
+		CGLabelScope beginLbScope = makeLabel("if_begin");
+		CGLabelScope thenLbScope = makeLabel("if_then");
+		CGLabelScope elseLbScope = makeLabel("if_else");
+		CGLabelScope endLbScope = makeLabel("if_end");
+		
+		condBScope.prepend(beginLbScope);
+		thenBScope.prepend(thenLbScope);
+		condBScope.append(new CGIAsm("cpi r16,0x01")); //TODO в конечном оптимизаторе можно упростить выражения вида rol r16;cpi r16,0x01;brne ...end
+		if(null != elseBScope) {
+			condBScope.append(new CGIAsm("brne " + elseLbScope.getName())); //TODO необходима проверка длины прыжка
+			thenBScope.append(new CGIAsm("rjmp " + endLbScope.getName())); //TODO необходима проверка длины прыжка
+			elseBScope.prepend(elseLbScope);
+			elseBScope.append(endLbScope);
+		}
+		else {
+			condBScope.append(new CGIAsm("brne " + endLbScope.getName())); //TODO необходима проверка длины прыжка
+			thenBScope.append(endLbScope);
+		}
 	}
 
 	@Override
@@ -542,21 +676,22 @@ public class Generator extends CodeGenerator {
 	//Хотя, вероятно можно вынести вне блока, работать со стеком перед меткой входа и после метки выхода из блока.
 	//Это вопрос ключа оптимизации по памяти или по коду, текущий вариант съест меньше памяти чем стандартный сишный.
 	@Override
-	public void eWhile(Integer labelCondResId, Integer condResId, int labelBodyResId, int bodyResId, int labelEndResId) throws Exception {
+	public void eWhile(Integer condResId, int bodyResId) throws Exception {
 		int _resId = genId();
-		System.out.println(	"CG:while, resId:" + _resId + ", labelCondResId:" + labelCondResId + ", labelBodyResId:" + labelBodyResId +
-							", bodyResId:" + bodyResId);
-		CGBlockScope condScope = null == condResId ? null : (CGBlockScope)getScope(condResId);
-		CGBlockScope bodyScope = (CGBlockScope)getScope(bodyResId);
+		System.out.println(	"CG:while, resId:" + _resId + ", condResId:" + condResId + ", bodyResId:" + bodyResId);
+		CGBlockScope condBScope = null == condResId ? null : (CGBlockScope)getScope(condResId);
+		CGBlockScope bodyBScope = (CGBlockScope)getScope(bodyResId);
 		
-		CGLabelScope lbBodyScope = labels.get(labelBodyResId);
-		CGLabelScope lbEndScope = labels.get(labelEndResId);
+		CGLabelScope beginlbScope = makeLabel("while_begin");
+		CGLabelScope bodylbScope = makeLabel("while_body");
+		CGLabelScope endlbScope = makeLabel("while_end");
 		
-		if(null != labelCondResId) {
+		if(null != condBScope) {
+			condBScope.prepend(beginlbScope);
 		}
-		else {
-			bodyScope.append(new CGIAsm("jmp " + lbBodyScope.getName(), 2)); //TODO нужно будет в оптимизировать(если расстояние укладыввается в rjmp)
-		}
+		bodyBScope.prepend(bodylbScope);
+		bodyBScope.append(new CGIAsm("jmp " + bodylbScope.getName(), 2)); //TODO нужно будет в оптимизировать(если расстояние укладыввается в rjmp)
+		bodyBScope.append(endlbScope);
 	}
 	
 	@Override

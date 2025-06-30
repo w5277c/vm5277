@@ -18,5 +18,5 @@ package ru.vm5277.common.cg;
 import ru.vm5277.common.cg.items.CGItem;
 
 public interface CGActionHandler {
-	public CGItem action(int sn, String reg);
+	public CGItem action(int sn, String rOp);
 }

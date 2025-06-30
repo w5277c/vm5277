@@ -178,10 +178,8 @@ public class VarNode extends AstNode {
 				cg.localStore(runtimeId, ((LiteralExpression)initializer).getNumValue());
 			}
 			else if(initializer instanceof BinaryExpression) {
-				cg.enterExpression();
 				initializer.codeGen(cg);
 				cg.storeAcc(runtimeId);
-				cg.leaveExpression();
 			}
 			else if(initializer instanceof FieldAccessExpression) {
 				FieldAccessExpression fae = (FieldAccessExpression)initializer;

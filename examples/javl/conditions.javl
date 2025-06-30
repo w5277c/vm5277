@@ -15,9 +15,7 @@
  */
 import rtos.system;
 import rtos.rtosparam;
-import rtos.thread;
 import hal.gpio;
-
 
 class Main {
     public static void main() {
@@ -25,20 +23,38 @@ class Main {
 		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
 		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
 
-		byte port = GPIO.PB1;
-		GPIO.modeOut(port);
-		while(true) {
-			Thread.waitMS(250);
-			GPIO.invert(port);
+
+		if(true) {
+			System.outChar('A');
+		}
+
+		if(false) {
+			System.outChar('B');
+		}
+
+		if(3==1+2) {
+			System.outChar('C');
+		}
+
+		if(1!=2) {
+			System.outChar('D');
+		}
+		else {
+			System.outChar('E');
+		}
+
+		byte ch = 'F';
+		if(ch is byte) {
+			System.outChar(ch);
+		}
+
+		byte i=1;
+		byte j=2;
+		if(i+j<2) {
+			System.outChar('G');
+		}
+		else {
+			System.outChar('H');
 		}
     }
-
-    /* TODO ввести class:
-    GPIOPin pin = new GPIOPin(GPIO.PB1);
-    pin.setHi();
-    pin.setLo();
-    pin.invert();
-    bool isHi = pin.isHi();
-    bool isOutMode = pin.isOutMode();
-    */
 }

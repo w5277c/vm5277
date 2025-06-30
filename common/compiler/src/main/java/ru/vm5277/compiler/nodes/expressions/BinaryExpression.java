@@ -263,12 +263,18 @@ public class BinaryExpression extends ExpressionNode {
 	
 	@Override
 	public void codeGen(CodeGenerator cg) throws Exception {
+		cg.enterExpression();
 		// Генерация кода для левого и правого операндов
 		left.codeGen(cg);
 		if(right instanceof VariableExpression) {
 			VariableExpression ve = (VariableExpression)right;
 			
-			cg.localAction(operator, ve.getSymbol().getRuntimeId(), null);
+			cg.localAction(operator, ve.getSymbol().getRuntimeId());
+		}
+		else if(right instanceof LiteralExpression) {
+			LiteralExpression le = (LiteralExpression)right;
+			
+			cg.constAction(operator, le.getNumValue());
 		}
 		
 		//Operand rightOp = cg.getAcc();
@@ -310,6 +316,7 @@ public class BinaryExpression extends ExpressionNode {
 //		else {
 			//cg.emitBinaryOp(operator, leftType, rightType);
 //		}
+		cg.leaveExpression();
 	}
 	
 	@Override

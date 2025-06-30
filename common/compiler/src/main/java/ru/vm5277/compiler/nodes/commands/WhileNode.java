@@ -16,6 +16,8 @@
 package ru.vm5277.compiler.nodes.commands;
 
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.items.CGIText;
+import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
@@ -116,25 +118,20 @@ public class WhileNode extends CommandNode {
 		if(condition instanceof LiteralExpression) {
 			LiteralExpression le = (LiteralExpression)condition;
 			if(0x00 != le.getNumValue()) {
-				int labelBodyResId = cg.makeLabel("bwhile");
 				int bodyResId = cg.enterBlock();
 				body.codeGen(cg);
 				cg.leaveBlock();
-				int labelEndResId = cg.makeLabel("ewhile");
-				cg.eWhile(null, null, labelBodyResId, bodyResId, labelEndResId);
+				cg.eWhile(null, bodyResId);
 			}
 		}
 		else {
-			int labelCondResId = cg.makeLabel("cwhile");
 			int condResId = cg.enterBlock();
 			condition.codeGen(cg);
 			cg.leaveBlock();
-			int labelBodyResId = cg.makeLabel("bwhile");
 			int bodyResId = cg.enterBlock();
 			body.codeGen(cg);
 			cg.leaveBlock();
-			int labelEndResId = cg.makeLabel("ewhile");
-			cg.eWhile(labelCondResId, condResId, labelBodyResId, bodyResId, labelEndResId);
+			cg.eWhile(condResId, bodyResId);
 		}
 		
 

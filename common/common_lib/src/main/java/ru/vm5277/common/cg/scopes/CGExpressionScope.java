@@ -15,10 +15,17 @@
  */
 package ru.vm5277.common.cg.scopes;
 
-import ru.vm5277.common.cg.scopes.CGScope;
-
 public class CGExpressionScope extends CGScope {
+	private	int	nestCntr = 0;
+	
 	public CGExpressionScope(CGScope parent, int resId) {
 		super(parent, resId, "");
+	}
+	
+	public void enter() {
+		nestCntr++;
+	}
+	public int leave() {
+		return nestCntr--;
 	}
 }

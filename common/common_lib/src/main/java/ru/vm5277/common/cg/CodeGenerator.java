@@ -35,6 +35,7 @@ import ru.vm5277.common.NativeBinding;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.RTOSFeature;
 import ru.vm5277.common.SystemParam;
+import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.compiler.Case;
 import ru.vm5277.common.compiler.Operand;
@@ -87,7 +88,7 @@ public abstract class CodeGenerator extends CGScope {
 	public int enterConstructor(int[] typeIds) {
 		int _resId = genId();
 		System.out.println("CG:enterConstructor, id:" + _resId + ", parameters:" + Arrays.toString(typeIds));
-		scope = new CGMethodScope(scope, -1, _resId, VarType.NULL.getId(), typeIds, "contr", buildRegsPool());
+		scope = new CGMethodScope(scope, null, _resId, VarType.NULL.getId(), typeIds, "contr", buildRegsPool());
 		return _resId;
 	}
 	public void leaveConstructor() {
@@ -99,8 +100,8 @@ public abstract class CodeGenerator extends CGScope {
 	public int enterMethod(int typeId, int[] typeIds, String name) {
 		int _resId = genId();
 		System.out.println("CG:enterMethod, id:" + _resId + ", typeId:" + typeId + ", parameters:" + Arrays.toString(typeIds));
-		int lId = makeLabel(scope.getPath());
-		scope = new CGMethodScope(scope, lId, _resId, typeId, typeIds, name, buildRegsPool());
+		CGLabelScope lbScope = makeLabel(scope.getPath());
+		scope = new CGMethodScope(scope, lbScope, _resId, typeId, typeIds, name, buildRegsPool());
 		return _resId;
 	}
 	public void leaveMethod() {
@@ -111,7 +112,6 @@ public abstract class CodeGenerator extends CGScope {
 			for(int i=0; i<mScope.getUsedRegs().size(); i++) {
 				mScope.insert(pushRegAsm(mScope.getUsedRegs().get(i)));
 			}
-			mScope.insert(new CGIText(""));
 		}
 		
 		int size = mScope.getStackBlockSize();
@@ -124,7 +124,6 @@ public abstract class CodeGenerator extends CGScope {
 		
 
 		if(!mScope.getUsedRegs().isEmpty()) {
-			mScope.append(new CGIText(""));
 			for(int i=mScope.getUsedRegs().size()-1; i>=0; i--) {
 				mScope.append(popRegAsm(mScope.getUsedRegs().get(i)));
 			}
@@ -150,7 +149,6 @@ public abstract class CodeGenerator extends CGScope {
 			for(int i=0; i<bScope.getUsedRegs().size(); i++) {
 				bScope.insert(pushRegAsm(bScope.getUsedRegs().get(i)));
 			}
-			bScope.insert(new CGIText(""));
 		}
 
 		int size = bScope.getStackBlockSize();
@@ -160,7 +158,6 @@ public abstract class CodeGenerator extends CGScope {
 		}
 
 		if(!bScope.getUsedRegs().isEmpty()) {
-			bScope.append(new CGIText(""));
 			for(int i=bScope.getUsedRegs().size()-1; i>=0; i--) {
 				bScope.append(popRegAsm(bScope.getUsedRegs().get(i)));
 			}
@@ -247,20 +244,26 @@ public abstract class CodeGenerator extends CGScope {
 	
 	
 	public int enterExpression() throws Exception {
-		if(isExpressionScope()) throw new Exception("CG:exterExpression, already in expression:" + scope);
-
 		int _resId = genId();
-		System.out.println("CG:enterExpression, id:" + _resId);
+		if(isExpressionScope()) {
+			((CGExpressionScope)scope).enter();
+		}
+		else {
+			System.out.println("CG:enterExpression, id:" + _resId);
 
-		accum.set(0x01, 0x00, _resId); // Сброс аккумулятора
-		
-		scope = new CGExpressionScope(scope, _resId);
+			accum.set(0x01, 0x00, _resId); // Сброс аккумулятора
+
+			scope = new CGExpressionScope(scope, _resId);
+		}
 		return _resId;
 	}
+	
 	public void leaveExpression() {
-		scope = scope.free();
-		//TODO
-		System.out.println("CG:LeaveExpression");
+		if(0==((CGExpressionScope)scope).leave()) {
+			scope = scope.free();
+			//TODO
+			System.out.println("CG:LeaveExpression");
+		}
 	}
 
 	public void setAcc(int size, long value) throws Exception {
@@ -304,14 +307,15 @@ public abstract class CodeGenerator extends CGScope {
 		flashData.put(resId, new DataSymbol(resId, "javl_" + scope.getParent().getPath()+"_r"+resId, size, value));
 	}
 
-	public int makeLabel(String name) {
+	protected CGLabelScope makeLabel(String name) {
 		int _resId = genId();
 		String fullname = "javl_" + scope.getPath() + "_l" + _resId + (null != name ? name : "");
 		CGLabelScope lbScope = new CGLabelScope(scope, _resId, fullname);
 		labels.put(_resId, lbScope);
-		return _resId;
+		return lbScope;
+
 	}
-	
+
 	public abstract void invokeMethod(String methodQName, int id, int typeId, Operand[] operands);
 	public abstract void invokeNative(String methodQName, int typeId, Operand[] operands) throws Exception; 
 	public abstract boolean emitInstanceof(long op, int typeId);
@@ -322,7 +326,7 @@ public abstract class CodeGenerator extends CGScope {
 	
 	public abstract void eIf(int conditionBlockId, int thenBlockId, Integer elseBlockId);
 	public abstract void eTry(int blockId, List<Case> cases, Integer defaultBlockId);
-	public abstract void eWhile(Integer labelCondResId, Integer condResId, int labelBodyResId, int bodyResId, int labelEndResId) throws Exception;
+	public abstract void eWhile(Integer condResId, int bodyResId) throws Exception;
 	public abstract void eReturn();
 	public abstract void eThrow();
 	
@@ -337,7 +341,8 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract CGItem stackFreeAsm();
 	public abstract String getVersion();
 
-	public abstract void localAction(Operator op, int resId, Long k) throws Exception;
+	public abstract void localAction(Operator op, int resId) throws Exception;
+	public abstract void constAction(Operator op, long k) throws Exception;
 	public abstract void localLoadRegs(CGLocalScope lScope, byte[] registers) throws Exception;
 	public abstract void localStoreRegs(int stackOffset, int size);
 	public abstract void loadRegsConst(byte[] regs, long value);

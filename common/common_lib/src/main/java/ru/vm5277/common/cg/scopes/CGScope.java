@@ -22,7 +22,7 @@ import ru.vm5277.common.cg.items.CGIText;
 
 public class CGScope extends CGIContainer {
 	private				static	int						idCntr		= 0;
-	private		final			String					name;
+	protected	final			String					name;
 	protected					CGScope					parent;
 	protected	final	static	Map<Integer, CGScope>	scopesMap	= new HashMap<>();
 
@@ -45,7 +45,9 @@ public class CGScope extends CGIContainer {
 		this.resId = resId;
 		
 		if(null != parent) {
-			parent.append(this);
+			if(!(this instanceof CGLabelScope)) {
+				parent.append(this);
+			}
 			scopesMap.put(resId, this);
 		}
 		if(verbose) append(new CGIText(";======== enter " + toString() + " ========"));

@@ -73,9 +73,18 @@ public class InstanceOfExpression extends ExpressionNode {
 			}
 
 			// Проверяем, что typeExpr возвращает тип (класс)
-			rightType = rightExpr.getType(scope);
-			if (!rightType.isClassType()) {
-				markError("Right-hand side of 'is' must be a class type, got: " + rightType);
+			if(rightExpr instanceof LiteralExpression && ((LiteralExpression)rightExpr).getValue() instanceof VarType) {
+				rightType = (VarType)((LiteralExpression)rightExpr).getValue(); //TODO корректная логика?
+			}
+			else {
+				rightType = rightExpr.getType(scope);
+			}
+			if(VarType.UNKNOWN == rightType) {
+				markError("Unknown right-hand side of 'is': " + rightExpr);
+				return false;
+			}
+			if(VarType.VOID == rightType) {
+				markError("Right-hand side of 'is' cant be void");
 				return false;
 			}
 
