@@ -117,7 +117,7 @@ public class NativeBinding {
 	}
 
 	public String getMethod() {
-		return methodName + " " + Arrays.toString(methodParams);
+		return methodName + (null == methodParams ? "" : " " + Arrays.toString(methodParams));
 	}
 	public String getMethodPath() {
 		return methodName;

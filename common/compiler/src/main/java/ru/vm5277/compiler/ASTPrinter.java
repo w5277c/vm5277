@@ -51,7 +51,7 @@ import ru.vm5277.compiler.nodes.expressions.NewExpression;
 import ru.vm5277.compiler.nodes.expressions.TernaryExpression;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
 import ru.vm5277.compiler.nodes.expressions.UnaryExpression;
-import ru.vm5277.compiler.nodes.expressions.VariableExpression;
+import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
 import ru.vm5277.compiler.tokens.Token;
 
 public class ASTPrinter {
@@ -94,7 +94,7 @@ public class ASTPrinter {
 		ClassBlockNode cbn = clazz.getBody();
 		if(null != cbn) {
 			out.put("{"); out.print(); out.extend();
-			for(AstNode node : cbn.getDeclarations()) {
+			for(AstNode node : cbn.getChildren()) {
 				if(node instanceof ClassNode) {
 					printClass((ClassNode)node);
 				}
@@ -206,7 +206,7 @@ public class ASTPrinter {
 	
 	void printBody(BlockNode body)  {
 		out.put("{"); out.print(); out.extend();
-		for(AstNode node : body.getDeclarations()) {
+		for(AstNode node : body.getChildren()) {
 			if(node instanceof LabelNode) {
 				out.put(((LabelNode)node).getName() + ":");
 				continue;
@@ -417,8 +417,8 @@ public class ASTPrinter {
 			printArguments(mce.getArguments());
 			out.put(")");
 		}
-		else if(expr instanceof VariableExpression) {
-			out.put(((VariableExpression)expr).getValue());
+		else if(expr instanceof VarFieldExpression) {
+			out.put(((VarFieldExpression)expr).getValue());
 		}
 		else if(expr instanceof UnaryExpression) {
 			UnaryExpression ue = (UnaryExpression)expr;

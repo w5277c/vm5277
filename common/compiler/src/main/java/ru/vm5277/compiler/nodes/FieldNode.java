@@ -15,31 +15,29 @@
  */
 package ru.vm5277.compiler.nodes;
 
+import java.util.Arrays;
+import java.util.List;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.compiler.Operand;
-import ru.vm5277.common.compiler.OperandType;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.Operator;
+import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
-import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
-import ru.vm5277.compiler.nodes.expressions.VariableExpression;
 import ru.vm5277.compiler.semantic.ClassScope;
+import ru.vm5277.compiler.semantic.FieldSymbol;
 import ru.vm5277.compiler.semantic.Scope;
-import ru.vm5277.compiler.semantic.Symbol;
 
 public class FieldNode extends AstNode {
 	private	final	Set<Keyword>	modifiers;
 	private			VarType			type;
 	private			String			name;
 	private			ExpressionNode	initializer;
-	private			Symbol			symbol;
 	
 	public FieldNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType  type, String name) {
 		super(tb, mc);
@@ -58,14 +56,6 @@ public class FieldNode extends AstNode {
         try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
 	}
 
-	public FieldNode(MessageContainer mc, Set<Keyword> modifiers, VarType returnType, String name) {
-		super(null, mc);
-		
-		this.modifiers = modifiers;
-		this.type = returnType;
-		this.name = name;
-	}
-	
 	public Set<Keyword> getModifiers() {
 		return modifiers;
 	}
@@ -91,6 +81,9 @@ public class FieldNode extends AstNode {
 	public boolean isPublic() {
 		return modifiers.contains(Keyword.PUBLIC);
 	}
+	public boolean isPrivate() {
+		return modifiers.contains(Keyword.PRIVATE);
+	}
 
 	@Override
 	public String getNodeType() {
@@ -104,7 +97,9 @@ public class FieldNode extends AstNode {
 
 	@Override
 	public boolean preAnalyze() {
-		if(Character.isUpperCase(name.charAt(0))) addMessage(new WarningMessage("Field name should start with lowercase letter:" + name, sp));
+		if((!isFinal() || !isStatic()) && Character.isUpperCase(name.charAt(0))) {
+			addMessage(new WarningMessage("Field name should start with lowercase letter:" + name, sp));
+		}
 
 		return true;
 	}
@@ -114,17 +109,20 @@ public class FieldNode extends AstNode {
 		if(scope instanceof ClassScope) {
 			ClassScope classScope = (ClassScope)scope;
 			boolean isFinal = modifiers.contains(Keyword.FINAL);
-			symbol = new Symbol(name, type, isFinal, modifiers.contains(Keyword.STATIC));
+			symbol = new FieldSymbol(name, type, isFinal, isStatic(), isPrivate(), classScope, this);
+
+			//TODO рудимент
+			/*
 			if(isFinal && null != initializer) {
 				if(initializer instanceof LiteralExpression) {
 					LiteralExpression le = (LiteralExpression)initializer;
-					symbol.setConstantOperand(new Operand(le.getType(scope), OperandType.LITERAL, le.getValue()));
+					symbol.setOperand(new Operand(le.getType(scope), OperandType.LITERAL, le.getValue()));
 				}
-				else if(initializer instanceof VariableExpression) {
-					VariableExpression ve = (VariableExpression)initializer;
-					symbol.setConstantOperand(new Operand(ve.getType(scope), OperandType.TYPE, ve.getValue()));
+				else if(initializer instanceof VarFieldExpression) {
+					VarFieldExpression ve = (VarFieldExpression)initializer;
+					symbol.setOperand(new Operand(ve.getType(scope), OperandType.TYPE, ve.getValue()));
 				}
-			}
+			}*/
 			
 			try{classScope.addField(symbol);}
 			catch(SemanticException e) {markError(e);}
@@ -135,15 +133,18 @@ public class FieldNode extends AstNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
-		// Проверка инициализации final-полей
-		if (isFinal() && initializer == null) markError("Final field '" + name + "' must be initialized");
-
-		// Анализ инициализатора, если есть
-		if (initializer != null) initializer.postAnalyze(scope);
-
-		// Проверка совместимости типов
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		try {
+			//symbol.setResId(cg.enterFiled(type.getId(), type.getSize(), isFinal(), name));
+			cgScope = cg.enterField(type, isStatic(), name);
+
+			// Проверка инициализации final-полей
+			if (isFinal() && initializer == null) markError("Final field '" + name + "' must be initialized");
+
+			// Анализ инициализатора, если есть
+			if (initializer != null) initializer.postAnalyze(scope, cg);
+
+			// Проверка совместимости типов
 			VarType initType = initializer.getType(scope);
 			if (!isCompatibleWith(scope, type, initType)) {
 				markError("Type mismatch: cannot assign " + initType + " to " + type);
@@ -154,18 +155,26 @@ public class FieldNode extends AstNode {
 			}
 		}
 		catch (SemanticException e) {markError(e);}
-		
+
+		cg.leaveField();		
 		return true;
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) throws Exception {
-		symbol.setRuntimeId(cg.enterFiled(type.getId(), type.getSize(), isFinal(), name));
-		try {
-			initializer.codeGen(cg);
-		}
-		finally {
-			cg.leaveField();
-		}
+	public Object codeGen(CodeGenerator cg) throws Exception {
+		if(cgDone) return null;
+
+		cgDone = true;
+		((CGFieldScope)cgScope).build();
+		initializer.codeGen(cg);
+		cg.accToCells(cgScope, (CGFieldScope)cgScope);
+
+		return true;
+	}
+
+	@Override
+	public List<AstNode> getChildren() {
+		if(null != initializer) return Arrays.asList(initializer);
+		return null;
 	}
 }

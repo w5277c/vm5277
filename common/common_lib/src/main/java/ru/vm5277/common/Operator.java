@@ -169,4 +169,8 @@ public enum Operator {
 		return	isArithmetic() || isBitwise() || this == PLUS || this == MINUS || this == INC || this == DEC || this == PRE_INC || this == PRE_DEC ||
 				this == POST_INC || this == POST_DEC;
 	}
+	
+	public boolean isCommutative() {
+		return this == PLUS || this == MULT || this == BIT_AND || this == BIT_OR || this == BIT_XOR || this == EQ || this == NEQ;
+	}
 }

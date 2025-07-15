@@ -13,10 +13,26 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ru.vm5277.common.compiler;
+package ru.vm5277.compiler.semantic;
 
-public class Param {
-	public Param(VarType type, Object value) {
-		//TODO
+import ru.vm5277.common.compiler.VarType;
+
+public class ClassSymbol extends Symbol {
+	private	final	Scope	scope;
+	
+	public ClassSymbol(String name, VarType returnType, boolean isFinal, boolean isStatic, Scope scope) {
+		super(name, returnType, isFinal, isStatic);
+		
+		this.scope = scope;
+	}
+
+	public Scope getScope() {
+		return scope;
+	}
+	
+	@Override
+	public String toString() {
+		return	((isNative ? "native " : "") + (isFinal ? "final " : "") + (isStatic ? "static " : "") + " " +
+				((ClassScope)scope.getParent()).getName() + "." + name).trim();
 	}
 }

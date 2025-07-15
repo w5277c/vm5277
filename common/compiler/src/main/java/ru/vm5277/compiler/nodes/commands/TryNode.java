@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.compiler.Case;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
@@ -36,12 +37,12 @@ import ru.vm5277.compiler.semantic.Symbol;
 public class TryNode extends CommandNode {
 	private	BlockNode		tryBlock;
 	private	String			varName;
-	private	List<AstCase>	catchCases		= new ArrayList<>();
-	private	BlockNode		catchDefault;
+	private	List<AstCase>	catchCases			= new ArrayList<>();
+	private	BlockNode		catchDefaultBlock;
 	private	BlockScope		tryScope;
 	private	BlockScope		catchScope;
 	private	BlockScope		defaultScope;
-	private	boolean			hasDefault		= false;
+	private	boolean			hasDefault			= false;
 	
 	public TryNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
@@ -71,7 +72,7 @@ public class TryNode extends CommandNode {
 			// Если сразу идет код без case/default - считаем его default-блоком
             if (!tb.match(Keyword.CASE) && !tb.match(Keyword.DEFAULT) && !tb.match(Delimiter.RIGHT_BRACE)) {
 				tb.getLoopStack().add(this);
-                try {catchDefault = new BlockNode(tb, mc, true);} catch (ParseException e) {markFirstError(e);}
+                try {catchDefaultBlock = new BlockNode(tb, mc, true);} catch (ParseException e) {markFirstError(e);}
                 tb.getLoopStack().remove(this);
 			}
 			else {
@@ -90,7 +91,7 @@ public class TryNode extends CommandNode {
 						consumeToken(tb); // Потребляем "default"
 						try {consumeToken(tb, Delimiter.COLON);} catch(ParseException e) {markFirstError(e);}
 						tb.getLoopStack().add(this);
-						try {catchDefault = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());}
+						try {catchDefaultBlock = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());}
 						catch(ParseException e) {markFirstError(e);}
 						tb.getLoopStack().remove(this);
 					}
@@ -117,7 +118,7 @@ public class TryNode extends CommandNode {
 	}
 
 	public BlockNode getCatchDefault() {
-		return catchDefault;
+		return catchDefaultBlock;
 	}
 	
 	@Override
@@ -126,7 +127,7 @@ public class TryNode extends CommandNode {
 	}
 	
 	public AstNode getEndNode() {
-		if (null != catchDefault) return catchDefault;
+		if (null != catchDefaultBlock) return catchDefaultBlock;
 		if (!catchCases.isEmpty()) return catchCases.get(catchCases.size()-1).getBlock();
 		return tryBlock;
 	}
@@ -143,7 +144,7 @@ public class TryNode extends CommandNode {
 		}
 
 		// Проверка default-блока
-		if (null != catchDefault) catchDefault.preAnalyze();
+		if (null != catchDefaultBlock) catchDefaultBlock.preAnalyze();
 
 		return true;
 	}
@@ -168,18 +169,18 @@ public class TryNode extends CommandNode {
 		}
 
 		// Объявление default-блока
-		if (null != catchDefault) {
+		if (null != catchDefaultBlock) {
 			defaultScope = new BlockScope(catchScope);
-			catchDefault.declare(defaultScope);
+			catchDefaultBlock.declare(defaultScope);
 		}
 
 		return true;
 	}
 	
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		// Анализ блока try
-		if (null != tryBlock) tryBlock.postAnalyze(tryScope);
+		if (null != tryBlock) tryBlock.postAnalyze(tryScope, cg);
 
 		// Проверка catch-значений на уникальность
 		List<Long> catchValues = new ArrayList<>();
@@ -202,36 +203,48 @@ public class TryNode extends CommandNode {
 			}
 
 			// Анализ блока catch
-			if (null != astCase.getBlock()) astCase.getBlock().postAnalyze(astCase.getScope());
+			if (null != astCase.getBlock()) astCase.getBlock().postAnalyze(astCase.getScope(), cg);
 		}
 
 		// Анализ default-блока
-		if (null != catchDefault) catchDefault.postAnalyze(defaultScope);
+		if (null != catchDefaultBlock) catchDefaultBlock.postAnalyze(defaultScope, cg);
 
 		return true;
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) throws Exception {
-		int blockId = cg.enterBlock();
+	public Object codeGen(CodeGenerator cg) throws Exception {
+		if(cgDone) return null;
+		cgDone = true;
+
+		CGBlockScope blockScope = cg.enterBlock();
 		tryBlock.codeGen(cg);
 		cg.leaveBlock();
 		
 		List<Case> cases = new ArrayList<>();
 		for(AstCase astCase : catchCases) {
-			int caseBlockId = cg.enterBlock();
+			CGBlockScope caseBlockScope = cg.enterBlock();
 			astCase.getBlock().codeGen(cg);
 			cg.leaveBlock();
-			cases.add(new Case(astCase.getFrom(), astCase.getTo(), caseBlockId));
+			cases.add(new Case(astCase.getFrom(), astCase.getTo(), caseBlockScope));
 		}
 			
-		Integer defaultBlockId = null;
-		if(null != catchDefault) {
-			defaultBlockId = cg.enterBlock();
-			catchDefault.codeGen(cg);
+		CGBlockScope defaultBlockScope = null;
+		if(null != catchDefaultBlock) {
+			defaultBlockScope = cg.enterBlock();
+			catchDefaultBlock.codeGen(cg);
 			cg.leaveBlock();
 		}
 		
-		cg.eTry(blockId, cases, defaultBlockId);
+		cg.eTry(blockScope, cases, defaultBlockScope);
+		
+		return null;
+	}
+	
+	@Override
+	public List<AstNode> getChildren() {
+		List<AstNode> result = new ArrayList<>(catchCases);
+		if(null != catchDefaultBlock) result.add(catchDefaultBlock);
+		return result;
 	}
 }

@@ -15,15 +15,17 @@
  */
 package ru.vm5277.common.compiler;
 
+import ru.vm5277.common.cg.scopes.CGBlockScope;
+
 public class Case {
-	private	final	long	from;
-	private	final	Long	to;
-	private	final	int		blockId;
+	private	final	long			from;
+	private	final	Long			to;
+	private	final	CGBlockScope	blockScope;
 	
-	public Case(long from, Long to, int blockId) {
+	public Case(long from, Long to, CGBlockScope blockScope) {
 		this.from = from;
 		this.to = to;
-		this.blockId = blockId;
+		this.blockScope = blockScope;
 	}
 	
 	public long getFrom() {
@@ -34,12 +36,12 @@ public class Case {
 		return to;
 	}
 	
-	public int getBlockId() {
-		return blockId;
+	public CGBlockScope getBlockScope() {
+		return blockScope;
 	}
 	
 	@Override
 	public String toString() {
-		return (null == to ? from : from + "-" + to) + ":" + blockId;
+		return (null == to ? from : from + "-" + to) + ":" + blockScope;
 	}
 }

@@ -15,6 +15,8 @@
  */
 package ru.vm5277.compiler.nodes.commands;
 
+import java.util.List;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.common.exceptions.ParseException;
@@ -79,7 +81,7 @@ public class ContinueNode extends CommandNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		AstNode node = tb.getLoopStack().peek();
 		if (null == node || !(node instanceof ForNode || node instanceof WhileNode || node instanceof DoWhileNode)) {
             markFirstError(parserError("'continue' can only be used inside loop statements"));
@@ -89,5 +91,10 @@ public class ContinueNode extends CommandNode {
 		if(null != label && !isLabelInCurrentMethod(symbol, scope)) markError("Cannot break to label in different method");
 		
 		return true;
+	}
+
+	@Override
+	public List<AstNode> getChildren() {
+		return null;
 	}
 }

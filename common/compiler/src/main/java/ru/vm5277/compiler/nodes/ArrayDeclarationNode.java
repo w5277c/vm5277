@@ -15,10 +15,12 @@
  */
 package ru.vm5277.compiler.nodes;
 
+import java.util.List;
 import java.util.Set;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.Operator;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.exceptions.SemanticException;
@@ -37,7 +39,6 @@ public class ArrayDeclarationNode extends AstNode {
     private	final	String			name;
 	private			ExpressionNode	size;
 	private			ExpressionNode	initializer;
-	private			Symbol			symbol;
 
 	public ArrayDeclarationNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType type, String name) {
 		super(tb, mc);
@@ -102,11 +103,11 @@ public class ArrayDeclarationNode extends AstNode {
 	}
 	
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		// Проверка размера массива (если указан)
 		Integer declaredSize = null;
 		if (size != null) {
-			if (size.postAnalyze(scope)) {
+			if (size.postAnalyze(scope, cg)) {
 				// Проверяем, что размер - целочисленная константа
 				if (!(size instanceof LiteralExpression) || VarType.INT != ((LiteralExpression)size).getType(scope)) {
 					markError("Array size must be a constant expression");
@@ -127,7 +128,7 @@ public class ArrayDeclarationNode extends AstNode {
 
 		// Проверка инициализатора (если есть)
 		if (initializer != null) {
-			if (initializer.postAnalyze(scope)) {
+			if (initializer.postAnalyze(scope, cg)) {
 				// Проверка совместимости типов
 				try {
 					VarType initType = initializer.getType(scope);
@@ -166,5 +167,10 @@ public class ArrayDeclarationNode extends AstNode {
 		if (modifiers.contains(Keyword.FINAL) && null == initializer) markError("Final array must be initialized");
 
 		return true;
+	}
+
+	@Override
+	public List<AstNode> getChildren() {
+		return null;
 	}
 }

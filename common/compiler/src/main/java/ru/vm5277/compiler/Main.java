@@ -24,16 +24,21 @@ import java.util.Map;
 import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.SystemParam;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.compiler.codegen.PlatformLoader;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.nodes.AstNode;
+import ru.vm5277.compiler.nodes.ClassBlockNode;
 import ru.vm5277.compiler.nodes.ClassNode;
+import ru.vm5277.compiler.nodes.MethodNode;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.InterfaceSymbol;
 
 public class Main {
-    public	final	static	String	VERSION		= "0.0.23";
+    public	final	static	String	VERSION				= "0.0.23";
 	public			static	boolean	isWindows;
 	public			static	Path	toolkitPath;
+	public			static	String	launchMethodName	= "main";
 
 	public static void main(String[] args) throws IOException, Exception {
 		isWindows = (null != System.getProperty("os.name") && System.getProperty("os.name").toLowerCase().contains("windows"));
@@ -117,32 +122,51 @@ public class Main {
 		
 		ClassScope globalScope = new ClassScope();
 		globalScope.addInterface(new InterfaceSymbol("Object"));
+
+		File libDir = toolkitPath.resolve("bin").resolve("libs").normalize().toFile();
+		NativeBindingsReader nbr = new NativeBindingsReader(runtimePath, mc);
+
+		Map<SystemParam, Object> params = new HashMap<>();
+		params.put(SystemParam.MCU, mcu);
+		if(null != core_freq) {
+			params.put(SystemParam.CORE_FREQ, core_freq);
+		}
+		CodeGenerator cg = PlatformLoader.loadGenerator(platform, libDir, nbr.getMap(), params);
 		
 		ASTParser parser = new ASTParser(runtimePath, basePath, lexer.getTokens(), mc);
 		ClassNode clazz = parser.getClazz();
-		SemanticAnalyzer.analyze(globalScope, parser.getClazz());
-		new ASTPrinter(parser.getClazz());
+		SemanticAnalyzer.analyze(globalScope, parser.getClazz(), cg);
+		//ReachableAnalyzer.analyze(parser.getClazz(), launchMethodName, mc);
 
+		new ASTPrinter(parser.getClazz());
 		if(0 == mc.getErrorCntr()) {
-			File libDir = toolkitPath.resolve("bin").resolve("libs").normalize().toFile();
-			NativeBindingsReader nbr = new NativeBindingsReader(runtimePath, mc);
-			
-			Map<SystemParam, Object> params = new HashMap<>();
-			params.put(SystemParam.MCU, mcu);
-			if(null != core_freq) {
-				params.put(SystemParam.CORE_FREQ, core_freq);
-			}
-			CodeGenerator cg = PlatformLoader.loadGenerator(platform, libDir, nbr.getMap(), params);
 			try {
-				clazz.codeGen(cg);
-				cg.postBuild();
+				MethodNode launchNode = null;
+				ClassBlockNode classBlockNode = clazz.getBody();
+				for(AstNode node : classBlockNode.getChildren()) {
+					if(node instanceof MethodNode) {
+						MethodNode mNode = (MethodNode)node;
+						if(mNode.isPublic() && mNode.isStatic() && mNode.getParameters().isEmpty() && mNode.getName().equals(launchMethodName)) {
+							launchNode = mNode;
+							break;
+						}
+					}
+				}
+
+				if(null != launchNode) {
+					launchNode.codeGen(cg);
+					cg.postBuild();
+					System.out.println();
+					System.out.println(cg.getAsm());
+				}
+				else {
+					mc.add(new ErrorMessage("TODO Can't find launch point 'public static void main() {...'", null));
+				}
 			}
 			catch(Exception e) {
 				e.printStackTrace();
 			}
 			
-			System.out.println();
-			System.out.println(cg.getAsm());
 		}
     }
 	

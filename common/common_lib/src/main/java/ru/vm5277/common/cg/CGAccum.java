@@ -15,7 +15,10 @@
  */
 package ru.vm5277.common.cg;
 
+import ru.vm5277.common.cg.scopes.CGScope;
+
 public class CGAccum {
+	private	CGScope	source;
 	private	int		size	= 1;
 	private	long	value	= 0;
 	private	Integer	localResId;
@@ -23,13 +26,15 @@ public class CGAccum {
 	public CGAccum() {
 	}
 	
-	public void set(int size, long value, Integer localResId) {
+	public void set(CGScope source, int size, long value, Integer localResId) {
+		this.source = source;
 		this.size = size;
 		this.value = value;
 		this.localResId = localResId;
 	}
 
-	public void set(int size, long value) {
+	public void set(CGScope source, int size, long value) {
+		this.source = source;
 		this.size = size;
 		this.value = value;
 	}
@@ -47,5 +52,8 @@ public class CGAccum {
 	public int getSize() {
 		return size;
 	}
-
+	
+	public CGScope getSource() {
+		return source;
+	}
 }

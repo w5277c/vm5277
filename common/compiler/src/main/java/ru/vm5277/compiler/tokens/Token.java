@@ -22,6 +22,7 @@ import javax.xml.bind.DatatypeConverter;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.SourceBuffer;
 import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
@@ -72,7 +73,7 @@ public class Token {
 		if(value instanceof Boolean) return ((Boolean)value).toString();
 		if(value instanceof byte[]) return "0x" + DatatypeConverter.printHexBinary((byte[])value);
 		if(value instanceof Character) {
-			return "'" + ((Character)value).toString() + "'"; // TODO экранирующие символы
+			return "'" + StrUtils.escapeChar((Character)value) + "'";
 		}
 		if(value instanceof Keyword) {
 			return ((Keyword)value).getName();

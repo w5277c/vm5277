@@ -16,12 +16,24 @@
 package ru.vm5277.common.cg.scopes;
 
 public class CGLabelScope extends CGScope {
-	public CGLabelScope(CGScope parent, int resId, String name) {
-		super(parent, resId, name);
+	private	static	int		idCntr	= 0;
+	private			boolean	isUsed;
+	
+	
+	public CGLabelScope(CGScope scope, String name, boolean isUsed) {
+		super();
+		
+		this.resId = idCntr++;
+		this.name = "javl_" + (null == scope ? "" : scope.getPath("_") + "_") + resId + (null != name ? name : "");
+		this.isUsed = isUsed;
+	}
+	
+	public void setUsed() {
+		isUsed = true;
 	}
 	
 	@Override
-	public String build() {
-		return name + ":\n";
+	public String getSource() {
+		return isUsed ? name + ":\n" : "";
 	}
 }

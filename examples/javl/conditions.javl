@@ -25,36 +25,36 @@ class Main {
 
 
 		if(true) {
-			System.outChar('A');
+			System.outChar('A'); //65
 		}
 
 		if(false) {
-			System.outChar('B');
+			System.outChar('B'); //66
 		}
 
 		if(3==1+2) {
-			System.outChar('C');
+			System.outChar('C'); //67
 		}
 
 		if(1!=2) {
-			System.outChar('D');
+			System.outChar('D'); //68
 		}
 		else {
-			System.outChar('E');
+			System.outChar('E'); //69
 		}
 
 		byte ch = 'F';
 		if(ch is byte) {
-			System.outChar(ch);
+			System.outChar(ch); //70
 		}
 
 		byte i=1;
 		byte j=2;
 		if(i+j<2) {
-			System.outChar('G');
+			System.outChar('G'); //71
 		}
 		else {
-			System.outChar('H');
+			System.outChar('H'); //72
 		}
     }
 }

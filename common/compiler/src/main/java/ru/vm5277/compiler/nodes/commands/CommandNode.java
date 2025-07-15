@@ -15,6 +15,8 @@
  */
 package ru.vm5277.compiler.nodes.commands;
 
+import java.util.Arrays;
+import java.util.List;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -29,16 +31,16 @@ import ru.vm5277.compiler.tokens.TNumber;
 import ru.vm5277.compiler.tokens.Token;
 
 public abstract class CommandNode extends AstNode {
-	public static class AstCase {
+	public static class AstCase extends AstNode {
 		private	final	long		from;
 		private	final	Long		to;
-		private	final	BlockNode	block;
+		private	final	BlockNode	blockNode;
 		private			BlockScope	scope;
 		
 		public AstCase(long from, Long to, BlockNode block) {
 			this.from = from;
 			this.to = to;
-			this.block = block;
+			this.blockNode = block;
 		}
 		
 		public long getFrom() {
@@ -50,7 +52,7 @@ public abstract class CommandNode extends AstNode {
 		}
 		
 		public BlockNode getBlock() {
-			return block;
+			return blockNode;
 		}
 		
 		public BlockScope getScope() {
@@ -58,6 +60,16 @@ public abstract class CommandNode extends AstNode {
 		}
 		public void setScope(BlockScope scope) {
 			this.scope = scope;
+		}
+
+		@Override
+		public String getNodeType() {
+			return null;
+		}
+
+		@Override
+		public List<AstNode> getChildren() {
+			return Arrays.asList(blockNode);
 		}
 	}
 

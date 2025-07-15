@@ -23,7 +23,7 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.compiler.nodes.AstNode;
 
-public class ClassScope implements Scope { // Плохая идея, область видимости класса не является символом... сделать отдельный метод для поиска классов
+public class ClassScope extends Scope {
 	private			ClassScope						parent;
 	private			String							name;
 	
@@ -228,13 +228,13 @@ public class ClassScope implements Scope { // Плохая идея, облас�
 		return null;
 	}
 	
-	public MethodSymbol resolveMethod(String methodName, List<VarType> argTypes) {
+	public MethodSymbol resolveMethod(String methodName, List<VarType> argTypes) throws SemanticException {
 		// Ищем методы в текущем классе
 		List<MethodSymbol> candidates = methods.get(methodName);
 		if (null == candidates) return null;
 		for (MethodSymbol method : candidates) {
 			if (isApplicable(method, argTypes)) {
-				return method; // Пока возвращаем первое совпадение по количеству
+				return method;
 			}
 		}
 		return null;
@@ -248,14 +248,14 @@ public class ClassScope implements Scope { // Плохая идея, облас�
 	}
 */
 	
-	private boolean isApplicable(MethodSymbol method, List<VarType> argTypes) {
+	private boolean isApplicable(MethodSymbol method, List<VarType> argTypes) throws SemanticException {
 		List<VarType> paramTypes = method.getParameterTypes();
 		if (paramTypes.size() != argTypes.size()) {
 			return false;
 		}
 
-		for (int i = 0; i < paramTypes.size(); i++) {
-			if (!AstNode.isCompatibleWith(this, argTypes.get(i), paramTypes.get(i))) {
+		for (int i=0; i<paramTypes.size(); i++) {
+			if (!AstNode.isCompatibleWith(this, paramTypes.get(i), argTypes.get(i))) {
 				return false;
 			}
 		}

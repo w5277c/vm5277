@@ -15,6 +15,8 @@
  */
 package ru.vm5277.compiler.nodes;
 
+import java.util.List;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
@@ -31,7 +33,7 @@ public class ParameterNode extends AstNode {
 	public ParameterNode(TokenBuffer tb, MessageContainer mc) throws ParseException {
 		super(tb, mc);
 		
-		this.isFinal = tb.match(Keyword.FINAL);
+		this.isFinal = tb.match(TokenType.MODIFIER, Keyword.FINAL);
 		if (this.isFinal) {
             consumeToken(tb); // Потребляем 'final'
 		}
@@ -108,7 +110,7 @@ public class ParameterNode extends AstNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		// Проверка типа параметра
 		if (VarType.UNKNOWN == type || VarType.NULL == type) {
 			markError("Invalid parameter type: " + type);
@@ -134,5 +136,10 @@ public class ParameterNode extends AstNode {
 		}
 
 		return true;
+	}
+
+	@Override
+	public List<AstNode> getChildren() {
+		return null;
 	}
 }

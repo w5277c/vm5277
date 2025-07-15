@@ -19,11 +19,11 @@ import java.util.HashMap;
 import java.util.Map;
 import ru.vm5277.common.exceptions.SemanticException;
 
-public class MethodScope implements Scope {
+public class MethodScope extends Scope {
 	private			MethodSymbol		symbol;
 	private	final	ClassScope			parent;
 	private	final	Map<String, Symbol>	variables		= new HashMap<>();
-
+	
 	public MethodScope(MethodSymbol methodSymbol, ClassScope parent) {
 		this.symbol = methodSymbol;
 		this.parent = parent;
@@ -81,6 +81,6 @@ public class MethodScope implements Scope {
 	
 	@Override
 	public String toString() {
-		return getClass().getSimpleName();
+		return symbol.toString();
 	}
 }

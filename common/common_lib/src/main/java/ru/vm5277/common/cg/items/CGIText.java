@@ -23,7 +23,7 @@ public class CGIText implements CGItem {
 	}
 	
 	@Override
-	public String build() {
+	public String getSource() {
 		return text + "\n";
 	}
 }

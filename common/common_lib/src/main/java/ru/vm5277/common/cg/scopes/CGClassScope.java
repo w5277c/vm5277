@@ -17,20 +17,40 @@ package ru.vm5277.common.cg.scopes;
 
 import java.util.HashMap;
 import java.util.Map;
+import ru.vm5277.common.cg.CGCell;
+import ru.vm5277.common.compiler.VarType;
 
 public class CGClassScope extends CGScope {
-	private	final	int							typeId;
+	private	final	VarType						type;
 	private	final	int[]						intrerfaceIds;
-	private	final	Map<Integer, CGLocalScope>	locals	= new HashMap<>();
+	private	final	Map<Integer, CGFieldScope>	fields			= new HashMap<>();
+	private			int							heapOffset		= 0;
 	
-	public CGClassScope(CGScope parent, int id, int typeId, int[] intrerfaceIds, String name) {
+	public CGClassScope(CGScope parent, int id, VarType type, int[] intrerfaceIds, String name) {
 		super(parent, id, name);
 		
-		this.typeId = typeId;
+		this.type = type;
 		this.intrerfaceIds = intrerfaceIds;
 	}
 
-	public void addField(CGLocalScope local) {
-		locals.put(local.getResId(), local);
+	public void addField(CGFieldScope field) {
+		fields.put(field.getResId(), field);
+	}
+
+	public CGCell[] memAllocate(int size, boolean isStatic) {
+		CGCell[] cells = new CGCell[size];
+		for(int i=0; i<size; i++) {
+			if(isStatic) {
+				cells[i] = new CGCell(CGCell.Type.STAT, statOffset++);
+			}
+			else {
+				cells[i] = new CGCell(CGCell.Type.HEAP, heapOffset++);
+			}
+		}
+		return cells;
+	}
+	
+	public int getHeapOffset() {
+		return heapOffset;
 	}
 }

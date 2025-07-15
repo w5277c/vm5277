@@ -18,7 +18,6 @@ package ru.vm5277.compiler.nodes.expressions;
 import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.compiler.Operand;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -72,11 +71,11 @@ public class NewExpression extends ExpressionNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		try {
 			// Проверяем аргументы конструктора
 			for (ExpressionNode arg : args) {
-				if (!arg.postAnalyze(scope)) return false;
+				if (!arg.postAnalyze(scope, cg)) return false;
 			}
 
 			// Проверяем существование класса
@@ -108,7 +107,7 @@ public class NewExpression extends ExpressionNode {
 		}
 	}
 	
-	private MethodSymbol findMatchingConstructor(Scope scope, List<MethodSymbol> constructors, List<VarType> argTypes) {
+	private MethodSymbol findMatchingConstructor(Scope scope, List<MethodSymbol> constructors, List<VarType> argTypes) throws SemanticException {
 		for (MethodSymbol constructor : constructors) {
 			if (isArgumentsMatch(scope, constructor, argTypes)) {
 				return constructor;
@@ -117,7 +116,7 @@ public class NewExpression extends ExpressionNode {
 		return null;
 	}
 //TODO дубликат в MethodCallExpression
-	private boolean isArgumentsMatch(Scope scope, MethodSymbol constructor, List<VarType> argTypes) {
+	private boolean isArgumentsMatch(Scope scope, MethodSymbol constructor, List<VarType> argTypes) throws SemanticException {
 		List<VarType> paramTypes = constructor.getParameterTypes();
 		if (paramTypes.size() != argTypes.size()) {
 			return false;
@@ -131,8 +130,10 @@ public class NewExpression extends ExpressionNode {
 		return true;
 	}
 	
+	//TODO isUsed setUsed getChildren
+	
 	@Override
-	public void codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg) throws Exception {
 		long[] operands = null;
 		if(!args.isEmpty()) {
 			
@@ -144,5 +145,7 @@ public class NewExpression extends ExpressionNode {
 		}
 
 		cg.eNew(getType(null).getId(), operands, false);//TODO canThrow
+		
+		return null;
 	}
 }

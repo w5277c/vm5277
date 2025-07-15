@@ -24,14 +24,16 @@ import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.semantic.ClassScope;
+import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 
 public class ClassBlockNode extends AstNode {
-	protected	List<AstNode>			declarations	= new ArrayList<>();
+	protected	List<AstNode>	children	= new ArrayList<>();
 
 	public ClassBlockNode(TokenBuffer tb, MessageContainer mc, String className) throws ParseException {
 		super(tb, mc);
@@ -43,12 +45,12 @@ public class ClassBlockNode extends AstNode {
 
 			// Обработка классов с модификаторами
 			if (tb.match(TokenType.OOP, Keyword.CLASS)) {
-				declarations.add(new ClassNode(tb, mc, modifiers, null, null));
+				children.add(new ClassNode(tb, mc, modifiers, null, null));
 				continue;
 			}
 			// Обработка интерфейсов с модификаторами
 			if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
-				declarations.add(new InterfaceNode(tb, mc, modifiers, null));
+				children.add(new InterfaceNode(tb, mc, modifiers, null));
 				continue;
 			}
 
@@ -72,29 +74,27 @@ public class ClassBlockNode extends AstNode {
 
 			if(tb.match(Delimiter.LEFT_PAREN)) { //'(' Это метод
 				if(isClassName) {
-					declarations.add(new MethodNode(tb, mc, modifiers, null, className));
+					children.add(new MethodNode(tb, mc, modifiers, null, className));
 				}
 				else {
-					declarations.add(new MethodNode(tb, mc, modifiers, type, name));
+					children.add(new MethodNode(tb, mc, modifiers, type, name));
 				}
 				continue;
 			}
 
 			if(null != type) {
 				if (tb.match(Delimiter.LEFT_BRACKET)) { // Это объявление массива
-					declarations.add(new ArrayDeclarationNode(tb, mc, modifiers, type, name));
+					children.add(new ArrayDeclarationNode(tb, mc, modifiers, type, name));
 				}
 				else { // Поле
-					declarations.add(new FieldNode(tb, mc, modifiers, type, name));
+					children.add(new FieldNode(tb, mc, modifiers, type, name));
 				}
 			}
 
 			if(tb.match(Delimiter.LEFT_BRACE)) {
 				tb.getLoopStack().add(this);
 				try {
-					BlockNode blockNode = new BlockNode(tb, mc);
-					declarations.add(blockNode);
-					blocks.add(blockNode);
+					children.add(new BlockNode(tb, mc));
 				}
 				catch(ParseException e) {}
 				tb.getLoopStack().remove(this);
@@ -109,10 +109,6 @@ public class ClassBlockNode extends AstNode {
 		super(null, mc);
 	}
 	
-	public List<AstNode> getDeclarations() {
-		return declarations;
-	}
-	
 	@Override
 	public String getNodeType() {
 		return "class body";
@@ -121,35 +117,43 @@ public class ClassBlockNode extends AstNode {
 	@Override
 	public boolean preAnalyze() {
 		// Проверка всех объявлений в блоке
-		for (AstNode declaration : declarations) {
-			declaration.preAnalyze(); // Не реагируем на критические ошибки
+		for (AstNode node : children) {
+			node.preAnalyze(); // Не реагируем на критические ошибки
 		}
 		return true;
 	}
 
 	@Override
 	public boolean declare(Scope scope) {
-		for (AstNode declaration : declarations) {
-			declaration.declare(scope);
+		for (AstNode node : children) {
+			node.declare(scope);
 		}
 		return true;
 	}
 
 	
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		ClassScope classScope = (ClassScope)scope;
 		
 		// Проверка наличия конструктора
 		if (checkNonStaticMembers(classScope)) {
 			List<MethodSymbol> constructors = classScope.getConstructors();
 			if(null == constructors || constructors.isEmpty()) {
-				markError("Class must have at least one constructor");
+				//Есть не статические методы, но нет конструктора
+				try {
+					MethodScope methodScope = new MethodScope(null, classScope);
+					MethodSymbol methodSymbol = new MethodSymbol(classScope.getName(), null, new ArrayList<>(), false, false, false, false, methodScope, null);
+					methodScope.setSymbol(methodSymbol);
+					classScope.addConstructor(methodSymbol);
+					markWarning("Class must have at least one constructor");
+				}
+				catch(SemanticException e) {markError(e);}
 			}
 		}
 		
-		for (AstNode node : declarations) {
-			node.postAnalyze(scope);
+		for (AstNode node : children) {
+			node.postAnalyze(scope, cg);
 		}
 		return true;
 	}
@@ -171,9 +175,19 @@ public class ClassBlockNode extends AstNode {
 	}
 
 	@Override
-	public void codeGen(CodeGenerator cg) throws Exception {
-		for(AstNode decl : declarations) {
-			decl.codeGen(cg);
+	public Object codeGen(CodeGenerator cg) throws Exception {
+		if(cgDone) return null;
+		cgDone = true;
+		
+		for(AstNode node : children) {
+			node.codeGen(cg);
 		}
+		
+		return null;
+	}
+
+	@Override
+	public List<AstNode> getChildren() {
+		return children;
 	}
 }

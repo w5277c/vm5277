@@ -17,9 +17,11 @@ package ru.vm5277.common.cg;
 
 public class CGCell {
 	public static enum Type {
-		REG,
-		STACK,
-		RAM;
+		REG,	//регистры
+		STACK,	//блок памяти выделенный в стеке
+		STAT,	//глобальный блок памяти выделенный под статические переменные
+		HEAP,	//блок памяти выделенный в инстансе класса
+		RET;	//результат возвращенный методом, лежит за верхушкой стека
 	}
 	
 	private	Type	type;
@@ -36,5 +38,10 @@ public class CGCell {
 	
 	public int getNum() {
 		return num;
+	}
+	
+	@Override
+	public String toString() {
+		return type + ":" + num;
 	}
 }

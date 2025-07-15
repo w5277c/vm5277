@@ -16,7 +16,7 @@
 
 // Алиасы SCK, RX, SDA и прочие здесь не размещаются, их место в обертках соответствующих драйверов.
 
-public final class GPIO {
+public class GPIO {
 	public	final	static	byte	PA0	= 0x00;
 	public	final	static	byte	PA1	= 0x01;
 	public	final	static	byte	PA2	= 0x02;

@@ -15,6 +15,7 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
@@ -65,10 +66,10 @@ public class ArrayExpression extends ExpressionNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		try {
 			// Проверяем подвыражения
-			if (!array.postAnalyze(scope) || !index.postAnalyze(scope)) {
+			if (!array.postAnalyze(scope, cg) || !index.postAnalyze(scope, cg)) {
 				return false;
 			}
 

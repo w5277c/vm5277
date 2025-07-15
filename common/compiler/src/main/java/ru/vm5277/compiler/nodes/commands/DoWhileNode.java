@@ -15,6 +15,9 @@
  */
 package ru.vm5277.compiler.nodes.commands;
 
+import java.util.Arrays;
+import java.util.List;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
@@ -25,12 +28,14 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class DoWhileNode extends CommandNode {
 	private	ExpressionNode	condition;
+	private	BlockNode		blockNode;
 	private	BlockScope		blockScope;
 
 	public DoWhileNode(TokenBuffer tb, MessageContainer mc) {
@@ -39,7 +44,9 @@ public class DoWhileNode extends CommandNode {
 		consumeToken(tb);
 		// Тело цикла
 		tb.getLoopStack().add(this);
-		try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement()));}
+		try {
+			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
+		}
 		catch(ParseException e) {markFirstError(e);}
 		tb.getLoopStack().remove(this);
 
@@ -61,7 +68,7 @@ public class DoWhileNode extends CommandNode {
 	}
 
 	public BlockNode getBody() {
-		return blocks.isEmpty() ? null : blocks.get(0);
+		return blockNode;
 	}
 
 	@Override
@@ -107,13 +114,13 @@ public class DoWhileNode extends CommandNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		// Анализ тела цикла
-		if (null != getBody()) getBody().postAnalyze(blockScope);
+		if (null != getBody()) getBody().postAnalyze(blockScope, cg);
 
 		// Проверка типа условия
 		if (null != condition) {
-			if(condition.postAnalyze(scope)) {
+			if(condition.postAnalyze(scope, cg)) {
 				try {
 					VarType condType = condition.getType(scope);
 					if (VarType.BOOL != condType) markError("While condition must be boolean, got: " + condType);
@@ -129,5 +136,10 @@ public class DoWhileNode extends CommandNode {
 			}
 		}
 		return true;
+	}
+	
+	@Override
+	public List<AstNode> getChildren() {
+		return Arrays.asList(blockNode);
 	}
 }

@@ -17,20 +17,25 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.ArrayList;
 import java.util.List;
-import ru.vm5277.common.compiler.Operand;
-import ru.vm5277.common.compiler.OperandType;
+import ru.vm5277.common.cg.Operand;
+import ru.vm5277.common.cg.OperandType;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.Operator;
 import static ru.vm5277.common.Operator.MINUS;
 import static ru.vm5277.common.Operator.PLUS;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
+import ru.vm5277.compiler.nodes.FieldNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
+import ru.vm5277.compiler.nodes.VarNode;
+import ru.vm5277.compiler.semantic.AstHolder;
+import ru.vm5277.compiler.semantic.FieldSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 import ru.vm5277.compiler.tokens.Token;
@@ -103,7 +108,18 @@ public class ExpressionNode extends AstNode {
 				else {
 					typeExpr = parseTypeReference(); // Разбираем выражение типа
 				}
-				return optimizeExpression(new InstanceOfExpression(tb, mc, left, typeExpr));
+				String varName = null;
+				if (tb.match(Keyword.AS)) {
+					tb.consume(); // Потребляем "as"
+					// Проверяем, что после типа идет идентификатор
+					if (tb.match(TokenType.ID)) {
+						varName = consumeToken(tb).getStringValue();
+					}
+					else {
+						markError("TODO Expected variable name after type in pattern matching");
+					}
+				}
+				return optimizeExpression(new InstanceOfExpression(tb, mc, left, typeExpr, varName));
 			}
 			
 			Integer precedence = Operator.PRECEDENCE.get(operator);
@@ -156,13 +172,13 @@ public class ExpressionNode extends AstNode {
 
 		if (op.isAssignment() && right instanceof BinaryExpression) {
 			BinaryExpression bRight = (BinaryExpression)right;
-			if (left instanceof VariableExpression && (Operator.PLUS==bRight.getOperator() || Operator.MINUS==bRight.getOperator())) {
-				if(	(bRight.getLeft() instanceof VariableExpression && bRight.getRight() instanceof LiteralExpression) ||
-					(bRight.getLeft() instanceof LiteralExpression && bRight.getRight() instanceof VariableExpression)) {
+			if (left instanceof VarFieldExpression && (Operator.PLUS==bRight.getOperator() || Operator.MINUS==bRight.getOperator())) {
+				if(	(bRight.getLeft() instanceof VarFieldExpression && bRight.getRight() instanceof LiteralExpression) ||
+					(bRight.getLeft() instanceof LiteralExpression && bRight.getRight() instanceof VarFieldExpression)) {
 					
-					VariableExpression ve = (VariableExpression)(bRight.getLeft() instanceof VariableExpression ? bRight.getLeft() : bRight.getRight());
-					LiteralExpression le = (LiteralExpression)(bRight.getLeft() instanceof VariableExpression ? bRight.getRight(): bRight.getLeft());
-					if(	ve.getValue().equals(((VariableExpression)left).getValue()) && le.isInteger()) {
+					VarFieldExpression ve = (VarFieldExpression)(bRight.getLeft() instanceof VarFieldExpression ? bRight.getLeft() : bRight.getRight());
+					LiteralExpression le = (LiteralExpression)(bRight.getLeft() instanceof VarFieldExpression ? bRight.getRight(): bRight.getLeft());
+					if(	ve.getValue().equals(((VarFieldExpression)left).getValue()) && le.isInteger()) {
 						long num = le.getNumValue();
 						if(-1 == num || 1 == num) {
 							return new UnaryExpression(tb, mc, (Operator.PLUS==bRight.getOperator()^(-1==num)) ? Operator.PRE_INC : Operator.PRE_DEC, left);
@@ -265,7 +281,7 @@ public class ExpressionNode extends AstNode {
 				result = term.isPositive() ? node : new UnaryExpression(tb, mc, Operator.MINUS, node);
 			}
 			else {
-				result = new BinaryExpression(tb, mc, result, term.isPositive() ? Operator.PLUS : Operator.MINUS, node);
+				result = new BinaryExpression(tb, mc, node, term.isPositive() ? Operator.PLUS : Operator.MINUS, result);
 			}
 		}
 		return result != null ? result : new LiteralExpression(tb, mc, hasDoubles ? 0.0 : 0L);
@@ -303,12 +319,21 @@ public class ExpressionNode extends AstNode {
 	// Оптимизация выражения с использованием Scope (поздний этап).
 	public ExpressionNode optimizeWithScope(Scope scope) throws ParseException {
 		// Заменяем переменные на их значения из Scope (если они final и известны)
-		if (this instanceof VariableExpression) {
-			VariableExpression varExpr = (VariableExpression) this;
-			Symbol symbol = scope.resolve(varExpr.getValue());
-			if (null != symbol && symbol.isFinal()) {
-				if(null != symbol.getConstantOperand() && OperandType.LITERAL == symbol.getConstantOperand().getOperandType()) {
-					return new LiteralExpression(tb, mc, symbol.getConstantOperand().getValue());
+		if (this instanceof VarFieldExpression) {
+			VarFieldExpression vfe = (VarFieldExpression)this;
+			if(vfe.getSymbol() instanceof AstHolder) {
+				AstNode node = ((AstHolder)vfe.getSymbol()).getNode();
+				if(node instanceof VarNode) {
+					VarNode vNode = (VarNode)node;
+					if(vNode.isFinal() && VarType.CSTR != vNode.getType() && vNode.getInitializer() instanceof LiteralExpression) {
+						return vNode.getInitializer();
+					}
+				}
+				else if(node instanceof FieldNode) {
+					FieldNode fNode = (FieldNode)node;
+					if (fNode.isStatic() && fNode.isFinal() && VarType.CSTR != fNode.getType() && fNode.getInitializer() instanceof LiteralExpression) {
+						return fNode.getInitializer();
+					}
 				}
 			}
 		}
@@ -320,21 +345,21 @@ public class ExpressionNode extends AstNode {
 			if (ioe.isFulfillsContract()) return new LiteralExpression(tb, mc, true);
 
 			// Оптимизация для final объектов
-			if (ioe.getLeft() instanceof VariableExpression) {
+			if (ioe.getLeft() instanceof VarFieldExpression) {
 				if(ioe.getLeftType().isPrimitive() && ioe.getLeftType() == ioe.getRightType()) {
 					return new LiteralExpression(tb, mc, true);
 				}
 
-				VariableExpression varExpr = (VariableExpression)ioe.getLeft();
-				Symbol symbol = varExpr.getSymbol();
+				VarFieldExpression varExpr = (VarFieldExpression)ioe.getLeft();
+				Symbol varSymbol = varExpr.getSymbol();
 
-
-				if (null != symbol && symbol.isFinal() && ioe.getLeftType() != null && ioe.getRightType() != null) {
+				if (null != varSymbol && varSymbol.isFinal() && ioe.getLeftType() != null && ioe.getRightType() != null) {
 					VarType leftType = ioe.getLeftType();
-					Operand op = symbol.getConstantOperand();
+					Operand op = null;//varSymbol.getConstantOperand();
+					//TODO
 					if(null != op && OperandType.TYPE == op.getOperandType()) {
-						symbol = scope.resolve((String)op.getValue());
-						if(null != symbol) leftType = symbol.getType();
+						varSymbol = scope.resolve((String)op.getValue());
+						if(null != varSymbol) leftType = varSymbol.getType();
 					}
 					// Точное совпадение типов
 					if (leftType == ioe.getRightType()) return new LiteralExpression(tb, mc, true);
@@ -358,13 +383,21 @@ public class ExpressionNode extends AstNode {
 			return ioe;
 		}
 
+		if (this instanceof FieldAccessExpression) {
+			FieldAccessExpression fae = (FieldAccessExpression)this;
+			FieldNode fNode = (FieldNode)((AstHolder)fae.getSymbol()).getNode();
+			if (fNode.isStatic() && fNode.isFinal() && fNode.getInitializer() instanceof LiteralExpression) {
+				return fNode.getInitializer();
+			}
+		}
+		
 		if (this instanceof BinaryExpression) {
 			BinaryExpression bin = (BinaryExpression) this;
 			ExpressionNode left = bin.getLeft().optimizeWithScope(scope);
 			ExpressionNode right = bin.getRight().optimizeWithScope(scope);
 			return optimizeOperationChain(left, bin.getOperator(), right, 0);
 		}
-		return this;
+		return null;
 	}
 
 	private ExpressionNode optimizeMultiplicativeChain(ExpressionNode left, Operator op, ExpressionNode right) {
@@ -630,8 +663,10 @@ public class ExpressionNode extends AstNode {
 			return expr;
 		}
 		else if(tb.match(TokenType.ID)) {
+			ExpressionNode expr = parseFullQualifiedExpression(tb);
+
 			// Парсим цепочку идентификаторов через точки
-			ExpressionNode expr = parseQualifiedName();
+//			ExpressionNode expr = parseQualifiedName();
 			
 			// Если после цепочки идет '(', то это вызов метода
 			if(tb.match(Delimiter.LEFT_PAREN)) {
@@ -644,30 +679,6 @@ public class ExpressionNode extends AstNode {
         }
     }
 	
-	private ExpressionNode parseQualifiedName() throws ParseException {
-		// Парсим первый идентификатор
-		Token firstToken = consumeToken(tb, TokenType.ID);
-		ExpressionNode expr = new VariableExpression(tb, mc, firstToken.getValue().toString());
-
-/*		// Обрабатываем возможный оператор 'is' после идентификатора
-		if (tb.match(Operator.IS)) {
-			consumeToken(tb); // Пропускаем 'is'
-			ExpressionNode typeExpr = parseTypeReference();
-			return new InstanceOfExpression(tb, mc, expr, typeExpr);
-		} должно быть в ParseBinary*/
-		
-		// Парсим остальные части через точки
-		while(tb.match(Delimiter.DOT)) {
-			consumeToken(tb); // Потребляем точку
-			String name = consumeToken(tb, TokenType.ID).getValue().toString();
-
-			// Создаем цепочку доступов
-			expr = new FieldAccessExpression(tb, mc, expr, name);
-		}
-
-		return expr;
-	}
-
 	private ExpressionNode parseMethodCall(ExpressionNode target) throws ParseException {
 		// Проверяем, является ли target MemberAccessExpression или VariableExpression
 		String methodName;
@@ -675,8 +686,8 @@ public class ExpressionNode extends AstNode {
 			methodName = ((FieldAccessExpression)target).getFieldName();
 			target = ((FieldAccessExpression)target).getTarget();
 		}
-		else if(target instanceof VariableExpression) {
-			methodName = ((VariableExpression)target).getValue();
+		else if(target instanceof VarFieldExpression) {
+			methodName = ((VarFieldExpression)target).getValue();
 			target = null; // Статический вызов
 		}
 		else {
@@ -718,7 +729,20 @@ public class ExpressionNode extends AstNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		return false;
+	}
+
+	@Override
+	public List<AstNode> getChildren() {
+		return null;
+	}
+	
+	public int getResId() {
+		int result = -1;
+		if(symbol instanceof AstHolder) {
+			result = ((AstHolder)symbol).getNode().getCGScope().getResId();
+		}
+		return result;
 	}
 }

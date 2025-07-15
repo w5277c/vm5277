@@ -36,6 +36,7 @@ import ru.vm5277.compiler.nodes.commands.SwitchNode;
 import ru.vm5277.compiler.nodes.commands.TryNode;
 import ru.vm5277.compiler.nodes.commands.WhileNode;
 import ru.vm5277.compiler.nodes.expressions.BinaryExpression;
+import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.MethodCallExpression;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
@@ -43,8 +44,8 @@ import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class BlockNode extends AstNode {
-	private	List<AstNode>			declarations	= new ArrayList<>();
-	private	Map<String, LabelNode>	labels			= new HashMap<>();
+	private	List<AstNode>			children	= new ArrayList<>();
+	private	Map<String, LabelNode>	labels		= new HashMap<>();
 	private	BlockScope				blockScope;
 	
 	public BlockNode() {
@@ -53,7 +54,7 @@ public class BlockNode extends AstNode {
 	public BlockNode(TokenBuffer tb, MessageContainer mc, AstNode singleStatement) {
 		super(tb, mc);
 		
-		declarations.add(singleStatement);
+		children.add(singleStatement);
 	}
 
 	public BlockNode(TokenBuffer tb, MessageContainer mc) throws ParseException {
@@ -68,11 +69,11 @@ public class BlockNode extends AstNode {
 			if(tb.match(TokenType.LABEL)) {
 				LabelNode label = new LabelNode(tb, mc);
 				labels.put(label.getName(), label);
-				declarations.add(label);
+				children.add(label);
 			}
 			if (tb.match(TokenType.COMMAND)) {
 				try {
-					declarations.add(parseCommand());
+					children.add(parseCommand());
 				}
 				catch(ParseException e) {
 					addMessage(e.getErrorMessage());
@@ -81,7 +82,7 @@ public class BlockNode extends AstNode {
 				continue;
 			}
 			if(tb.match(Keyword.FREE)) {
-				declarations.add(new FreeNode(tb, mc));
+				children.add(new FreeNode(tb, mc));
 				continue;
 			}
 			
@@ -89,12 +90,12 @@ public class BlockNode extends AstNode {
 
 			// Обработка классов с модификаторами
 			if (tb.match(TokenType.OOP) && Keyword.CLASS == tb.current().getValue()) {
-				declarations.add(new ClassNode(tb, mc, modifiers, null, null));
+				children.add(new ClassNode(tb, mc, modifiers, null, null));
 				continue;
 			}
 			// Обработка интерфейсов с модификаторами
 			if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
-				declarations.add(new InterfaceNode(tb, mc, modifiers, null));
+				children.add(new InterfaceNode(tb, mc, modifiers, null));
 				continue;
 			}
 
@@ -112,7 +113,7 @@ public class BlockNode extends AstNode {
 							String methodName = (String)consumeToken(tb, TokenType.ID).getValue();
 							if (tb.match(Delimiter.LEFT_PAREN)) {
 								// Это вызов метода
-								declarations.add(	new MethodCallExpression(tb, mc, new TypeReferenceExpression(tb, mc, type.getClassName()), methodName,
+								children.add(	new MethodCallExpression(tb, mc, new TypeReferenceExpression(tb, mc, type.getClassName()), methodName,
 													parseArguments(tb)));
 								consumeToken(tb, Delimiter.SEMICOLON);
 								break;
@@ -131,11 +132,11 @@ public class BlockNode extends AstNode {
 
 						if (tb.match(Delimiter.LEFT_BRACKET)) { // Это объявление массива
 							ArrayDeclarationNode node = new ArrayDeclarationNode(tb, mc, modifiers, type, name);
-							if(null != name) declarations.add(node);
+							if(null != name) children.add(node);
 						}
 						else { // Переменная
 							VarNode varNode = new VarNode(tb, mc, modifiers, type, name);
-							if(null != name) declarations.add(varNode);
+							if(null != name) children.add(varNode);
 						}
 						continue;
 					}
@@ -147,11 +148,7 @@ public class BlockNode extends AstNode {
 
 			// Обработка остальных statement (if, while, вызовы и т.д.)
 			try {
-				AstNode statement = parseStatement();
-				declarations.add(statement);
-				if(statement instanceof BlockNode) {
-					blocks.add((BlockNode)statement);
-				}
+				children.add(parseStatement());
 			}
 			catch(ParseException e) {
 				markFirstError(e);
@@ -173,16 +170,16 @@ public class BlockNode extends AstNode {
 		// Если это блок, проверяем все его декларации
 		if (node instanceof BlockNode) {
 			BlockNode block = (BlockNode)node;
-			for (AstNode declaration : block.getDeclarations()) {
-				if (hasReturnStatement(declaration)) {
+			for (AstNode nodes : block.getChildren()) {
+				if (hasReturnStatement(nodes)) {
 					return true;
 				}
 			}
 		}
 		// Для других узлов проверяем их дочерние блоки
 		else {
-			for (BlockNode block : node.getBlocks()) {
-				if (hasReturnStatement(block)) {
+			for (AstNode _node : node.getChildren()) {
+				if (hasReturnStatement(_node)) {
 					return true;
 				}
 			}
@@ -219,10 +216,6 @@ public class BlockNode extends AstNode {
 		return false;
 	}
 	
-	public List<AstNode> getDeclarations() {
-		return declarations;
-	}
-	
 	public Map<String, LabelNode> getLabels() {
 		return labels;
 	}
@@ -235,8 +228,8 @@ public class BlockNode extends AstNode {
 	@Override
 	public boolean preAnalyze() {
 		// Проверка всех объявлений в блоке
-		for (AstNode declaration : declarations) {
-			declaration.preAnalyze(); // Не реагируем на критические ошибки
+		for (AstNode node : children) {
+			node.preAnalyze(); // Не реагируем на критические ошибки
 		}
 		return true;
 	}
@@ -247,34 +240,34 @@ public class BlockNode extends AstNode {
 		blockScope = new BlockScope(scope);
 
 		// Объявляем все элементы в блоке
-		for (AstNode declaration : declarations) {
-			declaration.declare(blockScope);
+		for (AstNode node : children) {
+			node.declare(blockScope);
 		}
 
 		return true;
 	}
 	
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		boolean inTryBlock = false;
 		TryNode currentTryNode = null;
 
-		for (int i = 0; i < declarations.size(); i++) {
-			AstNode declaration = declarations.get(i);
+		for (int i = 0; i < children.size(); i++) {
+			AstNode node = children.get(i);
 
 			// Анализируем текущую ноду
-			declaration.postAnalyze(blockScope);
-
+			node.postAnalyze(blockScope, cg);
+			
 			// Если нашли try-block, отмечаем начало зоны обработки исключений
-			if (declaration instanceof TryNode) {
-				currentTryNode = (TryNode)declaration;
+			if (node instanceof TryNode) {
+				currentTryNode = (TryNode)node;
 				inTryBlock = true;
 			}
 
 			// Проверка вызовов методов
-			if (declaration instanceof MethodCallExpression) {
-				MethodCallExpression call = (MethodCallExpression)declaration;
-				MethodSymbol methodSymbol = call.getMethod();
+			if (node instanceof MethodCallExpression) {
+				MethodCallExpression call = (MethodCallExpression)node;
+				MethodSymbol methodSymbol = (MethodSymbol)call.getSymbol();
 
 				if (null != methodSymbol && methodSymbol.canThrow() && !inTryBlock) {
 					markWarning("Call to throwing method '" + methodSymbol.getName() + "' without try-catch at line " + call.getSP());
@@ -282,14 +275,14 @@ public class BlockNode extends AstNode {
 			}
 
 			// Если это конец try-block, сбрасываем флаг
-            if (inTryBlock && declaration == currentTryNode.getEndNode()) {
+            if (inTryBlock && node == currentTryNode.getEndNode()) {
                 inTryBlock = false;
                 currentTryNode = null;
             }
 			
 			// Проверяем недостижимый код после прерывающих инструкций
-			if (i > 0 && isControlFlowInterrupted(declarations.get(i - 1))) {
-				markError("Unreachable code after " + declarations.get(i - 1).getClass().getSimpleName());
+			if (i > 0 && isControlFlowInterrupted(children.get(i - 1))) {
+				markError("Unreachable code after " + children.get(i - 1).getClass().getSimpleName());
 				// Можно пропустить анализ остального кода, так как он недостижим
 				break;
 			}
@@ -298,19 +291,27 @@ public class BlockNode extends AstNode {
 	}
 
 	@Override
-	public void codeGen(CodeGenerator cg) throws Exception {
-		for(AstNode decl : declarations) {
-			if(decl instanceof BinaryExpression) {
-				decl.codeGen(cg);
-			}
-			else {
-				decl.codeGen(cg);
+	public Object codeGen(CodeGenerator cg) throws Exception {
+		if(cgDone) return null;
+		cgDone = true;
+		
+		for(AstNode node : children) {
+			//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
+			if(!(node instanceof VarNode)) {
+				node.codeGen(cg);
 			}
 		}
+		
+		return null;
 	}
 	
 	@Override
 	public String toString() {
 		return getClass().getSimpleName();
+	}
+
+	@Override
+	public List<AstNode> getChildren() {
+		return children;
 	}
 }

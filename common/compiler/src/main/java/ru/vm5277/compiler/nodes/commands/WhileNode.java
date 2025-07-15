@@ -15,9 +15,10 @@
  */
 package ru.vm5277.compiler.nodes.commands;
 
+import java.util.Arrays;
+import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.cg.items.CGIText;
-import ru.vm5277.common.cg.scopes.CGLabelScope;
+import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
@@ -26,13 +27,14 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class WhileNode extends CommandNode {
 	private	ExpressionNode	condition;
-	private	BlockNode		body;
+	private	BlockNode		blockNode;
 	private	BlockScope		blockScope;
 
 	public WhileNode(TokenBuffer tb, MessageContainer mc) {
@@ -45,8 +47,7 @@ public class WhileNode extends CommandNode {
 
 		tb.getLoopStack().add(this);
 		try {
-			body = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
-			blocks.add(body);
+			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
 		}
 		catch(ParseException e) {markFirstError(e);}
 		tb.getLoopStack().remove(this);
@@ -57,7 +58,7 @@ public class WhileNode extends CommandNode {
 	}
 
 	public BlockNode getBody() {
-		return body;
+		return blockNode;
 	}
 
 	@Override
@@ -71,7 +72,7 @@ public class WhileNode extends CommandNode {
 		if (null != condition) condition.preAnalyze();
 		else markError("While condition cannot be null");
 
-		if (null != body) body.preAnalyze();
+		if (null != blockNode) blockNode.preAnalyze();
 		
 		return true;
 	}
@@ -84,16 +85,16 @@ public class WhileNode extends CommandNode {
 		// Создаем новую область видимости для тела цикла
 		blockScope = new BlockScope(scope);
 		// Объявляем элементы тела цикла
-		if (null != body) body.declare(blockScope);
+		if (null != blockNode) blockNode.declare(blockScope);
 
 		return true;
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		// Проверка типа условия
 		if (null != condition) {
-			if(condition.postAnalyze(scope)) {
+			if(condition.postAnalyze(scope, cg)) {
 				try {
 					VarType condType = condition.getType(scope);
 					if (VarType.BOOL != condType) markError("While condition must be boolean, got: " + condType);
@@ -103,10 +104,10 @@ public class WhileNode extends CommandNode {
 		}
 
 		// Анализ тела цикла
-		if (null != body) body.postAnalyze(blockScope);
+		if (null != blockNode) blockNode.postAnalyze(blockScope, cg);
 		
 		// Проверяем бесконечный цикл с возвратом
-		if (condition instanceof LiteralExpression && Boolean.TRUE.equals(((LiteralExpression)condition).getValue()) &&	isControlFlowInterrupted(body)) {
+		if (condition instanceof LiteralExpression && Boolean.TRUE.equals(((LiteralExpression)condition).getValue()) &&	isControlFlowInterrupted(blockNode)) {
 			markWarning("Code after infinite while loop is unreachable");
 		}
 
@@ -114,24 +115,27 @@ public class WhileNode extends CommandNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg) throws Exception {
+		if(cgDone) return null;
+		cgDone = true;
+
 		if(condition instanceof LiteralExpression) {
 			LiteralExpression le = (LiteralExpression)condition;
 			if(0x00 != le.getNumValue()) {
-				int bodyResId = cg.enterBlock();
-				body.codeGen(cg);
+				CGBlockScope bodyResScope = cg.enterBlock();
+				blockNode.codeGen(cg);
 				cg.leaveBlock();
-				cg.eWhile(null, bodyResId);
+				cg.eWhile(null, bodyResScope);
 			}
 		}
 		else {
-			int condResId = cg.enterBlock();
+			CGBlockScope condResScope = cg.enterBlock();
 			condition.codeGen(cg);
 			cg.leaveBlock();
-			int bodyResId = cg.enterBlock();
-			body.codeGen(cg);
+			CGBlockScope bodyResScope = cg.enterBlock();
+			blockNode.codeGen(cg);
 			cg.leaveBlock();
-			cg.eWhile(condResId, bodyResId);
+			cg.eWhile(condResScope, bodyResScope);
 		}
 		
 
@@ -140,5 +144,12 @@ public class WhileNode extends CommandNode {
 //		cg.leaveBlock();
 
 //		cg.eWhile(condBlockId, bodyBlockId);
+
+		return null;
+	}
+	
+	@Override
+	public List<AstNode> getChildren() {
+		return Arrays.asList(blockNode);
 	}
 }

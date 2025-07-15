@@ -15,33 +15,44 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
+import java.util.Arrays;
+import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.common.Operator;
+import ru.vm5277.common.cg.scopes.CGCellsScope;
+import ru.vm5277.common.cg.scopes.CGFieldScope;
+import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.nodes.AstNode;
+import ru.vm5277.compiler.semantic.AstHolder;
 import ru.vm5277.compiler.semantic.ClassScope;
+import ru.vm5277.compiler.semantic.FieldSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
+import ru.vm5277.compiler.semantic.VarSymbol;
 
 public class BinaryExpression extends ExpressionNode {
-    private	final	ExpressionNode	left;
+    private	final	ExpressionNode	leftExpr;
     private	final	Operator		operator;
-    private	final	ExpressionNode	right;
+    private	final	ExpressionNode	rightExpr;
 	private			VarType			leftType;
 	private			VarType			rightType;
+	private			boolean			isUsed		= false;
 
     public BinaryExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode left, Operator operator, ExpressionNode right) {
         super(tb, mc);
         
-		this.left = left;
+		this.leftExpr = left;
         this.operator = operator;
-        this.right = right;
+        this.rightExpr = right;
     }
     
 	public ExpressionNode getLeft() {
-		return left;
+		return leftExpr;
 	}
 	
 	public Operator getOperator() {
@@ -49,14 +60,14 @@ public class BinaryExpression extends ExpressionNode {
 	}
 	
 	public ExpressionNode getRight() {
-		return right;
+		return rightExpr;
 	}
 
 	@Override
 	public VarType getType(Scope scope) throws SemanticException {
 		// Получаем типы операндов
-		VarType leftType = left.getType(scope);
-		VarType rightType = right.getType(scope);
+		VarType leftType = leftExpr.getType(scope);
+		VarType rightType = rightExpr.getType(scope);
 
 		// Проверяем совместимость типов
 		if (!isCompatibleWith(scope, leftType, rightType)) {
@@ -88,20 +99,20 @@ public class BinaryExpression extends ExpressionNode {
 	@Override
 	public boolean preAnalyze() {
 		// Проверка наличия операндов
-		if (null == left) {
+		if (null == leftExpr) {
 			markError("Left operand is missing in binary expression");
 			return false;
 		}
-		if (null == right) {
+		if (null == rightExpr) {
 			markError("Right operand is missing in binary expression");
 			return false;
 		}
 		
 		// Рекурсивный анализ операндов
-		if (!left.preAnalyze()) {
+		if (!leftExpr.preAnalyze()) {
 			return false; // Ошибка уже помечена в left
 		}
-		if (!right.preAnalyze()) {
+		if (!rightExpr.preAnalyze()) {
 			return false; // Ошибка уже помечена в right
 		}
 
@@ -109,26 +120,28 @@ public class BinaryExpression extends ExpressionNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		try {
+			cgScope = cg.enterExpression();
 			// Анализ операндов
-			if (!left.postAnalyze(scope) || !right.postAnalyze(scope)) return false;
+			if (!leftExpr.postAnalyze(scope, cg) || !rightExpr.postAnalyze(scope, cg)) return false;
 
-			leftType = left.getType(scope);
-			rightType = right.getType(scope);
+			leftType = leftExpr.getType(scope);
+			rightType = rightExpr.getType(scope);
 
 			if(operator.isAssignment()) {
-				if(left instanceof VariableExpression) {
-					VariableExpression varExpr = (VariableExpression) left;
+				if(leftExpr instanceof VarFieldExpression) {
+					VarFieldExpression varExpr = (VarFieldExpression) leftExpr;
 					Symbol symbol = scope.resolve(varExpr.getValue());
 					if(null != symbol && symbol.isFinal()) {
 						markError("Cannot assign to final variable: " + varExpr.getValue());
+						cg.leaveExpression();
 						return false;
 					}
 				}
-				else if (left instanceof FieldAccessExpression) {
+				else if (leftExpr instanceof FieldAccessExpression) {
 					// Для полей классов проверяем final (если нужно)
-					FieldAccessExpression memberExpr = (FieldAccessExpression) left;
+					FieldAccessExpression memberExpr = (FieldAccessExpression) leftExpr;
 					ExpressionNode target = memberExpr.getTarget();
 					String fieldName = memberExpr.getFieldName();
 
@@ -142,6 +155,7 @@ public class BinaryExpression extends ExpressionNode {
 							Symbol field = classScope.getFields().get(fieldName);
 							if (null != field && field.isFinal()) {
 								markError("Cannot assign to final field: " + targetType.getClassName() + "." + fieldName);
+								cg.leaveExpression();
 								return false;
 							}
 						}
@@ -152,6 +166,7 @@ public class BinaryExpression extends ExpressionNode {
 			// Проверка совместимости типов
 			if (!isCompatibleWith(scope, leftType, rightType)) {
 				markError("Type mismatch: " + leftType.getName() + " " + operator + " " + rightType.getName());
+				cg.leaveExpression();
 				return false;
 			}
 			
@@ -159,29 +174,34 @@ public class BinaryExpression extends ExpressionNode {
 			if (operator.isLogical()) {
 				if (!leftType.isBoolean() || !rightType.isBoolean()) {
 					markError("Logical operators require boolean operands");
+					cg.leaveExpression();
 					return false;
 				}
+				cg.leaveExpression();
 				return true;
 			}
 
 			if (operator.isBitwise()) {
 				if (!leftType.isInteger() || !rightType.isInteger()) {
 					markError("Bitwise operators require integer operands");
+					cg.leaveExpression();
 					return false;
 				}
 
 				// Запрет смешивания разных целочисленных типов
 				if (leftType != rightType) {
 					markError("Bitwise operations require identical integer types");
+					cg.leaveExpression();
 					return false;
 				}
+				cg.leaveExpression();
 				return true;
 			}
 			
 			// Проверка деления на ноль (универсальная для всех типов)
 			if ((Operator.DIV == operator || Operator.MOD == operator)) {
-				if (right instanceof LiteralExpression) {
-					Object val = ((LiteralExpression)right).getValue();
+				if (rightExpr instanceof LiteralExpression) {
+					Object val = ((LiteralExpression)rightExpr).getValue();
 					boolean isZero = false;
 
 					if (val instanceof Double) isZero = (Double)val == 0.0;
@@ -189,6 +209,7 @@ public class BinaryExpression extends ExpressionNode {
 
 					if (isZero) {
 						markError("Division by zero");
+						cg.leaveExpression();
 						return false;
 					}
 				}
@@ -204,9 +225,9 @@ public class BinaryExpression extends ExpressionNode {
 			// Проверки для арифметических операций
 			if (operator.isArithmetic()) {
 				// Проверки для численных типов
-				if (left instanceof LiteralExpression && right instanceof LiteralExpression) {
-					LiteralExpression leftLE = (LiteralExpression)left;
-					LiteralExpression rightLE = (LiteralExpression)right;
+				if (leftExpr instanceof LiteralExpression && rightExpr instanceof LiteralExpression) {
+					LiteralExpression leftLE = (LiteralExpression)leftExpr;
+					LiteralExpression rightLE = (LiteralExpression)rightExpr;
 
 					if(leftType.isFixedPoint() || rightType.isFixedPoint()) {
 						double leftVal = leftLE.getValue() instanceof Double ? ((Double)leftLE.getValue()) : ((Number)leftLE.getValue()).doubleValue();
@@ -223,6 +244,7 @@ public class BinaryExpression extends ExpressionNode {
 						}
 						catch(SemanticException e) {
 							markError(e);
+							cg.leaveExpression();
 							return false;
 						}
 					}
@@ -242,6 +264,7 @@ public class BinaryExpression extends ExpressionNode {
 						}
 						catch(SemanticException e) {
 							markError(e);
+							cg.leaveExpression();
 							return false;
 						}
 					}
@@ -251,6 +274,7 @@ public class BinaryExpression extends ExpressionNode {
 				if (leftType == VarType.FIXED || rightType == VarType.FIXED) {
 					if (operator == Operator.MOD) {
 						markError("Modulo operation is not supported for FIXED type");
+						cg.leaveExpression();
 						return false;
 					}
 				}
@@ -258,69 +282,77 @@ public class BinaryExpression extends ExpressionNode {
 		}
 		catch(SemanticException e) {markError(e); return false;}
 
+		cg.leaveExpression();
 		return true;
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) throws Exception {
-		cg.enterExpression();
-		// Генерация кода для левого и правого операндов
-		left.codeGen(cg);
-		if(right instanceof VariableExpression) {
-			VariableExpression ve = (VariableExpression)right;
-			
-			cg.localAction(operator, ve.getSymbol().getRuntimeId());
+	public Object codeGen(CodeGenerator cg) throws Exception {
+		Object rl = depCodeGen(cg, leftExpr.getSymbol());
+		Object rr = depCodeGen(cg, rightExpr.getSymbol());
+		
+		if(null == rl && null == rr) {
+			if(rightExpr instanceof VarFieldExpression) {
+				rr = (CGCellsScope)((AstHolder)rightExpr.getSymbol()).getNode().getCGScope();
+				cg.cellsToAcc(cgScope.getParent(), (CGCellsScope)rr);
+			}
+			else if(leftExpr instanceof VarFieldExpression) {
+				rl = (CGCellsScope)((AstHolder)leftExpr.getSymbol()).getNode().getCGScope();
+				cg.cellsToAcc(cgScope.getParent(), (CGCellsScope)rl);
+			}		
 		}
-		else if(right instanceof LiteralExpression) {
-			LiteralExpression le = (LiteralExpression)right;
-			
-			cg.constAction(operator, le.getNumValue());
+
+		if(null == rl && null == rr) {
+			throw new SemanticException("Both operands not used accum:" + toString());
+		}	
+
+		ExpressionNode noAccExpr = rightExpr;
+		if(operator.isCommutative()) {
+			if(null != rl && null != rr) { //TODO похоже ошибка, здесь я пытаюсь выяснить порядок генерации кода, но resId генерируется в postAnalyze!
+				if(((CGScope)rl).getResId()<((CGScope)rr).getResId()) noAccExpr = leftExpr;
+			}
+			else if(null != rr) noAccExpr = leftExpr;
+		}
+		else {
+			if(noAccExpr == leftExpr) {
+				rl = (CGCellsScope)((AstHolder)leftExpr.getSymbol()).getNode().getCGScope();
+				cg.cellsToAcc(cgScope.getParent(), (CGCellsScope)rl);
+				noAccExpr = leftExpr;
+			}
 		}
 		
-		//Operand rightOp = cg.getAcc();
-
-		// Обработка операторов присваивания (=, +=, -=, и т.д.)
-/*		if (operator.isAssignment()) {
-			// Для простого присваивания (=) генерируем сохранение значения
-			if (operator == Operator.ASSIGN) {
-				// Если левый операнд — переменная, генерируем store
-				if (left instanceof VariableExpression) {
-					VariableExpression varExpr = (VariableExpression) left;
-					//TODO cg.emitStoreVariable(varExpr.getValue(), leftType);
-					cg.storeAcc(varExpr.getSymbol().getRuntimeId());
-				}
-				// Если левый операнд — доступ к полю (x.y), генерируем putfield
-				else if (left instanceof FieldAccessExpression) {
-					FieldAccessExpression memberExpr = (FieldAccessExpression) left;
-					//TODO cg.emitFieldStore(memberExpr.getTarget().getType(cg.getCurrentScope()).getClassName(),memberExpr.getMemberName(),leftType);
-				}
+		// Генерация кода для левого и правого операндов
+		if(noAccExpr instanceof VarFieldExpression) {
+			VarFieldExpression ve = (VarFieldExpression)noAccExpr;
+			if(ve.getSymbol() instanceof AstHolder) {
+				AstHolder ah = (AstHolder)ve.getSymbol();
+				cg.cellsAction(cgScope.getParent(), (CGCellsScope)ah.getNode().getCGScope(), operator);
 			}
-			// Для составных присваиваний (+=, -=, ...) генерируем соответствующий оператор
 			else {
-/*				cg.emitBinaryOp(arithmeticOp, leftType, rightType);
-				// Затем сохраняем результат обратно
-				if (left instanceof VariableExpression) {
-					VariableExpression varExpr = (VariableExpression) left;
-					cg.emitStoreVariable(varExpr.getValue(), leftType);
-				} else if (left instanceof MemberAccessExpression) {
-					MemberAccessExpression memberExpr = (MemberAccessExpression) left;
-					cg.emitFieldStore(
-						memberExpr.getTarget().getType(cg.getCurrentScope()).getClassName(),
-						memberExpr.getMemberName(),
-						leftType
-					);
-				}*/
-//			}
-//		}
-		// Обработка арифметических, логических и битовых операций
-//		else {
-			//cg.emitBinaryOp(operator, leftType, rightType);
-//		}
-		cg.leaveExpression();
+				throw new SemanticException("Unsupported:" + ve.getSymbol());
+			}
+		}
+		else if(noAccExpr instanceof LiteralExpression) {
+			LiteralExpression le = (LiteralExpression)noAccExpr;
+			cg.constAction(cgScope.getParent(), operator, le.getNumValue());
+		}
+		else if(noAccExpr instanceof MethodCallExpression) {
+			MethodCallExpression mce = (MethodCallExpression)noAccExpr;
+			int t=3434;
+		}
+		else {
+			throw new SemanticException("Unsupported:" + rightExpr);
+		}
+		return null;
 	}
-	
+
+	@Override
+	public List<AstNode> getChildren() {
+		return Arrays.asList(leftExpr, rightExpr);
+	}
+
 	@Override
 	public String toString() {
-		return getClass().getSimpleName() + ": " + left + ", " + operator + ", " + right;
+		return getClass().getSimpleName() + ": " + leftExpr + ", " + operator + ", " + rightExpr;
 	}
 }

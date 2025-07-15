@@ -16,8 +16,6 @@
 package ru.vm5277.compiler.nodes.expressions;
 
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.compiler.Operand;
-import ru.vm5277.common.compiler.OperandType;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -58,11 +56,15 @@ public class TypeReferenceExpression extends ExpressionNode {
 
 	@Override
 	public boolean preAnalyze() {
-		return className != null && !className.isEmpty();
+		if (null == className || className.isEmpty()) {
+			markError("Classname cannot be empty");
+			return false;
+		}
+		return true;
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		try {
 			varType = getType(scope); // Проверяем существование типа
 			return true;
@@ -78,8 +80,13 @@ public class TypeReferenceExpression extends ExpressionNode {
 		return "TypeReference: " + className;
 	}
 	
+	public String getName() {
+		return className;
+	}
+	
 	@Override
-	public void codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg) throws Exception {
 		//cg.setAcc(new Operand(VarType.CLASS, OperandType.TYPE, varType.getId()));
+		return null;
 	}
 }

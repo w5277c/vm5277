@@ -15,6 +15,9 @@
  */
 package ru.vm5277.compiler.nodes.commands;
 
+import java.util.Arrays;
+import java.util.List;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -35,7 +38,9 @@ public class ForNode extends CommandNode {
     private	AstNode			initialization;
     private	ExpressionNode	condition;
     private	ExpressionNode	iteration;
-    private	BlockScope		forScope;
+    private	BlockNode		blockNode;
+	private	BlockNode		elseBlockNode;
+	private	BlockScope		forScope;
 	private	BlockScope		bodyScope;
 	private	BlockScope		elseScope;
 	
@@ -80,7 +85,9 @@ public class ForNode extends CommandNode {
 		
         // Основной блок
 		tb.getLoopStack().add(this);
-		try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement()));}
+		try {
+			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
+		}
 		catch(ParseException e) {markFirstError(e);}
 		tb.getLoopStack().remove(this);
        
@@ -88,7 +95,9 @@ public class ForNode extends CommandNode {
         if (tb.match(Keyword.ELSE)) {
 			consumeToken(tb);
 			tb.getLoopStack().add(this);
-			try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement()));}
+			try {
+				elseBlockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
+			}
 			catch(ParseException e) {markFirstError(e);}
 			tb.getLoopStack().remove(this);
         }
@@ -108,11 +117,11 @@ public class ForNode extends CommandNode {
     }
     
     public BlockNode getBody() {
-        return blocks.isEmpty() ? null : blocks.get(0);
+        return blockNode;
     }
     
     public BlockNode getElseBlock() {
-        return blocks.size() > 1 ? blocks.get(1) : null;
+        return elseBlockNode;
     }
     
     @Override
@@ -186,13 +195,13 @@ public class ForNode extends CommandNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		// Анализ блока инициализации
-		if (initialization != null) initialization.postAnalyze(forScope);
+		if (initialization != null) initialization.postAnalyze(forScope, cg);
 
 		// Проверка типа условия
 		if (condition != null) {
-			if (condition.postAnalyze(forScope)) {
+			if (condition.postAnalyze(forScope, cg)) {
 				try {
 					VarType condType = condition.getType(forScope);
 					if (VarType.BOOL != condType && condType != null) markError("For loop condition must be boolean, got: " + condType);
@@ -202,16 +211,16 @@ public class ForNode extends CommandNode {
 		}
 
 		// Анализ блока итерации
-		if (null != iteration) iteration.postAnalyze(forScope);
+		if (null != iteration) iteration.postAnalyze(forScope, cg);
 
 		// Анализ тела цикла
 		if (null != getBody()) {
-			getBody().postAnalyze(bodyScope);
+			getBody().postAnalyze(bodyScope, cg);
 		}
 		
 		// Анализ else-блока
 		if (null != getElseBlock()) {
-			getElseBlock().postAnalyze(elseScope);
+			getElseBlock().postAnalyze(elseScope, cg);
 		}
 		
 		// Проверяем бесконечный цикл с возвратом
@@ -220,5 +229,13 @@ public class ForNode extends CommandNode {
 		}
 
 		return true;
+	}
+
+	@Override
+	public List<AstNode> getChildren() {
+		if(null == elseBlockNode) {
+			return Arrays.asList(blockNode);
+		}
+		return Arrays.asList(blockNode, elseBlockNode);
 	}
 }

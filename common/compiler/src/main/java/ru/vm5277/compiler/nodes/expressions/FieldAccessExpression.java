@@ -15,22 +15,24 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
+import java.util.Arrays;
+import java.util.List;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.ClassScope;
+import ru.vm5277.compiler.semantic.FieldSymbol;
 import ru.vm5277.compiler.semantic.Scope;
-import ru.vm5277.compiler.semantic.Symbol;
 
 public class FieldAccessExpression extends ExpressionNode {
 	private	final	ExpressionNode	target;
 	private	final	String			fieldName;
 	
 	private			String			className;
-	private			Symbol			fieldSymbol;
-	
+    
 	public FieldAccessExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode target, String fieldName) {
 		super(tb, mc);
 		this.target = target;
@@ -55,41 +57,105 @@ public class FieldAccessExpression extends ExpressionNode {
 
 	@Override
 	public VarType getType(Scope scope) throws SemanticException {
-		resolve(scope);
-		return null == fieldSymbol ? null : fieldSymbol.getType();
-	}
-
-	public Symbol getSymbol() {
-		return fieldSymbol;
-	}
-	
-	public Object getValue() {
-		return null == fieldSymbol ? null : fieldSymbol;
-	}
-	
-	// Реализация остальных методов (getType, analyze и т.д.)
-	
-	// TODO поидее этот код метода declare
-	private void resolve(Scope scope) throws SemanticException {
-		if(null == fieldSymbol) {
-			if(target instanceof VariableExpression) {
-				VariableExpression ve = (VariableExpression)target;
-				className = ve.getValue();
-				ClassScope classScope = scope.getThis().resolveClass(ve.getValue());
-				if(null != classScope) {
-					fieldSymbol = classScope.resolve(fieldName);
-				}
-				else {
-					throw new SemanticException("Can't resolve class scope:" + ve.getValue());
-				}
-			}
-			else {
-				throw new SemanticException("Not supported expression:" + target.toString() + ", type:"+ target.getNodeType());
-			}
+		if(null == symbol) {
+			declare(scope);
 		}
+		return null == symbol ? null : symbol.getType();
+	}
+	
+	
+	@Override
+	public boolean preAnalyze() {
+		if (target == null) {
+			markError("Field access target cannot be null");
+			return false;
+		}
+
+		if(!target.preAnalyze()) {
+			return false;
+		}
+
+		if (target instanceof TypeReferenceExpression || target instanceof VarFieldExpression) {
+		}
+		else {
+			markError("Invalid field access target: " + target.toString());
+			return false;
+		}
+		return true;
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) throws Exception {
+	public boolean declare(Scope scope) {
+		try {
+			if (target instanceof TypeReferenceExpression) {
+				TypeReferenceExpression tre = (TypeReferenceExpression) target;
+				className = tre.getClassName();
+				ClassScope classScope = scope.getThis().resolveClass(tre.getType(scope).getClassName());
+				if(null != classScope) {
+					symbol = classScope.resolve(fieldName);
+				}
+				else {
+					markError("Can't resolve class scope:" + tre.toString());
+					return false;
+				}
+			}
+			else {
+				// Нестатическое поле (this.field или obj.field)
+				VarType targetType = target.getType(scope);
+				if (targetType == null || targetType.isPrimitive()) {
+					markError("Cannot access field of primitive type: " + targetType);
+					return false;
+				}
+				ClassScope classScope = scope.getThis().resolveClass(target.getType(scope).getClassName());
+				if(null != classScope) {
+					symbol = classScope.resolve(fieldName);
+				}
+				else {
+					markError("Can't resolve class scope:" + target.toString());
+					return false;
+				}
+			}
+
+			if (symbol == null) {
+				throw new SemanticException("Field not found: " + fieldName);
+			}
+		}
+		catch (SemanticException e) {
+            markError(e.getMessage());
+			return false;
+        }
+
+		return true;
+	}
+	
+	@Override
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		if(null == symbol) return false;
+		
+		// Проверка видимости поля
+		if (((FieldSymbol)symbol).isPrivate()) {
+			markError("Private field '" + fieldName + "' is not accessible");
+			return false;
+		}
+
+		if(!target.postAnalyze(scope, cg)) {
+			return false;
+		}
+		
+		return true;
+	}
+	
+	public Object getValue() {
+		return null == symbol ? null : symbol;
+	}
+	
+	@Override
+	public Object codeGen(CodeGenerator cg) throws Exception {
+		return null;
+	}
+	
+	@Override
+	public List<AstNode> getChildren() {
+		return Arrays.asList(target);
 	}
 }

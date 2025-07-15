@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-public final class Thread {
+public class Thread {
     public static native void wait();
     public static native void waitMS(short milliseconds);
     public static native void waitS(short seconds);

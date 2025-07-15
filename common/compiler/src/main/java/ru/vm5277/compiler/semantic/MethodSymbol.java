@@ -18,20 +18,23 @@ package ru.vm5277.compiler.semantic;
 import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.compiler.nodes.AstNode;
 
-public class MethodSymbol extends Symbol {
+public class MethodSymbol extends Symbol implements AstHolder {
 	private	final	List<Symbol>	parameters;
 	private			boolean			canThrow;
 	private			String			signature;
 	private	final	MethodScope		scope;
+	private			AstNode			astNode;
 	
 	public MethodSymbol(String name, VarType returnType, List<Symbol> parameters, boolean isFinal, boolean isStatic, boolean isNative, boolean canThrow,
-						MethodScope scope) {
+						MethodScope scope, AstNode astNode) {
 		super(name, returnType, isFinal, isStatic, isNative);
 		
 		this.parameters = parameters;
 		this.canThrow = canThrow;
 		this.scope = scope;
+		this.astNode = astNode;
 	}
 
 	public MethodScope getScope() {
@@ -68,5 +71,20 @@ public class MethodSymbol extends Symbol {
 			signature = sb.toString();
 		}
 		return signature;
+	}
+	
+	@Override
+	public void setNode(AstNode astNode) {
+		this.astNode = astNode;
+	}
+	@Override
+	public AstNode getNode() {
+		return astNode;
+	}
+	
+	@Override
+	public String toString() {
+		return	(isNative ? "native " : "") + (isFinal ? "final " : "") + (isStatic ? "static " : "") + type + " " +
+				((ClassScope)scope.getParent()).getName() + "." + signature;
 	}
 }

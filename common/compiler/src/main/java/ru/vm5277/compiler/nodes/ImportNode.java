@@ -16,6 +16,8 @@
 package ru.vm5277.compiler.nodes;
 
 import java.io.File;
+import java.util.List;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
@@ -141,7 +143,7 @@ public class ImportNode extends AstNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		if (scope instanceof ClassScope) {
 			ClassScope classScope = (ClassScope)scope;
 			if (isStatic) {
@@ -157,5 +159,10 @@ public class ImportNode extends AstNode {
 			}
 		}
 		return true;
+	}
+
+	@Override
+	public List<AstNode> getChildren() {
+		return null;
 	}
 }

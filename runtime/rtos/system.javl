@@ -14,10 +14,10 @@
  * limitations under the License.
  */
 
-public final class System {
+public class System {
 	public static native void setParam(byte paramId, byte value);
 
-	public static void out(Object obj) {
+	public static void out(final Object obj) {
 		if(obj is byte as b) {
 			outNum(b);
 		}

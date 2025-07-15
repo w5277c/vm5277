@@ -34,8 +34,12 @@ public class CGIAsm implements CGItem {
 		return wSize;
 	}
 
+	public String getText() {
+		return text;
+	}
+	
 	@Override
-	public String build() {
+	public String getSource() {
 		return text + "\n";
 	}
 }

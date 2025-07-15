@@ -15,6 +15,7 @@
  */
 package ru.vm5277.compiler.nodes.commands;
 
+import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
@@ -23,6 +24,7 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class ThrowNode extends CommandNode {
@@ -65,9 +67,9 @@ public class ThrowNode extends CommandNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		if (null != exceptionExpr) {
-			if (exceptionExpr.postAnalyze(scope)) {
+			if (exceptionExpr.postAnalyze(scope, cg)) {
 				try {
 					VarType exprType = exceptionExpr.getType(scope);
 					// Проверяем, что выражение имеет тип byte (код ошибки)
@@ -80,8 +82,18 @@ public class ThrowNode extends CommandNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg) throws Exception {
+		if(cgDone) return null;
+		cgDone = true;
+
 		exceptionExpr.codeGen(cg);
 		cg.eThrow();
+		
+		return null;
+	}
+
+	@Override
+	public List<AstNode> getChildren() {
+		return null;
 	}
 }

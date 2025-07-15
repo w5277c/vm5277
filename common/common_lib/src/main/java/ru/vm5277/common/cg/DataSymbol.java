@@ -15,15 +15,12 @@
  */
 package ru.vm5277.common.cg;
 
-
 public class DataSymbol {
-	private	int		resId;
-	private	String	label;
-	private	int		size;
-	private	Object	value;
+	private	String			label;
+	private	int				size;
+	private	Object			value;
 	
-	public DataSymbol(int resId, String label, int size, Object value) {
-		this.resId = resId;
+	public DataSymbol(String label, int size, Object value) {
 		this.label = label;
 		this.size = size;
 		this.value = value;

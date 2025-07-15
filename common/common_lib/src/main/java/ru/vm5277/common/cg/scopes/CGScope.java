@@ -18,18 +18,17 @@ package ru.vm5277.common.cg.scopes;
 import java.util.HashMap;
 import java.util.Map;
 import ru.vm5277.common.cg.items.CGIContainer;
-import ru.vm5277.common.cg.items.CGIText;
 
 public class CGScope extends CGIContainer {
 	private				static	int						idCntr		= 0;
-	protected	final			String					name;
+	protected					String					name;
 	protected					CGScope					parent;
 	protected	final	static	Map<Integer, CGScope>	scopesMap	= new HashMap<>();
-
+	protected			static	int						statOffset	= 0; // Блок для хранения статических полей классов
+	
 	protected					int						resId;
 	private						int						sbPos		= 0;
-	private						boolean					verbose		= false;
-	
+	protected					boolean					verbose		= true;
 	
 	public static int genId() {
 		return idCntr++;
@@ -44,13 +43,11 @@ public class CGScope extends CGIContainer {
 		this.name = name;
 		this.resId = resId;
 		
+		
 		if(null != parent) {
-			if(!(this instanceof CGLabelScope)) {
-				parent.append(this);
-			}
+			parent.append(this);
 			scopesMap.put(resId, this);
 		}
-		if(verbose) append(new CGIText(";======== enter " + toString() + " ========"));
 	}
 	
 	public CGScope getParent() {
@@ -62,7 +59,6 @@ public class CGScope extends CGIContainer {
 	}
 	
 	public CGScope free() {
-		if(verbose) append(new CGIText(";======== leave " + toString() + " ========"));
 //!!!		parent.asmAppend(cgb);
 		return parent;
 	}
@@ -71,12 +67,12 @@ public class CGScope extends CGIContainer {
 		return scopesMap.get(resId);
 	}
 	
-	public String getPath() {
+	public String getPath(String delimeter) {
 		StringBuilder sb = new StringBuilder();
 		CGScope _scope = this;
 		while(null != _scope) {
 			if(!_scope.getName().isEmpty()) {
-				sb.insert(0, _scope.getName() + "_");
+				sb.insert(0, _scope.getName() + delimeter);
 			}
 			_scope = _scope.getParent();
 		}
@@ -100,5 +96,14 @@ public class CGScope extends CGIContainer {
 	@Override
 	public String toString() {
 		return getClass().getSimpleName() + ":" + name;
+	}
+	
+	@Override
+	public String getSource() {
+		
+		StringBuilder sb = new StringBuilder();
+		sb.append(super.getSource());
+
+		return sb.toString();
 	}
 }

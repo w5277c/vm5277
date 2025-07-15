@@ -16,6 +16,7 @@
 package ru.vm5277.compiler.nodes;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -38,7 +39,7 @@ public class ClassNode extends AstNode {
 	private	final	Set<Keyword>	modifiers;
 	private			String			name;
 	private			String			parentClassName;
-	private			List<String>	interfaces	= new ArrayList<>();
+	private			List<String>	interfaces			= new ArrayList<>();
 	private			ClassBlockNode	blockNode;
 	private			ClassScope		classScope;
 	
@@ -121,6 +122,13 @@ public class ClassNode extends AstNode {
 		}
 		
 		try{validateModifiers(modifiers, Keyword.PUBLIC, Keyword.PRIVATE, Keyword.STATIC);} catch(SemanticException e) {addMessage(e);}
+
+		if(null != importedClasses) {
+			for (ClassNode imported : importedClasses) {
+				imported.preAnalyze();
+			}
+		}
+
 		
 		// Анализ тела класса
 		blockNode.preAnalyze();
@@ -149,7 +157,17 @@ public class ClassNode extends AstNode {
 	
 	
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		int[] interfaceIds = null;
+		if(!interfaces.isEmpty()) {
+			interfaceIds = new int[interfaces.size()];
+			for(int i=0; i<interfaces.size(); i++) {
+				interfaceIds[i] = VarType.fromClassName(interfaces.get(i)).getId();
+			}
+		}
+			
+		if(null != cg) cg.enterClass(VarType.fromClassName(name), interfaceIds, name);
+
 		for (String interfaceName : interfaces) {
 			// Проверяем существование интерфейса
 			InterfaceSymbol interfaceSymbol = classScope.resolveInterface(interfaceName);
@@ -158,8 +176,15 @@ public class ClassNode extends AstNode {
 			checkInterfaceImplementation(classScope, interfaceSymbol);
 		}
 		
-		blockNode.postAnalyze(classScope);
+		if(null != importedClasses) {
+			for (ClassNode imported : importedClasses) {
+				imported.postAnalyze(scope, cg);
+			}
+		}
+		
+		blockNode.postAnalyze(classScope, cg);
 
+		if(null != cg) cg.leaveClass();
 		return true;
 	}
 	
@@ -197,17 +222,38 @@ public class ClassNode extends AstNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) throws Exception {
-		int[] interfaceIds = null;
-		if(!interfaces.isEmpty()) {
-			interfaceIds = new int[interfaces.size()];
-			for(int i=0; i<interfaces.size(); i++) {
-				interfaceIds[i] = VarType.fromClassName(interfaces.get(i)).getId();
+	public Object codeGen(CodeGenerator cg) throws Exception {
+		if(cgDone) return null;
+		cgDone = true;
+
+/*		if(null != importedClasses) {
+			for (ClassNode imported : importedClasses) {
+				if(isUsed()) imported.codeGen(cg);
 			}
 		}
-			
-		cg.enterClass(VarType.fromClassName(name).getId(), interfaceIds, name);
-		blockNode.codeGen(cg);
-		cg.leaveClass();
+*/
+		
+		return null;
+	}
+	
+	public List<ClassNode>	getImportedClasses() {
+		return importedClasses;
+	}
+/*	
+	@Override
+	public Boolean isUsed() {
+		if(null != super.isUsed() && super.isUsed()) return true;
+		if(null == classScope) return null;
+		return classScope.isUsed();
+	}
+	@Override
+	public void setUsed() {
+		super.setUsed();
+		if(null != classScope) classScope.setUsed();
+	}
+*/
+	@Override
+	public List<AstNode> getChildren() {
+		return Arrays.asList(blockNode);
 	}
 }

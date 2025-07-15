@@ -15,20 +15,24 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
+import java.util.Arrays;
+import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 
 public class UnaryExpression extends ExpressionNode {
-    private final Operator		 operator;
-    private final ExpressionNode operand;
-    
+    private	final	Operator		operator;
+    private	final	ExpressionNode	operand;
+    private			boolean			isUsed		= false;
+	
     public UnaryExpression(TokenBuffer tb, MessageContainer mc, Operator operator, ExpressionNode operand) {
         super(tb, mc);
         
@@ -54,10 +58,10 @@ public class UnaryExpression extends ExpressionNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		try {
 			// Проверяем операнд
-			if (!operand.postAnalyze(scope)) {
+			if (!operand.postAnalyze(scope, cg)) {
 				return false;
 			}
 
@@ -101,12 +105,12 @@ public class UnaryExpression extends ExpressionNode {
 						markError("Increment/decrement requires numeric type");
 						return false;
 					}
-					if (!(operand instanceof VariableExpression)) {
+					if (!(operand instanceof VarFieldExpression)) {
 						markError("Can only increment/decrement variables");
 						return false;
 					}
 					// Дополнительная проверка на изменяемость переменной
-					if (isFinalVariable((VariableExpression)operand, scope)) {
+					if (isFinalVariable((VarFieldExpression)operand, scope)) {
 						markError("Cannot modify final variable");
 						return false;
 					}
@@ -124,7 +128,7 @@ public class UnaryExpression extends ExpressionNode {
 		}
 	}
 	
-	private boolean isFinalVariable(VariableExpression var, Scope scope) {
+	private boolean isFinalVariable(VarFieldExpression var, Scope scope) {
 		Symbol symbol = scope.resolve(var.getValue());
 		if(null == symbol) {
 			ClassScope classScope = scope.getThis().resolveClass(var.getValue());
@@ -145,18 +149,25 @@ public class UnaryExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg) throws Exception {
 		// Генерация кода для операнда (например, переменной или другого выражения)
 		operand.codeGen(cg);
 
-		if(operand instanceof VariableExpression) {
-			cg.emitUnary(operator, ((VariableExpression)operand).getSymbol().getRuntimeId()); //Работаем с переменной
+		if(operand instanceof VarFieldExpression) {
+			cg.emitUnary(operator, ((VarFieldExpression)operand).getCGScope().getResId()); //Работаем с переменной
 		}
 		else {
 			cg.emitUnary(operator, null); //TODO Работаем с уже загруженным Accum
 		}
+		
+		return null;
 	}
 	
+	@Override
+	public List<AstNode> getChildren() {
+		return Arrays.asList(operand);
+	}
+
 	@Override
 	public String toString() {
 		return getClass().getSimpleName() + " " + operator + " " + operand;

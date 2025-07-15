@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-public final class RTOSParam {
+public class RTOSParam {
 	public	final	static	byte	CORE_FREQ		= 0x00;
 	public	final	static	byte	MCU				= 0x01;
 	public	final	static	byte	STDOUT_PORT		= 0x02;

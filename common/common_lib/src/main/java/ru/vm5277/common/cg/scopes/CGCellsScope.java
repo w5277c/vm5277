@@ -17,27 +17,21 @@ package ru.vm5277.common.cg.scopes;
 
 import ru.vm5277.common.cg.CGCell;
 import ru.vm5277.common.cg.DataSymbol;
+import ru.vm5277.common.compiler.VarType;
 
-public class CGLocalScope extends CGScope {
-	private	final	int						typeId;
-	private	final	int						size;
-	private			boolean					isConstant;
-	private			int						stackOffset;
-	private			DataSymbol				dataSymbol;
-	private			CGCell[]				cells;
-			
-	public CGLocalScope(CGScope parent, int resId, int typeId, int size, boolean isConstant, String name, CGCell[] cells) {
+
+public abstract class CGCellsScope extends CGScope {
+	protected	final	VarType		type;
+	protected	final	int			size;
+	protected			DataSymbol	dataSymbol;
+	
+	public CGCellsScope(CGScope parent, int resId, VarType type, int size, String name) {
 		super(parent, resId, name);
-		
-		this.typeId = typeId;
+		this.type = type;
 		this.size = size;
-		this.isConstant = isConstant;
-		this.cells = cells;
 	}
 	
-	public CGCell[] getCells() {
-		return cells;
-	}
+	public abstract CGCell[] getCells();
 	
 	public void setDataSymbol(DataSymbol dataSymbol) {
 		this.dataSymbol = dataSymbol;
@@ -45,28 +39,12 @@ public class CGLocalScope extends CGScope {
 	public DataSymbol getDataSymbol() {
 		return dataSymbol;
 	}
-	
-	
-	public void setStackOffset(int offset) {
-		this.stackOffset = offset;
-	}
-	public int getStackOffset() {
-		return stackOffset;
+
+	public VarType getType() {
+		return type;
 	}
 	
 	public int getSize() {
 		return size;
-	}
-	
-	public boolean isConstant() {
-		return isConstant;
-	}
-	
-	public Integer getRegCellPos(byte reg) {
-		for(int pos=0; pos<cells.length;pos++) {
-			CGCell cell = cells[pos];
-			if(CGCell.Type.REG == cell.getType() && cell.getNum() == reg) return pos;
-		}
-		return null;
 	}
 }

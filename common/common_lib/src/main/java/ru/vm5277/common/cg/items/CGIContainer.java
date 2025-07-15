@@ -21,6 +21,15 @@ import java.util.List;
 public class CGIContainer implements CGItem {
 	private	final	List<CGItem>	items	= new ArrayList<>();
 	private			int				pos		= 0;
+	private			String			tag;
+	
+	public CGIContainer() {
+		tag = "";
+	}
+	
+	public CGIContainer(String tag) {
+		this.tag = tag;
+	}
 	
 	public void begin() {
 		pos = 0;
@@ -44,12 +53,22 @@ public class CGIContainer implements CGItem {
 		items.remove(item);
 	}
 	
+	public List<CGItem> getItems() {
+		return items;
+	}
+	
 	@Override
-	public String build() {
+	public String getSource() {
 		StringBuilder sb = new StringBuilder();
+		
 		for(CGItem item : items) {
-			sb.append(item.build());
+			sb.append(item.getSource());
 		}
+		
 		return sb.toString();
+	}
+	
+	public String getTag() {
+		return tag;
 	}
 }

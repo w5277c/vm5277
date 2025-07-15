@@ -18,6 +18,7 @@ package ru.vm5277.compiler;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.exceptions.ParseException;
@@ -87,6 +88,11 @@ public class ASTParser extends AstNode {
 	
 	public TokenBuffer getTB() {
 		return tb;
+	}
+
+	@Override
+	public List<AstNode> getChildren() {
+		return Arrays.asList(classNode);
 	}
 }
 

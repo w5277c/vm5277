@@ -17,9 +17,10 @@ package ru.vm5277.compiler.semantic;
 
 import java.util.HashMap;
 import java.util.Map;
+import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.SemanticException;
 
-public class BlockScope implements Scope {
+public class BlockScope extends Scope {
 	private	final	Scope						parent;
 	private	final	Map<String, Symbol>			locals	= new HashMap<>();
 	private	final	Map<String, LabelSymbol>	labels	= new HashMap<>();
@@ -50,6 +51,11 @@ public class BlockScope implements Scope {
 		labels.put(name, label);
 	}
 
+	public void addAlias(String name, VarType type, Symbol symbol) throws SemanticException {
+		if (locals.containsKey(name)) throw new SemanticException("Duplicate local variable: " + name);
+		locals.put(name, new AliasSymbol(name, type, symbol));
+	}
+	
 	public LabelSymbol resolveLabel(String name) {
 		// Ищем метку в текущей и родительских областях
 		BlockScope current = this;

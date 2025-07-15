@@ -15,17 +15,15 @@
  */
 package ru.vm5277.compiler.semantic;
 
-import ru.vm5277.common.compiler.Operand;
 import ru.vm5277.common.compiler.VarType;
 
+//TODO содердание типа как в type, так и в Operand
 public class Symbol {
-	protected			String	name;
-	protected			VarType	type;
-	protected			boolean	isStatic;
-	protected			boolean	isFinal;
-	protected			boolean	isNative;
-	protected			int		runtimeId	= -1;
-	protected			Operand	constOp;
+	protected			String				name;
+	protected			VarType				type;
+	protected			boolean				isStatic;
+	protected			boolean				isFinal;
+	protected			boolean				isNative;
 	
 	protected Symbol(String name) {
 		this.name = name;
@@ -74,17 +72,8 @@ public class Symbol {
 		return isNative;
 	}
 	
-	public void setRuntimeId(int runtimeId) {
-		this.runtimeId = runtimeId;
-	}
-	public int getRuntimeId() {
-		return runtimeId;
-	}
-
-	public void setConstantOperand(Operand op) {
-		this.constOp = op;
-	}
-	public Operand getConstantOperand() {
-		return constOp;
+	@Override
+	public String toString() {
+		return	(isNative ? "native " : "") + (isFinal ? "final " : "") + (isStatic ? "static " : "") + type + " " + name;
 	}
 }

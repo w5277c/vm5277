@@ -34,7 +34,7 @@ import static ru.vm5277.common.Operator.PRE_DEC;
 import static ru.vm5277.common.Operator.PRE_INC;
 import ru.vm5277.common.compiler.Case;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.compiler.Operand;
+import ru.vm5277.common.cg.Operand;
 import ru.vm5277.common.RTOSFeature;
 import ru.vm5277.common.SystemParam;
 import ru.vm5277.common.cg.CGActionHandler;
@@ -43,10 +43,16 @@ import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.CGCell;
-import ru.vm5277.common.cg.scopes.CGLocalScope;
-import ru.vm5277.common.compiler.OperandType;
+import ru.vm5277.common.cg.scopes.CGVarScope;
+import ru.vm5277.common.cg.OperandType;
 import ru.vm5277.common.cg.items.CGItem;
+import ru.vm5277.common.cg.scopes.CGCellsScope;
+import ru.vm5277.common.cg.scopes.CGExpressionScope;
+import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
+import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.exceptions.SemanticException;
 
 public class Generator extends CodeGenerator {
 	private	final	static	String				VERSION		= "0.1";
@@ -91,60 +97,71 @@ public class Generator extends CodeGenerator {
 	public CGIAsm popRegAsm(int reg) {return new CGIAsm("pop r"+reg+"");}
 	
 	@Override
-	public void loadRegs(int size) {
-		long value = accum.getValue();
+	public void loadConstToAcc(CGScope scope, int size, long value) {
+		scope.append(new CGIText(";const '" + value + "'->accum "));
+		accum.setSize(size);
 		scope.append(new CGIAsm("ldi r16," + (value&0xff))); value >>= 0x08;
 		if(size>1) scope.append(new CGIAsm("ldi r17," + (value&0xff))); value >>= 0x08;
 		if(size>2) scope.append(new CGIAsm("ldi r18," + (value&0xff))); value >>= 0x08;
-		if(size>3) scope.append(new CGIAsm("ldi r19," + (value&0xff))); value >>= 0x08;
+		if(size>3) scope.append(new CGIAsm("ldi r19," + (value&0xff)));
 	}
 	
 	@Override
-	public void loadRegsConst(byte[] regs, long value) {
+	public void loadRegsConst(CGScope scope, byte[] regs, long value) {
 		for(byte reg : regs) {
 			scope.append(new CGIAsm("ldi r" + reg + "," + (value&0xff))); value >>= 0x08;
 		}
 	}
 
 	@Override
-	public void storeAcc(int resId) throws Exception { //Записываем acc в переменную
-		System.out.println("CG:storeAcc, dstId:" + resId);
-
-		CGLocalScope lScope = getLocal(resId);
-		if(null == lScope) throw new Exception("CG:storeAcc, unknown resource id: " + resId);
+	public void accToCells(CGScope scope, CGCellsScope cScope) throws Exception { //Записываем acc в переменную
+		if(cScope instanceof CGVarScope) {
+			CGVarScope vScope = (CGVarScope)cScope;
+			scope.append(new CGIText(";accum->var '" + vScope.getName() + "'"));
 		
-		if(!lScope.isConstant()) {
-			localStoreRegs(lScope.getStackOffset(), lScope.getSize());
+			if(!vScope.isConstant()) {
+				accToVar(scope, vScope);
+			}
 		}
+		else if(cScope instanceof CGFieldScope) {
+			CGFieldScope fScope = (CGFieldScope)cScope;
+			scope.append(new CGIText(";accum->field " + fScope.getName()));
+			if(!fScope.isStatic()) {
+				accToField(scope, fScope);
+			}
+		}
+		else throw new SemanticException("Unsupported scope:" + cScope);
 	}
 	
 	@Override
-	public void loadAcc(int resId) throws Exception {
-		System.out.println("CG:loadAcc, srcId:" + resId);
-
-		CGLocalScope lScope = getLocal(resId);
-		if(null == lScope) throw new Exception("CG:storeAcc, unknown resource id: " + resId);
-
-		if(!lScope.isConstant()) {
-			switch(lScope.getSize()) {
-				case 1: localLoadRegs(lScope, new byte[]{16}); break;
-				case 2: localLoadRegs(lScope, new byte[]{16,17}); break;
-				case 3: localLoadRegs(lScope, new byte[]{16,17,18}); break;
-				default: localLoadRegs(lScope, new byte[]{16,17,18,19}); break;
+	public void cellsToAcc(CGScope scope, CGCellsScope cScope) throws Exception {
+		if(cScope instanceof CGVarScope) {
+			CGVarScope vScope = (CGVarScope)cScope;
+			if(!vScope.isConstant()) {
+				scope.append(new CGIText(";var '" + vScope.getName() + "'->accum"));
+				varToRegs(scope, vScope, getAccRegs(vScope.getSize()));
+			}
+			else {
+// Не нужно, invokeNative сразу записыапет значение в нужные регистры				
+//				scope.append(new CGIAsm("ldi zl,low(" + vScope.getDataSymbol().getLabel() + ")"));
+//				scope.append(new CGIAsm("ldi zh,high(" + vScope.getDataSymbol().getLabel() + ")"));
 			}
 		}
+		else if(cScope instanceof CGFieldScope) {
+			CGFieldScope fScope = (CGFieldScope)cScope;
+			scope.append(new CGIText(";field '" + fScope.getName() + "'->accum"));
+			fieldToRegs(scope, fScope, getAccRegs(fScope.getSize()));
+		}
+		else throw new SemanticException("Unsupported scope:" + cScope);
 	}
 
-	@Override
-	public void localLoadRegs(CGLocalScope lScope, byte[] registers) throws Exception {
-		if(registers.length != lScope.getSize()) throw new Exception("TODO Different size");
-		accum.setSize(lScope.getSize());
-		scope.append(new CGIText(";local " + lScope.getName() + " -> accum"));
+	public void varToRegs(CGScope scope, CGVarScope vScope, byte[] registers) throws Exception {
+		accum.setSize(vScope.getSize());
 		//Map<Byte, String> popRegs = new HashMap<>();
 		LinkedList<Byte> popRegs = new LinkedList<>();
 		
 		for(int i=0; i<registers.length; i++) {
-			CGCell cell = lScope.getCells()[i];
+			CGCell cell = vScope.getCells()[i];
 			byte srcReg = (byte)cell.getNum();
 			byte dstReg = registers[i];
 
@@ -153,10 +170,10 @@ public class Generator extends CodeGenerator {
 					if(srcReg == dstReg) continue; // регистры совпались, ничего не делаем
 					
 					if(!popRegs.contains(dstReg)) {
-						if(	i != (registers.length-1) && isEven(srcReg) && isEven(dstReg) &&
-							(srcReg+1)==lScope.getCells()[i+1].getNum() && (dstReg+1)==registers[i+1]) { // подходит для инструкции movw
+						if(	i != (registers.length-1) && isEven(srcReg) && isEven(dstReg) && CGCell.Type.REG == vScope.getCells()[i+1].getType() &&
+							(srcReg+1)==vScope.getCells()[i+1].getNum() && (dstReg+1)==registers[i+1]) { // подходит для инструкции movw
 						
-							Integer pos = lScope.getRegCellPos(dstReg);
+							Integer pos = vScope.getRegCellPos(dstReg);
 							if(null==pos || pos<=i) {
 								scope.append(new CGIAsm("movw r" + dstReg + ", r" + srcReg));
 								i++;
@@ -164,7 +181,7 @@ public class Generator extends CodeGenerator {
 							}
 						}
 						
-						Integer pos = lScope.getRegCellPos(dstReg);
+						Integer pos = vScope.getRegCellPos(dstReg);
 						if(null != pos && pos > i) {
 							scope.append(new CGIAsm("push r" + dstReg));
 							popRegs.addFirst(srcReg);
@@ -173,7 +190,7 @@ public class Generator extends CodeGenerator {
 					}
 					break;
 				case STACK:
-					if(cell.getNum() <= (64-lScope.getSize())) {
+					if(cell.getNum() <= (64-vScope.getSize())) {
 						scope.append(new CGIAsm("ldd r" + dstReg + ", y+" + cell.getNum()));
 					}
 					else {
@@ -192,12 +209,25 @@ public class Generator extends CodeGenerator {
 		}
 	}
 
+	public void fieldToRegs(CGScope scope, CGFieldScope fScope, byte[] registers) throws Exception {
+		accum.setSize(fScope.getSize());
+		
+		if(CGCell.Type.HEAP == fScope.getCells()[0].getType()) {
+			int addr = fScope.getCells()[0].getNum();
+			scope.append(new CGIAsm("ldi zl,low(" + addr + ")"));
+			scope.append(new CGIAsm("ldi zh,high(" + addr + ")"));
+
+			for (int i=0; i<fScope.getCells().length; i++) {
+				scope.append(new CGIAsm("ldd r" + registers[i] + ",z+" + (fScope.getCells()[i].getNum()-addr)));
+			}
+		}
+	}
+	
 	@Override
-	public void localStore(int resId, long value) throws Exception {
-		CGLocalScope lScope = getLocal(resId);
-		scope.append(new CGIText(";" + value + "->local " + lScope.getName()));
+	public void varStore(CGVarScope scope, long value) throws Exception {
+		scope.append(new CGIText(";value '" + value + "'->var " + scope.getName()));
 		boolean usedY = false;
-		for (CGCell cell : lScope.getCells()) {
+		for (CGCell cell : scope.getCells()) {
 			switch(cell.getType()) {
 				case REG:
 					if(usedY) {
@@ -208,7 +238,7 @@ public class Generator extends CodeGenerator {
 					scope.append(new CGIAsm("ldi r" + cell.getNum() + ", " + (value&0xff)));
 					break;
 				case STACK:
-					if(lScope.getStackOffset() <= (64-lScope.getSize())) {
+					if(scope.getStackOffset() <= (64-scope.getSize())) {
 						if(usedY) {
 							scope.append(new CGIAsm("pop yh"));
 							scope.append(new CGIAsm("pop yl"));
@@ -240,25 +270,73 @@ public class Generator extends CodeGenerator {
 		}
 	}
 
-	@Override
-	public void localStoreRegs(int stackOffset, int size) {
-		scope.append(new CGIText(";accum -> local"));
-		if(stackOffset <= (64-size)) {
-			scope.append(new CGIAsm("std y+" + stackOffset + ",r16"));
-			if(size>1) scope.append(new CGIAsm("std y+" + (stackOffset+1) + ",r17"));
-			if(size>2) scope.append(new CGIAsm("std y+" + (stackOffset+2) + ",r18"));
-			if(size>3) scope.append(new CGIAsm("std y+" + (stackOffset+3) + ",r19"));
+	public void accToVar(CGScope scope, CGVarScope vScope) throws SemanticException {
+		int size = vScope.getCells().length;
+		byte[] regs = getAccRegs(size);
+		LinkedList<Byte> popRegs = new LinkedList<>();
+		Integer addr = null;
+		
+		for(int i=0; i<size; i++) {
+			CGCell cell = vScope.getCells()[i];
+			byte srcReg = regs[i];
+			switch(cell.getType()) {
+				case REG:
+					byte dstReg = (byte)cell.getNum();
+					if(dstReg == srcReg) continue;
+
+					int pos = getRegPos(regs, i, dstReg);
+					if(-1 != pos) {
+						scope.append(new CGIAsm("push r" + dstReg));
+						popRegs.add(srcReg);
+						continue;
+					}
+					
+					if(	i != (regs.length-1) && isEven(dstReg) && isEven(srcReg) && CGCell.Type.REG == vScope.getCells()[i+1].getType() && 
+						dstReg+1==vScope.getCells()[i+1].getNum() && (srcReg+1)==regs[i+1]) { // подходит для инструкции movw
+
+						pos = getRegPos(regs, i, dstReg);
+						if(-1 == pos) {
+							scope.append(new CGIAsm("movw r" + dstReg + ", r" + srcReg));
+							i++;
+							continue;
+						}
+					}
+
+					scope.append(new CGIAsm("mov r" + dstReg + ",r" + srcReg));
+					break;
+				case STACK:
+					if(null == addr) {
+						addr = vScope.getStackOffset() + vScope.getCells()[0].getNum();
+						scope.append(new CGIAsm("ldi yl,low(" + addr + ")"));
+						scope.append(new CGIAsm("ldi yh,high(" + addr + ")"));
+					}
+					scope.append(new CGIAsm("std y+" + (vScope.getCells()[i].getNum()-addr) + ",r" + srcReg));
+					break;
+				default:
+					throw new SemanticException("Unsupported cell type:" + cell.getType());
+			}
 		}
-		else {
-			scope.append(new CGIAsm("subi yl,low(0x10000-" + stackOffset + ")"));
-			scope.append(new CGIAsm("sbci yh,high(0x10000-" + stackOffset + ")"));
-			scope.append(new CGIAsm("st y,r16"));
-			if(size>1) scope.append(new CGIAsm("std y+1,r17"));
-			if(size>2) scope.append(new CGIAsm("std y+2,r18"));
-			if(size>3) scope.append(new CGIAsm("std y+3,r19"));
-			scope.append(new CGIAsm("subi yl," + stackOffset));
-			scope.append(new CGIAsm("sbci yh," + stackOffset));
+		for(Byte reg : popRegs) {
+			scope.append(new CGIAsm("pop r" + reg));
 		}
+	}
+	
+	
+	public int getRegPos(byte[] regs, int offset, byte reg) {
+		for(int i=offset; i<regs.length; i++) {
+			if(regs[i] == reg) return i;
+		}
+		return -1;
+	}
+
+	public void accToField(CGScope scope, CGFieldScope fScope) {
+		int size = fScope.getCells().length;
+		scope.append(new CGIAsm("ldi zl,low(" + fScope.getCells()[0].getNum() + ")"));
+		scope.append(new CGIAsm("ldi zh,high(" + fScope.getCells()[0].getNum() + ")"));
+		scope.append(new CGIAsm("st z,r16"));
+		if(size>1) scope.append(new CGIAsm("std z+" + fScope.getCells()[1].getNum() + ",r17"));
+		if(size>2) scope.append(new CGIAsm("std z+" + fScope.getCells()[2].getNum() + ",r18"));
+		if(size>3) scope.append(new CGIAsm("std z+" + fScope.getCells()[3].getNum() + ",r19"));
 	}
 
 	@Override
@@ -269,61 +347,26 @@ public class Generator extends CodeGenerator {
 
 
 	@Override
-	public void addAccum(int value) {
-		if(0x00<value) {
-			long tmp = 0x100000000l - value;
-			scope.append(new CGIAsm("subi r16," + (tmp&0xff))); tmp >>= 0x08;
-			if(accum.getSize()>1) scope.append(new CGIAsm("subi r17," + (tmp&0xff))); tmp >>= 0x08;
-			if(accum.getSize()>2) scope.append(new CGIAsm("subi r18," + (tmp&0xff))); tmp >>= 0x08;
-			if(accum.getSize()>3) scope.append(new CGIAsm("subi r19," + (tmp&0xff))); tmp >>= 0x08;
-		}
-	}
-
-	public void add(byte[] regs, int value) { //TODO херня, должно быть как в localLoadRegs. Т.е. либо работаем с аккумулятором(если несколько действий, либо
-		//полноценно единоразово, как в localLoadRegs. Нет проблемы, если переменная в регистрах, а если затронута память? Тогда лучше всего загрузить в аккум и не выебываться
-		//НЕТ, при единой опрации всеравно экономнее разбирать побайтно, а не загружать в аккум. Но тогда нужно будет это сделать для каждой операции!!!
-		//Хм, возможно получится взять один механизм а ему просто подставлять строку в определенном формате
-		if(0x00<value) {
-			long tmp = 0x100000000l - value;
-			scope.append(new CGIAsm("subi r" + regs[0] + "," + (tmp&0xff))); tmp >>= 0x08;
-			if(regs.length>1) scope.append(new CGIAsm("subi r" + regs[1] + "," + (tmp&0xff))); tmp >>= 0x08;
-			if(regs.length>2) scope.append(new CGIAsm("subi r" + regs[2] + "," + (tmp&0xff))); tmp >>= 0x08;
-			if(regs.length>3) scope.append(new CGIAsm("subi r" + regs[3] + "," + (tmp&0xff)));
-		}
-	}
-
-
-	@Override
-	public void subAccum(int value) {
-		if(0x00<value) {
-			scope.append(new CGIAsm("subi r16," + (value&0xff) + ")n")); value >>= 0x08;
-			if(accum.getSize()>1) scope.append(new CGIAsm("subi r17," + (value&0xff))); value >>= 0x08;
-			if(accum.getSize()>2) scope.append(new CGIAsm("subi r18," + (value&0xff))); value >>= 0x08;
-			if(accum.getSize()>3) scope.append(new CGIAsm("subi r19," + (value&0xff)));
-		}
-	}
-	
-	@Override
 	public void emitUnary(Operator op, Integer resId) throws Exception {
 		if(null == resId) throw new Exception("CG: emitUrany, unsupported accum mode");
-		CGLocalScope lScope = getLocal(resId);
+		CGVarScope lScope = getLocal(scope, resId);//TODO
 		
 		switch(op) {
 			case PLUS:
 				break;
 			case MINUS:
-				localActionAsm(lScope, (int sn, String reg) -> new CGIAsm("com " + reg));
-				localActionAsm(lScope, (int sn, String reg) -> new CGIAsm(0 == sn ? "sub " + reg + ", C0x01" : "sbc " + reg + ", C0x00"));
+				cellsActionAsm(lScope, lScope, (int sn, String reg) -> new CGIAsm("com " + reg));
+				cellsActionAsm(lScope, lScope, (int sn, String reg) -> new CGIAsm(0 == sn ? "sub " + reg + ", C0x01" : "sbc " + reg + ", C0x00"));
 				break;
 			case BIT_NOT:
-				localActionAsm(lScope, (int sn, String reg) -> new CGIAsm("com " + reg));
+				cellsActionAsm(lScope, lScope, (int sn, String reg) -> new CGIAsm("com " + reg));
 			case PRE_INC:
 			case POST_INC:
-				localActionAsm(lScope, (int sn, String reg) -> new CGIAsm(0 == sn ? "add " + reg + ", C0x01" : "adc " + reg + ", C0x00"));
+				cellsActionAsm(lScope, lScope, (int sn, String reg) -> new CGIAsm(0 == sn ? "add " + reg + ", C0x01" : "adc " + reg + ", C0x00"));
 				break;
 			case PRE_DEC:
 			case POST_DEC:
-				localActionAsm(lScope, (int sn, String reg) -> new CGIAsm(0 == sn ? "sub " + reg + ", C0x01" : "sbc " + reg + ", C0x00"));
+				cellsActionAsm(lScope, lScope, (int sn, String reg) -> new CGIAsm(0 == sn ? "sub " + reg + ", C0x01" : "sbc " + reg + ", C0x00"));
 				break;
 			default:
 				throw new Exception("CG:emitUnary: unsupported operator: " + op);
@@ -333,48 +376,45 @@ public class Generator extends CodeGenerator {
 		
 	// Работаем с аккумулятором!
 	@Override
-	public void localAction(Operator op, int resId) throws Exception {
-		CGLocalScope lScope = getLocal(resId);
-		scope.append(new CGIText(";accum " + op + " local " + lScope.getName() + " -> accum"));
+	public void cellsAction(CGScope scope, CGCellsScope cScope, Operator op) throws Exception {
+		scope.append(new CGIText(";accum " + op + " cells " + cScope.getName() + " -> accum"));
 
-		System.out.println("CG:localAction, op:" + op);
 		switch(op) {
 			case PLUS:
-				localActionAsm(lScope, (int sn, String reg) -> new CGIAsm((0 == sn ? "add " : "adc ") + getRightOp(sn, null) + ", " + reg));
+				cellsActionAsm(scope, cScope, (int sn, String reg) -> new CGIAsm((0 == sn ? "add " : "adc ") + getRightOp(sn, null) + ", " + reg));
 				break;
 			case MINUS:
-				localActionAsm(lScope, (int sn, String reg) -> new CGIAsm((0 == sn ? "sub " : "sbc ") + getRightOp(sn, null) + ", " + reg));
+				cellsActionAsm(scope, cScope, (int sn, String reg) -> new CGIAsm((0 == sn ? "sub " : "sbc ") + getRightOp(sn, null) + ", " + reg));
 				break;
 			case BIT_AND:
-				localActionAsm(lScope, (int sn, String reg) -> new CGIAsm("and " + getRightOp(sn, null) + ", " + reg));
+				cellsActionAsm(scope, cScope, (int sn, String reg) -> new CGIAsm("and " + getRightOp(sn, null) + ", " + reg));
 				break;
 			case BIT_OR:
-				localActionAsm(lScope, (int sn, String reg) -> new CGIAsm("or " + getRightOp(sn, null) + ", " + reg));
+				cellsActionAsm(scope, cScope, (int sn, String reg) -> new CGIAsm("or " + getRightOp(sn, null) + ", " + reg));
 				break;
 			case BIT_XOR:
-				localActionAsm(lScope, (int sn, String reg) -> new CGIAsm("eor " + getRightOp(sn, null) + ", " + reg));
+				cellsActionAsm(scope, cScope, (int sn, String reg) -> new CGIAsm("eor " + getRightOp(sn, null) + ", " + reg));
 				break;
 			default:
-				throw new Exception("CG:localAction: unsupported operator: " + op);
+				throw new Exception("CG:cellsAction: unsupported operator: " + op);
 		}
 	}
 
 	// Работаем с аккумулятором!
 	// Оптиммизировано для экономии памяти, для экономии FLASH можно воспользоваться CPC инструкцией
 	@Override
-	public void constAction(Operator op, long k) throws Exception {
+	public void constAction(CGScope scope, Operator op, long k) throws Exception {
 		scope.append(new CGIText(";accum " + op + " " + k + " -> accum"));
-
-		System.out.println("CG:localAction, op:" + op);
+		System.out.println("CG:constAction, op:" + op);
+		CGIContainer cont = new CGIContainer("constAction:" + op);
 		switch(op) {
 			case PLUS:
-				constActionAsm(~k, (int sn, String rOp) -> new CGIAsm((0 == sn ? "subi " : "sbci ") + getRightOp(sn, null) + ", " + rOp));
+				constActionAsm(scope, ~k, (int sn, String rOp) -> new CGIAsm((0 == sn ? "subi " : "sbci ") + getRightOp(sn, null) + ", " + rOp));
 				break;
 			case MINUS:
-				constActionAsm(k, (int sn, String rOp) -> new CGIAsm((0 == sn ? "subi " : "sbci ") + getRightOp(sn, null) + ", " + rOp));
+				constActionAsm(scope, k, (int sn, String rOp) -> new CGIAsm((0 == sn ? "subi " : "sbci ") + getRightOp(sn, null) + ", " + rOp));
 			case LT:
-				CGIContainer cont = new CGIContainer();
-				CGLabelScope lbScope = makeLabel("end");
+				CGLabelScope lbScope = makeLabel(null, "end", true);
 				for(int i=accum.getSize()-1; i>=0; i--) {
 					cont.append(new CGIAsm("cpi " + getRightOp(i, null) + ", " + ((k>>(i*8))&0xff)));
 					if(i!=0) {
@@ -389,8 +429,7 @@ public class Generator extends CodeGenerator {
 				scope.append(cont);
 				break;
 			case LTE:
-				cont = new CGIContainer();
-				lbScope = makeLabel("end");
+				lbScope = makeLabel(null, "end", true);
 				for(int i=accum.getSize()-1; i>=0; i--) {
 					cont.append(new CGIAsm("cpi " + getRightOp(i, null) + ", " + ((k>>(i*8))&0xff)));
 					if(i!=0) {
@@ -406,8 +445,7 @@ public class Generator extends CodeGenerator {
 				scope.append(cont);
 				break;
 			case GTE:
-				cont = new CGIContainer();
-				lbScope = makeLabel("end");
+				lbScope = makeLabel(null, "end", true);
 				for(int i=accum.getSize()-1; i>=0; i--) {
 					cont.append(new CGIAsm("cpi " + getRightOp(i, null) + ", " + ((k>>(i*8))&0xff)));
 					if(i!=0) {
@@ -423,8 +461,7 @@ public class Generator extends CodeGenerator {
 				scope.append(cont);
 				break;
 			case GT:
-				cont = new CGIContainer();
-				lbScope = makeLabel("end");
+				lbScope = makeLabel(null, "end", true);
 				for(int i=accum.getSize()-1; i>=0; i--) {
 					cont.append(new CGIAsm("cpi " + getRightOp(i, null) + ", " + ((k>>(i*8))&0xff)));
 					if(i!=0) {
@@ -442,8 +479,7 @@ public class Generator extends CodeGenerator {
 				break;
 			case EQ:
 			case NEQ:
-				cont = new CGIContainer();
-				lbScope = makeLabel("end");
+				lbScope = makeLabel(null, "end", true);
 				for(int i=accum.getSize()-1; i>=0; i--) {
 					cont.append(new CGIAsm("cpi " + getRightOp(i, null) + ", " + ((k>>(i*8))&0xff)));
 					if(i!=0) {
@@ -459,7 +495,7 @@ public class Generator extends CodeGenerator {
 				scope.append(cont);
 				break;
 			default:
-				throw new Exception("CG:localAction: unsupported operator: " + op);
+				throw new Exception("CG:constAction: unsupported operator: " + op);
 		}
 	}
 
@@ -475,10 +511,32 @@ public class Generator extends CodeGenerator {
 		return Long.toString((constant>>(sn*8))&0xff);
 	}
 	
-	public void localActionAsm(CGLocalScope lScope, CGActionHandler handler) throws Exception {
+	public void cellsActionAsm(CGScope scope, CGCellsScope cHolder, CGActionHandler handler) throws Exception {
 		boolean usedY = false;
-		for (int i=0; i<lScope.getSize(); i++) {
-			CGCell cell = lScope.getCells()[i];
+		if(CGCell.Type.HEAP == cHolder.getCells()[0].getType()) {
+			int addr = cHolder.getCells()[0].getNum();
+			scope.append(new CGIAsm("push yl")); //TODO проверять свободный регистр, если все занято, использовать YL
+			scope.append(new CGIAsm("ldi zl,low(" + addr + ")"));
+			scope.append(new CGIAsm("ldi zh,high(" + addr + ")"));
+			
+			for (int i=0; i<cHolder.getCells().length; i++) {
+				CGCell cell = cHolder.getCells()[i];
+				scope.append(new CGIAsm("ldd yl,z+" + (cell.getNum()-addr)));
+				scope.append(handler.action(i, "yl"));
+			}
+			scope.append(new CGIAsm("pop yl"));
+			return;
+		}
+		
+		if(CGCell.Type.RET == cHolder.getCells()[0].getType()) {
+			for (int i=0; i<cHolder.getCells().length; i++) {
+				scope.append(new CGIAsm("pop zl"));
+				scope.append(handler.action(i, "zl"));
+			}
+		}
+
+		for (int i=0; i<cHolder.getCells().length; i++) {
+			CGCell cell = cHolder.getCells()[i];
 			switch(cell.getType()) {
 				case REG:
 					if(usedY) {
@@ -489,18 +547,18 @@ public class Generator extends CodeGenerator {
 					scope.append(handler.action(i, "r" + cell.getNum()));
 					break;
 				case STACK:
-					if(lScope.getStackOffset() <= (64-lScope.getSize())) {
+					if(((CGVarScope)cHolder).getStackOffset() <= (64-cHolder.getCells().length)) {
 						if(usedY) {
 							scope.append(new CGIAsm("pop yh"));
 							scope.append(new CGIAsm("pop yl"));
 							usedY = false;
 						}
-						scope.getBlockScope().putUsedReg((byte)16);
+						cHolder.getBlockScope().putUsedReg((byte)16);
 						scope.append(handler.action(i, "r16"));
 						scope.append(new CGIAsm("std y+" + cell.getNum() + ",r16"));
 					}
 					else {
-						scope.getBlockScope().putUsedReg((byte)16);
+						cHolder.getBlockScope().putUsedReg((byte)16);
 						if(!usedY) {
 							scope.append(new CGIAsm("push yl"));
 							scope.append(new CGIAsm("push yh"));
@@ -511,6 +569,9 @@ public class Generator extends CodeGenerator {
 						scope.append(handler.action(i, "r16"));
 						scope.append(new CGIAsm("st y,r16"));
 					}
+					break;
+				default:
+					throw new SemanticException("Unsupported cell type:" + cell.getType());
 			}
 		}
 		if(usedY) {
@@ -519,7 +580,7 @@ public class Generator extends CodeGenerator {
 		}
 	};
 	
-	public void constActionAsm(long k, CGActionHandler handler) throws Exception {
+	public void constActionAsm(CGScope scope, long k, CGActionHandler handler) throws Exception {
 		for(int i=0; i<accum.getSize(); i++) {
 			scope.append(handler.action(i, Long.toString((k>>(i*8))&0xff)));
 		}
@@ -539,25 +600,45 @@ public class Generator extends CodeGenerator {
 
 
 	@Override
-	public void invokeMethod(String methodQName, int id, int typeId, Operand[] operands) {
-		System.out.println("CG:invokeMethod " + methodQName + ", id:" + id + ", typeId:" + typeId + ", reeIds:" + Arrays.toString(operands));
+	//public void invokeMethod(String className, String methodName, String methodParams, int resId, int typeId, Operand[] operands) {
+	public void invokeMethod(String className, String methodName, int typeId) {
+		String methodQName = className + "." + methodName;
+		//System.out.println("CG:invokeMethod " + methodQName + ", typeId:" + typeId);
+		
+/*		CGDepScope dScope = new CGDepScope(className, methodName, methodParams);
+		if(!dependies.keySet().contains(dScope.getFullName())) {
+			dependies.put(dScope.getFullName(), dScope);
+		}
+		CGLabelScope lbScope = null;
+		if(-1 == resId) {
+			resId = genId();
+			String fullname = ("javl_" + className.replaceAll("\\.", "_") + "_" + methodName).toLowerCase();
+			lbScope = new CGLabelScope(scope, resId, fullname);
+			labels.put(resId, lbScope);
+		}
+		else {
+			lbScope = labels.get(resId);
+		}
+		
+		scope.append(new CGIAsm("call " + lbScope.getName()));*/
 	}
 	
 	@Override
-	public void invokeNative(String methodQName, int typeId, Operand[] parameters) throws Exception {
-		System.out.println("CG:invokeNative " + methodQName + ", typeId:" + typeId + ", resIds" + Arrays.toString(parameters));
+	public void invokeNative(CGScope scope, String className, String methodName, String paramTypes, VarType type, Operand[] ops) throws Exception {
+		String methodQName = className + "." + methodName + (null != paramTypes ? " " + paramTypes : "");
+		scope.append(new CGIText("CG:invokeNative " + type + " " + methodQName + (null != ops ? ", params:" + Arrays.toString(ops) : "")));
 		
 		if(methodQName.equals("System.setParam [byte, byte]")) {
-			SystemParam sp = SystemParam.values()[(int)getNum(parameters[0x00])];
+			SystemParam sp = SystemParam.values()[(int)getNum(ops[0x00])];
 			switch(sp) {
 				case CORE_FREQ:
-					params.put(sp, (int)getNum(parameters[0x01]));
+					params.put(sp, (int)getNum(ops[0x01]));
 					break;
 				case STDOUT_PORT:
-					params.put(sp, (int)getNum(parameters[0x01]));
+					params.put(sp, (int)getNum(ops[0x01]));
 					break;
 				case SHOW_WELCOME:
-					if(0x00 == (int)getNum(parameters[0x01])) {
+					if(0x00 == (int)getNum(ops[0x01])) {
 						RTOSFeatures.remove(RTOSFeature.OS_FT_WELCOME);
 					}
 					else {
@@ -587,35 +668,46 @@ public class Generator extends CodeGenerator {
 				}
 			}
 
-			if(null != parameters) {
-				for(int i=0; i<parameters.length; i++) {
+			if(null != ops) {
+				for(int i=0; i<ops.length; i++) {
 					byte[] regs = regIds[i];
 					if(0 == regs.length || 4 < regs.length) throw new Exception("CG:Invalid parameters for invoke method " + methodQName);
 
 					scope.getBlockScope().putUsedRegs(regs);
 					
 					long value = 0;
-					Operand op = parameters[i];
-					if(OperandType.LOCAL_RESID == op.getOperandType()) {
-						CGLocalScope lScope = getLocal((int)op.getValue());
-						if(null != lScope) {
-							if(!lScope.isConstant()) {
-								if(regs.length != lScope.getSize()) {
+					Operand op = ops[i];
+					if(OperandType.LOCAL_RES == op.getOperandType()) {
+						CGVarScope vScope = getLocal(scope, (int)op.getValue());
+						if(null != vScope) {
+							if(!vScope.isConstant()) {
+								if(regs.length != vScope.getSize()) {
 									throw new Exception("CG:InvokeNative: params qnt not equlas regs qnt in method: " + methodQName);
 								}
-								localLoadRegs(lScope, regs);
+								varToRegs(vScope, vScope, regs);
 							}
 							else {
-								constLoadRegs(lScope.getDataSymbol().getLabel(), regs);
+								constLoadRegs(vScope.getDataSymbol().getLabel(), regs);
 							}
 						}
 						else {
 							throw new Exception("CG:InvokeNative: local not found resId: " + op.getValue());
 						}
 					}
+					else if(OperandType.FLASH_RES == op.getOperandType()) {
+						if(0x00 == regs.length || 0x02<regs.length) {
+							throw new SemanticException("Invalid registers quantity for flash constant");
+						}
+						if(0x00<regs.length) {
+							scope.append(new CGIAsm("ldi r" + regs[0] + ",low(" + flashData.get((Integer)op.getValue()).getLabel() + ")"));
+						}
+						if(0x01<regs.length) {
+							scope.append(new CGIAsm("ldi r" + regs[1] + ",high(" + flashData.get((Integer)op.getValue()).getLabel() + ")"));
+						}
+					}
 					else {
-						value = getNum(parameters[i]);
-						loadRegsConst(regs, value);
+						value = getNum(ops[i]);
+						loadRegsConst(scope, regs, value);
 					}
 				}
 			}
@@ -641,62 +733,78 @@ public class Generator extends CodeGenerator {
 	}
 	
 	@Override
-	public void eIf(int condBlockResId, int thenBlockResId, Integer elseBlockResId) {
-		System.out.println("CG:if, condBlockId:" + condBlockResId + ", thenBlockId:" + thenBlockResId + ", elseBlockId:" + elseBlockResId);
-		CGBlockScope condBScope = (CGBlockScope)scope.getScope(condBlockResId);
-		CGBlockScope thenBScope = (CGBlockScope)scope.getScope(thenBlockResId);
-		CGBlockScope elseBScope = (null == elseBlockResId ? null : (CGBlockScope)scope.getScope(elseBlockResId));
+	public void eIf(CGBlockScope condBlockScope, CGBlockScope thenBlockScope, CGBlockScope elseBlockScope) {
+		System.out.println("CG:if, condBlockId:" + condBlockScope + ", thenBlockId:" + thenBlockScope + ", elseBlockId:" + elseBlockScope);
 		
-		CGLabelScope beginLbScope = makeLabel("if_begin");
-		CGLabelScope thenLbScope = makeLabel("if_then");
-		CGLabelScope elseLbScope = makeLabel("if_else");
-		CGLabelScope endLbScope = makeLabel("if_end");
+		CGLabelScope beginLbScope = makeLabel(null, "if_begin", true);
+		CGLabelScope thenLbScope = makeLabel(null, "if_then", true);
+		CGLabelScope elseLbScope = makeLabel(null, "if_else", true);
+		CGLabelScope endLbScope = makeLabel(null, "if_end", true);
 		
-		condBScope.prepend(beginLbScope);
-		thenBScope.prepend(thenLbScope);
-		condBScope.append(new CGIAsm("cpi r16,0x01")); //TODO в конечном оптимизаторе можно упростить выражения вида rol r16;cpi r16,0x01;brne ...end
-		if(null != elseBScope) {
-			condBScope.append(new CGIAsm("brne " + elseLbScope.getName())); //TODO необходима проверка длины прыжка
-			thenBScope.append(new CGIAsm("rjmp " + endLbScope.getName())); //TODO необходима проверка длины прыжка
-			elseBScope.prepend(elseLbScope);
-			elseBScope.append(endLbScope);
+		condBlockScope.prepend(beginLbScope);
+		thenBlockScope.prepend(thenLbScope);
+		
+
+		String optimizedBrInst = Optimizator.localWithConstantComparingCondition((CGExpressionScope)condBlockScope.getItems().get(1));
+		boolean optimized = false;
+		String brInstr = null == optimizedBrInst ? "brne" : optimizedBrInst;
+		
+
+		if(null == optimizedBrInst) condBlockScope.append(new CGIAsm("cpi r16,0x01"));
+		if(null != elseBlockScope) {
+			condBlockScope.append(new CGIAsm(brInstr + " " + elseLbScope.getName())); //TODO необходима проверка длины прыжка
+			thenBlockScope.append(new CGIAsm("rjmp " + endLbScope.getName())); //TODO необходима проверка длины прыжка
+			elseBlockScope.prepend(elseLbScope);
+			elseBlockScope.append(endLbScope);
 		}
 		else {
-			condBScope.append(new CGIAsm("brne " + endLbScope.getName())); //TODO необходима проверка длины прыжка
-			thenBScope.append(endLbScope);
+			condBlockScope.append(new CGIAsm(brInstr + " " + endLbScope.getName())); //TODO необходима проверка длины прыжка
+			thenBlockScope.append(endLbScope);
 		}
 	}
 
 	@Override
-	public void eTry(int blockId, List<Case> cases, Integer defaultBlockId) {
-		System.out.println("CG:try, blockId:" + blockId + ", casesBlocks:" + cases + ", defaultBlockId:" + defaultBlockId);
+	public void eTry(CGBlockScope blockScope, List<Case> cases, CGBlockScope defaultBlockScope) {
+		//System.out.println("CG:try, block:" + blockScope + ", casesBlocks:" + cases + ", defaultBlock:" + defaultBlockScope);
 	}
 	
 	//TODO основано на блоках! Т.е. каждая итерация это вход в блок(и выход) выделяет память в стеке для переменных и сохраняет регистры
 	//Хотя, вероятно можно вынести вне блока, работать со стеком перед меткой входа и после метки выхода из блока.
 	//Это вопрос ключа оптимизации по памяти или по коду, текущий вариант съест меньше памяти чем стандартный сишный.
 	@Override
-	public void eWhile(Integer condResId, int bodyResId) throws Exception {
+	public void eWhile(CGBlockScope condBlockScope, CGBlockScope bodyBlockScope) throws Exception {
 		int _resId = genId();
-		System.out.println(	"CG:while, resId:" + _resId + ", condResId:" + condResId + ", bodyResId:" + bodyResId);
-		CGBlockScope condBScope = null == condResId ? null : (CGBlockScope)getScope(condResId);
-		CGBlockScope bodyBScope = (CGBlockScope)getScope(bodyResId);
+		System.out.println(	"CG:while, resId:" + _resId + ", cond:" + condBlockScope + ", body:" + bodyBlockScope);
 		
-		CGLabelScope beginlbScope = makeLabel("while_begin");
-		CGLabelScope bodylbScope = makeLabel("while_body");
-		CGLabelScope endlbScope = makeLabel("while_end");
+		CGLabelScope beginlbScope = makeLabel(null, "while_begin", true);
+		CGLabelScope bodylbScope = makeLabel(null, "while_body", true);
+		CGLabelScope endlbScope = makeLabel(null, "while_end", true);
 		
-		if(null != condBScope) {
-			condBScope.prepend(beginlbScope);
+		if(null != condBlockScope) {
+			condBlockScope.prepend(beginlbScope);
 		}
-		bodyBScope.prepend(bodylbScope);
-		bodyBScope.append(new CGIAsm("jmp " + bodylbScope.getName(), 2)); //TODO нужно будет в оптимизировать(если расстояние укладыввается в rjmp)
-		bodyBScope.append(endlbScope);
+		bodyBlockScope.prepend(bodylbScope);
+		bodyBlockScope.append(new CGIAsm("jmp " + bodylbScope.getName(), 2)); //TODO нужно будет в оптимизировать(если расстояние укладыввается в rjmp)
+		bodyBlockScope.append(endlbScope);
 	}
 	
 	@Override
-	public void eReturn() {
-		System.out.println("CG:return");
+	public void eReturn(CGScope scope, int size) {
+		scope.append(new CGIText("CG:eReturn, size:" + size));
+		if(2>=size) {
+			if(1==size) scope.append(new CGIAsm("mov zl,r16"));
+			if(2==size) scope.append(new CGIAsm("movw zl,r16"));
+			scope.append(new CGIAsm("ret"));
+		}
+		else {
+			scope.append(new CGIAsm("pop zh"));
+			scope.append(new CGIAsm("pop zl"));
+			scope.append(new CGIAsm("push r16"));
+			scope.append(new CGIAsm("push r17"));
+			scope.append(new CGIAsm("push r18"));
+			scope.append(new CGIAsm("push r19"));
+			scope.append(new CGIAsm("ijmp"));
+		}
 	}
 	
 	@Override
@@ -717,6 +825,14 @@ public class Generator extends CodeGenerator {
 		return result;
 	}
 	
+	public byte[] getAccRegs(int size) {
+		switch(size) {
+			case 1: return new byte[]{16};
+			case 2: return new byte[]{16,17};
+			case 4: return new byte[]{16,17,18,19};
+		}
+		return null;
+	}
 	
 	@Override
 	public String getVersion() {

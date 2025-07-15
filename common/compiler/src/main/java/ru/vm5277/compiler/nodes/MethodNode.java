@@ -16,9 +16,12 @@
 package ru.vm5277.compiler.nodes;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
@@ -39,9 +42,15 @@ public class MethodNode extends AstNode {
 	private	final	VarType				returnType;
 	private	final	String				name;
 	private			List<ParameterNode>	parameters;
+	private			BlockNode			blockNode;
 	private			MethodScope			methodScope; // Добавляем поле для хранения области видимости
-	private			MethodSymbol		methodSymbol;
 	private			boolean				canThrow	= false;
+	
+	@Override
+	public String toString() {
+		return	StrUtils.toString(modifiers) + " " + returnType + " " + name + "(" + StrUtils.toString(parameters) + ")" +
+				(canThrow ? " throws" : "");
+	}
 	
 	public MethodNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType returnType, String name) throws ParseException {
 		super(tb, mc);
@@ -62,7 +71,10 @@ public class MethodNode extends AstNode {
 
 		if(tb.match(Delimiter.LEFT_BRACE)) {
 			tb.getLoopStack().add(this);
-			try {blocks.add(new BlockNode(tb, mc));}catch(ParseException e) {}
+			try {
+				blockNode = new BlockNode(tb, mc);
+			}
+			catch(ParseException e) {}
 			tb.getLoopStack().remove(this);
 		}
 		else {
@@ -80,7 +92,7 @@ public class MethodNode extends AstNode {
 		this.parameters = parameters;
 		this.canThrow = canThrow;
 		
-		blocks.add(body);
+		blockNode = body;
 	}
 	
 	public boolean canThrow() {
@@ -116,7 +128,7 @@ public class MethodNode extends AstNode {
     }
 	
 	public BlockNode getBody() {
-		return blocks.isEmpty() ? null : blocks.get(0);
+		return blockNode;
 	}
 	
 	public boolean isConstructor() {
@@ -185,18 +197,18 @@ public class MethodNode extends AstNode {
 		// Создаем MethodSymbol
 		try {
 			methodScope = new MethodScope(null, classScope);
-			methodSymbol = new MethodSymbol(	name, returnType, paramSymbols, modifiers.contains(Keyword.FINAL),
-												modifiers.contains(Keyword.STATIC),	modifiers.contains(Keyword.NATIVE), canThrow, methodScope);
+			symbol = new MethodSymbol(	name, returnType, paramSymbols, modifiers.contains(Keyword.FINAL),
+										modifiers.contains(Keyword.STATIC),	modifiers.contains(Keyword.NATIVE), canThrow, methodScope, this);
 			// Устанавливаем обратную ссылку
-			methodScope.setSymbol(methodSymbol);
+			methodScope.setSymbol((MethodSymbol)symbol);
 
 			// Добавляем метод или конструктор в область видимости класса
 			if (isConstructor()) {
-				classScope.addConstructor(methodSymbol);
+				classScope.addConstructor((MethodSymbol)symbol);
 			}
 			else {
 				// Для обычных методов
-				classScope.addMethod(methodSymbol);
+				classScope.addMethod((MethodSymbol)symbol);
 			}
 
 			// Объявляем параметры в области видимости метода
@@ -214,61 +226,87 @@ public class MethodNode extends AstNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		VarType[] types = null;
+		if(!parameters.isEmpty()) {
+			types = new VarType[parameters.size()];
+			for(int i=0; i<parameters.size(); i++) {
+				types[i] = parameters.get(i).getType();
+			}
+		}
+
+		if(null == returnType) {
+			//symbol.setResId(cg.enterConstructor(typeIds));
+			if(null != cg) cgScope = cg.enterConstructor(types);
+		}
+		else {
+			//symbol.setResId(cg.enterMethod(returnType.getId(), typeIds, name));
+			if(null != cg) cgScope = cg.enterMethod(returnType, types, name);
+		}
+
 		if (modifiers.contains(Keyword.NATIVE)) {
 			if (getBody() != null) {
 				markError("Native method cannot have a body");
 			}
-			return true;
 		}
-		
-		// Анализ тела метода (если есть)
-		if (null != getBody() && null != methodScope) {
-			for (ParameterNode param : parameters) {
-				param.postAnalyze(methodScope);
-			}
+		else {
+			// Анализ тела метода (если есть)
+			if (null != getBody() && null != methodScope) {
+				for (ParameterNode param : parameters) {
+					param.postAnalyze(methodScope, cg);
+				}
 
-			// Анализируем тело метода
-			getBody().postAnalyze(methodScope);
+				// Анализируем тело метода
+				getBody().postAnalyze(methodScope, cg);
 
-			// Для не-void методов проверяем наличие return
-			// TODO переосмыслить после ConstantFolding
-			if (null != returnType && !returnType.equals(VarType.VOID)) {
-				if (!BlockNode.hasReturnStatement(getBody())) {
-					markError("Method '" + name + "' must return a value");
+				// Для не-void методов проверяем наличие return
+				// TODO переосмыслить после ConstantFolding
+				if (null != returnType && !returnType.equals(VarType.VOID)) {
+					if (!BlockNode.hasReturnStatement(getBody())) {
+						markError("Method '" + name + "' must return a value");
+					}
+				}
+
+				List<AstNode> nodes = getBody().getChildren();
+				for (int i = 0; i < nodes.size(); i++) {
+					if (i > 0 && isControlFlowInterrupted(nodes.get(i - 1))) {
+						markError("Unreachable code in method " + name);
+						break;
+					}
 				}
 			}
-			
-			List<AstNode> declarations = getBody().getDeclarations();
-			for (int i = 0; i < declarations.size(); i++) {
-				if (i > 0 && isControlFlowInterrupted(declarations.get(i - 1))) {
-					markError("Unreachable code in method " + name);
-					break;
-				}
-			}
 		}
+
+		if(null != cg) cg.leaveMethod();
 		return true;
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) throws Exception {
-		int[] typeIds = null;
-		if(!parameters.isEmpty()) {
-			typeIds = new int[parameters.size()];
-			for(int i=0; i<parameters.size(); i++) {
-				typeIds[i] = parameters.get(i).getType().getId();
-			}
-		}
+	public Object codeGen(CodeGenerator cg) throws Exception {
+		if(cgDone) return null;
+		cgDone = true;
+
+		if(null != blockNode) blockNode.codeGen(cg);
+
+		((CGMethodScope)cgScope).build(cg);
 		
-		if(null == returnType) {
-			methodSymbol.setRuntimeId(cg.enterConstructor(typeIds));
-		}
-		else {
-			methodSymbol.setRuntimeId(cg.enterMethod(returnType.getId(), typeIds, name));
-		}
-		
-		BlockNode body = blocks.get(0);
-		if(null != body) body.codeGen(cg);
-		cg.leaveMethod();
+		return null;
+	}
+/*
+	@Override
+	public Boolean isUsed() {
+		if(null != super.isUsed() && super.isUsed()) return true;
+		if(null == methodScope) return null;
+		return methodScope.isUsed();
+	}
+	@Override
+	public void setUsed() {
+		super.setUsed();
+		if(null != methodScope) methodScope.setUsed();
+	}
+*/
+	@Override
+	public List<AstNode> getChildren() {
+		return Arrays.asList(blockNode);
 	}
 }

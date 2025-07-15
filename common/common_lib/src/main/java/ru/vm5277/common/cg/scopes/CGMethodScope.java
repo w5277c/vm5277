@@ -16,21 +16,49 @@
 package ru.vm5277.common.cg.scopes;
 
 import java.util.List;
+import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGCell;
+import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.items.CGIText;
+import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.exceptions.SemanticException;
 
 public class CGMethodScope extends CGBlockScope {
 	private	final	CGLabelScope				lbScope;
-	private	final	int							typeId;
-	private	final	int[]						typeIds;
+	private	final	VarType						type;
+	private	final	VarType[]					types;
 	private	final	List<Byte>					regsPool;
 	
-	public CGMethodScope(CGScope parent, CGLabelScope lbScope, int id, int typeId, int[] typeIds, String name, List<Byte> regsPool) {
-		super(parent, id, name);
+	public CGMethodScope(CGClassScope parent, CGLabelScope lbScope, int resId, VarType type, VarType[] types, String name, List<Byte> regsPool) {
+		super(parent, resId, name);
 		
 		this.lbScope = lbScope;
-		this.typeId = typeId;
-		this.typeIds = typeIds;
+		this.type = type;
+		this.types = types;
 		this.regsPool = regsPool;
+	}
+	
+	public void build(CodeGenerator cg) throws SemanticException {
+		if(verbose) parent.append(new CGIText(";build " + toString()));
+		
+		if(userRegs.isEmpty()) {
+			begin();
+			for(int i=0; i<userRegs.size(); i++) {
+				insert(cg.pushRegAsm(userRegs.get(i)));
+			}
+		}
+		
+		if(0x00 != stackBlockOffset) {
+			cg.setDpStackAlloc();
+			insert(cg.stackAllocAsm(stackBlockOffset));
+		}
+		
+		if(userRegs.isEmpty()) {
+			for(int i=userRegs.size()-1; i>=0; i--) {
+				append(cg.popRegAsm(userRegs.get(i)));
+			}
+		}
+		if(0x00 != stackBlockOffset) append(cg.stackFreeAsm());
 	}
 	
 	
@@ -62,5 +90,10 @@ public class CGMethodScope extends CGBlockScope {
 			}
 		}
 		return cells;
+	}
+	
+	@Override
+	public String toString() {
+		return "method " + type + " '" + getPath(".") +  "(" + StrUtils.toString(types) + "), id:" + resId;
 	}
 }

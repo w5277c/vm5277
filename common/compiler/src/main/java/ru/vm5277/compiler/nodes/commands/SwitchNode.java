@@ -22,16 +22,18 @@ import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import java.util.ArrayList;
 import java.util.List;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class SwitchNode extends CommandNode {
 	private	ExpressionNode	expression;
-	private	final	List<AstCase>				cases			= new ArrayList<>();
+	private	final	List<AstCase>			cases			= new ArrayList<>();
 	private			BlockNode				defaultBlock	= null;
 	private			BlockScope				switchScope;
 	private			BlockScope				defaultScope;
@@ -150,12 +152,12 @@ public class SwitchNode extends CommandNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		boolean allCasesReturn = true;		
 		
 		// Проверка типа выражения switch
 		if (expression != null) {
-			if (expression.postAnalyze(scope)) {
+			if (expression.postAnalyze(scope, cg)) {
 				try {
 					VarType exprType = expression.getType(scope);
 					if (!exprType.isInteger() && VarType.BYTE != exprType && VarType.SHORT != exprType) {
@@ -188,7 +190,7 @@ public class SwitchNode extends CommandNode {
 
 			// Анализ блока case
 			if (null != astCase.getBlock()) {
-				astCase.getBlock().postAnalyze(astCase.getScope());
+				astCase.getBlock().postAnalyze(astCase.getScope(), cg);
 				if (!isControlFlowInterrupted(astCase.getBlock())) {
 					allCasesReturn = false;
 				}
@@ -196,12 +198,19 @@ public class SwitchNode extends CommandNode {
 		}
 
 		// Анализ default-блока (если есть)
-		if (null != defaultBlock) defaultBlock.postAnalyze(defaultScope);
+		if (null != defaultBlock) defaultBlock.postAnalyze(defaultScope, cg);
 
 		if (allCasesReturn && !cases.isEmpty()) {
 			markWarning("Code after switch statement may be unreachable");
 		}
 		
 		return true;
+	}
+
+	@Override
+	public List<AstNode> getChildren() {
+		List<AstNode> result = new ArrayList<>(cases);
+		if(null != defaultBlock) result.add(defaultBlock);
+		return result;
 	}
 }

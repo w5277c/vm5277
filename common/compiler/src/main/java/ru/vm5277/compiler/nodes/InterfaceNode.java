@@ -16,6 +16,7 @@
 package ru.vm5277.compiler.nodes;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
@@ -127,7 +128,16 @@ public class InterfaceNode extends AstNode {
 	
 	
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		int[] interfaceIds = null;
+		if(!interfaces.isEmpty()) {
+			interfaceIds = new int[interfaces.size()];
+			for(int i=0; i<interfaces.size(); i++) {
+				interfaceIds[i] = VarType.fromClassName(interfaces.get(i)).getId();
+			}
+		}
+		cg.enterInterface(VarType.fromClassName(name), interfaceIds, name);
+
 		// Проверка что интерфейс не содержит конструкторов
 		for (AstNode decl : blockNode.getDeclarations()) {
 			if (decl instanceof MethodNode) {
@@ -161,15 +171,19 @@ public class InterfaceNode extends AstNode {
 		// Проверка вложенных интерфейсов
 		for (AstNode decl : blockNode.getDeclarations()) {
 			if (decl instanceof InterfaceNode) {
-				decl.postAnalyze(scope);
+				decl.postAnalyze(scope, cg);
 			}
 		}
 
+		cg.leaveInterface();
 		return true;
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg) throws Exception {
+		if(cgDone) return null;
+		cgDone = true;
+
 		int[] interfaceIds = null;
 		if(!interfaces.isEmpty()) {
 			interfaceIds = new int[interfaces.size()];
@@ -178,13 +192,20 @@ public class InterfaceNode extends AstNode {
 			}
 		}
 			
-		cg.enterInterface(VarType.fromClassName(name).getId(), interfaceIds, name);
+		cg.enterInterface(VarType.fromClassName(name), interfaceIds, name);
 		try {
 			blockNode.codeGen(cg);
 		}
 		finally {
 			cg.leaveInterface();
 		}
+		
+		return null;
+	}
+	
+	@Override
+	public List<AstNode> getChildren() {
+		return Arrays.asList(blockNode);
 	}
 }
 

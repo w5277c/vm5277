@@ -15,6 +15,8 @@
  */
 package ru.vm5277.compiler.nodes;
 
+import java.util.List;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
@@ -45,8 +47,8 @@ public class FreeNode extends AstNode {
         return true;
 	}
 	@Override
-	public boolean postAnalyze(Scope scope) {
-		if (null != target && target.postAnalyze(scope)) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		if (null != target && target.postAnalyze(scope, cg)) {
 			try {
 				VarType type = target.getType(scope);
 				if (!type.isReferenceType() || type == VarType.CSTR) {
@@ -66,5 +68,10 @@ public class FreeNode extends AstNode {
 	@Override
 	public String toString() {
 		return "free: " + target;
+	}
+
+	@Override
+	public List<AstNode> getChildren() {
+		return null;
 	}
 }

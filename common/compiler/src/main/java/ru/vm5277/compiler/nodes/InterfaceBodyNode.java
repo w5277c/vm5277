@@ -30,7 +30,7 @@ import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class InterfaceBodyNode extends AstNode {
-	protected List<AstNode> declarations = new ArrayList<>();
+	protected List<AstNode> children = new ArrayList<>();
 	
 	public InterfaceBodyNode(TokenBuffer tb, MessageContainer mc, String className) throws ParseException {
 		super(tb, mc);
@@ -42,13 +42,13 @@ public class InterfaceBodyNode extends AstNode {
 
 			// Обработка вложенных интерфейсов
 			if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
-				declarations.add(new InterfaceNode(tb, mc, modifiers, null));
+				children.add(new InterfaceNode(tb, mc, modifiers, null));
 				continue;
 			}
 
 			// Обработка вложенных классов
 			if (tb.match(TokenType.OOP, Keyword.CLASS)) {
-				declarations.add(new ClassNode(tb, mc, modifiers, null, null));
+				children.add(new ClassNode(tb, mc, modifiers, null, null));
 				continue;
 			}
 
@@ -63,12 +63,12 @@ public class InterfaceBodyNode extends AstNode {
 			}
 
 			if (tb.match(Delimiter.LEFT_PAREN)) { // Это метод
-				declarations.add(new MethodNode(tb, mc, modifiers, type, name));
+				children.add(new MethodNode(tb, mc, modifiers, type, name));
 				continue;
 			}
 
 			if (null != type) { // Это поле
-				declarations.add(new FieldNode(tb, mc, modifiers, type, name));
+				children.add(new FieldNode(tb, mc, modifiers, type, name));
 				continue;
 			}
 
@@ -85,7 +85,7 @@ public class InterfaceBodyNode extends AstNode {
 	}
 	
 	public List<AstNode> getDeclarations() {
-		return declarations;
+		return children;
 	}
 	
 	@Override
@@ -96,28 +96,28 @@ public class InterfaceBodyNode extends AstNode {
 	@Override
 	public boolean preAnalyze() {
 		// Проверка всех объявлений в блоке
-		for (AstNode declaration : declarations) {
-			if(declaration instanceof InterfaceNode) {
-				declaration.preAnalyze();
+		for (AstNode node : children) {
+			if(node instanceof InterfaceNode) {
+				node.preAnalyze();
 			}
-			else if(declaration instanceof FieldNode) {
-				FieldNode fieldNode = (FieldNode)declaration;
+			else if(node instanceof FieldNode) {
+				FieldNode fieldNode = (FieldNode)node;
 				if(!fieldNode.getModifiers().isEmpty()) {
 					//TODO не сохраняется позиция для конкретного modifier
 					addMessage(new WarningMessage("Modifiers not allowed for interface fields (already public static final)", fieldNode.getSP()));
 				}
-				declaration.preAnalyze();
+				node.preAnalyze();
 			}
-			else if(declaration instanceof MethodNode) {
-				MethodNode methoddNode = (MethodNode)declaration;
+			else if(node instanceof MethodNode) {
+				MethodNode methoddNode = (MethodNode)node;
 				if(!methoddNode.getModifiers().isEmpty()) {
 					//TODO не сохраняется позиция для конкретного modifier
 					addMessage(new WarningMessage("Modifiers not allowed for interface methods (already public abstract)", methoddNode.getSP()));
 				}
-				declaration.preAnalyze();
+				node.preAnalyze();
 			}
 			else {
-				markError("Interface cannot contain " + declaration.getNodeType() + " declarations. Only methods, constants and nested types are allowed");
+				markError("Interface cannot contain " + node.getNodeType() + " declarations. Only methods, constants and nested types are allowed");
 			}
 		}
 		
@@ -126,30 +126,30 @@ public class InterfaceBodyNode extends AstNode {
 
 	@Override
 	public boolean declare(Scope scope) {
-		for (AstNode declaration : declarations) {
-			declaration.declare(scope);
+		for (AstNode node : children) {
+			node.declare(scope);
 		}
 		return true;
 	}
 
 	
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		ClassScope classScope = (ClassScope)scope;
 
-		for (AstNode declaration : declarations) {
-			if (declaration instanceof InterfaceNode || declaration instanceof ClassNode) {
+		for (AstNode node : children) {
+			if (node instanceof InterfaceNode || node instanceof ClassNode) {
 				// Обработка вложенных интерфейсов и классов
-				declaration.postAnalyze(scope);
+				node.postAnalyze(scope, cg);
 			} 
-			else if (declaration instanceof FieldNode) {
-				FieldNode fieldNode = (FieldNode)declaration;
+			else if (node instanceof FieldNode) {
+				FieldNode fieldNode = (FieldNode)node;
 
 				// Проверка инициализации поля
 				if (null == fieldNode.getInitializer()) {
 					markError("Interface field '" + fieldNode.getName() + "' must be initialized");
 				} else {
-					fieldNode.getInitializer().postAnalyze(scope);
+					fieldNode.getInitializer().postAnalyze(scope, cg);
 				}
 
 				// Проверка что поле static final
@@ -160,8 +160,8 @@ public class InterfaceBodyNode extends AstNode {
 					markError("Interface field '" + fieldNode.getName() + "' must be final");
 				}
 			} 
-			else if (declaration instanceof MethodNode) {
-				MethodNode methodNode = (MethodNode)declaration;
+			else if (node instanceof MethodNode) {
+				MethodNode methodNode = (MethodNode)node;
 
 				// Запрет конструкторов
 				if (methodNode.isConstructor()) {
@@ -175,7 +175,7 @@ public class InterfaceBodyNode extends AstNode {
 					if (null == methodNode.getBody()) {
 						markError("Static method '" + methodNode.getName() + "' must have a body");
 					} else {
-						methodNode.getBody().postAnalyze(scope);
+						methodNode.getBody().postAnalyze(scope, cg);
 					}
 				} else {
 					// Для нестатических методов не должно быть тела (абстрактные)
@@ -195,14 +195,24 @@ public class InterfaceBodyNode extends AstNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) throws Exception {
-		for(AstNode decl : declarations) {
-			if(decl instanceof MethodNode && ((MethodNode)decl).isStatic()) {
-				decl.codeGen(cg);
+	public Object codeGen(CodeGenerator cg) throws Exception {
+		if(cgDone) return null;
+		cgDone = true;
+
+/*		for(AstNode node : children) {
+			if(node instanceof MethodNode && ((MethodNode)node).isStatic()) {
+				node.codeGen(cg);
 			}
-			else if(decl instanceof FieldNode && ((FieldNode)decl).isStatic()) {
-				decl.codeGen(cg);
+			else if(node instanceof FieldNode && ((FieldNode)node).isStatic()) {
+				node.codeGen(cg);
 			}
 		}
+*/		
+		return null;
+	}
+
+	@Override
+	public List<AstNode> getChildren() {
+		return children;
 	}
 }

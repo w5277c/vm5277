@@ -15,6 +15,7 @@
  */
 package ru.vm5277.compiler.nodes.commands;
 
+import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
@@ -23,11 +24,13 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class ReturnNode extends CommandNode {
 	private	ExpressionNode	expression;
+	private	VarType			returnType;
 	
 	public ReturnNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
@@ -61,18 +64,28 @@ public class ReturnNode extends CommandNode {
 
 	@Override
 	public boolean preAnalyze() {
-		if (expression != null) expression.preAnalyze();
-		
+		if (expression != null) {
+			if(!expression.preAnalyze()) {
+				return false;
+			}
+		}
 		return true;
 	}
 
 	@Override
 	public boolean declare(Scope scope) {
+		if(null != expression) {
+			if(!expression.declare(scope)) {
+				return false;
+			}
+		}
 		return true;
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		cgScope = cg.getScope();
+	
 		// Находим ближайший MethodScope
 		MethodScope methodScope = findEnclosingMethodScope(scope);
 		if (null == methodScope) {
@@ -80,27 +93,29 @@ public class ReturnNode extends CommandNode {
 		}
 		else {
 			// Получаем тип возвращаемого значения метода
-			VarType methodReturnType = methodScope.getSymbol().getType();
+			returnType = methodScope.getSymbol().getType();
 
 			// Проверяем соответствие возвращаемого значения
 			if (null == expression) { // return без значения
-				if (!methodReturnType.isVoid()) markError("Void method cannot return a value");
+				if (!returnType.isVoid()) markError("Void method cannot return a value");
 			}
 			else { // return с выражением
-				if (methodReturnType.isVoid()) markError("Non-void method must return a value");
+				if (returnType.isVoid()) markError("Non-void method must return a value");
 				else {
+					if(!expression.postAnalyze(scope, cg)) {
+						return false;
+					}
 					// Проверяем тип выражения
 					try {
 						VarType exprType = expression.getType(scope);
-						if (!isCompatibleWith(scope, exprType, methodReturnType)) {
-							markError(String.format("Return type mismatch: expected " + methodReturnType + ", got " + exprType));
+						if(null == exprType) {
+							markError(String.format("TODO Can't resolve expression: " + expression));
 						}
-						
-						// Дополнительная проверка на сужающее преобразование
-						if (exprType.isNumeric() && methodReturnType.isNumeric() && exprType.getSize() < methodReturnType.getSize()) {
-							markError("Narrowing conversion from " + methodReturnType + " to " + exprType + " requires explicit cast");
+						else {
+							if (!isCompatibleWith(scope, returnType, exprType)) {
+								markError(String.format("Return type mismatch: expected " + returnType + ", got " + exprType));
+							}
 						}
-
 					}
 					catch (SemanticException e) {markError(e);}
 				}
@@ -110,10 +125,20 @@ public class ReturnNode extends CommandNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg) throws Exception {
+		if(cgDone) return null;
+		cgDone = true;
+
 		if(null != expression) {
 			expression.codeGen(cg);
 		}
-		cg.eReturn();
+		cg.eReturn(cgScope, returnType.getSize());
+		
+		return null;
+	}
+
+	@Override
+	public List<AstNode> getChildren() {
+		return null;
 	}
 }

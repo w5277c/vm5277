@@ -15,17 +15,22 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
+import java.util.Arrays;
+import java.util.List;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class TernaryExpression extends ExpressionNode {
-	private final ExpressionNode condition;
-	private final ExpressionNode trueExpr;
-	private final ExpressionNode falseExpr;
-
+	private final	ExpressionNode	condition;
+	private final	ExpressionNode	trueExpr;
+	private	final	ExpressionNode	falseExpr;
+	private			boolean			isUsed		= false;
+	
 	public TernaryExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode condition, ExpressionNode trueExpr, ExpressionNode falseExpr) {
 		super(tb, mc);
 
@@ -58,12 +63,12 @@ public class TernaryExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		try {
 			// Проверяем условие и ветки
-			if (!condition.postAnalyze(scope)) return false;
-			if (!trueExpr.postAnalyze(scope)) return false;
-			if (!falseExpr.postAnalyze(scope)) return false;
+			if (!condition.postAnalyze(scope, cg)) return false;
+			if (!trueExpr.postAnalyze(scope, cg)) return false;
+			if (!falseExpr.postAnalyze(scope, cg)) return false;
 
 			// Проверяем тип условия
 			VarType condType = condition.getType(scope);
@@ -100,6 +105,11 @@ public class TernaryExpression extends ExpressionNode {
 
 	public ExpressionNode getFalseExpr() {
 		return falseExpr;
+	}
+
+	@Override
+	public List<AstNode> getChildren() {
+		return Arrays.asList(condition, trueExpr, falseExpr);
 	}
 
 	@Override

@@ -16,5 +16,5 @@
 package ru.vm5277.common.cg.items;
 
 public interface CGItem {
-	public String build();
+	public String getSource();
 }

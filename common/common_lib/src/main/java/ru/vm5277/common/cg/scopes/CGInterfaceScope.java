@@ -15,14 +15,16 @@
  */
 package ru.vm5277.common.cg.scopes;
 
+import ru.vm5277.common.compiler.VarType;
+
 public class CGInterfaceScope extends CGScope {
-	private	final	int		typeId;
+	private	final	VarType	type;
 	private	final	int[]	intrerfaceIds;
 			
-	public CGInterfaceScope(CGScope parent, int id, int typeId, int[] intrerfaceIds, String name) {
+	public CGInterfaceScope(CGScope parent, int id, VarType type, int[] intrerfaceIds, String name) {
 		super(parent, id, name);
 		
-		this.typeId = typeId;
+		this.type = type;
 		this.intrerfaceIds = intrerfaceIds;
 	}
 }

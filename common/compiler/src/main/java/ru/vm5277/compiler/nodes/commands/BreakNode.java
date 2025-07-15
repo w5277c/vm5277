@@ -15,6 +15,8 @@
  */
 package ru.vm5277.compiler.nodes.commands;
 
+import java.util.List;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.common.exceptions.ParseException;
@@ -88,7 +90,7 @@ public class BreakNode extends CommandNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		// Проверка для break с меткой
         if (null != symbol) {
 
@@ -99,5 +101,10 @@ public class BreakNode extends CommandNode {
             if (!isLabelInCurrentMethod(symbol, scope)) markError("Cannot break to label in different method");
         }
 		return true;
+	}
+
+	@Override
+	public List<AstNode> getChildren() {
+		return null;
 	}
 }

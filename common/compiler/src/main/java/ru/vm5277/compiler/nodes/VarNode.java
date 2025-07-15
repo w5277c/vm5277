@@ -15,33 +15,31 @@
  */
 package ru.vm5277.compiler.nodes;
 
+import java.util.Arrays;
+import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.compiler.Operand;
-import ru.vm5277.common.compiler.OperandType;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.Operator;
+import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
-import ru.vm5277.compiler.nodes.expressions.BinaryExpression;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
-import ru.vm5277.compiler.nodes.expressions.VariableExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.Scope;
-import ru.vm5277.compiler.semantic.Symbol;
+import ru.vm5277.compiler.semantic.VarSymbol;
 
 public class VarNode extends AstNode {
 	private	final	Set<Keyword>	modifiers;
 	private	final	VarType			type;
 	private	final	String			name;
 	private			ExpressionNode	initializer;
-	private			Symbol			symbol;
 	
 	public VarNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType type, String name) {
 		super(tb, mc);
@@ -102,26 +100,42 @@ public class VarNode extends AstNode {
 	public boolean preAnalyze() {
 		if(Character.isUpperCase(name.charAt(0))) addMessage(new WarningMessage("Variable name should start with lowercase letter:" + name, sp));
 
+		if(null != initializer) {
+			if(!initializer.preAnalyze()) {
+				return false;
+			}
+		}
+		
 		return true;
 	}
 
 	
 	@Override
 	public boolean declare(Scope scope) {
+		if(null != initializer) {
+			if(!initializer.declare(scope)) {
+				return false;
+			}
+		}
+		
 		if(scope instanceof BlockScope) {
 			BlockScope blockScope = (BlockScope)scope;
-			boolean isFinal = modifiers.contains(Keyword.FINAL) || VarType.CSTR == type;
-			symbol = new Symbol(name, type, isFinal, modifiers.contains(Keyword.STATIC));
-			if(isFinal && null != initializer) {
+			symbol = new VarSymbol(name, type, modifiers.contains(Keyword.FINAL) || VarType.CSTR == type, modifiers.contains(Keyword.STATIC), scope, this);
+			//TODO рудимент
+			/*
+			if(VarType.CSTR == type && null != initializer) {
 				if(initializer instanceof LiteralExpression) {
 					LiteralExpression le = (LiteralExpression)initializer;
-					symbol.setConstantOperand(new Operand(le.getType(scope), OperandType.LITERAL, le.getValue()));
+					symbol.setOperand(new Operand(le.getType(scope), OperandType.FLASH_RES, null)); //TODO лишнее
 				}
-				else if(initializer instanceof VariableExpression) {
-					VariableExpression ve = (VariableExpression)initializer;
-					symbol.setConstantOperand(new Operand(ve.getType(scope), OperandType.TYPE, ve.getValue()));
-				}
-			}
+				else {
+					markError("Unsupported " + initializer.toString());
+				}*/
+/*				else if(initializer instanceof VarFieldExpression) {
+					VarFieldExpression ve = (VarFieldExpression)initializer;
+					symbol.setOperand(new Operand(ve.getType(scope), OperandType.TYPE, ve.getValue()));
+				}*/
+			/*}*/
 
 			try {blockScope.addLocal(symbol);}
 			catch(SemanticException e) {markError(e);}
@@ -132,15 +146,22 @@ public class VarNode extends AstNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
-		// Проверка инициализации final-полей
-		if (isFinal() && initializer == null) markError("Final variable  '" + name + "' must be initialized");
-
-		// Анализ инициализатора, если есть
-		if (initializer != null) initializer.postAnalyze(scope);
-
-		// Проверка совместимости типов
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		try {
+			cgScope = cg.enterLocal(type, VarType.CSTR == type, name);
+// Проверка инициализации final-полей
+			if (isFinal() && initializer == null) markError("Final variable  '" + name + "' must be initialized");
+
+			// Анализ инициализатора, если есть
+			if (initializer != null) {
+				if(!initializer.postAnalyze(scope, cg)) {
+					cg.leaveLocal();
+					return false;
+				}
+			}
+
+			// Проверка совместимости типов
+
 			VarType initType = initializer.getType(scope);
 			if (!isCompatibleWith(scope, type, initType)) {
 				markError("Type mismatch: cannot assign " + initType + " to " + type);
@@ -153,44 +174,51 @@ public class VarNode extends AstNode {
 		}
 		catch (SemanticException e) {markError(e);}
 		
+		cg.leaveLocal();
 		return true;
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) throws Exception {
-		boolean isConstant = isFinal() || VarType.CSTR == type;
-		int runtimeId = cg.enterLocal(type.getId(), type.getSize(), isConstant, name);
-		symbol.setRuntimeId(runtimeId);
-		if(isConstant) {
+	public Object codeGen(CodeGenerator cg) throws Exception {
+		if(cgDone) return null;
+		cgDone = true;
+
+		boolean accUsed = false;
+		((CGVarScope)cgScope).build();
+		
+		if(VarType.CSTR == type) {
 			if(initializer instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)initializer;
 				if(VarType.CSTR == le.getType(null)) {
-					cg.defineStr(runtimeId, (String)le.getValue());
-				}
-				else {
-//TODO вроде как не нужно					cg.defineData(runtimeId, type.getSize(), le.getNumValue());
+					cg.defineStr((CGVarScope)cgScope, (String)le.getValue());
+					//TODO рудимент?
+					//symbol.getConstantOperand().setValue(cgScope.getResId());
 				}
 			}
 			else throw new Exception("unexpected expression:" + initializer + " for constant");
 		}
 		else {
 			if(initializer instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
-				cg.localStore(runtimeId, ((LiteralExpression)initializer).getNumValue());
-			}
-			else if(initializer instanceof BinaryExpression) {
-				initializer.codeGen(cg);
-				cg.storeAcc(runtimeId);
+				cg.loadConstToAcc(cgScope, ((CGVarScope)cgScope).getSize(), ((LiteralExpression)initializer).getNumValue());
 			}
 			else if(initializer instanceof FieldAccessExpression) {
-				FieldAccessExpression fae = (FieldAccessExpression)initializer;
-				cg.localStore(runtimeId, ((Number)fae.getSymbol().getConstantOperand().getValue()).longValue());
+				cg.loadConstToAcc(	cgScope, ((CGVarScope)cgScope).getSize(), -1);
+				//TODO
+									//((Number)((FieldAccessExpression)initializer).getSymbol().getConstantOperand().getValue()).longValue());
 			}
 			else {
 				initializer.codeGen(cg);
-				cg.loadRegs(type.getSize());
-				cg.storeAcc(runtimeId);
 			}
+			cg.accToCells(cgScope, (CGVarScope)cgScope);
+			accUsed = true;
 		}
-		cg.leaveLocal();
+		
+		return accUsed;
+	}
+
+	@Override
+	public List<AstNode> getChildren() {
+		if(null != initializer) return Arrays.asList(initializer);
+		return null;
 	}
 }

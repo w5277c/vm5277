@@ -15,8 +15,10 @@
  */
 package ru.vm5277.compiler.semantic;
 
-public interface Scope {
-	public Symbol resolve(String name);
-	public Scope getParent();
-	public ClassScope getThis();
+public abstract class Scope {
+	private	boolean	isUsed	= false;
+	
+	public abstract Symbol resolve(String name);
+	public abstract Scope getParent();
+	public abstract ClassScope getThis();
 }

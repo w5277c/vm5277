@@ -16,11 +16,14 @@
 package ru.vm5277.compiler.nodes.expressions;
 
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
+import ru.vm5277.compiler.semantic.Symbol;
+import ru.vm5277.compiler.tokens.Token;
 
 public class LiteralExpression extends ExpressionNode {
     private Object value;
@@ -46,6 +49,7 @@ public class LiteralExpression extends ExpressionNode {
 		}
 		if (value instanceof Character) return VarType.BYTE;
 		if (value instanceof String) return VarType.CSTR;
+		if (value instanceof VarType) return (VarType)value;
 		return VarType.UNKNOWN;
 	}	
 
@@ -73,11 +77,7 @@ public class LiteralExpression extends ExpressionNode {
 	
 	@Override
 	public String toString() {
-        if (null == value) return getClass().getSimpleName() + ":null";
-		if(value instanceof Double) return getClass().getSimpleName() + ":" + ((Double)value).toString();
-		if(value instanceof Number) return getClass().getSimpleName() + ":" + ((Number)value).toString();
-		if(value instanceof String) return getClass().getSimpleName() + ":" + ((String)value);
-		return getClass().getSimpleName() + ":" + value;
+		return getClass().getSimpleName() + ":" + Token.toStringValue(value);
     }
 	
 	@Override
@@ -90,46 +90,54 @@ public class LiteralExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		try {
+			cgScope = cg.enterExpression();
 			if (value instanceof Number) {
 				VarType type = getType(scope);
 				if (type == VarType.UNKNOWN) {
 					markError("Unsupported numeric literal type");
+					cg.leaveExpression();
 					return false;
 				}
 				// Проверка диапазона через VarType.checkRange
 				type.checkRange((Number)value);
 			}
+			
+			cg.leaveExpression();
 			return true;
 		} 
 		catch (SemanticException e) {
 			markError(e.getMessage());
+
+			cg.leaveExpression();
 			return false;
 		}
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) throws Exception {
-		VarType type = getType(null);
-//		if(VarType.CSTR == type) {
-//			int resId = cg.defineData(new Operand(VarType.CSTR, OperandType.CONSTANT, value));
-//			cg.setAcc(resId);
-//		}
-//		else
-		if(VarType.NULL == type) {
-			cg.setAcc(0x01, 0);
-		}
-		else {
-			if(value instanceof Character) {
-				cg.setAcc(type.getSize(), (int)(Character)value);
-			}
-			if(value instanceof Boolean) {
-				cg.setAcc(type.getSize(), ((Boolean)value) ? 0x01 : 0x00);
+	public Object codeGen(CodeGenerator cg) throws Exception {
+		if(cgScope.getParent() instanceof CGCellsScope) {
+			CGCellsScope cScope = (CGCellsScope)cgScope.getParent();
+
+			if(VarType.NULL == cScope.getType()) {
+				cg.setAcc(cScope, 0x01, 0);
 			}
 			else {
-				cg.setAcc(type.getSize(), ((Number)value).longValue());
+				if(value instanceof Character) {
+					cg.setAcc(cScope, cScope.getSize(), (int)(Character)value);
+				}
+				else if(value instanceof Boolean) {
+					cg.setAcc(cScope, cScope.getSize(), ((Boolean)value) ? 0x01 : 0x00);
+				}
+				else if(value instanceof VarType) {
+					cg.setAcc(cScope, cScope.getSize(), ((VarType)value).getId());
+				}
+				else {
+					cg.setAcc(cScope, cScope.getSize(), ((Number)value).longValue());
+				}
 			}
 		}
+		return null;
 	}
 }

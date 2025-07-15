@@ -15,7 +15,10 @@
  */
 package ru.vm5277.compiler.nodes.commands;
 
+import java.util.Arrays;
+import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
@@ -26,6 +29,7 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.expressions.InstanceOfExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
@@ -34,6 +38,9 @@ import ru.vm5277.compiler.semantic.Symbol;
 
 public class IfNode extends CommandNode {
     private	ExpressionNode	condition;
+	private	BlockNode		blockNode;
+	private	BlockNode		elseBlockNode;
+	
 	private	BlockScope		thenScope;
 	private	BlockScope		elseScope;
 	private	String			varName;
@@ -47,22 +54,13 @@ public class IfNode extends CommandNode {
 		// Условие
 		try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(ParseException e){markFirstError(e);}
 		try {this.condition = new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
-		// Парсинг условия (обычное или pattern matching)
-		if (tb.match(Keyword.AS)) {
-			tb.consume(); // Потребляем "as"
-			// Проверяем, что после типа идет идентификатор
-			if (tb.match(TokenType.ID)) {
-				this.varName = consumeToken(tb).getStringValue();
-			}
-			else {
-				markError("Expected variable name after type in pattern matching");
-			}
-		}
 		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(ParseException e){markFirstError(e);}
 
 		// Then блок
 		tb.getLoopStack().add(this);
-		try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement()));}
+		try {
+			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
+		}
 		catch(ParseException e) {markFirstError(e);}
 		tb.getLoopStack().remove(this);
 
@@ -73,12 +71,14 @@ public class IfNode extends CommandNode {
 			if (tb.match(TokenType.COMMAND, Keyword.IF)) {
 				// Обработка else if
 				tb.getLoopStack().add(this);
-				blocks.add(new BlockNode(tb, mc, new IfNode(tb, mc)));
+				elseBlockNode = new BlockNode(tb, mc, new IfNode(tb, mc));
 				tb.getLoopStack().remove(this);
 			}
 			else {
 				tb.getLoopStack().add(this);
-				try {blocks.add(tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement()));}
+				try {
+					elseBlockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
+				}
 				catch(ParseException e) {markFirstError(e);}
 				tb.getLoopStack().remove(this);
 			}
@@ -91,11 +91,11 @@ public class IfNode extends CommandNode {
     }
 
     public BlockNode getThenBlock() {
-        return blocks.get(0);
+        return blockNode;
     }
 
     public BlockNode getElseBlock() {
-        return (0x02 == blocks.size() ? blocks.get(1) : null);
+        return elseBlockNode;
     }
 	
 	public String getVarName() {
@@ -146,9 +146,16 @@ public class IfNode extends CommandNode {
 			if(condition instanceof InstanceOfExpression) {
 				InstanceOfExpression instanceOf = (InstanceOfExpression) condition;
 				try {
-					VarType type = instanceOf.getTypeExpr().getType(scope);
+					VarType type;
+					if(instanceOf.getTypeExpr() instanceof LiteralExpression && ((LiteralExpression)instanceOf.getTypeExpr()).getValue() instanceof VarType) {
+						type = (VarType)((LiteralExpression)instanceOf.getTypeExpr()).getValue();
+					}
+					else {
+						type = instanceOf.getTypeExpr().getType(scope);
+					}
 					if (null != type && null != thenScope) {
 						thenScope.addLocal(new Symbol(varName, type, false, false));
+						
 					}
 				}
 				catch (SemanticException e) {markError(e);
@@ -173,10 +180,10 @@ public class IfNode extends CommandNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		// Проверка типа условия
 		if (null != condition) {
-			if (condition.postAnalyze(scope)) {
+			if (condition.postAnalyze(scope, cg)) {
 				try {
 					VarType condType = condition.getType(scope);
 					if (VarType.BOOL != condType) markError("If condition must be boolean, got: " + condType);
@@ -186,10 +193,10 @@ public class IfNode extends CommandNode {
 		}
 
 		// Анализ then-блока
-		if (null != getThenBlock()) getThenBlock().postAnalyze(thenScope);
+		if (null != getThenBlock()) getThenBlock().postAnalyze(thenScope, cg);
 
 		// Анализ else-блока
-		if (null != getElseBlock()) getElseBlock().postAnalyze(elseScope);
+		if (null != getElseBlock()) getElseBlock().postAnalyze(elseScope, cg);
 		
 		// Проверяем недостижимый код после if с возвратом во всех ветках
         if (null != getElseBlock() && isControlFlowInterrupted(getThenBlock()) && isControlFlowInterrupted(getElseBlock())) {
@@ -197,7 +204,10 @@ public class IfNode extends CommandNode {
         }
 		
 		try {
-			condition = condition.optimizeWithScope(scope);
+			ExpressionNode optimizedExpr = condition.optimizeWithScope(scope);
+			if(null != optimizedExpr) {
+				condition = optimizedExpr;
+			}
 			if(condition instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)condition;
 				if(VarType.BOOL == le.getType(scope)) {
@@ -218,12 +228,15 @@ public class IfNode extends CommandNode {
 	}
 	
 	@Override
-	public void codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg) throws Exception {
+		if(cgDone) return null;
+		cgDone = true;
+
 		if(alwaysTrue) {
 			cg.enterBlock();
 			getThenBlock().codeGen(cg);
 			cg.leaveBlock();
-			return;
+			return null;
 		}
 		if(alwaysFalse()) {
 			if (getElseBlock() != null) {
@@ -231,24 +244,49 @@ public class IfNode extends CommandNode {
 				getElseBlock().codeGen(cg);
 				cg.leaveBlock();
 			}
-			return;
+			return null;
 		}
 		
-		int condBlockId = cg.enterBlock();
-		condition.codeGen(cg);
+		CGBlockScope condBlockScope = cg.enterBlock();
+		Object obj = condition.codeGen(cg);
 		cg.leaveBlock();
 		
-		int thenBlockId = cg.enterBlock();
+		//Если результат стал известен без кодогенерации
+		if(obj instanceof Boolean) {
+			if(((Boolean)obj)) {
+				cg.enterBlock();
+				getThenBlock().codeGen(cg);
+				cg.leaveBlock();
+			}
+			else if(getElseBlock() != null) {
+				cg.enterBlock();
+				getElseBlock().codeGen(cg);
+				cg.leaveBlock();
+			}
+			return null;
+		}
+		
+		CGBlockScope thenBlockScope = cg.enterBlock();
 		getThenBlock().codeGen(cg);
 		cg.leaveBlock();
 
-		Integer elseBlockId = null;
+		CGBlockScope elseBlockScope = null;
 		if(null != getElseBlock()) {
-			elseBlockId = cg.enterBlock();
+			elseBlockScope = cg.enterBlock();
 			getElseBlock().codeGen(cg);
 			cg.leaveBlock();
 		}
 		
-		cg.eIf(condBlockId, thenBlockId, elseBlockId);
+		cg.eIf(condBlockScope, thenBlockScope, elseBlockScope);
+		
+		return null;
+	}
+
+	@Override
+	public List<AstNode> getChildren() {
+		if(null == elseBlockNode) {
+			return Arrays.asList(blockNode);
+		}
+		return Arrays.asList(blockNode, elseBlockNode);
 	}
 }

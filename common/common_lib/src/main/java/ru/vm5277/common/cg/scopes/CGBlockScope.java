@@ -25,7 +25,7 @@ import ru.vm5277.common.cg.CGCell;
 //TODO а в будущем, учитывать свободные регистры
 
 public class CGBlockScope extends CGScope {
-	protected	final	Map<Integer, CGLocalScope>	locals				= new HashMap<>();
+	protected	final	Map<Integer, CGVarScope>	locals				= new HashMap<>();
 	protected			int							stackBlockOffset	= 0;
 	protected	final	List<Byte>					userRegs			= new ArrayList<>();
 
@@ -38,11 +38,11 @@ public class CGBlockScope extends CGScope {
 		}
 	}
 	
-	public void addLocal(CGLocalScope local) {
+	public void addLocal(CGVarScope local) {
 		locals.put(local.getResId(), local);
 	}
-	public CGLocalScope getLocal(int resId) {
-		CGLocalScope lScope = locals.get(resId);
+	public CGVarScope getLocal(int resId) {
+		CGVarScope lScope = locals.get(resId);
 		if(null != lScope) return lScope;
 		
 		if(null != parent && parent instanceof CGBlockScope) return ((CGBlockScope)parent).getLocal(resId);
@@ -54,6 +54,7 @@ public class CGBlockScope extends CGScope {
 	}
 
 	public void putUsedReg(byte reg) {
+		if(16==reg) return; //r16 всегда свободен и используется для аккумулятора(который используется только временно(для выражений))
 		if(!userRegs.contains(reg)) {
 			if(parent instanceof CGBlockScope) { // Если родитель тоже блок, и он не использует этот регистр, то выгодней сохранение регистра вынести в родитель
 				CGBlockScope bScope =((CGBlockScope)parent);

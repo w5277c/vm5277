@@ -13,13 +13,11 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ru.vm5277.common.compiler;
+package ru.vm5277.common.cg;
 
 public enum OperandType {
-	LITERAL,
-	VARIABLE,
-	TYPE,
-	CONSTANT,
-	LOCAL_RESID,
-	ADDR_OFFSET;
+	LITERAL,	//число в виде константы(сразу записывается в регистр)
+	TYPE,		//reference? т.е. заполнен resId?
+	FLASH_RES,	//данные размещенные во FLASH области
+	LOCAL_RES;	//field или var, заполнен resId.
 }
