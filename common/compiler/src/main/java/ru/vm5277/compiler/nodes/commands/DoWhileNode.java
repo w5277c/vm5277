@@ -25,8 +25,8 @@ import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
@@ -47,7 +47,7 @@ public class DoWhileNode extends CommandNode {
 		try {
 			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
 		}
-		catch(ParseException e) {markFirstError(e);}
+		catch(CompileException e) {markFirstError(e);}
 		tb.getLoopStack().remove(this);
 
 		try {
@@ -56,11 +56,11 @@ public class DoWhileNode extends CommandNode {
 			this.condition = new ExpressionNode(tb, mc).parse();
 			consumeToken(tb, Delimiter.RIGHT_PAREN);
 		}
-		catch(ParseException e) {
+		catch(CompileException e) {
 			markFirstError(e);
 		}
 
-		try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
+		try {consumeToken(tb, Delimiter.SEMICOLON);}catch(CompileException e) {markFirstError(e);}
 	}
 
 	public ExpressionNode getCondition() {
@@ -125,7 +125,7 @@ public class DoWhileNode extends CommandNode {
 					VarType condType = condition.getType(scope);
 					if (VarType.BOOL != condType) markError("While condition must be boolean, got: " + condType);
 				}
-				catch (SemanticException e) {markError(e);}
+				catch (CompileException e) {markError(e);}
 			}
 			
 			// Проверяем бесконечный цикл с возвратом

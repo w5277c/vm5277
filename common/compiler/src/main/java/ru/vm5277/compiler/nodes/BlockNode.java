@@ -25,7 +25,7 @@ import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.commands.CommandNode.AstCase;
 import ru.vm5277.compiler.nodes.commands.DoWhileNode;
@@ -35,8 +35,6 @@ import ru.vm5277.compiler.nodes.commands.ReturnNode;
 import ru.vm5277.compiler.nodes.commands.SwitchNode;
 import ru.vm5277.compiler.nodes.commands.TryNode;
 import ru.vm5277.compiler.nodes.commands.WhileNode;
-import ru.vm5277.compiler.nodes.expressions.BinaryExpression;
-import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.MethodCallExpression;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
@@ -57,10 +55,10 @@ public class BlockNode extends AstNode {
 		children.add(singleStatement);
 	}
 
-	public BlockNode(TokenBuffer tb, MessageContainer mc) throws ParseException {
+	public BlockNode(TokenBuffer tb, MessageContainer mc) throws CompileException {
 		this(tb, mc, false);
 	}
-	public BlockNode(TokenBuffer tb, MessageContainer mc, boolean leftBraceConsumed) throws ParseException {
+	public BlockNode(TokenBuffer tb, MessageContainer mc, boolean leftBraceConsumed) throws CompileException {
 		super(tb, mc);
         
 		if(!leftBraceConsumed) consumeToken(tb, Delimiter.LEFT_BRACE); //Наличие токена должно быть гарантировано вызывающим
@@ -75,7 +73,7 @@ public class BlockNode extends AstNode {
 				try {
 					children.add(parseCommand());
 				}
-				catch(ParseException e) {
+				catch(CompileException e) {
 					addMessage(e.getErrorMessage());
 					markFirstError(e);
 				} // Фиксируем ошибку(Unexpected command token)
@@ -120,7 +118,7 @@ public class BlockNode extends AstNode {
 							}
 							else {
 								// Доступ к полю (можно добавить FieldAccessNode)
-								throw new ParseException("Field access not implemented yet", tb.current().getSP());
+								throw new CompileException("Field access not implemented yet", tb.current().getSP());
 							}
 						}
 						continue;
@@ -128,7 +126,7 @@ public class BlockNode extends AstNode {
 					else {
 						// Получаем имя метода/конструктора
 						String name = null;
-						try {name = consumeToken(tb, TokenType.ID).getStringValue();}catch(ParseException e) {markFirstError(e);} // Нет имени сущности, пытаемся парсить дальше
+						try {name = consumeToken(tb, TokenType.ID).getStringValue();}catch(CompileException e) {markFirstError(e);} // Нет имени сущности, пытаемся парсить дальше
 
 						if (tb.match(Delimiter.LEFT_BRACKET)) { // Это объявление массива
 							ArrayDeclarationNode node = new ArrayDeclarationNode(tb, mc, modifiers, type, name);
@@ -142,7 +140,7 @@ public class BlockNode extends AstNode {
 					}
 				}
 			}
-			catch(ParseException e) {
+			catch(CompileException e) {
 				markFirstError(e);
 			}
 
@@ -150,14 +148,14 @@ public class BlockNode extends AstNode {
 			try {
 				children.add(parseStatement());
 			}
-			catch(ParseException e) {
+			catch(CompileException e) {
 				markFirstError(e);
 			}
 		}
 		consumeToken(tb, Delimiter.RIGHT_BRACE);
     }
 
-	public BlockNode(MessageContainer mc) throws ParseException {
+	public BlockNode(MessageContainer mc) throws CompileException {
         super(null, mc);
 	}
 	

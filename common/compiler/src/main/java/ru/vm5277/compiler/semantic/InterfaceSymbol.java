@@ -19,7 +19,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class InterfaceSymbol extends Symbol {
 	private	final	Map<String, List<MethodSymbol>>	methods	= new HashMap<>();
@@ -28,7 +28,7 @@ public class InterfaceSymbol extends Symbol {
 		super(name);
 	}
 
-	public void addMethod(String name, MethodSymbol method) throws SemanticException {
+	public void addMethod(String name, MethodSymbol method) throws CompileException {
 		List<MethodSymbol> symbols = methods.get(name);
 		if(null == symbols) {
 			symbols = new ArrayList<>();
@@ -38,7 +38,7 @@ public class InterfaceSymbol extends Symbol {
 		String methodSignature = method.getSignature();
 		for(MethodSymbol symbol : symbols) {
 			if(methodSignature.equals(symbol.getSignature())) {
-				throw new SemanticException("Method '" + methodSignature + "' is already defined in interface '" + name + "'");
+				throw new CompileException("Method '" + methodSignature + "' is already defined in interface '" + name + "'");
 			}
 		}
 		

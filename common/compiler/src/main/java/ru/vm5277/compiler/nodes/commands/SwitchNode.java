@@ -24,8 +24,8 @@ import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.semantic.BlockScope;
@@ -43,11 +43,11 @@ public class SwitchNode extends CommandNode {
 
 		consumeToken(tb); // Потребляем "switch"
 		// Парсим выражение switch
-		try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(ParseException e) {markFirstError(e);}
-		try {this.expression = new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
-		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(ParseException e) {markFirstError(e);}
+		try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(CompileException e) {markFirstError(e);}
+		try {this.expression = new ExpressionNode(tb, mc).parse();} catch(CompileException e) {markFirstError(e);}
+		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(CompileException e) {markFirstError(e);}
 		
-		try {consumeToken(tb, Delimiter.LEFT_BRACE);} catch(ParseException e) {markFirstError(e);}
+		try {consumeToken(tb, Delimiter.LEFT_BRACE);} catch(CompileException e) {markFirstError(e);}
 		// Парсим case-блоки
 		while (!tb.match(Delimiter.RIGHT_BRACE)) {
 			if (tb.match(Keyword.CASE)) {
@@ -56,17 +56,17 @@ public class SwitchNode extends CommandNode {
 			}
 			else if (tb.match(Keyword.DEFAULT)) {
 				consumeToken(tb); // Потребляем "default"
-				try {consumeToken(tb, Delimiter.COLON);} catch(ParseException e) {markFirstError(e);}
+				try {consumeToken(tb, Delimiter.COLON);} catch(CompileException e) {markFirstError(e);}
 				tb.getLoopStack().add(this);
 				try {defaultBlock = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());}
-				catch(ParseException e) {markFirstError(e);}
+				catch(CompileException e) {markFirstError(e);}
 				tb.getLoopStack().remove(this);
 			}
 			else {
 				markFirstError(parserError("Expected 'case' or 'default' in switch statement"));
 			}
 		}
-		try {consumeToken(tb, Delimiter.RIGHT_BRACE);}catch(ParseException e) {markFirstError(e);}
+		try {consumeToken(tb, Delimiter.RIGHT_BRACE);}catch(CompileException e) {markFirstError(e);}
 	}
 
 
@@ -164,7 +164,7 @@ public class SwitchNode extends CommandNode {
 						markError("Switch expression must be integer type, got: " + exprType);
 					}
 				}
-				catch (SemanticException e) {markError(e);}
+				catch (CompileException e) {markError(e);}
 			}
 		}
 

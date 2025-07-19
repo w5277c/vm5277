@@ -19,5 +19,6 @@ public enum OperandType {
 	LITERAL,	//число в виде константы(сразу записывается в регистр)
 	TYPE,		//reference? т.е. заполнен resId?
 	FLASH_RES,	//данные размещенные во FLASH области
-	LOCAL_RES;	//field или var, заполнен resId.
+	LOCAL_RES,	//field или var, заполнен resId.
+	RETURN;		//возвращенное методом значение
 }

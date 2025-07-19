@@ -15,6 +15,7 @@
  */
 package ru.vm5277.compiler.semantic;
 
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.VarType;
 
 //TODO содердание типа как в type, так и в Operand
@@ -24,6 +25,7 @@ public class Symbol {
 	protected			boolean				isStatic;
 	protected			boolean				isFinal;
 	protected			boolean				isNative;
+	private				CGScope				cgScope;
 	
 	protected Symbol(String name) {
 		this.name = name;
@@ -58,6 +60,13 @@ public class Symbol {
 	}
 	public void setType(VarType type) {
 		this.type = type;
+	}
+	
+	public void setCGScope(CGScope cgScope) {
+		this.cgScope = cgScope;
+	}
+	public CGScope getCGScope() {
+		return cgScope;
 	}
 	
 	public boolean isFinal() {

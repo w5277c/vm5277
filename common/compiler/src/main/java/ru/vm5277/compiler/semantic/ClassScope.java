@@ -20,7 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.nodes.AstNode;
 
 public class ClassScope extends Scope {
@@ -38,37 +38,37 @@ public class ClassScope extends Scope {
 	public ClassScope() {
 	}
 	
-	public ClassScope(String name, Scope parentScope) throws SemanticException {
-		if (null != parentScope && !(parentScope instanceof ClassScope)) throw new SemanticException("Сlass " + name + " can only be declared within a class.");
-		if (name == null || name.isEmpty()) throw new SemanticException("Class name cannot be empty");
+	public ClassScope(String name, Scope parentScope) throws CompileException {
+		if (null != parentScope && !(parentScope instanceof ClassScope)) throw new CompileException("Сlass " + name + " can only be declared within a class.");
+		if (name == null || name.isEmpty()) throw new CompileException("Class name cannot be empty");
 
 		this.parent = (ClassScope)parentScope;
 		this.name = name;
 	}
 	
-	public void addImport(String importPath, String alias) throws SemanticException {
+	public void addImport(String importPath, String alias) throws CompileException {
 		String importName = (alias != null) ? alias : getLastComponent(importPath);
-		if (imports.containsKey(importName)) throw new SemanticException("Duplicate import for name: " + importName);
+		if (imports.containsKey(importName)) throw new CompileException("Duplicate import for name: " + importName);
 		imports.put(importName, importPath);
 	}
 
-	public void addStaticImport(String importPath, String alias) throws SemanticException {
+	public void addStaticImport(String importPath, String alias) throws CompileException {
 		String importName = (alias != null) ? alias : getLastComponent(importPath);
-		if (staticImports.containsKey(importName)) throw new SemanticException("Duplicate static import for name: " + importName);
+		if (staticImports.containsKey(importName)) throw new CompileException("Duplicate static import for name: " + importName);
 		staticImports.put(importName, importPath);
 	}
 	
-	public void addClass(ClassScope classScope) throws SemanticException {
+	public void addClass(ClassScope classScope) throws CompileException {
         String scopeName = classScope.getName();
 		
-		if (imports.containsKey(name)) throw new SemanticException("Class '" + scopeName + "' conflicts with import");
-        if (staticImports.containsKey(name)) throw new SemanticException("Class '" + scopeName + "' conflicts with static import");
-		if (classes.containsKey(classScope.getName())) throw new SemanticException("Duplicate class: " + scopeName);
-		if (interfaces.containsKey(classScope.getName())) throw new SemanticException("Class: " + scopeName + " already defined as interface");
+		if (imports.containsKey(name)) throw new CompileException("Class '" + scopeName + "' conflicts with import");
+        if (staticImports.containsKey(name)) throw new CompileException("Class '" + scopeName + "' conflicts with static import");
+		if (classes.containsKey(classScope.getName())) throw new CompileException("Duplicate class: " + scopeName);
+		if (interfaces.containsKey(classScope.getName())) throw new CompileException("Class: " + scopeName + " already defined as interface");
 		
 		// Получаем символ Object из родительской области
 		InterfaceSymbol objectInterface = resolveInterface("Object");
-		if (null == objectInterface) throw new SemanticException("Base interface 'Object' not found");
+		if (null == objectInterface) throw new CompileException("Base interface 'Object' not found");
 		if (!"Object".equals(scopeName)) {
 			classScope.addInterface(objectInterface); // Добавляем существующий символ
 		}
@@ -76,34 +76,34 @@ public class ClassScope extends Scope {
 		classes.put(scopeName, classScope);
 	}
 	
-	public void addInterface(InterfaceSymbol symbol) throws SemanticException {
+	public void addInterface(InterfaceSymbol symbol) throws CompileException {
         String symbolName = symbol.getName();
 		
-		if (imports.containsKey(name)) throw new SemanticException("Interface '" + symbolName + "' conflicts with import");
-        if (staticImports.containsKey(name)) throw new SemanticException("Interface '" + symbolName + "' conflicts with static import");
-		if (classes.containsKey(symbol.getName())) throw new SemanticException("Interface " + symbolName + " conflicts with class of the same name");
-		if (interfaces.containsKey(symbol.getName())) throw new SemanticException("Class " + symbolName + " conflicts with interface of the same name");
+		if (imports.containsKey(name)) throw new CompileException("Interface '" + symbolName + "' conflicts with import");
+        if (staticImports.containsKey(name)) throw new CompileException("Interface '" + symbolName + "' conflicts with static import");
+		if (classes.containsKey(symbol.getName())) throw new CompileException("Interface " + symbolName + " conflicts with class of the same name");
+		if (interfaces.containsKey(symbol.getName())) throw new CompileException("Class " + symbolName + " conflicts with interface of the same name");
 		interfaces.put(symbolName, symbol);
 	}
 	
-	public void addConstructor(MethodSymbol newSymbol) throws SemanticException {
-		if(!name.equals(newSymbol.getName())) throw new SemanticException("Constructor name must match class name '" + name + "'");
+	public void addConstructor(MethodSymbol newSymbol) throws CompileException {
+		if(!name.equals(newSymbol.getName())) throw new CompileException("Constructor name must match class name '" + name + "'");
 		
 		String signature = newSymbol.getSignature();
 		for(MethodSymbol symbol : constructors) {
-			if(signature.equals(symbol.getSignature())) throw new SemanticException("Duplicate constructor '" + signature + "'");
+			if(signature.equals(symbol.getSignature())) throw new CompileException("Duplicate constructor '" + signature + "'");
 		}
 		constructors.add(newSymbol);
 	}
 	
-	public void addMethod(MethodSymbol newSymbol) throws SemanticException {
+	public void addMethod(MethodSymbol newSymbol) throws CompileException {
 		String symbolName = newSymbol.getName();
 		
-        if (imports.containsKey(name)) throw new SemanticException("Method '" + symbolName + "' conflicts with import");
-        if (staticImports.containsKey(name)) throw new SemanticException("Method '" + symbolName + "' conflicts with static import");
-		if (fields.containsKey(symbolName)) throw new SemanticException("Method name '" + symbolName + "' conflicts with field name");
-		if (classes.containsKey(symbolName)) throw new SemanticException("Method name '" + symbolName + "' conflicts with class name");
-		if (interfaces.containsKey(symbolName)) throw new SemanticException("Method name '" + symbolName + "' conflicts with interface name");
+        if (imports.containsKey(name)) throw new CompileException("Method '" + symbolName + "' conflicts with import");
+        if (staticImports.containsKey(name)) throw new CompileException("Method '" + symbolName + "' conflicts with static import");
+		if (fields.containsKey(symbolName)) throw new CompileException("Method name '" + symbolName + "' conflicts with field name");
+		if (classes.containsKey(symbolName)) throw new CompileException("Method name '" + symbolName + "' conflicts with class name");
+		if (interfaces.containsKey(symbolName)) throw new CompileException("Method name '" + symbolName + "' conflicts with interface name");
 
 		
 		// Получаем список методов с таким же именем
@@ -117,25 +117,25 @@ public class ClassScope extends Scope {
 		String newSignature = newSymbol.getSignature();
 		for (MethodSymbol existingMethod : methodsWithSameName) {
 			// Проверяем полное совпадение сигнатур
-			if (newSignature.equals(existingMethod.getSignature())) throw new SemanticException("Duplicate method '" + newSignature + "' in class '" +
+			if (newSignature.equals(existingMethod.getSignature())) throw new CompileException("Duplicate method '" + newSignature + "' in class '" +
 																								name + "'");
 			// Дополнительная проверка на конфликт при наследовании (если нужно)
 			if (newSymbol.getType().equals(existingMethod.getType()) &&
-				newSymbol.getParameterTypes().equals(existingMethod.getParameterTypes())) throw new SemanticException(	"Method '" + newSignature +
+				newSymbol.getParameterTypes().equals(existingMethod.getParameterTypes())) throw new CompileException(	"Method '" + newSignature +
 																														"' conflicts with inherited method");
 		}
 
 		methodsWithSameName.add(newSymbol);
 	}
 
-	public void addField(Symbol symbol) throws SemanticException {
+	public void addField(Symbol symbol) throws CompileException {
 		String symbolName = symbol.getName();
 		
-        if (imports.containsKey(symbolName)) throw new SemanticException("Field '" + symbolName + "' conflicts with import");
-        if (staticImports.containsKey(symbolName)) throw new SemanticException("Field '" + symbolName + "' conflicts with static import");
-		if (classes.containsKey(symbolName)) throw new SemanticException("Field name " + symbolName + " conflicts with class name");
-		if (interfaces.containsKey(symbolName)) throw new SemanticException("Field name " + symbolName + " conflicts with interface name");
-		if (fields.containsKey(symbolName)) throw new SemanticException("Duplicate field: " + symbolName);
+        if (imports.containsKey(symbolName)) throw new CompileException("Field '" + symbolName + "' conflicts with import");
+        if (staticImports.containsKey(symbolName)) throw new CompileException("Field '" + symbolName + "' conflicts with static import");
+		if (classes.containsKey(symbolName)) throw new CompileException("Field name " + symbolName + " conflicts with class name");
+		if (interfaces.containsKey(symbolName)) throw new CompileException("Field name " + symbolName + " conflicts with interface name");
+		if (fields.containsKey(symbolName)) throw new CompileException("Duplicate field: " + symbolName);
 		fields.put(symbolName, symbol);
 	}
 	
@@ -228,7 +228,7 @@ public class ClassScope extends Scope {
 		return null;
 	}
 	
-	public MethodSymbol resolveMethod(String methodName, List<VarType> argTypes) throws SemanticException {
+	public MethodSymbol resolveMethod(String methodName, List<VarType> argTypes) throws CompileException {
 		// Ищем методы в текущем классе
 		List<MethodSymbol> candidates = methods.get(methodName);
 		if (null == candidates) return null;
@@ -248,7 +248,7 @@ public class ClassScope extends Scope {
 	}
 */
 	
-	private boolean isApplicable(MethodSymbol method, List<VarType> argTypes) throws SemanticException {
+	private boolean isApplicable(MethodSymbol method, List<VarType> argTypes) throws CompileException {
 		List<VarType> paramTypes = method.getParameterTypes();
 		if (paramTypes.size() != argTypes.size()) {
 			return false;

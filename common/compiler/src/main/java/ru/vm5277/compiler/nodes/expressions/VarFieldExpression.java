@@ -18,19 +18,19 @@ package ru.vm5277.compiler.nodes.expressions;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.AliasSymbol;
 import ru.vm5277.compiler.semantic.AstHolder;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.ClassSymbol;
-import ru.vm5277.compiler.semantic.FieldSymbol;
 import ru.vm5277.compiler.semantic.Scope;
-import ru.vm5277.compiler.semantic.VarSymbol;
+import ru.vm5277.compiler.semantic.Symbol;
 
 public class VarFieldExpression extends ExpressionNode {
     private final	String	value;
+	private			Scope	scope;
 	
     public VarFieldExpression(TokenBuffer tb, MessageContainer mc, String value) {
         super(tb, mc);
@@ -47,8 +47,7 @@ public class VarFieldExpression extends ExpressionNode {
 		if (symbol == null) {
 			symbol = scope.resolve(value);
 			if(null != symbol) {
-				if(symbol instanceof VarSymbol || symbol instanceof FieldSymbol || symbol instanceof AliasSymbol) return symbol.getType();
-				return null;
+				return symbol.getType();
 			}
 			else {
 				ClassScope classScope = scope.getThis().resolveClass(value);
@@ -79,6 +78,8 @@ public class VarFieldExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		boolean result = true;
 		try {
+			this.scope = scope;
+			
 			cgScope = cg.enterExpression();
 			if (symbol == null) {
 				symbol = scope.resolve(value);
@@ -91,7 +92,7 @@ public class VarFieldExpression extends ExpressionNode {
 				}
 			}
 		}
-		catch (SemanticException e) {markError(e); result = false;}
+		catch (CompileException e) {markError(e); result = false;}
 		if (null == symbol) {
 			markError("Variable '" + value + "' is not declared");
 			result = false;
@@ -104,8 +105,26 @@ public class VarFieldExpression extends ExpressionNode {
 	public Object codeGen(CodeGenerator cg) throws Exception {
 		if(null == depCodeGen(cg)) {
 			//Зависимость уже обработана, используем переменную
-			CGVarScope vScope = (CGVarScope)((AstHolder)symbol).getNode().getCGScope();
-			cg.cellsToAcc(cgScope.getParent(), vScope);
+			if(symbol instanceof AliasSymbol) {
+				Symbol  vSymbol = scope.resolve(value);
+				while(vSymbol instanceof AliasSymbol) {
+					symbol = ((AliasSymbol)vSymbol).getSymbol();
+					if(symbol instanceof AstHolder) {
+						depCodeGen(cg);
+						CGVarScope vScope = (CGVarScope)symbol.getCGScope();
+						cg.cellsToAcc(cgScope.getParent(), vScope);
+						//Назначаем алиас ссылающийся на реальную переменную
+						symbol = vSymbol;
+						break;
+					}
+					vSymbol = scope.resolve(symbol.getName());
+				}
+			}
+			else {
+				CGVarScope vScope = (CGVarScope)symbol.getCGScope();
+				cg.cellsToAcc(cgScope.getParent(), vScope);
+			}
+
 //cg.cellsToAcc(cgScope.getParent(), (CGVarScope)cgScope.getParent());
 		}
 		return null;

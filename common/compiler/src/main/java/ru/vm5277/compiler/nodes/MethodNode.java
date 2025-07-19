@@ -26,8 +26,7 @@ import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
@@ -52,7 +51,7 @@ public class MethodNode extends AstNode {
 				(canThrow ? " throws" : "");
 	}
 	
-	public MethodNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType returnType, String name) throws ParseException {
+	public MethodNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType returnType, String name) throws CompileException {
 		super(tb, mc);
 		
 		this.modifiers = modifiers;
@@ -74,25 +73,12 @@ public class MethodNode extends AstNode {
 			try {
 				blockNode = new BlockNode(tb, mc);
 			}
-			catch(ParseException e) {}
+			catch(CompileException e) {}
 			tb.getLoopStack().remove(this);
 		}
 		else {
-			try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
+			try {consumeToken(tb, Delimiter.SEMICOLON);}catch(CompileException e) {markFirstError(e);}
 		}
-	}
-	
-	public MethodNode(	MessageContainer mc, Set<Keyword> modifiers, VarType returnType, String name, List<ParameterNode> parameters, boolean canThrow,
-						BlockNode body) {
-		super(null, mc);
-		
-		this.modifiers = modifiers;
-		this.returnType = returnType;
-		this.name = name;
-		this.parameters = parameters;
-		this.canThrow = canThrow;
-		
-		blockNode = body;
 	}
 	
 	public boolean canThrow() {
@@ -117,7 +103,7 @@ public class MethodNode extends AstNode {
 				markFirstError(message);
 				break;
 			}
-			catch(ParseException e) {
+			catch(CompileException e) {
 				markFirstError(e);
 				tb.skip(Delimiter.RIGHT_PAREN);
 				break;
@@ -165,10 +151,13 @@ public class MethodNode extends AstNode {
 	public boolean isPublic() {
 		return modifiers.contains(Keyword.PUBLIC);
 	}
+	public boolean isNative() {
+		return modifiers.contains(Keyword.NATIVE);
+	}
 	
 	@Override
 	public boolean preAnalyze() {
-		try{validateModifiers(modifiers, Keyword.PUBLIC, Keyword.PRIVATE, Keyword.STATIC, Keyword.NATIVE);} catch(SemanticException e) {addMessage(e);}
+		try{validateModifiers(modifiers, Keyword.PUBLIC, Keyword.PRIVATE, Keyword.STATIC, Keyword.NATIVE);} catch(CompileException e) {addMessage(e);}
 		
 		if(!isConstructor() && Character.isUpperCase(name.charAt(0))) {
 			addMessage(new WarningMessage("Method name should start with uppercase letter:" + name, sp));
@@ -191,7 +180,18 @@ public class MethodNode extends AstNode {
 		
 		List<Symbol> paramSymbols = new ArrayList<>();
 		for (ParameterNode param : parameters) {
-			paramSymbols.add(new Symbol(param.getName(), param.getType(), param.isFinal(), false));
+			//TODO здесь мы не знаем, кто нас вызывает и что передает
+/*			if(!isNative()) {
+				Symbol pSymbol = null;//TODO
+				if(null == pSymbol) {
+					markError(new CompileException("param '" + param.getName() + "' not found"));
+					return false;
+				}
+				paramSymbols.add(new AliasSymbol(param.getName(), param.getType(), pSymbol));
+			}
+			else {*/
+				paramSymbols.add(new Symbol(param.getName(), param.getType(), param.isFinal(), false));
+			//}
 		}
 
 		// Создаем MethodSymbol
@@ -216,7 +216,7 @@ public class MethodNode extends AstNode {
 				param.declare(methodScope);
 			}
 		}
-		catch(SemanticException e) {markError(e);}
+		catch(CompileException e) {markError(e);}
 		
 		if(null != getBody()) {
 			getBody().declare(methodScope);
@@ -236,12 +236,10 @@ public class MethodNode extends AstNode {
 		}
 
 		if(null == returnType) {
-			//symbol.setResId(cg.enterConstructor(typeIds));
-			if(null != cg) cgScope = cg.enterConstructor(types);
+			symbol.setCGScope(cg.enterConstructor(types));
 		}
 		else {
-			//symbol.setResId(cg.enterMethod(returnType.getId(), typeIds, name));
-			if(null != cg) cgScope = cg.enterMethod(returnType, types, name);
+			symbol.setCGScope(cg.enterMethod(returnType, types, name));
 		}
 
 		if (modifiers.contains(Keyword.NATIVE)) {
@@ -283,12 +281,19 @@ public class MethodNode extends AstNode {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg) throws Exception {
+		return codeGen(cg, false);
+	}
+	public Object codeGen(CodeGenerator cg, boolean launchPoint) throws Exception {
 		if(cgDone) return null;
 		cgDone = true;
 
 		if(null != blockNode) blockNode.codeGen(cg);
 
-		((CGMethodScope)cgScope).build(cg);
+		((CGMethodScope)symbol.getCGScope()).build(cg, launchPoint);
+		
+		if(VarType.VOID == returnType) {
+			cg.eReturn(symbol.getCGScope(), 0);
+		}
 		
 		return null;
 	}

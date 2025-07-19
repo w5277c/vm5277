@@ -25,7 +25,7 @@ public class VarSymbol extends Symbol implements AstHolder {
 	public VarSymbol(String name, VarType returnType, boolean isFinal, boolean isStatic, Scope scope, AstNode astNode) {
 		super(name, returnType, isFinal, isStatic);
 		
-		this.scope = scope;
+		this.scope = scope;	//Нужен только для toString();
 		this.astNode = astNode;
 	}
 

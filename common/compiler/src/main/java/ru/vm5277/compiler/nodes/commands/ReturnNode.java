@@ -17,44 +17,46 @@ package ru.vm5277.compiler.nodes.commands;
 
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
+import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class ReturnNode extends CommandNode {
-	private	ExpressionNode	expression;
+	private	ExpressionNode	expr;
 	private	VarType			returnType;
+	private	CGScope			cgScope;
 	
 	public ReturnNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
 		
 		consumeToken(tb); // Потребляем "return"
 		
-		try {this.expression = tb.match(Delimiter.SEMICOLON) ? null : new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
+		try {this.expr = tb.match(Delimiter.SEMICOLON) ? null : new ExpressionNode(tb, mc).parse();} catch(CompileException e) {markFirstError(e);}
         
         // Обязательно потребляем точку с запятой
-        try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
+        try {consumeToken(tb, Delimiter.SEMICOLON);}catch(CompileException e) {markFirstError(e);}
     }
 
-	public ReturnNode(MessageContainer mc, ExpressionNode expression) {
+	public ReturnNode(MessageContainer mc, ExpressionNode expr) {
 		super(null, mc);
 		
-		this.expression = expression;
+		this.expr = expr;
 	}
 	
     public ExpressionNode getExpression() {
-        return expression;
+        return expr;
     }
 
     public boolean returnsValue() {
-        return null != expression;
+        return null != expr;
     }
 	
 	@Override
@@ -64,8 +66,8 @@ public class ReturnNode extends CommandNode {
 
 	@Override
 	public boolean preAnalyze() {
-		if (expression != null) {
-			if(!expression.preAnalyze()) {
+		if (expr != null) {
+			if(!expr.preAnalyze()) {
 				return false;
 			}
 		}
@@ -74,8 +76,8 @@ public class ReturnNode extends CommandNode {
 
 	@Override
 	public boolean declare(Scope scope) {
-		if(null != expression) {
-			if(!expression.declare(scope)) {
+		if(null != expr) {
+			if(!expr.declare(scope)) {
 				return false;
 			}
 		}
@@ -96,20 +98,20 @@ public class ReturnNode extends CommandNode {
 			returnType = methodScope.getSymbol().getType();
 
 			// Проверяем соответствие возвращаемого значения
-			if (null == expression) { // return без значения
+			if (null == expr) { // return без значения
 				if (!returnType.isVoid()) markError("Void method cannot return a value");
 			}
 			else { // return с выражением
 				if (returnType.isVoid()) markError("Non-void method must return a value");
 				else {
-					if(!expression.postAnalyze(scope, cg)) {
+					if(!expr.postAnalyze(scope, cg)) {
 						return false;
 					}
 					// Проверяем тип выражения
 					try {
-						VarType exprType = expression.getType(scope);
+						VarType exprType = expr.getType(scope);
 						if(null == exprType) {
-							markError(String.format("TODO Can't resolve expression: " + expression));
+							markError(String.format("TODO Can't resolve expression: " + expr));
 						}
 						else {
 							if (!isCompatibleWith(scope, returnType, exprType)) {
@@ -117,7 +119,7 @@ public class ReturnNode extends CommandNode {
 							}
 						}
 					}
-					catch (SemanticException e) {markError(e);}
+					catch (CompileException e) {markError(e);}
 				}
 			}
 		}
@@ -129,8 +131,14 @@ public class ReturnNode extends CommandNode {
 		if(cgDone) return null;
 		cgDone = true;
 
-		if(null != expression) {
-			expression.codeGen(cg);
+		if(null != expr) {
+			expr.codeGen(cg);
+			//TODO необходимо определиться где именно устанавливается значение в аккумулятор. Лучше в самом выражении, но
+			//ReturnNode не имеет собственного CGScope, выражение видит CGMethodScope
+			if(expr instanceof LiteralExpression) {
+				//cg.setAcc(cgScope, returnType.getSize(), ((LiteralExpression)expr).getNumValue());
+				cg.loadConstToAcc(cgScope, returnType.getSize(), ((LiteralExpression)expr).getNumValue());
+			}
 		}
 		cg.eReturn(cgScope, returnType.getSize());
 		

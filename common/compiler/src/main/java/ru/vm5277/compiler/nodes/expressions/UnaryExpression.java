@@ -18,7 +18,7 @@ package ru.vm5277.compiler.nodes.expressions;
 import java.util.Arrays;
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
@@ -41,7 +41,7 @@ public class UnaryExpression extends ExpressionNode {
     }
     
 	@Override
-	public VarType getType(Scope scope) throws SemanticException {
+	public VarType getType(Scope scope) throws CompileException {
 		VarType operandType = operand.getType(scope);
 
 		switch (operator) {
@@ -122,7 +122,7 @@ public class UnaryExpression extends ExpressionNode {
 			}
 
 			return true;
-		} catch (SemanticException e) {
+		} catch (CompileException e) {
 			markError(e.getMessage());
 			return false;
 		}
@@ -154,7 +154,7 @@ public class UnaryExpression extends ExpressionNode {
 		operand.codeGen(cg);
 
 		if(operand instanceof VarFieldExpression) {
-			cg.emitUnary(operator, ((VarFieldExpression)operand).getCGScope().getResId()); //Работаем с переменной
+			cg.emitUnary(operator, operand.getSymbol().getCGScope().getResId()); //Работаем с переменной
 		}
 		else {
 			cg.emitUnary(operator, null); //TODO Работаем с уже загруженным Accum

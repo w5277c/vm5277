@@ -19,7 +19,7 @@ import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.messages.MessageContainer;
@@ -37,10 +37,10 @@ public class BreakNode extends CommandNode {
         consumeToken(tb);
         
 		if(tb.match(TokenType.ID)) {
-			try {label = consumeToken(tb, TokenType.ID).toString();}catch(ParseException e) {markFirstError(e);};
+			try {label = consumeToken(tb, TokenType.ID).toString();}catch(CompileException e) {markFirstError(e);};
 		}
 		
-		try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
+		try {consumeToken(tb, Delimiter.SEMICOLON);}catch(CompileException e) {markFirstError(e);}
         
 		AstNode node = tb.getLoopStack().peek();
 		if (null == node || !(node instanceof ForNode || node instanceof WhileNode || node instanceof DoWhileNode)) {

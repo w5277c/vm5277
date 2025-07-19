@@ -40,6 +40,6 @@ public class CGIAsm implements CGItem {
 	
 	@Override
 	public String getSource() {
-		return text + "\n";
+		return "\t" + text + "\n";
 	}
 }

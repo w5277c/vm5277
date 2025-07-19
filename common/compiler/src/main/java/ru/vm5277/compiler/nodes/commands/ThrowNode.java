@@ -21,8 +21,8 @@ import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.semantic.Scope;
@@ -36,10 +36,10 @@ public class ThrowNode extends CommandNode {
 		consumeToken(tb); // Потребляем "throw"
 
 		// Парсим выражение исключения
-		try {this.exceptionExpr = new ExpressionNode(tb, mc).parse();} catch (ParseException e) {markFirstError(e);}
+		try {this.exceptionExpr = new ExpressionNode(tb, mc).parse();} catch (CompileException e) {markFirstError(e);}
 
 		// Потребляем точку с запятой
-		try {consumeToken(tb, Delimiter.SEMICOLON);} catch (ParseException e) {markFirstError(e);}
+		try {consumeToken(tb, Delimiter.SEMICOLON);} catch (CompileException e) {markFirstError(e);}
 	}
 
 	public ExpressionNode getExceptionExpr() {
@@ -75,7 +75,7 @@ public class ThrowNode extends CommandNode {
 					// Проверяем, что выражение имеет тип byte (код ошибки)
 					if (VarType.BYTE != exprType) markError("Throw expression must be of type byte, got: " + exprType);
 				}
-				catch (SemanticException e) {markError(e);}
+				catch (CompileException e) {markError(e);}
 			}
 		}
 		return true;

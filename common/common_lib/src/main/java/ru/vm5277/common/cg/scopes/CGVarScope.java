@@ -19,7 +19,7 @@ import java.util.Arrays;
 import ru.vm5277.common.cg.CGCell;
 import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class CGVarScope extends CGCellsScope {
 	private			boolean					isConstant;
@@ -32,22 +32,22 @@ public class CGVarScope extends CGCellsScope {
 		this.isConstant = isConstant;
 	}
 	
-	public void build() throws SemanticException {
+	public void build(CGCell[] oldCells) throws CompileException {
 		if(verbose) append(new CGIText(";build " + toString()));
-		
+	
 		if(!isConstant) {
 			if(parent instanceof CGMethodScope) {
-				cells = ((CGMethodScope)parent).memAllocate(size);
+				cells = ((CGMethodScope)parent).memAllocate(size, oldCells);
 				((CGMethodScope)parent).addLocal(this);
-				if(verbose) append(new CGIText(";alloc " + getPath(".") + " " + Arrays.toString(cells)));
+				append(new CGIText(";alloc " + getPath('.') + " " + Arrays.toString(cells)));
 			}
 			else if(parent instanceof CGBlockScope) {
-				cells = ((CGBlockScope)parent).memAllocate(size);
+				if(null == oldCells) cells = ((CGBlockScope)parent).memAllocate(size);
 				((CGBlockScope)parent).addLocal(this);
-				if(verbose) append(new CGIText(";alloc " + getPath(".") + " " + Arrays.toString(cells)));
+				append(new CGIText(";alloc " + getPath('.') + " " + Arrays.toString(cells)));
 			}
 			else {
-				throw new SemanticException("TODO unexpected CGScope:" + parent + " for local init");
+				throw new CompileException("TODO unexpected CGScope:" + parent + " for local init");
 			}
 		}
 	}
@@ -78,6 +78,6 @@ public class CGVarScope extends CGCellsScope {
 	
 	@Override
 	public String toString() {
-		return "var " + type + " '" + getPath(".") + "', id:" + resId + ", size:" + size;
+		return "var " + type + " '" + getPath('.') + "', id:" + resId + ", size:" + size;
 	}
 }

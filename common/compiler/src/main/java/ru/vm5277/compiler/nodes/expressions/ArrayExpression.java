@@ -18,8 +18,8 @@ package ru.vm5277.compiler.nodes.expressions;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
@@ -33,18 +33,18 @@ public class ArrayExpression extends ExpressionNode {
 
 		this.array = expr;
 		
-		try {consumeToken(tb, Delimiter.LEFT_BRACKET);} catch(ParseException e){markFirstError(e);} // Потребляем '['
-		try {index = new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);} // Парсим выражение-индекс
-		try {consumeToken(tb, Delimiter.RIGHT_BRACKET);} catch(ParseException e){markFirstError(e);} // Потребляем ']'
+		try {consumeToken(tb, Delimiter.LEFT_BRACKET);} catch(CompileException e){markFirstError(e);} // Потребляем '['
+		try {index = new ExpressionNode(tb, mc).parse();} catch(CompileException e) {markFirstError(e);} // Парсим выражение-индекс
+		try {consumeToken(tb, Delimiter.RIGHT_BRACKET);} catch(CompileException e){markFirstError(e);} // Потребляем ']'
 	}
 
    @Override
-	public VarType getType(Scope scope) throws SemanticException {
+	public VarType getType(Scope scope) throws CompileException {
 		// Получаем тип массива
 		VarType arrayType = array.getType(scope);
 
 		// Проверяем что это действительно массив
-		if (!arrayType.isArray()) throw new SemanticException("Array access on non-array type: " + arrayType);
+		if (!arrayType.isArray()) throw new CompileException("Array access on non-array type: " + arrayType);
 
 		// Возвращаем тип элементов массива
 		return arrayType.getElementType();
@@ -98,7 +98,7 @@ public class ArrayExpression extends ExpressionNode {
 
 			return true;
 		}
-		catch (SemanticException e) {
+		catch (CompileException e) {
 			markError(e.getMessage());
 			return false;
 		}

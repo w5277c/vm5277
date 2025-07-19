@@ -18,11 +18,10 @@ package ru.vm5277.compiler.nodes.expressions;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
-import ru.vm5277.compiler.semantic.Symbol;
 import ru.vm5277.compiler.tokens.Token;
 
 public class LiteralExpression extends ExpressionNode {
@@ -72,6 +71,9 @@ public class LiteralExpression extends ExpressionNode {
 		else if(value instanceof Boolean) {
 			return ((Boolean)value) ? 0x01 : 0x00;
 		}
+		else if(value instanceof VarType) {
+			return ((VarType)value).getId();
+		}
 		return ((Number)value).longValue();
 	}
 	
@@ -107,7 +109,7 @@ public class LiteralExpression extends ExpressionNode {
 			cg.leaveExpression();
 			return true;
 		} 
-		catch (SemanticException e) {
+		catch (CompileException e) {
 			markError(e.getMessage());
 
 			cg.leaveExpression();
@@ -117,26 +119,15 @@ public class LiteralExpression extends ExpressionNode {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg) throws Exception {
+		//TODO перенести код в VarNode и FieldNode
 		if(cgScope.getParent() instanceof CGCellsScope) {
 			CGCellsScope cScope = (CGCellsScope)cgScope.getParent();
 
-			if(VarType.NULL == cScope.getType()) {
-				cg.setAcc(cScope, 0x01, 0);
-			}
-			else {
-				if(value instanceof Character) {
-					cg.setAcc(cScope, cScope.getSize(), (int)(Character)value);
-				}
-				else if(value instanceof Boolean) {
-					cg.setAcc(cScope, cScope.getSize(), ((Boolean)value) ? 0x01 : 0x00);
-				}
-				else if(value instanceof VarType) {
-					cg.setAcc(cScope, cScope.getSize(), ((VarType)value).getId());
-				}
-				else {
-					cg.setAcc(cScope, cScope.getSize(), ((Number)value).longValue());
-				}
-			}
+//			if(VarType.NULL == cScope.getType()) {
+//				cg.setAcc(cScope, 0x01, 0);
+//			}
+			//accum.set(scope, size, value);
+			cg.loadConstToAcc(cScope, cScope.getSize(), getNumValue());
 		}
 		return null;
 	}

@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.ClassNode;
@@ -63,7 +63,7 @@ public class ASTParser extends AstNode {
 			try {
 				classNode = new ClassNode(tb, mc, modifiers, null, importedClasses);
 			}
-			catch(ParseException e) {
+			catch(CompileException e) {
 				// Парсинг прерван (дальнейший парсинг файла бессмыслен)
 			}
 		}
@@ -77,10 +77,6 @@ public class ASTParser extends AstNode {
 		return classNode;
 	}
 
-	public List<ClassNode> getImportedClasses() {
-		return importedClasses;
-	}
-	
 	@Override
 	public String getNodeType() {
 		return "root";

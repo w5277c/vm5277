@@ -19,12 +19,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.MethodScope;
@@ -35,7 +34,7 @@ import ru.vm5277.compiler.semantic.Symbol;
 public class ClassBlockNode extends AstNode {
 	protected	List<AstNode>	children	= new ArrayList<>();
 
-	public ClassBlockNode(TokenBuffer tb, MessageContainer mc, String className) throws ParseException {
+	public ClassBlockNode(TokenBuffer tb, MessageContainer mc, String className) throws CompileException {
 		super(tb, mc);
         
 		consumeToken(tb, Delimiter.LEFT_BRACE); // в случае ошибки, останавливаем парсинг файла
@@ -96,16 +95,16 @@ public class ClassBlockNode extends AstNode {
 				try {
 					children.add(new BlockNode(tb, mc));
 				}
-				catch(ParseException e) {}
+				catch(CompileException e) {}
 				tb.getLoopStack().remove(this);
 			}
 		}
 		
 		//Попытка потребить '}'
-		try {consumeToken(tb, Delimiter.RIGHT_BRACE);}catch(ParseException e) {markFirstError(e);}
+		try {consumeToken(tb, Delimiter.RIGHT_BRACE);}catch(CompileException e) {markFirstError(e);}
     }
 
-	public ClassBlockNode(MessageContainer mc) throws ParseException {
+	public ClassBlockNode(MessageContainer mc) throws CompileException {
 		super(null, mc);
 	}
 	
@@ -148,7 +147,7 @@ public class ClassBlockNode extends AstNode {
 					classScope.addConstructor(methodSymbol);
 					markWarning("Class must have at least one constructor");
 				}
-				catch(SemanticException e) {markError(e);}
+				catch(CompileException e) {markError(e);}
 			}
 		}
 		

@@ -20,7 +20,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.compiler.nodes.commands.IfNode;
 import ru.vm5277.compiler.nodes.commands.ReturnNode;
@@ -38,7 +38,6 @@ import ru.vm5277.compiler.nodes.commands.DoWhileNode;
 import ru.vm5277.compiler.nodes.commands.ForNode;
 import ru.vm5277.compiler.nodes.commands.SwitchNode;
 import ru.vm5277.compiler.SemanticAnalyzer;
-import ru.vm5277.common.exceptions.SemanticException;
 import ru.vm5277.common.messages.Message;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
@@ -48,7 +47,6 @@ import ru.vm5277.compiler.nodes.commands.CommandNode.AstCase;
 import ru.vm5277.compiler.nodes.commands.ThrowNode;
 import ru.vm5277.compiler.nodes.commands.TryNode;
 import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
-import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
 import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
 import ru.vm5277.compiler.semantic.AstHolder;
@@ -60,10 +58,8 @@ public abstract class AstNode extends SemanticAnalyzer {
 	protected			TokenBuffer				tb;
 	protected			SourcePosition			sp;
 	private				ErrorMessage			error;
-//	protected	final	ArrayList<BlockNode>	blocks	= new ArrayList<>();
 	protected			MessageContainer		mc;
 	protected			Symbol					symbol;
-	protected			CGScope					cgScope;
 	protected			boolean					cgDone;
 
 	protected AstNode() {
@@ -75,7 +71,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		this.mc = mc;
     }
 
-	protected AstNode parseCommand() throws ParseException {
+	protected AstNode parseCommand() throws CompileException {
 		Keyword kw = (Keyword)tb.current().getValue();
 		if(Keyword.IF == kw) return new IfNode(tb, mc);
 		if(Keyword.FOR == kw) return new ForNode(tb, mc);
@@ -88,10 +84,10 @@ public abstract class AstNode extends SemanticAnalyzer {
 		if(Keyword.TRY == kw) return new TryNode(tb, mc);
 		if(Keyword.THROW == kw) return new ThrowNode(tb, mc);
 		markFirstError(error);
-		throw new ParseException("Unexpected command token " + tb.current(), sp);
+		throw new CompileException("Unexpected command token " + tb.current(), sp);
 	}
 
-	protected AstNode parseStatement() throws ParseException {
+	protected AstNode parseStatement() throws CompileException {
 		if (tb.match(TokenType.COMMAND)) {
 			return parseCommand();
 		}
@@ -104,7 +100,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 				AstNode.this.consumeToken(tb, Delimiter.SEMICOLON);
 			}
 			else {
-				throw new ParseException("Expected ';' after statement", sp);
+				throw new CompileException("Expected ';' after statement", sp);
 			}
 			return expr;
 		}
@@ -125,12 +121,12 @@ public abstract class AstNode extends SemanticAnalyzer {
 			}
 			throw new ParseError("Unexpected operator: " + operator, tb.current().getLine(), tb.current().getColumn());
 		}*/
-		ParseException e = parserError("Unexpected statement token: " + tb.current());
+		CompileException e = parserError("Unexpected statement token: " + tb.current());
 		tb.skip(Delimiter.SEMICOLON, Delimiter.LEFT_BRACE);
 		throw e;
 	}
 
-	protected ExpressionNode parseTypeReference() throws ParseException {
+	protected ExpressionNode parseTypeReference() throws CompileException {
 		//TODO дублирование кода?
 		// Парсим цепочку идентификаторов через точки (для вложенных классов)
 		StringBuilder typeName = new StringBuilder();
@@ -146,7 +142,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		return new TypeReferenceExpression(tb, mc, typeName.toString());
 	}
 
-	protected VarType checkPrimtiveType() throws ParseException {
+	protected VarType checkPrimtiveType() throws CompileException {
 		if(tb.match(TokenType.TYPE)) {
 			Keyword kw = (Keyword)consumeToken(tb).getValue();
 			VarType type;
@@ -175,7 +171,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		}
 		return false;
 	}
-	protected VarType checkClassType() throws ParseException {
+	protected VarType checkClassType() throws CompileException {
 		if (tb.match(TokenType.ID)) {
 			VarType type = VarType.fromClassName((String)tb.current().getValue());
 			if(null != type) {
@@ -185,7 +181,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		}
 		return null;
 	}
-	protected VarType checkArrayType(VarType type) throws ParseException {
+	protected VarType checkArrayType(VarType type) throws CompileException {
 		// Обработка полей-массивов
 		if (null != type && tb.match(Delimiter.LEFT_BRACKET)) { //'['
 			while (tb.match(Delimiter.LEFT_BRACKET)) { //'['
@@ -196,11 +192,11 @@ public abstract class AstNode extends SemanticAnalyzer {
 				if(tb.match(TokenType.NUMBER)) {
 					depth++;
 					if (depth > 3) {
-						throw new ParseException("Maximum array nesting depth is 3", sp);
+						throw new CompileException("Maximum array nesting depth is 3", sp);
 					}
 					size = (Integer)consumeToken(tb).getValue();
 					if (size <= 0) {
-						throw new ParseException("Array size must be positive", sp);
+						throw new CompileException("Array size must be positive", sp);
 					}
 					type = VarType.arrayOf(type, size);
 				}
@@ -211,7 +207,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		return type;
 	}
 
-	protected ExpressionNode parseFullQualifiedExpression(TokenBuffer tb) throws ParseException {
+	protected ExpressionNode parseFullQualifiedExpression(TokenBuffer tb) throws CompileException {
 		String id = tb.consume().getValue().toString();
 		if(!tb.match(Delimiter.DOT)) {
 			if (tb.match(Delimiter.LEFT_PAREN)) {			
@@ -242,13 +238,18 @@ public abstract class AstNode extends SemanticAnalyzer {
 
 		return parent;
 	}
-	public List<ExpressionNode> parseArguments(TokenBuffer tb) throws ParseException {
+	public List<ExpressionNode> parseArguments(TokenBuffer tb) throws CompileException {
 		List<ExpressionNode> args = new ArrayList<>();
 		consumeToken(tb, Delimiter.LEFT_PAREN);
 
 		if (!tb.match(Delimiter.RIGHT_PAREN)) {
 			while(true) {
-				if(tb.match(TokenType.NUMBER) || tb.match(TokenType.STRING) || tb.match(TokenType.CHAR) || tb.match(TokenType.LITERAL)) {
+				//Изменяем логику - вместо проверки конкретных токенов 
+				//просто парсим выражение целиком
+				//Необходимо для поддерки приведения типов
+				args.add(new ExpressionNode(tb, mc).parse());
+
+/*				if(tb.match(TokenType.NUMBER) || tb.match(TokenType.STRING) || tb.match(TokenType.CHAR) || tb.match(TokenType.LITERAL)) {
 					args.add(new LiteralExpression(tb, mc, tb.consume().getValue()));
 				}
 				else if(tb.match(TokenType.ID)) {
@@ -258,7 +259,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 				else {
 					markError("Unexpected token:" + tb.current());
 				}
-				
+				*/
 				// Если после выражения нет запятой - выходим из цикла
 				if (!tb.match(Delimiter.COMMA)) break;
             
@@ -328,13 +329,28 @@ public abstract class AstNode extends SemanticAnalyzer {
 		return thenReturns && elseReturns;
 	}
 
-
-	public static boolean isCompatibleWith(Scope scope, VarType left, VarType right) throws SemanticException {
+	public static boolean canCast(VarType source, VarType target) throws CompileException {
+		// Приведение к тому же типу
+		if (source == target) return true;
+		
+		// CSTR не может участвовать в приведении
+		if(VarType.CSTR == source || VarType.CSTR == target) return false;
+		
+		// Разрешаем приведение между числовыми типами
+		if (target.isPrimitive() && source.isPrimitive()) return true;
+		
+		// Object -> что угодно (проверка в runtime)
+		if("Object".equals(source.getClassName())) return true;
+		
+		return false;
+	}
+	
+	public static boolean isCompatibleWith(Scope scope, VarType left, VarType right) throws CompileException {
 		// Проверка одинаковых типов
 		if (left == right) return true;
 
 		//TODO Любой тип данных можно привести к Object?
-		if ("Object".equals(right.getClassName())) return true;
+		if ("Object".equals(left.getClassName())) return true;
 		
 		// Специальные случаи для NULL
 		if (VarType.NULL == left || VarType.NULL == right) return left.isReferenceType() || right.isReferenceType();
@@ -379,25 +395,25 @@ public abstract class AstNode extends SemanticAnalyzer {
 		markFirstError(tb.current().getError());
 		return tb.consume();
     }
-	public Token consumeToken(TokenBuffer tb, TokenType expectedType) throws ParseException {
+	public Token consumeToken(TokenBuffer tb, TokenType expectedType) throws CompileException {
 		if (tb.current().getType() == expectedType) return consumeToken(tb);
 		else throw parserError("Expected " + expectedType + ", but got " + tb.current().getType());
     }
-	public Token consumeToken(TokenBuffer tb, Operator op) throws ParseException {
+	public Token consumeToken(TokenBuffer tb, Operator op) throws CompileException {
 		if (TokenType.OPERATOR == tb.current().getType()) {
             if(op == tb.current().getValue()) return consumeToken(tb);
 			else throw parserError("Expected operator " + op + ", but got " + tb.current().getValue());
         }
 		else throw parserError("Expected " + TokenType.OPERATOR + ", but got " + tb.current().getType());
     }
-	public Token consumeToken(TokenBuffer tb, Delimiter delimiter) throws ParseException {
+	public Token consumeToken(TokenBuffer tb, Delimiter delimiter) throws CompileException {
 		if (TokenType.DELIMITER == tb.current().getType()) {
             if(delimiter == tb.current().getValue()) return consumeToken(tb);
 			else throw parserError("Expected delimiter " + delimiter + ", but got " + tb.current().getValue());
         }
 		else throw parserError("Expected " + TokenType.DELIMITER + ", but got " + tb.current().getType());
     }
-	public Token consumeToken(TokenBuffer tb, TokenType type, Keyword keyword) throws ParseException {
+	public Token consumeToken(TokenBuffer tb, TokenType type, Keyword keyword) throws CompileException {
 		if (type == tb.current().getType()) {
             if(keyword == tb.current().getValue()) return consumeToken(tb);
 			else throw parserError("Expected keyword " + keyword + ", but got " + tb.current().getValue());
@@ -406,15 +422,15 @@ public abstract class AstNode extends SemanticAnalyzer {
     }
 	
 	
-	public ParseException parserError(String text) {
+	public CompileException parserError(String text) {
 		ErrorMessage message = new ErrorMessage(text, sp);
 		addMessage(message);
-		return new ParseException(message);
+		return new CompileException(message);
 	}
-	public SemanticException semanticError(String text) {
+	public CompileException semanticError(String text) {
 		ErrorMessage message = new ErrorMessage(text, sp);
 		addMessage(message);
-		return new SemanticException(text);
+		return new CompileException(text);
 	}
 
 	public void addMessage(Message message) {
@@ -424,7 +440,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		mc.add(new ErrorMessage(e.getMessage(), sp));
 	}
 	
-	public void markFirstError(ParseException e) {
+	public void markFirstError(CompileException e) {
 		if(null != e && null == error) error = e.getErrorMessage();
 	}
 	public void markFirstError(ErrorMessage message) {
@@ -433,7 +449,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 	
 	
 	// должно вызываться из текущей ноды, ее мы помеим как содержащую ошибку.
-	public ErrorMessage markError(SemanticException e) {
+	public ErrorMessage markError(CompileException e) {
 		ErrorMessage message = new ErrorMessage(e.getMessage(), sp);
 		if(null == error) error = message;
 		addMessage(message);
@@ -475,7 +491,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		throw new UnsupportedOperationException(this.toString());
 	}
 	
-	protected CGScope depCodeGen(CodeGenerator cg) throws Exception {
+	public CGScope depCodeGen(CodeGenerator cg) throws Exception {
 		return depCodeGen(cg, symbol);
 	}
 	protected CGScope depCodeGen(CodeGenerator cg, Symbol symbol) throws Exception {
@@ -483,13 +499,9 @@ public abstract class AstNode extends SemanticAnalyzer {
 			AstNode node = ((AstHolder)symbol).getNode();
 			if(null != node) {
 				Object obj = node.codeGen(cg);
-				if(null != obj) return node.getCGScope();
+				if(null != obj) return symbol.getCGScope();
 			}
 		}
 		return null;
-	}
-	
-	public CGScope getCGScope() {
-		return cgScope;
 	}
 }

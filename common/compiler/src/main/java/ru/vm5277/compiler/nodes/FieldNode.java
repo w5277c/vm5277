@@ -25,8 +25,7 @@ import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.semantic.ClassScope;
@@ -51,9 +50,9 @@ public class FieldNode extends AstNode {
         }
 		else {
 			consumeToken(tb);
-			try {initializer = new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
+			try {initializer = new ExpressionNode(tb, mc).parse();} catch(CompileException e) {markFirstError(e);}
 		}
-        try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
+        try {consumeToken(tb, Delimiter.SEMICOLON);}catch(CompileException e) {markFirstError(e);}
 	}
 
 	public Set<Keyword> getModifiers() {
@@ -125,7 +124,7 @@ public class FieldNode extends AstNode {
 			}*/
 			
 			try{classScope.addField(symbol);}
-			catch(SemanticException e) {markError(e);}
+			catch(CompileException e) {markError(e);}
 		}
 		else markError("Unexpected scope:" + scope.getClass().getSimpleName() + " in filed:" + name);
 
@@ -135,8 +134,7 @@ public class FieldNode extends AstNode {
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		try {
-			//symbol.setResId(cg.enterFiled(type.getId(), type.getSize(), isFinal(), name));
-			cgScope = cg.enterField(type, isStatic(), name);
+			symbol.setCGScope(cg.enterField(type, isStatic(), name));
 
 			// Проверка инициализации final-полей
 			if (isFinal() && initializer == null) markError("Final field '" + name + "' must be initialized");
@@ -153,8 +151,13 @@ public class FieldNode extends AstNode {
 			if (type.isNumeric() && initType.isNumeric() && type.getSize() < initType.getSize()) {
 				markError("Narrowing conversion from " + initType + " to " + type + " requires explicit cast");
 			}
+			
+			ExpressionNode optimizedExpr = initializer.optimizeWithScope(scope);
+			if(null != optimizedExpr) {
+				initializer = optimizedExpr;
+			}
 		}
-		catch (SemanticException e) {markError(e);}
+		catch (CompileException e) {markError(e);}
 
 		cg.leaveField();		
 		return true;
@@ -165,9 +168,9 @@ public class FieldNode extends AstNode {
 		if(cgDone) return null;
 
 		cgDone = true;
-		((CGFieldScope)cgScope).build();
+		((CGFieldScope)symbol.getCGScope()).build();
 		initializer.codeGen(cg);
-		cg.accToCells(cgScope, (CGFieldScope)cgScope);
+		cg.accToCells(symbol.getCGScope(), (CGFieldScope)symbol.getCGScope());
 
 		return true;
 	}

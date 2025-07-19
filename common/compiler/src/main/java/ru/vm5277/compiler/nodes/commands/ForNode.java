@@ -27,8 +27,8 @@ import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
@@ -48,7 +48,7 @@ public class ForNode extends CommandNode {
         super(tb, mc);
         
         consumeToken(tb); // Потребляем "for"
-        try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(ParseException e) {markFirstError(e);}
+        try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(CompileException e) {markFirstError(e);}
         
         // Инициализация
         if(!tb.match(Delimiter.SEMICOLON)) {
@@ -57,38 +57,38 @@ public class ForNode extends CommandNode {
 				if(null == type) type = checkClassType();
 				if(null != type) {
 					String name = null;
-					try {name = consumeToken(tb, TokenType.ID).getStringValue();} catch(ParseException e) {markFirstError(e);}
+					try {name = consumeToken(tb, TokenType.ID).getStringValue();} catch(CompileException e) {markFirstError(e);}
 					this.initialization = new VarNode(tb, mc, null, type, name);
 				}
 				else {
 					this.initialization = new ExpressionNode(tb, mc).parse();
 				}
 			}
-			catch(ParseException e) {
+			catch(CompileException e) {
 				markFirstError(e);
 			}
 		}
 		else {
 			this.initialization = null;
-			try {consumeToken(tb, Delimiter.SEMICOLON);} catch(ParseException e) {markFirstError(e);}
+			try {consumeToken(tb, Delimiter.SEMICOLON);} catch(CompileException e) {markFirstError(e);}
 		}
         
         // Условие
-        try {this.condition = tb.match(Delimiter.SEMICOLON) ? null : new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
-        try {consumeToken(tb, Delimiter.SEMICOLON);} catch(ParseException e) {markFirstError(e);}
+        try {this.condition = tb.match(Delimiter.SEMICOLON) ? null : new ExpressionNode(tb, mc).parse();} catch(CompileException e) {markFirstError(e);}
+        try {consumeToken(tb, Delimiter.SEMICOLON);} catch(CompileException e) {markFirstError(e);}
         
         // Итерация
-        try {this.iteration = tb.match(Delimiter.RIGHT_PAREN) ? null : new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
-        try {consumeToken(tb, Delimiter.SEMICOLON);} catch(ParseException e) {markFirstError(e);}
+        try {this.iteration = tb.match(Delimiter.RIGHT_PAREN) ? null : new ExpressionNode(tb, mc).parse();} catch(CompileException e) {markFirstError(e);}
+        try {consumeToken(tb, Delimiter.SEMICOLON);} catch(CompileException e) {markFirstError(e);}
         
-		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(ParseException e) {markFirstError(e);}
+		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(CompileException e) {markFirstError(e);}
 		
         // Основной блок
 		tb.getLoopStack().add(this);
 		try {
 			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
 		}
-		catch(ParseException e) {markFirstError(e);}
+		catch(CompileException e) {markFirstError(e);}
 		tb.getLoopStack().remove(this);
        
         // Блок else (если есть)
@@ -98,7 +98,7 @@ public class ForNode extends CommandNode {
 			try {
 				elseBlockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
 			}
-			catch(ParseException e) {markFirstError(e);}
+			catch(CompileException e) {markFirstError(e);}
 			tb.getLoopStack().remove(this);
         }
     }
@@ -206,7 +206,7 @@ public class ForNode extends CommandNode {
 					VarType condType = condition.getType(forScope);
 					if (VarType.BOOL != condType && condType != null) markError("For loop condition must be boolean, got: " + condType);
 				}
-				catch (SemanticException e) {markError(e);}
+				catch (CompileException e) {markError(e);}
 			}
 		}
 

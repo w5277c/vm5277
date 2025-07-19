@@ -19,8 +19,8 @@ import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.semantic.Scope;
@@ -32,8 +32,8 @@ public class FreeNode extends AstNode {
 		super(tb, mc);
 
 		consumeToken(tb); // Наличие гарантировано вызывающим
-		try {this.target = new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
-		try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
+		try {this.target = new ExpressionNode(tb, mc).parse();} catch(CompileException e) {markFirstError(e);}
+		try {consumeToken(tb, Delimiter.SEMICOLON);}catch(CompileException e) {markFirstError(e);}
 	}
 
 	@Override
@@ -55,7 +55,7 @@ public class FreeNode extends AstNode {
 					markError("Free can only be applied to pointers, got: " + type);
 				}
 			}
-			catch (SemanticException e) {markError(e);}
+			catch (CompileException e) {markError(e);}
 		}
 		return true;
 	}

@@ -19,7 +19,7 @@ import java.util.Arrays;
 import ru.vm5277.common.cg.CGCell;
 import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class CGFieldScope extends CGCellsScope {
 	private			boolean					isStatic;
@@ -31,12 +31,12 @@ public class CGFieldScope extends CGCellsScope {
 		this.isStatic = isStatic;
 	}
 	
-	public void build() throws SemanticException {
+	public void build() throws CompileException {
 		if(verbose) append(new CGIText(";build " + toString()));
 		
 		cells = ((CGClassScope)parent).memAllocate(size, isStatic);
 		((CGClassScope)parent).addField(this);
-		if(verbose) append(new CGIText(";alloc " + getPath(".") + " " + Arrays.toString(cells)));
+		append(new CGIText(";alloc " + getPath('.') + " " + Arrays.toString(cells)));
 	}
 	
 	@Override
@@ -50,6 +50,6 @@ public class CGFieldScope extends CGCellsScope {
 	
 	@Override
 	public String toString() {
-		return "field " + type + " '" + getPath(".") + "', id:" + resId + ", size:" + size;
+		return "field " + type + " '" + getPath('.') + "', id:" + resId + ", size:" + size;
 	}
 }

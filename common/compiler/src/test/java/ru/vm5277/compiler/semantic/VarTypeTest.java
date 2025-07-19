@@ -8,12 +8,12 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.nodes.AstNode;
 
 public class VarTypeTest {
     @Test
-    void numericTypesCompatibility() throws SemanticException {
+    void numericTypesCompatibility() throws CompileException {
         assertTrue(AstNode.isCompatibleWith(null, VarType.SHORT, VarType.BYTE));
 		assertTrue(AstNode.isCompatibleWith(null, VarType.INT, VarType.BYTE));
 		assertTrue(AstNode.isCompatibleWith(null, VarType.INT, VarType.SHORT));
@@ -25,7 +25,7 @@ public class VarTypeTest {
     }
 
     @Test
-    void arrayTypesCompatibility() throws SemanticException {
+    void arrayTypesCompatibility() throws CompileException {
         VarType intArray = VarType.arrayOf(VarType.INT);
         VarType anotherIntArray = VarType.arrayOf(VarType.INT);
         assertTrue(AstNode.isCompatibleWith(null, intArray, anotherIntArray));

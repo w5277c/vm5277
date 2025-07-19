@@ -42,6 +42,7 @@ import ru.vm5277.compiler.nodes.commands.ThrowNode;
 import ru.vm5277.compiler.nodes.commands.TryNode;
 import ru.vm5277.compiler.nodes.commands.WhileNode;
 import ru.vm5277.compiler.nodes.expressions.BinaryExpression;
+import ru.vm5277.compiler.nodes.expressions.CastExpression;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
 import ru.vm5277.compiler.nodes.expressions.InstanceOfExpression;
@@ -466,6 +467,11 @@ public class ASTPrinter {
 			FieldAccessExpression fae = (FieldAccessExpression)expr;
 			out.put(fae.getClassName() + "." + fae.getFieldName());
 		}
+		else if(expr instanceof CastExpression) {
+			CastExpression ce = (CastExpression)expr;
+			out.put("(" + ce.getTargetType() + ")");
+			printExpr(ce.getOperand());
+		}
 		else {
 			out.put("!unknown expr:" + expr); out.print();
 		}
@@ -479,7 +485,7 @@ public class ASTPrinter {
 			int parentPriority = Operator.PRECEDENCE.get(parentOp);
 			int childPriority = Operator.PRECEDENCE.get(childOp);
 
-			needParentheses = childPriority < parentPriority || (childPriority == parentPriority && !isLeft);
+			needParentheses = (childPriority < parentPriority) || (childPriority == parentPriority && !childOp.isLeftAssociative() && isLeft);
 		}
 
 		if (needParentheses) out.put("(");

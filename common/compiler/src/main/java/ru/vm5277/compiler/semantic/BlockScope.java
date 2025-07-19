@@ -18,42 +18,45 @@ package ru.vm5277.compiler.semantic;
 import java.util.HashMap;
 import java.util.Map;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class BlockScope extends Scope {
-	private	final	Scope						parent;
-	private	final	Map<String, Symbol>			locals	= new HashMap<>();
-	private	final	Map<String, LabelSymbol>	labels	= new HashMap<>();
+	protected	final	Scope						parent;
+	protected	final	Map<String, Symbol>			variables	= new HashMap<>();
+	private		final	Map<String, LabelSymbol>	labels		= new HashMap<>();
 	
 	public BlockScope(Scope parent) {
 		this.parent = parent;
 	}
 
-	public void addLocal(Symbol symbol) throws SemanticException {
+	public void addVariable(Symbol symbol) throws CompileException {
 		String name = symbol.getName();
-		if (locals.containsKey(name)) throw new SemanticException("Duplicate local variable: " + name);
-		locals.put(name, symbol);
+		if (variables.containsKey(name)) throw new CompileException("Duplicate variable: " + name);
+		variables.put(name, symbol);
 	}
 
 	@Override
 	public Symbol resolve(String name) {
 		// 1. Ищем в локальных переменных
-		Symbol symbol = locals.get(name);
+		Symbol symbol = variables.get(name);
 		if (symbol != null) return symbol;
 
 		// 2. Делегируем в родительскую область
 		return parent != null ? parent.resolve(name) : null;
 	}
 	
-	public void addLabel(LabelSymbol label) throws SemanticException {
+	public void addLabel(LabelSymbol label) throws CompileException {
 		String name = label.getName();
-		if (labels.containsKey(name)) throw new SemanticException("Duplicate label: " + name);
+		if (labels.containsKey(name)) throw new CompileException("Duplicate label: " + name);
 		labels.put(name, label);
 	}
 
-	public void addAlias(String name, VarType type, Symbol symbol) throws SemanticException {
-		if (locals.containsKey(name)) throw new SemanticException("Duplicate local variable: " + name);
-		locals.put(name, new AliasSymbol(name, type, symbol));
+	public void addAlias(String name, VarType type, Symbol symbol) throws CompileException {
+		Symbol oldSymbol = variables.get(name);
+		if (null != oldSymbol && (!(oldSymbol instanceof AliasSymbol) || ((AliasSymbol)oldSymbol).getSymbol() != symbol)) {
+			throw new CompileException("Duplicate variable: " + name);
+		}
+		variables.put(name, new AliasSymbol(name, type, symbol));
 	}
 	
 	public LabelSymbol resolveLabel(String name) {

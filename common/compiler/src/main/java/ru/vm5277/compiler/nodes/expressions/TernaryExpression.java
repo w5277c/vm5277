@@ -19,7 +19,7 @@ import java.util.Arrays;
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -40,7 +40,7 @@ public class TernaryExpression extends ExpressionNode {
 	}
 
 	@Override
-	public VarType getType(Scope scope) throws SemanticException {
+	public VarType getType(Scope scope) throws CompileException {
 		VarType trueType = trueExpr.getType(scope);
 		VarType falseType = falseExpr.getType(scope);
 
@@ -88,7 +88,7 @@ public class TernaryExpression extends ExpressionNode {
 
 			return true;
 		}
-		catch (SemanticException e) {
+		catch (CompileException e) {
 			markError(e.getMessage());
 			return false;
 		}

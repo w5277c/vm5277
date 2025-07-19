@@ -20,7 +20,7 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.Scope;
@@ -30,7 +30,7 @@ public class ParameterNode extends AstNode {
     private	final	String	name;
 	private	final	boolean	isFinal;
 	
-	public ParameterNode(TokenBuffer tb, MessageContainer mc) throws ParseException {
+	public ParameterNode(TokenBuffer tb, MessageContainer mc) throws CompileException {
 		super(tb, mc);
 		
 		this.isFinal = tb.match(TokenType.MODIFIER, Keyword.FINAL);
@@ -43,7 +43,7 @@ public class ParameterNode extends AstNode {
 		this.name = (String)consumeToken(tb, TokenType.ID).getValue();
 	}
 
-	public ParameterNode(MessageContainer mc, boolean isFinal, VarType type, String name) throws ParseException {
+	public ParameterNode(MessageContainer mc, boolean isFinal, VarType type, String name) throws CompileException {
 		super(null, mc);
 		
 		this.isFinal = isFinal;

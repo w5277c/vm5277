@@ -18,6 +18,7 @@ package ru.vm5277.common.cg.scopes;
 import java.util.HashMap;
 import java.util.Map;
 import ru.vm5277.common.cg.items.CGIContainer;
+import ru.vm5277.common.cg.items.CGIText;
 
 public class CGScope extends CGIContainer {
 	private				static	int						idCntr		= 0;
@@ -28,7 +29,7 @@ public class CGScope extends CGIContainer {
 	
 	protected					int						resId;
 	private						int						sbPos		= 0;
-	protected					boolean					verbose		= true;
+	public				static	boolean					verbose;
 	
 	public static int genId() {
 		return idCntr++;
@@ -43,6 +44,9 @@ public class CGScope extends CGIContainer {
 		this.name = name;
 		this.resId = resId;
 		
+		if(verbose && !(this instanceof CGExpressionScope)) {
+			append(new CGIText(";CG: " + getClass().getSimpleName() + " " + name + ", resId:" + resId));
+		}
 		
 		if(null != parent) {
 			parent.append(this);
@@ -67,20 +71,42 @@ public class CGScope extends CGIContainer {
 		return scopesMap.get(resId);
 	}
 	
-	public String getPath(String delimeter) {
+	public String getPath(Character delimeter) {
 		StringBuilder sb = new StringBuilder();
 		CGScope _scope = this;
 		while(null != _scope) {
 			if(!_scope.getName().isEmpty()) {
-				sb.insert(0, _scope.getName() + delimeter);
+				sb.insert(0, _scope.getName() + (null != delimeter ? delimeter : ""));
+				//TODO костыль, но пока работает, иначе все пути начинаются с Main.
+				if(_scope instanceof CGClassScope && ((CGClassScope)_scope).isImported()) {
+					break;
+				}
 			}
 			_scope = _scope.getParent();
 		}
-		sb.deleteCharAt(sb.length()-0x01);
-		return sb.toString().toLowerCase();
+		if(null != delimeter) sb.deleteCharAt(sb.length()-0x01);
+		return sb.toString();
+	}
+
+	public String getLPath() {
+		StringBuilder sb = new StringBuilder();
+		CGScope _scope = this;
+		while(null != _scope) {
+			if(!_scope.getLName().isEmpty()) {
+				sb.insert(0, _scope.getLName());
+				if(_scope instanceof CGClassScope && ((CGClassScope)_scope).isImported()) {
+					break;
+				}
+			}
+			_scope = _scope.getParent();
+		}
+		return sb.toString();
 	}
 	
 	public String getName() {
+		return name;
+	}
+	public String getLName() {
 		return name;
 	}
 	

@@ -17,6 +17,7 @@
 //TODO пересмотреть getType и postAnalyze, код как минимум не оптимизирован
 package ru.vm5277.compiler.nodes.expressions;
 
+import com.sun.javafx.fxml.expression.VariableExpression;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -24,12 +25,19 @@ import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.Operand;
 import ru.vm5277.common.cg.OperandType;
+import ru.vm5277.common.cg.scopes.CGMethodScope;
+import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
+import ru.vm5277.compiler.nodes.MethodNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
+import ru.vm5277.compiler.nodes.VarNode;
+import ru.vm5277.compiler.semantic.AliasSymbol;
+import ru.vm5277.compiler.semantic.AstHolder;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.InterfaceSymbol;
 import ru.vm5277.compiler.semantic.MethodScope;
@@ -66,7 +74,7 @@ public class MethodCallExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public VarType getType(Scope scope) throws SemanticException {
+	public VarType getType(Scope scope) throws CompileException {
 		VarType parentType = null;
 		//поиск метода в текущем классе
 		if(null == parent) {
@@ -80,10 +88,10 @@ public class MethodCallExpression extends ExpressionNode {
 		if (null == parentType && null != parent) {
 			try {
 				parentType = parent.getType(scope);
-				if (null == parentType) throw new SemanticException("Cannot resolve parent expression");
+				if (null == parentType) throw new CompileException("Cannot resolve parent expression");
 			}
-			catch (SemanticException e) {
-				throw new SemanticException("Invalid parent in method call: " + e.getMessage());
+			catch (CompileException e) {
+				throw new CompileException("Invalid parent in method call: " + e.getMessage());
 			}
 		}
 		
@@ -98,7 +106,7 @@ public class MethodCallExpression extends ExpressionNode {
 			// Если parent - класс (статический вызов)
 			if (parentType.isClassType()) {
 				ClassScope classScope = scope.getThis().resolveClass(parentType.getName());
-				if (null == classScope) throw new SemanticException("Class '" + parentType.getName() + "' not found");
+				if (null == classScope) throw new CompileException("Class '" + parentType.getName() + "' not found");
 
 				symbol = classScope.resolveMethod(methodName, argTypes);
 				if (symbol != null) return symbol.getType();
@@ -108,13 +116,13 @@ public class MethodCallExpression extends ExpressionNode {
 			else {
 				// Получаем класс объекта
 				ClassScope classScope = scope.getThis().resolveClass(parentType.getName());
-				if (null == classScope) throw new SemanticException("Class '" + parentType.getName() + "' not found");
+				if (null == classScope) throw new CompileException("Class '" + parentType.getName() + "' not found");
 
 				symbol = classScope.resolveMethod(methodName, argTypes);
 				if (null != symbol && !symbol.isStatic()) return symbol.getType();
 			}
 
-			throw new SemanticException("Method '" + methodName + "' not found in " + parentType);
+			throw new CompileException("Method '" + methodName + "' not found in " + parentType);
 		}
 
 		// Вызов метода текущего класса (без parent)
@@ -145,10 +153,10 @@ public class MethodCallExpression extends ExpressionNode {
 			}
 		}
 
-		throw new SemanticException("Method '" + methodName + "' not found");
+		throw new CompileException("Method '" + methodName + "' not found");
 	}
 	
-	private boolean isArgumentsMatch(Scope scope, MethodSymbol method, List<VarType> argTypes) throws SemanticException {
+	private boolean isArgumentsMatch(Scope scope, MethodSymbol method, List<VarType> argTypes) throws CompileException {
 		List<VarType> paramTypes = method.getParameterTypes();
 		if (paramTypes.size() != argTypes.size()) return false;
 
@@ -202,7 +210,7 @@ public class MethodCallExpression extends ExpressionNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		try {type = getType(scope);} catch(SemanticException e) {markError(e);}; //TODO костыль, нужен для присваивания symbol
+		try {type = getType(scope);} catch(CompileException e) {markError(e); return false;}; //TODO костыль, нужен для присваивания symbol
 
 		try {
 			cgScope = cg.enterExpression();		
@@ -219,7 +227,7 @@ public class MethodCallExpression extends ExpressionNode {
 						return false;
 					}
 				}
-				catch (SemanticException e) {
+				catch (CompileException e) {
 					markError("Parent type error: " + e.getMessage());
 					cg.leaveExpression();
 					return false;
@@ -237,7 +245,7 @@ public class MethodCallExpression extends ExpressionNode {
 						args.set(i, optimizedExpr);
 					}
 				}
-				catch(ParseException e) {
+				catch(CompileException e) {
 					e.printStackTrace();
 				}
 			}
@@ -255,14 +263,14 @@ public class MethodCallExpression extends ExpressionNode {
 					className = ((TypeReferenceExpression)parent).getClassName();
 				}
 				else {
-					markError(new SemanticException("Unsupported parent type: " + parent.toString()));
+					markError(new CompileException("Unsupported parent type: " + parent.toString()));
 					cg.leaveExpression();
 					return false;
 				}
 
 				ClassScope classScope = scope.getThis().resolveClass(className);
 				if(null == classScope) {
-					markError(new SemanticException("Class '" + className + "' not found"));
+					markError(new CompileException("Class '" + className + "' not found"));
 					cg.leaveExpression();
 					return false;
 				}
@@ -274,35 +282,39 @@ public class MethodCallExpression extends ExpressionNode {
 					return false;
 				}
 				
-/*				MethodScope mScope = ((MethodSymbol)symbol).getScope();
-				for(int i=0; i< args.size(); i++) {
-					Symbol paramSymbol = ((MethodSymbol)symbol).getParameters().get(i);
-					ExpressionNode expr = args.get(i);
-					if(expr instanceof LiteralExpression) {
-//						((MethodSymbol)symbol).getParameters().get(i).setConstantOperand(new Operand(argTypes.get(i), OperandType.CONSTANT, args.get(i)));
-						VarSymbol vSymbol = new VarSymbol(	paramSymbol.getName(), args.get(i).getType(scope), paramSymbol.isFinal(), paramSymbol.isStatic(),
-															mScope,	null);
-						//Operand op = new Operand(argTypes.get(i), OperandType.CONSTANT, args.get(i));
-						//vSymbol.setConstantOperand(op);
-						//TODO
-						//vSymbol.getConstantOperand().setValue(expr.getCGScope().getResId());//???
-								
-						mScope.addVariable(vSymbol);
-						//mScope.addVariable(vSymbol);
-//						((LiteralExpression)args.get(i)).setSymbol(vSymbol);
+				//Ничего не делаем с аргументами, если это нативный метод
+				if(!symbol.isNative()) {
+					//Создаем алиасы на переменные(из аргументов), которые содержат final переменные или переменные типа ссылки, массива и cstr
+					//Для остальных аргументов создаем новые переменные, которые должны быть проинициализирвоаны в кодогенерации
+					//и им должны быть присвоены значения переменных
+					MethodScope mScope = ((MethodSymbol)symbol).getScope();
+					for(int i=0; i< args.size(); i++) {
+						Symbol pSymbol = ((MethodSymbol)symbol).getParameters().get(i);
+						ExpressionNode expr = args.get(i);
+						if(expr instanceof LiteralExpression) {
+							//Это константа, создаем переменную
+							mScope.addVariable(new VarSymbol(pSymbol.getName(), expr.getType(scope), pSymbol.isFinal(), false, mScope, null));
+						}
+						else if(expr instanceof VarFieldExpression) {
+							VarFieldExpression ve = (VarFieldExpression)expr;
+							VarSymbol vSymbol = (VarSymbol)ve.getSymbol();
+							if(vSymbol.isFinal() || VarType.CSTR == vSymbol.getType() || VarType.CLASS == vSymbol.getType()) {
+								mScope.addAlias(pSymbol.getName(), expr.getType(scope), vSymbol);
+							}
+							else {
+								mScope.addVariable(new VarSymbol(pSymbol.getName(), expr.getType(scope), pSymbol.isFinal(), false, mScope, null));
+							}
+						}
+						else {
+							markError(new CompileException("TODO Unsupported arg: " + args.get(i)));
+							cg.leaveExpression();
+							return false;
+						}
 					}
-					else if(expr instanceof VarFieldExpression) {
-						//TODO ничего не делаем? А если это cstr?
-					}
-					else {
-						markError(new SemanticException("TODO Unsupported arg: " + args.get(i)));
-						cg.leaveExpression();
-						return false;
-					}
-				}*/
+				}
 			}
 		}
-		catch (SemanticException e) {
+		catch (CompileException e) {
             markError(e.getMessage());
             cg.leaveExpression();
 			return false;
@@ -321,22 +333,7 @@ public class MethodCallExpression extends ExpressionNode {
 			if(!args.isEmpty()) {
 				operands = new Operand[args.size()];
 				for(int i=0; i<args.size(); i++) {
-					ExpressionNode expr = args.get(i);
-					if(expr instanceof VarFieldExpression) {
-						VarFieldExpression ve = (VarFieldExpression)expr;
-						ve.codeGen(cg);
-						operands[i] = new Operand(VarType.CSTR == ve.getType(null) ? OperandType.FLASH_RES : OperandType.LOCAL_RES, ve.getResId());
-					}
-					else if(expr instanceof FieldAccessExpression) {
-						FieldAccessExpression fae = (FieldAccessExpression)expr;
-						fae.codeGen(cg);
-						operands[i] = new Operand(OperandType.LOCAL_RES, fae.getResId());
-					}
-					else if(expr instanceof LiteralExpression) {
-						LiteralExpression le = (LiteralExpression)expr;
-						operands[i] = new Operand(OperandType.LITERAL, le.getNumValue());
-					}
-					else throw new Exception("Unexpected expression:" + expr);
+					operands[i]= makeNativeOperand(cg, args.get(i));
 				}
 			}
 
@@ -351,21 +348,93 @@ public class MethodCallExpression extends ExpressionNode {
 			cg.invokeNative(cgScope.getParent(), className, symbol.getName(), (null == params ? null : Arrays.toString(params)), type, operands);
 		}
 		else {
-			for(int i=0; i<args.size(); i++) {
-/*TODO				Symbol pSymbol = ((MethodSymbol)symbol).getParameters().get(i);
-				VarType _type = argTypes.get(i);
-				pSymbol.setType(_type);
-				int resId = cg.enterLocal(_type.getId(), _type.getSize(),  false, pSymbol.getName()); //Локальная переменная, никогда не является константой
-				cg.localStore(resId, ((LiteralExpression)args.get(i)).getNumValue());
-				cg.leaveLocal();
-				pSymbol.setResId(resId);*/
+			Operand[] operands = null;
+			if(!args.isEmpty()) {
+				operands = new Operand[args.size()];
+
+				CGScope oldCGScope = cg.setScope(symbol.getCGScope());
+				// Перед обращением к методу, нужно создать в нем необходимые переменные
+				for(int i=0; i<args.size(); i++) {
+					// Получаем параметр вызываемого метода
+					Symbol pSymbol = ((MethodSymbol)symbol).getParameters().get(i);
+					// Получаем выражение передаваемое этому параметру
+					ExpressionNode expr = args.get(i);
+					// Отстраиваем завивисимости
+					expr.depCodeGen(cg);
+
+					// Получаю из scope вызываемого метода переменую с именем параметра(пустая переменная уже создана, или создан Alias)
+					Symbol vSymbol = ((MethodSymbol)symbol).getScope().resolve(pSymbol.getName());
+					if(vSymbol instanceof AliasSymbol) {
+						// Это алиас, который нужно что???
+						int t =45455;
+					}
+					else {
+						// Создаем новую переменную в scope вызываемого метода
+						CGVarScope dstVScope = cg.enterLocal(vSymbol.getType(), expr instanceof LiteralExpression, vSymbol.getName());
+					
+						// Отстраиваем(выделяем память) новую переменную с учетом cells источника.
+						// К примеру, назначаем теже регистры, что избавляет от лишнего копирования.
+						// При входе в метод регистры источника должны быть сохранены в стек, в при выходе востановлены.
+						dstVScope.build(((CGVarScope)expr.getSymbol().getCGScope()).getCells());
+						cg.leaveLocal();
+						
+						pSymbol.setCGScope(dstVScope);
+						//mNode.getScope().resolve(name)
+						//cg.cellsToAcc(mNode.getCGScope(), (CGVarScope)srcVNode.getCGScope());
+						//cg.accToCells(mNode.getCGScope(), dstVScope);
+						
+						// Не передаем ноду в новый символ, вот только у нас и нет никакой ноды! МЫ должны как-то дать новому символу ссылку на dstVScope
+						// Похоже символ все-же должен хранить resId
+						
+						int t =4545;
+					}
+					int t =4545;					
+					
+	/*				Symbol pSymbol = ((MethodSymbol)symbol).getParameters().get(i);
+					VarType _type = argTypes.get(i);
+					pSymbol.setType(_type);
+					int resId = cg.enterLocal(_type.getId(), _type.getSize(),  false, pSymbol.getName()); //Локальная переменная, никогда не является константой
+					cg.localStore(resId, ((LiteralExpression)args.get(i)).getNumValue());
+					cg.leaveLocal();
+					pSymbol.setResId(resId);*/
+				}
+				cg.setScope(oldCGScope);
 			}
-			
 			depCodeGen(cg);
-			cg.invokeMethod(className, symbol.getName(), type.getId());
+			
+			CGMethodScope mScope = (CGMethodScope)symbol.getCGScope();
+			cg.invokeMethod(cgScope.getParent(), className, symbol.getName(), type, mScope);
 		}
 		
 		return null;
+	}
+	
+	private Operand makeNativeOperand(CodeGenerator cg, ExpressionNode expr) throws Exception {
+		if(expr instanceof VarFieldExpression) {
+			VarFieldExpression ve = (VarFieldExpression)expr;
+			ve.codeGen(cg);
+			return new Operand(VarType.CSTR == ve.getType(null) ? OperandType.FLASH_RES : OperandType.LOCAL_RES, ve.getSymbol().getCGScope().getResId());
+		}
+		else if(expr instanceof FieldAccessExpression) {
+			FieldAccessExpression fae = (FieldAccessExpression)expr;
+			fae.codeGen(cg);
+			return new Operand(OperandType.LOCAL_RES, fae.getSymbol().getCGScope().getResId());
+		}
+		else if(expr instanceof LiteralExpression) {
+			LiteralExpression le = (LiteralExpression)expr;
+			return new Operand(OperandType.LITERAL, le.getNumValue());
+		}
+		else if(expr instanceof MethodCallExpression) {
+			MethodCallExpression mce = (MethodCallExpression)expr;
+			mce.codeGen(cg);
+			return new Operand(OperandType.RETURN, null);
+		}
+		else if(expr instanceof CastExpression) {
+			CastExpression ce = (CastExpression)expr;
+			ce.codeGen(cg);
+			return makeNativeOperand(cg, ce.getOperand());
+		}
+		else throw new Exception("Unexpected expression:" + expr);
 	}
 	
 	@Override

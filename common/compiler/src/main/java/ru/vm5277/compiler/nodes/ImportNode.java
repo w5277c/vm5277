@@ -18,11 +18,10 @@ package ru.vm5277.compiler.nodes;
 import java.io.File;
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.exceptions.ParseException;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.Scope;
@@ -71,9 +70,9 @@ public class ImportNode extends AstNode {
 				this.alias = null;
 			}
 			//Попытка потребить ';'
-			try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
+			try {consumeToken(tb, Delimiter.SEMICOLON);}catch(CompileException e) {markFirstError(e);}
 		}
-		catch(ParseException e) {
+		catch(CompileException e) {
 			// Что-то пошло не так, фиксируем ошибку
 			markFirstError(e);
 			// Пропускаем до конца выражения
@@ -135,7 +134,7 @@ public class ImportNode extends AstNode {
 					classScope.addImport(importStr, alias);
 				}
 			}
-			catch(SemanticException e) {markError(e);}
+			catch(CompileException e) {markError(e);}
 			return true;
 		}
 		markError("Import declarations must be at the beginning of the file, before any class members");

@@ -1,11 +1,9 @@
 package ru.vm5277.compiler;
 
-import ru.vm5277.compiler.Lexer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.compiler.ASTParser;
 import ru.vm5277.compiler.nodes.FieldNode;
 import ru.vm5277.compiler.nodes.expressions.BinaryExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
@@ -28,7 +26,7 @@ public class ParserTests {
 		MessageContainer mc = new MessageContainer(100, true, false);		
 		Lexer lexer = new Lexer(source, mc);
 		ASTParser parser = new ASTParser(null, null, lexer.getTokens(), mc);
-		
+
 		FieldNode field = (FieldNode)parser.getClazz().getBody().getChildren().get(0);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof Number);

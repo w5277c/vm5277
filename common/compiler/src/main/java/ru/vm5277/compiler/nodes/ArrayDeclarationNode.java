@@ -22,8 +22,7 @@ import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
@@ -50,20 +49,20 @@ public class ArrayDeclarationNode extends AstNode {
 		consumeToken(tb); // Потребляем '['
         
         // Размер массива
-        try{size = new ExpressionNode(tb, mc).parse();}  catch(ParseException e) {markFirstError(e);}
+        try{size = new ExpressionNode(tb, mc).parse();}  catch(CompileException e) {markFirstError(e);}
         
-        try {consumeToken(tb, Delimiter.RIGHT_BRACKET);} catch(ParseException e) {markFirstError(e);} // Потребляем ']'
+        try {consumeToken(tb, Delimiter.RIGHT_BRACKET);} catch(CompileException e) {markFirstError(e);} // Потребляем ']'
 
         // Инициализация (опционально)
         if (tb.match(Operator.ASSIGN)) {
             consumeToken(tb);
-            try {initializer = new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
+            try {initializer = new ExpressionNode(tb, mc).parse();} catch(CompileException e) {markFirstError(e);}
         }
 		else {
 			initializer = null;
 		}
 		
-		try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
+		try {consumeToken(tb, Delimiter.SEMICOLON);}catch(CompileException e) {markFirstError(e);}
 	}
 
 	@Override
@@ -78,6 +77,13 @@ public class ArrayDeclarationNode extends AstNode {
 		// Проверка типа элементов
 		if (null == elementType || VarType.VOID == elementType || VarType.UNKNOWN == elementType) markError("Invalid array element type: " + elementType);
 
+		if(!size.preAnalyze()) {
+			return false;
+		}
+		if(!initializer.preAnalyze()) {
+			return false;
+		}
+		
 		return true;
 	}
 
@@ -93,11 +99,11 @@ public class ArrayDeclarationNode extends AstNode {
 				((ClassScope)scope).addField(symbol);
 			}
 			else if (scope instanceof BlockScope) {
-				((BlockScope)scope).addLocal(symbol);
+				((BlockScope)scope).addVariable(symbol);
 			}
 			else markError("Arrays can only be declared in class or block scope");
 		}
-		catch (SemanticException e) {markError(e);}
+		catch (CompileException e) {markError(e);}
 		
 		return true;
 	}
@@ -159,7 +165,7 @@ public class ArrayDeclarationNode extends AstNode {
 						}
 					}
 				}
-				catch (SemanticException e) {markError(e);}
+				catch (CompileException e) {markError(e);}
 			}
 		}
 

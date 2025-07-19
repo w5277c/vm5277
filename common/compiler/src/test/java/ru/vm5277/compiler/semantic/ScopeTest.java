@@ -13,20 +13,20 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class ScopeTest {
     private ClassScope globalScope;
     private ClassScope childScope;
 
     @BeforeEach
-    void setup() throws SemanticException {
+    void setup() throws CompileException {
         globalScope = new ClassScope("Global", null);
         childScope = new ClassScope("Child", globalScope);
     }
 
     @Test
-    void resolveFieldFromParentScope() throws SemanticException {
+    void resolveFieldFromParentScope() throws CompileException {
         globalScope.addField(new Symbol("x", VarType.INT, false, false));
         Symbol resolved = childScope.resolve("x");
         assertNotNull(resolved);
@@ -34,9 +34,9 @@ public class ScopeTest {
     }
 
     @Test
-    void duplicateFieldThrowsException() throws SemanticException {
+    void duplicateFieldThrowsException() throws CompileException {
         globalScope.addField(new Symbol("x", VarType.INT, false, false));
-        assertThrows(SemanticException.class, new Executable() {
+        assertThrows(CompileException.class, new Executable() {
 			@Override
 			public void execute() throws Throwable {
 				globalScope.addField(new Symbol("x", VarType.CSTR, false, false));

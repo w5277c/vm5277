@@ -19,17 +19,17 @@ import java.util.Arrays;
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
+import ru.vm5277.compiler.semantic.AliasSymbol;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.InterfaceSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
-import ru.vm5277.compiler.semantic.VarSymbol;
 
 public class InstanceOfExpression extends ExpressionNode {
 	private	final	ExpressionNode	leftExpr;		// Проверяемое выражение
@@ -49,7 +49,7 @@ public class InstanceOfExpression extends ExpressionNode {
 	}
 
 	@Override
-	public VarType getType(Scope scope) throws SemanticException {
+	public VarType getType(Scope scope) throws CompileException {
 		// Результат instanceof всегда boolean
 		return VarType.BOOL;
 	}
@@ -94,20 +94,21 @@ public class InstanceOfExpression extends ExpressionNode {
 						VarFieldExpression ve = (VarFieldExpression)leftExpr;
 						Symbol vSymbol = scope.resolve(ve.getValue());
 						if(null == vSymbol) {
-							markError(new SemanticException("var '" + ve.getValue() + "' not found"));
+							markError(new CompileException("var '" + ve.getValue() + "' not found"));
 							return false;
 						}
+						//Добавляем просто символ, большего мы здесь не знаем
 						bScope.addAlias(varName, rightType, vSymbol);
 					}
 					//TODO а что если другое выражение или вызов метода?
 				}
 				else {
-					markError(new SemanticException("Unexpected scope '" + scope + "'"));
+					markError(new CompileException("Unexpected scope '" + scope + "'"));
 					return false;
 				}
 			}
 		}
-		catch(SemanticException e) {
+		catch(CompileException e) {
 			markError(e);
 			return false;
 		}
@@ -119,27 +120,34 @@ public class InstanceOfExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		this.scope = scope;
 		try {
+			cgScope = cg.enterExpression();
+			
 			if (!leftExpr.postAnalyze(scope, cg)) {
+				cg.leaveExpression();
 				return false;
 			}
 
 			// Анализируем правую часть (тип)
 			if (!rightExpr.postAnalyze(scope, cg)) {
+				cg.leaveExpression();
 				return false;
 			}
 
 			if(VarType.UNKNOWN == rightType) {
 				markError("Unknown right-hand side of 'is': " + rightExpr);
+				cg.leaveExpression();
 				return false;
 			}
 			if(VarType.VOID == rightType) {
 				markError("Right-hand side of 'is' cant be void");
+				cg.leaveExpression();
 				return false;
 			}
 
 			leftType = leftExpr.getType(scope);
 			if (leftExpr instanceof LiteralExpression) {
 				markError("Cannot check type of literals at runtime");
+				cg.leaveExpression();
 				return false;
 			}
 			
@@ -159,10 +167,12 @@ public class InstanceOfExpression extends ExpressionNode {
 				}
 			}
 			
+			cg.leaveExpression();
 			return true;
 		}
-		catch (SemanticException e) {
+		catch (CompileException e) {
 			markError(e.getMessage());
+			cg.leaveExpression();
 			return false;
 		}
 	}
@@ -190,10 +200,9 @@ public class InstanceOfExpression extends ExpressionNode {
 		}
 
 		leftExpr.codeGen(cg);
-		long objectOp = cg.getAcc();
-		cg.leaveExpression();
-		cg.setAcc(cgScope, 0x01, cg.emitInstanceof(objectOp, (int)rightType.getId()) ? 0x01 : 0x00);
-		
+		//TODO long objectOp = cg.getAcc(); //???
+		//cg.setAcc(cgScope, 0x01, cg.emitInstanceof(objectOp, (int)rightType.getId()) ? 0x01 : 0x00);
+		//cg.loadConstToAcc(cgScope, 0x01, cg.emitInstanceof(objectOp, (int)rightType.getId()) ? 0x01 : 0x00);
 		return null;
 	}
 

@@ -20,12 +20,12 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.semantic.ClassScope;
@@ -39,7 +39,7 @@ public class InterfaceNode extends AstNode {
 	private			List<String>		interfaces		= new ArrayList<>();
 	private			InterfaceBodyNode	blockNode;
 
-	public InterfaceNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, String parentClassName) throws ParseException {
+	public InterfaceNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, String parentClassName) throws CompileException {
 		super(tb, mc);
 		
 		this.modifiers = modifiers;
@@ -51,7 +51,7 @@ public class InterfaceNode extends AstNode {
 			this.name = (String)consumeToken(tb, TokenType.ID).getValue();
 			VarType.addClassName(this.name);
 		}
-		catch(ParseException e) {markFirstError(e);} // ошибка в имени, оставляем null
+		catch(CompileException e) {markFirstError(e);} // ошибка в имени, оставляем null
 		
         // Парсинг интерфейсов (если есть)
 		if (tb.match(Keyword.IMPLEMENTS)) {
@@ -60,7 +60,7 @@ public class InterfaceNode extends AstNode {
 				try {
 					interfaces.add((String)consumeToken(tb, TokenType.ID).getValue());
 				}
-				catch(ParseException e) {markFirstError(e);} // встретили не ID интерфейса, пропускаем
+				catch(CompileException e) {markFirstError(e);} // встретили не ID интерфейса, пропускаем
 				if (!tb.match(Delimiter.COMMA)) break;
 				consumeToken(tb);
 			}
@@ -97,13 +97,13 @@ public class InterfaceNode extends AstNode {
 
 	@Override
 	public boolean preAnalyze() {
-		try {validateName(name);} catch(SemanticException e) {addMessage(e);	return false;}
+		try {validateName(name);} catch(CompileException e) {addMessage(e);	return false;}
 
 		if(Character.isLowerCase(name.charAt(0))) {
 			addMessage(new WarningMessage("Interface name should start with uppercase letter:" + name, sp));
 		}
 		
-		try{validateModifiers(modifiers, Keyword.PUBLIC);} catch(SemanticException e) {addMessage(e);}
+		try{validateModifiers(modifiers, Keyword.PUBLIC);} catch(CompileException e) {addMessage(e);}
 		
 		// Анализ тела интерфейса
 		blockNode.preAnalyze();
@@ -120,7 +120,7 @@ public class InterfaceNode extends AstNode {
 			}
 			blockNode.declare(scope);
 		} 
-		catch (SemanticException e) {
+		catch (CompileException e) {
 			markError(e);
 		}
 		return true;

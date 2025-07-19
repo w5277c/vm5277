@@ -23,7 +23,7 @@ import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.semantic.ClassScope;
@@ -32,7 +32,7 @@ import ru.vm5277.compiler.semantic.Scope;
 public class InterfaceBodyNode extends AstNode {
 	protected List<AstNode> children = new ArrayList<>();
 	
-	public InterfaceBodyNode(TokenBuffer tb, MessageContainer mc, String className) throws ParseException {
+	public InterfaceBodyNode(TokenBuffer tb, MessageContainer mc, String className) throws CompileException {
 		super(tb, mc);
 
 		consumeToken(tb, Delimiter.LEFT_BRACE);
@@ -79,7 +79,7 @@ public class InterfaceBodyNode extends AstNode {
 
 		try {
 			consumeToken(tb, Delimiter.RIGHT_BRACE);
-		} catch (ParseException e) {
+		} catch (CompileException e) {
 			markFirstError(e);
 		}
 	}

@@ -17,6 +17,7 @@ package ru.vm5277.common.cg.items;
 
 import java.util.ArrayList;
 import java.util.List;
+import ru.vm5277.common.cg.scopes.CGClassScope;
 
 public class CGIContainer implements CGItem {
 	private	final	List<CGItem>	items	= new ArrayList<>();
@@ -62,7 +63,16 @@ public class CGIContainer implements CGItem {
 		StringBuilder sb = new StringBuilder();
 		
 		for(CGItem item : items) {
-			sb.append(item.getSource());
+			if(item instanceof CGClassScope) {
+				sb.append(item.getSource());
+			}
+		}
+		
+		
+		for(CGItem item : items) {
+			if(!(item instanceof CGClassScope)) {
+				sb.append(item.getSource());
+			}
 		}
 		
 		return sb.toString();

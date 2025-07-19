@@ -25,12 +25,14 @@ public class CGClassScope extends CGScope {
 	private	final	int[]						intrerfaceIds;
 	private	final	Map<Integer, CGFieldScope>	fields			= new HashMap<>();
 	private			int							heapOffset		= 0;
+	private	final	boolean						isImported;
 	
-	public CGClassScope(CGScope parent, int id, VarType type, int[] intrerfaceIds, String name) {
+	public CGClassScope(CGScope parent, int id, VarType type, int[] intrerfaceIds, String name, boolean isRoot) {
 		super(parent, id, name);
 		
 		this.type = type;
 		this.intrerfaceIds = intrerfaceIds;
+		this.isImported = isRoot;
 	}
 
 	public void addField(CGFieldScope field) {
@@ -52,5 +54,14 @@ public class CGClassScope extends CGScope {
 	
 	public int getHeapOffset() {
 		return heapOffset;
+	}
+	
+	public boolean isImported() {
+		return isImported;
+	}
+	
+	@Override
+	public String getLName() {
+		return "c" + name.toUpperCase();
 	}
 }

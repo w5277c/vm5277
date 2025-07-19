@@ -39,7 +39,7 @@ public class Main {
 	public			static	boolean	isWindows;
 	public			static	Path	toolkitPath;
 	public			static	String	launchMethodName	= "main";
-
+	
 	public static void main(String[] args) throws IOException, Exception {
 		isWindows = (null != System.getProperty("os.name") && System.getProperty("os.name").toLowerCase().contains("windows"));
 
@@ -63,6 +63,7 @@ public class Main {
 		String mcu = null;
 		Integer	core_freq = null;
 		String source = null;
+		boolean cgVerbose = false;
 		
 		if(0x02 <= args.length) {
 			String[] parts = args[0x00].split(":");
@@ -90,6 +91,9 @@ public class Main {
 							System.err.println("[ERROR] Invalid parameter " + arg + " value: " + value);
 						}
 					}
+				}
+				else if(arg.equalsIgnoreCase("--cg_verbose")) {
+					cgVerbose = true;
 				}
 				else {
 					System.err.println("[ERROR] Invalid parameter: " + arg);
@@ -132,6 +136,7 @@ public class Main {
 			params.put(SystemParam.CORE_FREQ, core_freq);
 		}
 		CodeGenerator cg = PlatformLoader.loadGenerator(platform, libDir, nbr.getMap(), params);
+		CodeGenerator.verbose = cgVerbose;
 		
 		ASTParser parser = new ASTParser(runtimePath, basePath, lexer.getTokens(), mc);
 		ClassNode clazz = parser.getClazz();
@@ -154,10 +159,9 @@ public class Main {
 				}
 
 				if(null != launchNode) {
-					launchNode.codeGen(cg);
-					cg.postBuild();
-					System.out.println();
-					System.out.println(cg.getAsm());
+					launchNode.codeGen(cg, true);
+					cg.build();
+					System.out.println("\n" + cg.getAsm());
 				}
 				else {
 					mc.add(new ErrorMessage("TODO Can't find launch point 'public static void main() {...'", null));
@@ -188,6 +192,7 @@ public class Main {
 		System.out.println("  -F, --freq <MHz>\tMCU clock frequency in MHz (default: platform specific)");
 		System.out.println("  -P, --path <dir>\tCustom toolkit directory path");
 		System.out.println("  -I, --include <dir>\tAdditional include path(s)");
+		System.out.println("      --cg_verbose\t\tGenerate detailed codegen info");
 		System.out.println("  -v, --version\t\tDisplay version");
 		System.out.println("  -h, --help\t\tShow this help");
 		System.out.println();

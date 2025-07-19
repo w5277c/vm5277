@@ -26,8 +26,8 @@ import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.expressions.InstanceOfExpression;
@@ -52,16 +52,16 @@ public class IfNode extends CommandNode {
 		
         consumeToken(tb); // Потребляем "if"
 		// Условие
-		try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(ParseException e){markFirstError(e);}
-		try {this.condition = new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
-		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(ParseException e){markFirstError(e);}
+		try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(CompileException e){markFirstError(e);}
+		try {this.condition = new ExpressionNode(tb, mc).parse();} catch(CompileException e) {markFirstError(e);}
+		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(CompileException e){markFirstError(e);}
 
 		// Then блок
 		tb.getLoopStack().add(this);
 		try {
 			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
 		}
-		catch(ParseException e) {markFirstError(e);}
+		catch(CompileException e) {markFirstError(e);}
 		tb.getLoopStack().remove(this);
 
 		// Else блок
@@ -79,7 +79,7 @@ public class IfNode extends CommandNode {
 				try {
 					elseBlockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
 				}
-				catch(ParseException e) {markFirstError(e);}
+				catch(CompileException e) {markFirstError(e);}
 				tb.getLoopStack().remove(this);
 			}
 		}
@@ -154,11 +154,11 @@ public class IfNode extends CommandNode {
 						type = instanceOf.getTypeExpr().getType(scope);
 					}
 					if (null != type && null != thenScope) {
-						thenScope.addLocal(new Symbol(varName, type, false, false));
+						thenScope.addVariable(new Symbol(varName, type, false, false));
 						
 					}
 				}
-				catch (SemanticException e) {markError(e);
+				catch (CompileException e) {markError(e);
 				}
 			}
 			else {
@@ -188,7 +188,7 @@ public class IfNode extends CommandNode {
 					VarType condType = condition.getType(scope);
 					if (VarType.BOOL != condType) markError("If condition must be boolean, got: " + condType);
 				}
-				catch (SemanticException e) {markError(e);}
+				catch (CompileException e) {markError(e);}
 			}
 		}
 
@@ -220,7 +220,7 @@ public class IfNode extends CommandNode {
 				}
 			}
 		}
-		catch (ParseException e) {
+		catch (CompileException e) {
 			markFirstError(e);
 		}
 		

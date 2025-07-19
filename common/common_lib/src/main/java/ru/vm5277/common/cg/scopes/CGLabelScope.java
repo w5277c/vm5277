@@ -20,14 +20,14 @@ public class CGLabelScope extends CGScope {
 	private			boolean	isUsed;
 	
 	
-	public CGLabelScope(CGScope scope, String name, boolean isUsed) {
+	public CGLabelScope(CGScope scope, Integer resId, String name, boolean isUsed) {
 		super();
 		
-		this.resId = idCntr++;
-		this.name = "javl_" + (null == scope ? "" : scope.getPath("_") + "_") + resId + (null != name ? name : "");
+		this.resId = (null == resId ? idCntr++ : resId);
+		this.name = "JAVL" + (null == scope ? "" : scope.getLPath()) + resId + (null != name ? name : "");
 		this.isUsed = isUsed;
 	}
-	
+
 	public void setUsed() {
 		isUsed = true;
 	}

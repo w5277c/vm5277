@@ -173,4 +173,9 @@ public enum Operator {
 	public boolean isCommutative() {
 		return this == PLUS || this == MULT || this == BIT_AND || this == BIT_OR || this == BIT_XOR || this == EQ || this == NEQ;
 	}
+
+	// Проверяет, является ли оператор левоассоциативным
+	public boolean isLeftAssociative() {
+		return !(this.isAssignment() || this == Operator.TERNARY);
+	}
 }

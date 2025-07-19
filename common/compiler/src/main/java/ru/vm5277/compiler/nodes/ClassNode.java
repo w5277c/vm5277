@@ -21,12 +21,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.semantic.ClassScope;
@@ -44,7 +44,7 @@ public class ClassNode extends AstNode {
 	private			ClassScope		classScope;
 	
 	public ClassNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, String parentClassName, List<ClassNode> importedClasses)
-																																		throws ParseException {
+																																	throws CompileException {
 		super(tb, mc);
 		
 		this.importedClasses = importedClasses;
@@ -57,7 +57,7 @@ public class ClassNode extends AstNode {
 			this.name = (String)consumeToken(tb, TokenType.ID).getValue();
 			VarType.addClassName(this.name);
 		}
-		catch(ParseException e) {markFirstError(e);} // ошибка в имени, оставляем null
+		catch(CompileException e) {markFirstError(e);} // ошибка в имени, оставляем null
 		
         // Парсинг интерфейсов (если есть)
 		if (tb.match(TokenType.OOP, Keyword.IMPLEMENTS)) {
@@ -66,22 +66,13 @@ public class ClassNode extends AstNode {
 				try {
 					interfaces.add((String)consumeToken(tb, TokenType.ID).getValue());
 				}
-				catch(ParseException e) {markFirstError(e);} // встретили не ID интерфейса, пропускаем
+				catch(CompileException e) {markFirstError(e);} // встретили не ID интерфейса, пропускаем
 				if (!tb.match(Delimiter.COMMA)) break;
 				consumeToken(tb);
 			}
 		}
         // Парсинг тела класса
 		blockNode = new ClassBlockNode(tb, mc, name);
-	}
-	
-	public ClassNode(MessageContainer mc, Set<Keyword> modifiers, String parentClassName, List<String> interfaces) throws ParseException {
-		super(null, mc);
-		
-		this.importedClasses = null;
-		this.modifiers = modifiers;
-		this.name = parentClassName;
-		this.interfaces = interfaces;
 	}
 	
 	public String getName() {
@@ -115,13 +106,13 @@ public class ClassNode extends AstNode {
 
 	@Override
 	public boolean preAnalyze() {
-		try {validateName(name);} catch(SemanticException e) {addMessage(e);	return false;}
+		try {validateName(name);} catch(CompileException e) {addMessage(e);	return false;}
 
 		if(Character.isLowerCase(name.charAt(0))) {
 			addMessage(new WarningMessage("Class name should start with uppercase letter:" + name, sp));
 		}
 		
-		try{validateModifiers(modifiers, Keyword.PUBLIC, Keyword.PRIVATE, Keyword.STATIC);} catch(SemanticException e) {addMessage(e);}
+		try{validateModifiers(modifiers, Keyword.PUBLIC, Keyword.PRIVATE, Keyword.STATIC);} catch(CompileException e) {addMessage(e);}
 
 		if(null != importedClasses) {
 			for (ClassNode imported : importedClasses) {
@@ -150,7 +141,7 @@ public class ClassNode extends AstNode {
 			
 			blockNode.declare(classScope);
 		}
-		catch(SemanticException e) {markError(e); return false;}
+		catch(CompileException e) {markError(e); return false;}
 
 		return true;
 	}
@@ -165,8 +156,8 @@ public class ClassNode extends AstNode {
 				interfaceIds[i] = VarType.fromClassName(interfaces.get(i)).getId();
 			}
 		}
-			
-		if(null != cg) cg.enterClass(VarType.fromClassName(name), interfaceIds, name);
+
+		if(null != cg) cg.enterClass(VarType.fromClassName(name), interfaceIds, name, null == parentClassName);
 
 		for (String interfaceName : interfaces) {
 			// Проверяем существование интерфейса
@@ -236,9 +227,6 @@ public class ClassNode extends AstNode {
 		return null;
 	}
 	
-	public List<ClassNode>	getImportedClasses() {
-		return importedClasses;
-	}
 /*	
 	@Override
 	public Boolean isUsed() {

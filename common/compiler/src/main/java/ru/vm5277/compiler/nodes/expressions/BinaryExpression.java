@@ -18,22 +18,18 @@ package ru.vm5277.compiler.nodes.expressions;
 import java.util.Arrays;
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
-import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.semantic.AstHolder;
 import ru.vm5277.compiler.semantic.ClassScope;
-import ru.vm5277.compiler.semantic.FieldSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
-import ru.vm5277.compiler.semantic.VarSymbol;
 
 public class BinaryExpression extends ExpressionNode {
     private	final	ExpressionNode	leftExpr;
@@ -64,14 +60,14 @@ public class BinaryExpression extends ExpressionNode {
 	}
 
 	@Override
-	public VarType getType(Scope scope) throws SemanticException {
+	public VarType getType(Scope scope) throws CompileException {
 		// Получаем типы операндов
 		VarType leftType = leftExpr.getType(scope);
 		VarType rightType = rightExpr.getType(scope);
 
 		// Проверяем совместимость типов
 		if (!isCompatibleWith(scope, leftType, rightType)) {
-			throw new SemanticException("Type mismatch in binary operation: " + leftType + " " + operator + " " + rightType);
+			throw new CompileException("Type mismatch in binary operation: " + leftType + " " + operator + " " + rightType);
 		}
 
 		if (Operator.PLUS == operator && VarType.CSTR == leftType) {
@@ -242,7 +238,7 @@ public class BinaryExpression extends ExpressionNode {
 								case DIV: leftType.checkRange(leftVal / rightVal); break;
 							}
 						}
-						catch(SemanticException e) {
+						catch(CompileException e) {
 							markError(e);
 							cg.leaveExpression();
 							return false;
@@ -262,7 +258,7 @@ public class BinaryExpression extends ExpressionNode {
 								case MOD: leftType.checkRange(leftVal % rightVal); break;
 							}
 						}
-						catch(SemanticException e) {
+						catch(CompileException e) {
 							markError(e);
 							cg.leaveExpression();
 							return false;
@@ -280,7 +276,7 @@ public class BinaryExpression extends ExpressionNode {
 				}
 			}
 		}
-		catch(SemanticException e) {markError(e); return false;}
+		catch(CompileException e) {markError(e); return false;}
 
 		cg.leaveExpression();
 		return true;
@@ -293,17 +289,17 @@ public class BinaryExpression extends ExpressionNode {
 		
 		if(null == rl && null == rr) {
 			if(rightExpr instanceof VarFieldExpression) {
-				rr = (CGCellsScope)((AstHolder)rightExpr.getSymbol()).getNode().getCGScope();
+				rr = (CGCellsScope)rightExpr.getSymbol().getCGScope();
 				cg.cellsToAcc(cgScope.getParent(), (CGCellsScope)rr);
 			}
 			else if(leftExpr instanceof VarFieldExpression) {
-				rl = (CGCellsScope)((AstHolder)leftExpr.getSymbol()).getNode().getCGScope();
+				rl = (CGCellsScope)leftExpr.getSymbol().getCGScope();
 				cg.cellsToAcc(cgScope.getParent(), (CGCellsScope)rl);
 			}		
 		}
 
 		if(null == rl && null == rr) {
-			throw new SemanticException("Both operands not used accum:" + toString());
+			throw new CompileException("Both operands not used accum:" + toString());
 		}	
 
 		ExpressionNode noAccExpr = rightExpr;
@@ -315,7 +311,7 @@ public class BinaryExpression extends ExpressionNode {
 		}
 		else {
 			if(noAccExpr == leftExpr) {
-				rl = (CGCellsScope)((AstHolder)leftExpr.getSymbol()).getNode().getCGScope();
+				rl = (CGCellsScope)leftExpr.getSymbol().getCGScope();
 				cg.cellsToAcc(cgScope.getParent(), (CGCellsScope)rl);
 				noAccExpr = leftExpr;
 			}
@@ -325,11 +321,10 @@ public class BinaryExpression extends ExpressionNode {
 		if(noAccExpr instanceof VarFieldExpression) {
 			VarFieldExpression ve = (VarFieldExpression)noAccExpr;
 			if(ve.getSymbol() instanceof AstHolder) {
-				AstHolder ah = (AstHolder)ve.getSymbol();
-				cg.cellsAction(cgScope.getParent(), (CGCellsScope)ah.getNode().getCGScope(), operator);
+				cg.cellsAction(cgScope.getParent(), (CGCellsScope)ve.getSymbol().getCGScope(), operator);
 			}
 			else {
-				throw new SemanticException("Unsupported:" + ve.getSymbol());
+				throw new CompileException("Unsupported:" + ve.getSymbol());
 			}
 		}
 		else if(noAccExpr instanceof LiteralExpression) {
@@ -341,7 +336,7 @@ public class BinaryExpression extends ExpressionNode {
 			int t=3434;
 		}
 		else {
-			throw new SemanticException("Unsupported:" + rightExpr);
+			throw new CompileException("Unsupported:" + rightExpr);
 		}
 		return null;
 	}

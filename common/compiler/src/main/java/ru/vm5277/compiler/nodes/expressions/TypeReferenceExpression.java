@@ -17,7 +17,7 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.InterfaceSymbol;
@@ -38,10 +38,10 @@ public class TypeReferenceExpression extends ExpressionNode {
 	}
 
 	@Override
-	public VarType getType(Scope scope) throws SemanticException {
+	public VarType getType(Scope scope) throws CompileException {
 		// Возвращаем тип-класс, если он существует
 		VarType type = VarType.fromClassName(className);
-		if (null != type && !type.isClassType()) throw new SemanticException("Type '" + className + "' not found");
+		if (null != type && !type.isClassType()) throw new CompileException("Type '" + className + "' not found");
 
 		if(null == type) {
 			// Затем проверяем, является ли это интерфейсом
@@ -69,7 +69,7 @@ public class TypeReferenceExpression extends ExpressionNode {
 			varType = getType(scope); // Проверяем существование типа
 			return true;
 		}
-		catch (SemanticException e) {
+		catch (CompileException e) {
 			markError(e.getMessage());
 			return false;
 		}

@@ -8,13 +8,13 @@ import java.io.IOException;
 import ru.vm5277.compiler.ASTParser;
 import ru.vm5277.compiler.Lexer;
 import ru.vm5277.compiler.SemanticAnalyzer;
-import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class Test {
     @org.junit.jupiter.api.Test
-    void test1() throws ParseException {
+    void test1() throws CompileException {
 /*		MessageContainer mc = new MessageContainer(100, true, false);
 		ClassNode classNode = new ClassNode(mc, new HashSet<Keyword>(), "Main", new ArrayList<String>());
 		ClassBlockNode classBlockNode = new ClassBlockNode(mc);
@@ -42,7 +42,7 @@ public class Test {
 
 
     @org.junit.jupiter.api.Test
-    void test2() throws ParseException, IOException, SemanticException {
+    void test2() throws CompileException, IOException, CompileException {
 		MessageContainer mc = new MessageContainer(100, true, false);
 		Lexer lexer = new Lexer("class Clazz{ void method() { byte b1 = -1; byte b2=0; byte b3=255; byte b4 = 256; byte B5=128; }}", mc);
 		ASTParser parser = new ASTParser(null, null, lexer.getTokens(), mc);

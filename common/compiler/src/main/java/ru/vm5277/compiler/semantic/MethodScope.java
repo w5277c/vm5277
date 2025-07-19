@@ -15,42 +15,22 @@
  */
 package ru.vm5277.compiler.semantic;
 
-import java.util.HashMap;
-import java.util.Map;
-import ru.vm5277.common.exceptions.SemanticException;
-
-public class MethodScope extends Scope {
-	private			MethodSymbol		symbol;
-	private	final	ClassScope			parent;
-	private	final	Map<String, Symbol>	variables		= new HashMap<>();
+public class MethodScope extends BlockScope {
+	private	MethodSymbol	mSymbol;
 	
-	public MethodScope(MethodSymbol methodSymbol, ClassScope parent) {
-		this.symbol = methodSymbol;
-		this.parent = parent;
+	public MethodScope(MethodSymbol mSymbol, ClassScope parent) {
+		super(parent);
+		this.mSymbol = mSymbol;
 	}
 
 	public MethodSymbol getSymbol() {
-		return symbol;
+		return mSymbol;
 	}
-	public void setSymbol(MethodSymbol symbol) {
-		this.symbol = symbol;
-	}
-
-	public void addVariable(Symbol symbol) throws SemanticException {
-		//TODO нигде не используется
-		String name = symbol.getName();
-
-/*TODO перенести в выражения
-// Проверяем конфликты с параметрами метода
-		for (Symbol param : this.symbol.getParameters()) {
-			if (param.getName().equals(name)) Warning  "Variable name '" + name + "' conflicts with parameter name");
-		}
-*/
-		if (variables.containsKey(name)) throw new SemanticException("Duplicate variable name: " + name);
-
-		variables.put(name, symbol);
+	public void setSymbol(MethodSymbol mSymbol) {
+		this.mSymbol = mSymbol;
 	}
 
+//	Убрал, так как отличается от BlockScope только поиском в параметрах, что не верно, параметры не имеют прямого отношения к переданным переменным
 	@Override
 	public Symbol resolve(String name) {
 		// 1. Проверяем локальные переменные
@@ -58,7 +38,7 @@ public class MethodScope extends Scope {
 		if (symbol != null) return symbol;
 
 		// 2. Проверяем параметры метода (через MethodSymbol)
-		for (Symbol param : this.symbol.getParameters()) {
+		for (Symbol param : mSymbol.getParameters()) {
 			if (param.getName().equals(name)) {
 				return param;
 			}
@@ -70,17 +50,7 @@ public class MethodScope extends Scope {
 	
 	
 	@Override
-	public ClassScope getThis() {
-		return parent;
-	}
-
-	@Override
-	public Scope getParent() {
-		return parent;
-	}
-	
-	@Override
 	public String toString() {
-		return symbol.toString();
+		return mSymbol.toString();
 	}
 }

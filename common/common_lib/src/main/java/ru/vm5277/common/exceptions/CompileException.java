@@ -18,17 +18,22 @@ package ru.vm5277.common.exceptions;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.messages.ErrorMessage;
 
-public class ParseException extends Exception {
+public class CompileException extends Exception {
 	private	final	ErrorMessage	message;
 
-	public ParseException(ErrorMessage message) {
+	public CompileException(ErrorMessage message) {
 		super(message.getText() + (null == message.getSP() ? "" : " at " + message.getSP()));
 		this.message = message;
 	}
 
-	public ParseException(String text, SourcePosition sp) {
+	public CompileException(String text, SourcePosition sp) {
 		super(text + (null == sp ? "" : " at " + sp));
 		this.message = new ErrorMessage(text, sp);
+	}
+
+	public CompileException(String text) {
+		super(text);
+		this.message = new ErrorMessage(text, null);
 	}
 
 	public ErrorMessage getErrorMessage() {

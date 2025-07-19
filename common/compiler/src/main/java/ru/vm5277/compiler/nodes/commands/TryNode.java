@@ -27,8 +27,8 @@ import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.Scope;
@@ -52,7 +52,7 @@ public class TryNode extends CommandNode {
 		// Блок try
 		if(tb.match(Delimiter.LEFT_BRACE)) {
 			tb.getLoopStack().add(this);
-			try {this.tryBlock = new BlockNode(tb, mc);} catch(ParseException e) {markFirstError(e);}
+			try {this.tryBlock = new BlockNode(tb, mc);} catch(CompileException e) {markFirstError(e);}
 			tb.getLoopStack().remove(this);
 		}
 		else markError("Expected '{' after 'try'");
@@ -60,19 +60,19 @@ public class TryNode extends CommandNode {
 		// Парсим параметр catch (byte errCode)
 		if (tb.match(Keyword.CATCH)) {
 			consumeToken(tb); // Потребляем "catch"
-			try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(ParseException e) {markFirstError(e);}
+			try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(CompileException e) {markFirstError(e);}
 			if (tb.match(TokenType.TYPE, Keyword.BYTE)) {tb.consume();} // Потребляем "byte"
 			else markError("Expected 'byte' type in catch parameter");
 			if (tb.match(TokenType.ID)) {this.varName = consumeToken(tb).getStringValue();}
 			else markError("Expected variable name in catch parameter");
-			try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(ParseException e) {markFirstError(e);}
+			try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(CompileException e) {markFirstError(e);}
 			// Тело catch
-			try {consumeToken(tb, Delimiter.LEFT_BRACE);} catch(ParseException e) {markFirstError(e);}
+			try {consumeToken(tb, Delimiter.LEFT_BRACE);} catch(CompileException e) {markFirstError(e);}
 
 			// Если сразу идет код без case/default - считаем его default-блоком
             if (!tb.match(Keyword.CASE) && !tb.match(Keyword.DEFAULT) && !tb.match(Delimiter.RIGHT_BRACE)) {
 				tb.getLoopStack().add(this);
-                try {catchDefaultBlock = new BlockNode(tb, mc, true);} catch (ParseException e) {markFirstError(e);}
+                try {catchDefaultBlock = new BlockNode(tb, mc, true);} catch (CompileException e) {markFirstError(e);}
                 tb.getLoopStack().remove(this);
 			}
 			else {
@@ -89,17 +89,17 @@ public class TryNode extends CommandNode {
 					}
 					else if (tb.match(Keyword.DEFAULT)) {
 						consumeToken(tb); // Потребляем "default"
-						try {consumeToken(tb, Delimiter.COLON);} catch(ParseException e) {markFirstError(e);}
+						try {consumeToken(tb, Delimiter.COLON);} catch(CompileException e) {markFirstError(e);}
 						tb.getLoopStack().add(this);
 						try {catchDefaultBlock = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());}
-						catch(ParseException e) {markFirstError(e);}
+						catch(CompileException e) {markFirstError(e);}
 						tb.getLoopStack().remove(this);
 					}
 					else {
 						markFirstError(parserError("Expected 'case', 'default' or code block in catch"));
 					}
 				}
-				try {consumeToken(tb, Delimiter.RIGHT_BRACE);}catch(ParseException e) {markFirstError(e);}
+				try {consumeToken(tb, Delimiter.RIGHT_BRACE);}catch(CompileException e) {markFirstError(e);}
 			}
 		}
 		// try может быть без catch
@@ -158,7 +158,7 @@ public class TryNode extends CommandNode {
 		// Объявление переменной catch-параметра
 		catchScope = new BlockScope(scope);
 		if(null != varName)	{
-			try{catchScope.addLocal(new Symbol(varName, VarType.BYTE, true, false));}catch(SemanticException e) {markError(e);}
+			try{catchScope.addVariable(new Symbol(varName, VarType.BYTE, true, false));}catch(CompileException e) {markError(e);}
 		}
 
 		// Объявление catch-блоков

@@ -22,15 +22,16 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.Operator;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
+import ru.vm5277.compiler.nodes.expressions.MethodCallExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.VarSymbol;
@@ -53,9 +54,9 @@ public class VarNode extends AstNode {
         }
 		else {
 			consumeToken(tb);
-			try {initializer = new ExpressionNode(tb, mc).parse();} catch(ParseException e) {markFirstError(e);}
+			try {initializer = new ExpressionNode(tb, mc).parse();} catch(CompileException e) {markFirstError(e);}
 		}
-        try {consumeToken(tb, Delimiter.SEMICOLON);}catch(ParseException e) {markFirstError(e);}
+        try {consumeToken(tb, Delimiter.SEMICOLON);}catch(CompileException e) {markFirstError(e);}
 	}
 
 	public VarNode(MessageContainer mc, Set<Keyword> modifiers, VarType type, String name) {
@@ -137,8 +138,8 @@ public class VarNode extends AstNode {
 				}*/
 			/*}*/
 
-			try {blockScope.addLocal(symbol);}
-			catch(SemanticException e) {markError(e);}
+			try {blockScope.addVariable(symbol);}
+			catch(CompileException e) {markError(e);}
 		}
 		else markError("Unexpected scope:" + scope.getClass().getSimpleName() + " in var:" + name);
 
@@ -148,7 +149,7 @@ public class VarNode extends AstNode {
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		try {
-			cgScope = cg.enterLocal(type, VarType.CSTR == type, name);
+			symbol.setCGScope(cg.enterLocal(type, VarType.CSTR == type, name));
 // Проверка инициализации final-полей
 			if (isFinal() && initializer == null) markError("Final variable  '" + name + "' must be initialized");
 
@@ -171,8 +172,13 @@ public class VarNode extends AstNode {
 			if (type.isNumeric() && initType.isNumeric() && type.getSize() < initType.getSize()) { //TODO верятно нужно и в других местах
 				markError("Narrowing conversion from " + initType + " to " + type + " requires explicit cast"); 
 			}
+			
+			ExpressionNode optimizedExpr = initializer.optimizeWithScope(scope);
+			if(null != optimizedExpr) {
+				initializer = optimizedExpr;
+			}
 		}
-		catch (SemanticException e) {markError(e);}
+		catch (CompileException e) {markError(e);}
 		
 		cg.leaveLocal();
 		return true;
@@ -183,8 +189,10 @@ public class VarNode extends AstNode {
 		if(cgDone) return null;
 		cgDone = true;
 
+		CGScope cgScope = symbol.getCGScope();
+		
 		boolean accUsed = false;
-		((CGVarScope)cgScope).build();
+		((CGVarScope)cgScope).build(null);
 		
 		if(VarType.CSTR == type) {
 			if(initializer instanceof LiteralExpression) {
@@ -200,17 +208,23 @@ public class VarNode extends AstNode {
 		else {
 			if(initializer instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
 				cg.loadConstToAcc(cgScope, ((CGVarScope)cgScope).getSize(), ((LiteralExpression)initializer).getNumValue());
+				cg.accToCells(cgScope, (CGVarScope)cgScope);
+				accUsed = true;
 			}
 			else if(initializer instanceof FieldAccessExpression) {
-				cg.loadConstToAcc(	cgScope, ((CGVarScope)cgScope).getSize(), -1);
-				//TODO
-									//((Number)((FieldAccessExpression)initializer).getSymbol().getConstantOperand().getValue()).longValue());
+				cg.loadConstToAcc(cgScope, ((CGVarScope)cgScope).getSize(), -1);
+				cg.accToCells(cgScope, (CGVarScope)cgScope);
+				accUsed = true;
+			}
+			else if(initializer instanceof MethodCallExpression) {
+				initializer.codeGen(cg);
+				cg.retToCells(cgScope, (CGVarScope)cgScope);
 			}
 			else {
 				initializer.codeGen(cg);
+				cg.accToCells(cgScope, (CGVarScope)cgScope);
+				accUsed = true;
 			}
-			cg.accToCells(cgScope, (CGVarScope)cgScope);
-			accUsed = true;
 		}
 		
 		return accUsed;

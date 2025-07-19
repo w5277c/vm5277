@@ -19,7 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.ClassScope;
@@ -101,13 +101,13 @@ public class NewExpression extends ExpressionNode {
 
 			return true;
 		}
-		catch (SemanticException e) {
+		catch (CompileException e) {
 			markError(e.getMessage());
 			return false;
 		}
 	}
 	
-	private MethodSymbol findMatchingConstructor(Scope scope, List<MethodSymbol> constructors, List<VarType> argTypes) throws SemanticException {
+	private MethodSymbol findMatchingConstructor(Scope scope, List<MethodSymbol> constructors, List<VarType> argTypes) throws CompileException {
 		for (MethodSymbol constructor : constructors) {
 			if (isArgumentsMatch(scope, constructor, argTypes)) {
 				return constructor;
@@ -116,7 +116,7 @@ public class NewExpression extends ExpressionNode {
 		return null;
 	}
 //TODO дубликат в MethodCallExpression
-	private boolean isArgumentsMatch(Scope scope, MethodSymbol constructor, List<VarType> argTypes) throws SemanticException {
+	private boolean isArgumentsMatch(Scope scope, MethodSymbol constructor, List<VarType> argTypes) throws CompileException {
 		List<VarType> paramTypes = constructor.getParameterTypes();
 		if (paramTypes.size() != argTypes.size()) {
 			return false;
@@ -140,7 +140,7 @@ public class NewExpression extends ExpressionNode {
 			operands = new long[args.size()];
 			for(int i=0; i<args.size(); i++) {
 				args.get(i).codeGen(cg);
-				operands[i] = cg.getAcc();
+				operands[i] = -1;//cg.getAcc();
 			}
 		}
 

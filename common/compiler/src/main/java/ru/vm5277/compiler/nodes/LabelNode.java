@@ -17,7 +17,7 @@ package ru.vm5277.compiler.nodes;
 
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.semantic.BlockScope;
@@ -62,7 +62,7 @@ public class LabelNode extends AstNode {
 			symbol = new LabelSymbol(name, scope);
 			((BlockScope)scope).addLabel((LabelSymbol)symbol);
 		}
-		catch (SemanticException e) {markError(e);}
+		catch (CompileException e) {markError(e);}
 
 		return true;
 	}

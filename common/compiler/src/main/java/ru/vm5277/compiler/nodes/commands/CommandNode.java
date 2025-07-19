@@ -18,7 +18,7 @@ package ru.vm5277.compiler.nodes.commands;
 import java.util.Arrays;
 import java.util.List;
 import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.BlockNode;
@@ -109,22 +109,22 @@ public abstract class CommandNode extends AstNode {
 		long from = 0;
 		Long to = null;
 
-		try {from = parseNumber(tb);} catch(ParseException e) {markFirstError(e);}
+		try {from = parseNumber(tb);} catch(CompileException e) {markFirstError(e);}
 		if (tb.match(Delimiter.RANGE)) {
 			consumeToken(tb); // Потребляем ".."
-			try{to = parseNumber(tb);}catch(ParseException e) {to=0l;markFirstError(e);}
+			try{to = parseNumber(tb);}catch(CompileException e) {to=0l;markFirstError(e);}
 		}
 
-		try {consumeToken(tb, Delimiter.COLON);} catch(ParseException e) {markFirstError(e);}
+		try {consumeToken(tb, Delimiter.COLON);} catch(CompileException e) {markFirstError(e);}
 		BlockNode blockNode = null;
 		tb.getLoopStack().add(this);
 		try {blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());}
-		catch(ParseException e) {markFirstError(e);}
+		catch(CompileException e) {markFirstError(e);}
 		tb.getLoopStack().remove(this);
 		return new AstCase(from, to, blockNode);
 	}
 
-	private long parseNumber(TokenBuffer tb) throws ParseException {
+	private long parseNumber(TokenBuffer tb) throws CompileException {
 		Token token = consumeToken(tb);
 		if(token instanceof TNumber) {
 			Number number = (Number)token.getValue();

@@ -19,7 +19,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.nodes.ClassNode;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.MethodScope;
@@ -43,14 +43,14 @@ public class SemanticAnalyzer {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg)  {return false;}
 	
 	
-	public void validateName(String name) throws SemanticException {
-        if (name == null || name.isEmpty()) throw new SemanticException("Name cannot be empty");
-        if (null != Keyword.fromString(name)) throw new SemanticException("Name cannot be a keyword");
+	public void validateName(String name) throws CompileException {
+        if (name == null || name.isEmpty()) throw new CompileException("Name cannot be empty");
+        if (null != Keyword.fromString(name)) throw new CompileException("Name cannot be a keyword");
     }
 	
-	protected void validateModifiers(Set<Keyword> modifiers, Keyword... allowedModifiers) throws SemanticException {
+	protected void validateModifiers(Set<Keyword> modifiers, Keyword... allowedModifiers) throws CompileException {
 		if(modifiers.contains(Keyword.PUBLIC) && modifiers.contains(Keyword.PRIVATE)) {
-			throw new SemanticException("Conflicting access modifiers: cannot combine 'public' and 'private'");
+			throw new CompileException("Conflicting access modifiers: cannot combine 'public' and 'private'");
 		}
 
 		// Создаем Set из разрешенных модификаторов
@@ -68,7 +68,7 @@ public class SemanticAnalyzer {
 		}
 
 		// Если есть недопустимые модификаторы
-		if (hasInvalid) throw new SemanticException("Invalid modifier(s): " + invalidMods.toString());
+		if (hasInvalid) throw new CompileException("Invalid modifier(s): " + invalidMods.toString());
 	}
 	
 	protected MethodScope findEnclosingMethodScope(Scope scope) {

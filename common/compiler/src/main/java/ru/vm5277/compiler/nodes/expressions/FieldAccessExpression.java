@@ -17,7 +17,7 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.Arrays;
 import java.util.List;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
@@ -56,7 +56,7 @@ public class FieldAccessExpression extends ExpressionNode {
 	}
 
 	@Override
-	public VarType getType(Scope scope) throws SemanticException {
+	public VarType getType(Scope scope) throws CompileException {
 		if(null == symbol) {
 			declare(scope);
 		}
@@ -117,10 +117,10 @@ public class FieldAccessExpression extends ExpressionNode {
 			}
 
 			if (symbol == null) {
-				throw new SemanticException("Field not found: " + fieldName);
+				throw new CompileException("Field not found: " + fieldName);
 			}
 		}
-		catch (SemanticException e) {
+		catch (CompileException e) {
             markError(e.getMessage());
 			return false;
         }

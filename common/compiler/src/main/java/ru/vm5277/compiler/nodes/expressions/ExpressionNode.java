@@ -25,35 +25,36 @@ import ru.vm5277.common.Operator;
 import static ru.vm5277.common.Operator.MINUS;
 import static ru.vm5277.common.Operator.PLUS;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.ParseException;
-import ru.vm5277.common.exceptions.SemanticException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.FieldNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.VarNode;
 import ru.vm5277.compiler.semantic.AstHolder;
-import ru.vm5277.compiler.semantic.FieldSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 import ru.vm5277.compiler.tokens.Token;
 
 public class ExpressionNode extends AstNode {
+	protected	CGScope	cgScope;
+	
 	public ExpressionNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
 	}
 	
-    public ExpressionNode parse() throws ParseException {
+    public ExpressionNode parse() throws CompileException {
         return parseAssignment();
     }
    
-	public ExpressionNode optimizeWithScope() throws ParseException {
+	public ExpressionNode optimizeWithScope() throws CompileException {
 		return this;
 	};
 	
-	private ExpressionNode parseAssignment() throws ParseException{
+	private ExpressionNode parseAssignment() throws CompileException {
 		ExpressionNode left = parseBinary(0);
 
 		if (tb.match(TokenType.OPERATOR) && ((Operator)tb.current().getValue()).isAssignment()) {
@@ -67,7 +68,7 @@ public class ExpressionNode extends AstNode {
 	}
 	
 	
-	private ExpressionNode parseBinary(int minPrecedence) throws ParseException {
+	private ExpressionNode parseBinary(int minPrecedence) throws CompileException {
         ExpressionNode left = parseUnary();
 
 		while (tb.match(TokenType.OPERATOR)) {
@@ -95,7 +96,7 @@ public class ExpressionNode extends AstNode {
 				consumeToken(tb); // Пропускаем 'is'
 
 				// Запрещаем литералы слева
-				if (left instanceof LiteralExpression) throw new ParseException("Literals cannot be used with 'instanceof'", left.getSP());
+				if (left instanceof LiteralExpression) throw new CompileException("Literals cannot be used with 'instanceof'", left.getSP());
 
 				if (minPrecedence > Operator.PRECEDENCE.get(operator)) {
 					break;
@@ -136,7 +137,7 @@ public class ExpressionNode extends AstNode {
     }
 	
 	// Агрессивная оптимизация
-	private ExpressionNode optimizeOperationChain(ExpressionNode left, Operator op, ExpressionNode right, int precedence) throws ParseException {
+	private ExpressionNode optimizeOperationChain(ExpressionNode left, Operator op, ExpressionNode right, int precedence) throws CompileException {
 		// Оптимизация унарных операций (если левая часть - унарный оператор)
 		if (right instanceof UnaryExpression) {
 			UnaryExpression unary = (UnaryExpression)right;
@@ -281,13 +282,34 @@ public class ExpressionNode extends AstNode {
 				result = term.isPositive() ? node : new UnaryExpression(tb, mc, Operator.MINUS, node);
 			}
 			else {
-				result = new BinaryExpression(tb, mc, node, term.isPositive() ? Operator.PLUS : Operator.MINUS, result);
+				//Перестановка операндов местами ломает сворачивание констант
+				result = new BinaryExpression(tb, mc, result, term.isPositive() ? Operator.PLUS : Operator.MINUS, node);
 			}
 		}
 		return result != null ? result : new LiteralExpression(tb, mc, hasDoubles ? 0.0 : 0L);
 	}
 
-	private ExpressionNode optimizeExpression(ExpressionNode node) throws ParseException {
+	private ExpressionNode optimizeExpression(ExpressionNode node) throws CompileException {
+		// Оптимизация цепочек примитивных приведений типов
+		if (node instanceof CastExpression) {
+			CastExpression leftCast = (CastExpression)node;
+			// Если операнд - тоже приведение типа
+			ExpressionNode operand = optimizeExpression(leftCast.getOperand());
+			CastExpression result = new CastExpression(tb, mc, leftCast.getType(), operand);
+			
+			if(operand instanceof CastExpression) {
+				CastExpression rightCast = (CastExpression)operand;
+				// Если оба типа примитивные
+				if (leftCast.getType().isPrimitive() && rightCast.getType().isPrimitive()) {
+					// Если внутреннее приведение - расширяющее, его можно убрать
+					if (leftCast.getType().getSize() <= rightCast.getType().getSize()) {
+						return optimizeExpression(new CastExpression(tb, mc, leftCast.getType(), rightCast.getOperand()));
+					}
+				}
+			}
+			return result;
+		}
+		
 		if (node instanceof InstanceOfExpression) {
 			InstanceOfExpression ioe = (InstanceOfExpression)node;
 
@@ -317,7 +339,22 @@ public class ExpressionNode extends AstNode {
 	
 	
 	// Оптимизация выражения с использованием Scope (поздний этап).
-	public ExpressionNode optimizeWithScope(Scope scope) throws ParseException {
+	// Осторожно с новыми инстансами выражений, теряем проинициализированные при семантическом анализе поля.
+	public ExpressionNode optimizeWithScope(Scope scope) throws CompileException {
+		if (this instanceof CastExpression) {
+			CastExpression cast = (CastExpression)this;
+			ExpressionNode operand = cast.getOperand().optimizeWithScope(scope);
+			if(null == operand) operand = cast.getOperand();
+
+			VarType operandType = operand.getType(scope);
+			
+			// Если внутреннее приведение - расширяющее, его можно убрать
+			if (null != operandType && cast.getType().isPrimitive() && operandType.isPrimitive() && cast.getType().getSize() >= operandType.getSize()) {
+				return operand;
+			}
+			return null;
+		}
+
 		// Заменяем переменные на их значения из Scope (если они final и известны)
 		if (this instanceof VarFieldExpression) {
 			VarFieldExpression vfe = (VarFieldExpression)this;
@@ -582,7 +619,23 @@ public class ExpressionNode extends AstNode {
 		terms.add(new Term(isPositive ? Operator.MULT : Operator.DIV, node, isPositive));
 	}
 	
-	private ExpressionNode parseUnary() throws ParseException {
+	private ExpressionNode parseUnary() throws CompileException {
+		// Обработка приведения типов (type)expr
+		if (tb.match(Delimiter.LEFT_PAREN)) {
+			consumeToken(tb);
+			VarType type = checkPrimtiveType();
+			if (type == null) {
+				type = checkClassType();
+			}
+
+			consumeToken(tb, Delimiter.RIGHT_PAREN);
+			
+			if (type != null) {
+				ExpressionNode expr = parseUnary();
+				return new CastExpression(tb, mc, type, expr);
+			}
+		}
+		
 		if (tb.match(TokenType.OPERATOR)) {
 			Operator operator = ((Operator)tb.current().getValue()); //TODO check it
 			
@@ -613,7 +666,7 @@ public class ExpressionNode extends AstNode {
 		return parsePostfix();
 	}
 	
-	private ExpressionNode parsePostfix() throws ParseException {
+	private ExpressionNode parsePostfix() throws CompileException {
 		ExpressionNode expr = parsePrimary();
         
 		while (true) {
@@ -639,7 +692,7 @@ public class ExpressionNode extends AstNode {
     }
 
 	
-	private ExpressionNode parsePrimary() throws ParseException {
+	private ExpressionNode parsePrimary() throws CompileException {
 		Token token = tb.current();
         
 		if(tb.match(Keyword.NEW)) {
@@ -675,11 +728,11 @@ public class ExpressionNode extends AstNode {
 			return expr;
 		}
 		else {
-			throw new ParseException("Unexpected token in expression: " + token, tb.current().getSP());
+			throw new CompileException("Unexpected token in expression: " + token, tb.current().getSP());
         }
     }
 	
-	private ExpressionNode parseMethodCall(ExpressionNode target) throws ParseException {
+	private ExpressionNode parseMethodCall(ExpressionNode target) throws CompileException {
 		// Проверяем, является ли target MemberAccessExpression или VariableExpression
 		String methodName;
 		if(target instanceof FieldAccessExpression) {
@@ -691,7 +744,7 @@ public class ExpressionNode extends AstNode {
 			target = null; // Статический вызов
 		}
 		else {
-			throw new ParseException("Invalid method call target", tb.current().getSP());
+			throw new CompileException("Invalid method call target", tb.current().getSP());
 		}
 
 		List<ExpressionNode> args = parseArguments(tb);
@@ -713,10 +766,10 @@ public class ExpressionNode extends AstNode {
 		return "expression";
 	}
 	
-	public VarType getType(Scope scope) throws SemanticException {
-		throw new SemanticException("Not supported here.");
+	public VarType getType(Scope scope) throws CompileException {
+		throw new CompileException("Not supported here.");
 	}
-//	public abstract VarType getType(Scope scope) throws SemanticException;
+//	public abstract VarType getType(Scope scope) throws CompileException;
 	
 	@Override
 	public boolean preAnalyze() {
@@ -738,11 +791,7 @@ public class ExpressionNode extends AstNode {
 		return null;
 	}
 	
-	public int getResId() {
-		int result = -1;
-		if(symbol instanceof AstHolder) {
-			result = ((AstHolder)symbol).getNode().getCGScope().getResId();
-		}
-		return result;
+	public void setSymbol(Symbol symbol) {
+		this.symbol = symbol;
 	}
 }
