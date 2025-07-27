@@ -116,6 +116,10 @@ public class VarType {
 		return className != null || this == CLASS;
 	}
 	
+	public boolean isObject() {
+		return isClassType() && "Object".equals(className);
+	}
+	
 	public String getClassName() {
 		return className;
 	}
@@ -169,9 +173,8 @@ public class VarType {
 		if (this == SHORT) return 2;
 		if (this == FIXED) return 2;
 		if (this == INT) return 4;
-		if (this == CSTR) return -1;
-		//TODO -1 - даем знать кодогенератору, что это ссылка, он сам должен определить используемый размер
-		throw new CompileException("getSize() unsupported for VarType: " + toString());
+		return -1; //TODO -1 - даем знать кодогенератору, что это ссылка, он сам должен определить используемый размер
+//		throw new CompileException("getSize() unsupported for VarType: " + toString());
 	}
 
 	public boolean isArray() {

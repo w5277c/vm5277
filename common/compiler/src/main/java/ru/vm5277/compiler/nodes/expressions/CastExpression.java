@@ -89,13 +89,13 @@ public class CastExpression extends ExpressionNode {
 
 	@Override
 	public Object codeGen(CodeGenerator cg) throws Exception {
-		operand.codeGen(cg);
+		Object result = operand.codeGen(cg);
 		if (sourceType != targetType) {
 			if (sourceType.isNumeric() && targetType.isNumeric()) {
 				cg.accCast(cgScope, targetType);
 			}
 		}
-		return null;
+		return result;
 	}
 
 	public VarType getTargetType() {

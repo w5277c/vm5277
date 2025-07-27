@@ -470,7 +470,14 @@ public class ASTPrinter {
 		else if(expr instanceof CastExpression) {
 			CastExpression ce = (CastExpression)expr;
 			out.put("(" + ce.getTargetType() + ")");
-			printExpr(ce.getOperand());
+			if (!(ce.getOperand() instanceof VarFieldExpression || ce.getOperand() instanceof LiteralExpression)) {
+				out.put("(");
+				printExpr(ce.getOperand());
+				out.put(")");
+			}
+			else {
+				printExpr(ce.getOperand());
+			}
 		}
 		else {
 			out.put("!unknown expr:" + expr); out.print();
@@ -486,6 +493,10 @@ public class ASTPrinter {
 			int childPriority = Operator.PRECEDENCE.get(childOp);
 
 			needParentheses = (childPriority < parentPriority) || (childPriority == parentPriority && !childOp.isLeftAssociative() && isLeft);
+		}
+		else if (operand instanceof CastExpression && parentOp != null) {
+			// Всегда ставим скобки вокруг каста, если он является частью более сложного выражения
+			needParentheses = true;
 		}
 
 		if (needParentheses) out.put("(");

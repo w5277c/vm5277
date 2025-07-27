@@ -41,7 +41,7 @@ public class ASTParser extends AstNode {
 		
 		if(tokens.isEmpty()) return;
 		
-		tb = new TokenBuffer(tokens.iterator());
+		tb = new TokenBuffer(tokens.listIterator());
 		// Обработка импортов		
 		while (tb.match(Keyword.IMPORT) && !tb.match(TokenType.EOF)) {
 			ImportNode importNode = new ImportNode(tb, mc);

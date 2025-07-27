@@ -307,6 +307,26 @@ public class ExpressionNode extends AstNode {
 					}
 				}
 			}
+			else if(operand instanceof LiteralExpression) {
+				LiteralExpression le = (LiteralExpression) operand;
+				VarType newType = leftCast.getType();
+				
+				Object value = null;
+				if(VarType.BOOL == newType) {
+					value = (byte)(le.getNumValue() & 0x01);
+				}
+				else if(newType.isInteger()) {
+					value = (long)(le.getNumValue() & ((1l<<(newType.getSize()*8))-1));
+				}
+				else if(VarType.FIXED == newType) {
+					double tmp = le.getValue() instanceof Double ? (Double)le.getValue() : (double)le.getNumValue();
+					// Ограничиваем целую часть диапазоном FIXED (Q7.8)
+					value = Math.max(-128.0, Math.min(127.99609375, tmp));
+				}
+				if(null != value) {
+					return new LiteralExpression(tb, mc, value);
+				}
+			}
 			return result;
 		}
 		
@@ -628,11 +648,13 @@ public class ExpressionNode extends AstNode {
 				type = checkClassType();
 			}
 
-			consumeToken(tb, Delimiter.RIGHT_PAREN);
-			
 			if (type != null) {
-				ExpressionNode expr = parseUnary();
+				consumeToken(tb, Delimiter.RIGHT_PAREN);
+				ExpressionNode expr = parse();
 				return new CastExpression(tb, mc, type, expr);
+			}
+			else {
+				tb.back();
 			}
 		}
 		

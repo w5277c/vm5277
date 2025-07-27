@@ -17,27 +17,24 @@
 //TODO пересмотреть getType и postAnalyze, код как минимум не оптимизирован
 package ru.vm5277.compiler.nodes.expressions;
 
-import com.sun.javafx.fxml.expression.VariableExpression;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import ru.vm5277.common.StrUtils;
+import ru.vm5277.common.cg.CGCell;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.Operand;
 import ru.vm5277.common.cg.OperandType;
+import ru.vm5277.common.cg.scopes.CGCellsScope;
+import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
-import ru.vm5277.compiler.nodes.MethodNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
-import ru.vm5277.compiler.nodes.VarNode;
 import ru.vm5277.compiler.semantic.AliasSymbol;
-import ru.vm5277.compiler.semantic.AstHolder;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.InterfaceSymbol;
 import ru.vm5277.compiler.semantic.MethodScope;
@@ -51,7 +48,7 @@ public class MethodCallExpression extends ExpressionNode {
 	private	final	String					methodName;
 	private	final	List<ExpressionNode>	args;
 	private			VarType					type;
-	private			List<VarType>			argTypes = new ArrayList<>();
+	private			VarType[]				argTypes;
 	
     public MethodCallExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode parent, String methodName, List<ExpressionNode> arguments) {
         super(tb, mc);
@@ -88,7 +85,7 @@ public class MethodCallExpression extends ExpressionNode {
 		if (null == parentType && null != parent) {
 			try {
 				parentType = parent.getType(scope);
-				if (null == parentType) throw new CompileException("Cannot resolve parent expression");
+				if (null == parentType) throw new CompileException("Cannot resolve:" + parent.toString());
 			}
 			catch (CompileException e) {
 				throw new CompileException("Invalid parent in method call: " + e.getMessage());
@@ -96,9 +93,9 @@ public class MethodCallExpression extends ExpressionNode {
 		}
 		
 		// Получаем типы аргументов
-		List<VarType> argTypes = new ArrayList<>();
-		for (ExpressionNode arg : args) {
-			argTypes.add(arg.getType(scope));
+		argTypes = new VarType[args.size()];
+		for (int i=0; i< args.size(); i++) {
+			argTypes[i] = args.get(i).getType(scope);
 		}
 
 		// Если есть parent (вызов через объект или класс)
@@ -156,12 +153,12 @@ public class MethodCallExpression extends ExpressionNode {
 		throw new CompileException("Method '" + methodName + "' not found");
 	}
 	
-	private boolean isArgumentsMatch(Scope scope, MethodSymbol method, List<VarType> argTypes) throws CompileException {
+	private boolean isArgumentsMatch(Scope scope, MethodSymbol method, VarType[] argTypes) throws CompileException {
 		List<VarType> paramTypes = method.getParameterTypes();
-		if (paramTypes.size() != argTypes.size()) return false;
+		if (paramTypes.size() != argTypes.length) return false;
 
 		for (int i = 0; i < paramTypes.size(); i++) {
-			if (!isCompatibleWith(scope, argTypes.get(i), paramTypes.get(i))) {
+			if (!isCompatibleWith(scope, argTypes[i], paramTypes.get(i))) {
 				return false;
 			}
 		}
@@ -251,9 +248,9 @@ public class MethodCallExpression extends ExpressionNode {
 			}
 			
 			// Получаем типы аргументов
-			argTypes = new ArrayList<>();
-			for (ExpressionNode arg : args) {
-				argTypes.add(arg.getType(scope));
+			argTypes = new VarType[args.size()];
+			for (int i=0; i<args.size(); i++) {
+				argTypes[i]=(args.get(i).getType(scope));
 			}
 
 			// Поиск метода в ClassScope
@@ -345,18 +342,24 @@ public class MethodCallExpression extends ExpressionNode {
 				}
 			}
 
-			cg.invokeNative(cgScope.getParent(), className, symbol.getName(), (null == params ? null : Arrays.toString(params)), type, operands);
+			cg.invokeNative(cgScope, className, symbol.getName(), (null == params ? null : Arrays.toString(params)), type, operands);
 		}
 		else {
-			Operand[] operands = null;
-			if(!args.isEmpty()) {
-				operands = new Operand[args.size()];
+			CGLabelScope rpCGScope = null;
+			int refTypeSize = 1; // TODO Определить значение на базе количества используемых типов класса
 
+			if(!args.isEmpty()) {
 				CGScope oldCGScope = cg.setScope(symbol.getCGScope());
+				
+				// Помещаем в стек адрес возврата
+				rpCGScope = cg.makeLabel(cgScope.getMethodScope(), "RP", true);
+				cg.pushCells(cgScope, 2, new CGCell[]{new CGCell(rpCGScope.getLName())});
 				// Перед обращением к методу, нужно создать в нем необходимые переменные
 				for(int i=0; i<args.size(); i++) {
 					// Получаем параметр вызываемого метода
 					Symbol pSymbol = ((MethodSymbol)symbol).getParameters().get(i);
+					VarType mVarType = pSymbol.getType();
+
 					// Получаем выражение передаваемое этому параметру
 					ExpressionNode expr = args.get(i);
 					// Отстраиваем завивисимости
@@ -366,44 +369,59 @@ public class MethodCallExpression extends ExpressionNode {
 					Symbol vSymbol = ((MethodSymbol)symbol).getScope().resolve(pSymbol.getName());
 					if(vSymbol instanceof AliasSymbol) {
 						// Это алиас, который нужно что???
-						int t =45455;
+						throw new CompileException("Unsupported alias:" + vSymbol.toString());
 					}
 					else {
-						// Создаем новую переменную в scope вызываемого метода
-						CGVarScope dstVScope = cg.enterLocal(vSymbol.getType(), expr instanceof LiteralExpression, vSymbol.getName());
-					
-						// Отстраиваем(выделяем память) новую переменную с учетом cells источника.
-						// К примеру, назначаем теже регистры, что избавляет от лишнего копирования.
-						// При входе в метод регистры источника должны быть сохранены в стек, в при выходе востановлены.
-						dstVScope.build(((CGVarScope)expr.getSymbol().getCGScope()).getCells());
+						int exprTypeSize = argTypes[i].getSize();
+						if(-1 == exprTypeSize) exprTypeSize = cg.getRefSize();
+						// Создаем новую область видимости переменной в вызываемом методе
+						int varSize = mVarType.isObject() ? refTypeSize + exprTypeSize : exprTypeSize;
+						CGVarScope dstVScope = cg.enterLocal(vSymbol.getType(), varSize, false, vSymbol.getName());
+						
+						// Выделяем память в стеке
+						dstVScope.build();
 						cg.leaveLocal();
-						
-						pSymbol.setCGScope(dstVScope);
-						//mNode.getScope().resolve(name)
-						//cg.cellsToAcc(mNode.getCGScope(), (CGVarScope)srcVNode.getCGScope());
-						//cg.accToCells(mNode.getCGScope(), dstVScope);
-						
-						// Не передаем ноду в новый символ, вот только у нас и нет никакой ноды! МЫ должны как-то дать новому символу ссылку на dstVScope
-						// Похоже символ все-же должен хранить resId
-						
-						int t =4545;
+						vSymbol.setCGScope(dstVScope);
+
+						if(expr instanceof LiteralExpression) {
+							if(mVarType.isObject() || mVarType.isReferenceType())	{
+								// Если тип ожидаемого параметра Object(т.е. любой тип) или reference(класс, интерфес, массив),
+								// то передаем ид типа и адрес данных
+								// Мы не можем сразу передать данные даже для примитива, так как размер параметра фиксирован
+								cg.pushConst(cgScope, refTypeSize, argTypes[i].getId());
+								cg.pushCells(cgScope, cg.getRefSize(), ((CGCellsScope)expr.getSymbol().getCGScope()).getCells());
+							}
+							else {
+								cg.pushConst(cgScope, exprTypeSize, ((LiteralExpression)expr).getNumValue());
+							}
+						}
+						else if(expr.getSymbol().getCGScope() instanceof CGCellsScope) {
+							if(mVarType.isObject() || mVarType.isReferenceType())	{
+								// Если тип ожидаемого параметра Object(т.е. любой тип) или reference(класс, интерфес, массив),
+								// то передаем ид типа и адрес данных
+								// Мы не можем сразу передать данные даже для примитива, так как размер параметра фиксирован
+								cg.pushConst(cgScope, refTypeSize, argTypes[i].getId());
+								cg.pushCells(cgScope, cg.getRefSize(), ((CGCellsScope)expr.getSymbol().getCGScope()).getCells());
+							}
+							else {
+								// Иначе, передаем данные примитивов
+								cg.pushCells(cgScope, exprTypeSize, ((CGCellsScope)expr.getSymbol().getCGScope()).getCells());
+							}
+						}
+						else {
+							// TODO массивы
+							throw new CompileException("Unsupported expression:" + expr.toString());
+						}
+						//cg.accToCells(symbol.getCGScope(), dstVScope);
 					}
-					int t =4545;					
-					
-	/*				Symbol pSymbol = ((MethodSymbol)symbol).getParameters().get(i);
-					VarType _type = argTypes.get(i);
-					pSymbol.setType(_type);
-					int resId = cg.enterLocal(_type.getId(), _type.getSize(),  false, pSymbol.getName()); //Локальная переменная, никогда не является константой
-					cg.localStore(resId, ((LiteralExpression)args.get(i)).getNumValue());
-					cg.leaveLocal();
-					pSymbol.setResId(resId);*/
 				}
 				cg.setScope(oldCGScope);
 			}
 			depCodeGen(cg);
 			
 			CGMethodScope mScope = (CGMethodScope)symbol.getCGScope();
-			cg.invokeMethod(cgScope.getParent(), className, symbol.getName(), type, mScope);
+			cg.invokeMethod(cgScope.getParent(), className, symbol.getName(), type, argTypes, mScope);
+			if(null != rpCGScope) cgScope.getParent().append(rpCGScope);
 		}
 		
 		return null;
@@ -412,7 +430,8 @@ public class MethodCallExpression extends ExpressionNode {
 	private Operand makeNativeOperand(CodeGenerator cg, ExpressionNode expr) throws Exception {
 		if(expr instanceof VarFieldExpression) {
 			VarFieldExpression ve = (VarFieldExpression)expr;
-			ve.codeGen(cg);
+			// Кодогенерация VarFieldExpression выполняет запись значения в аккумулятор, но нам этого не нужно, выполняет только зависимость
+			ve.depCodeGen(cg);
 			return new Operand(VarType.CSTR == ve.getType(null) ? OperandType.FLASH_RES : OperandType.LOCAL_RES, ve.getSymbol().getCGScope().getResId());
 		}
 		else if(expr instanceof FieldAccessExpression) {

@@ -16,6 +16,7 @@
 package ru.vm5277.compiler.nodes;
 
 import java.util.Iterator;
+import java.util.ListIterator;
 import java.util.Stack;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.compiler.Delimiter;
@@ -26,10 +27,10 @@ import ru.vm5277.compiler.tokens.Token;
 
 public class TokenBuffer {
 	private	Token	current;
-	private	final	Iterator<Token>		iterator;
-	private	final	Stack<AstNode>		loopStack	= new Stack<>();
+	private	final	ListIterator<Token>	iterator;
+	private	final	Stack<AstNode>		loopStack		= new Stack<>();
 	
-	public TokenBuffer(Iterator<Token> iterator) {
+	public TokenBuffer(ListIterator<Token> iterator) {
 		this.iterator = iterator;
 		this.current = iterator.hasNext() ? iterator.next() : new Token(null, TokenType.EOF, (Object)null);
 	}
@@ -42,6 +43,12 @@ public class TokenBuffer {
 	
 	public Token current() {
 		return current;
+	}
+	
+	public void back() {
+		iterator.previous();
+		current = iterator.previous();
+		iterator.next();
 	}
 	
 	public boolean match(TokenType type) {

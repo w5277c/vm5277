@@ -287,9 +287,14 @@ public class MethodNode extends AstNode {
 		if(cgDone) return null;
 		cgDone = true;
 
-		if(null != blockNode) blockNode.codeGen(cg);
-
 		((CGMethodScope)symbol.getCGScope()).build(cg, launchPoint);
+		
+		/* не требуется
+		for(ParameterNode node : parameters) {
+			node.codeGen(cg);
+		}*/
+		
+		if(null != blockNode) blockNode.codeGen(cg);		
 		
 		if(VarType.VOID == returnType) {
 			cg.eReturn(symbol.getCGScope(), 0);

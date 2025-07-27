@@ -15,10 +15,11 @@
  */
 package ru.vm5277.common.cg.scopes;
 
-import java.util.List;
+import java.util.ArrayList;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGCell;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.RegPair;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.compiler.VarType;
@@ -28,105 +29,69 @@ public class CGMethodScope extends CGBlockScope {
 	private	final	CGLabelScope				lbScope;
 	private	final	VarType						type;
 	private	final	VarType[]					types;
-	private	final	List<Byte>					regsPool;
-	private			int							labelIdCntr	= 1;
+	private	final	ArrayList<RegPair>			regsPool;	// Свободные регистры, true = cвободен
 	
-	public CGMethodScope(CodeGenerator cg, CGClassScope parent, int resId, VarType type, VarType[] types, String name, List<Byte> regsPool) {
-		super(parent, resId, name);
+	public CGMethodScope(CodeGenerator cg, CGClassScope parent, int resId, VarType type, VarType[] types, String name, ArrayList<RegPair> regsPool) {
+		super(parent, resId);
 		
 		this.type = type;
 		this.types = types;
+		this.name = name;
 		this.regsPool = regsPool;
-
-		lbScope = new CGLabelScope(this, labelIdCntr++, null, true);
+		
+		lbScope = new CGLabelScope(this, null, null, true);
 		cg.addLabel(lbScope);
 	}
 	
+	@Override
+	public void build(CodeGenerator cg) throws CompileException {
+		build(cg, false);
+	}
 	public void build(CodeGenerator cg, boolean launchPoint) throws CompileException {
 		CGIContainer cont = new CGIContainer();
-		if(verbose) cont.append(new CGIText(";build " + toString()));
+		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";build " + toString()));
 		if(launchPoint) cont.append(new CGIText("MAIN:"));
 		cont.append(lbScope);
-		
-		
-		if(userRegs.isEmpty()) {
-			for(int i=0; i<userRegs.size(); i++) {
-				cont.append(cg.pushRegAsm(userRegs.get(i)));
-			}
-		}
-		
-		if(0x00 != stackBlockOffset) {
-			cg.setDpStackAlloc();
-			cont.append(cg.stackAllocAsm(stackBlockOffset));
-		}
 		prepend(cont);
 		
-		if(userRegs.isEmpty()) {
-			for(int i=userRegs.size()-1; i>=0; i--) {
-				append(cg.popRegAsm(userRegs.get(i)));
-			}
-		}
-		if(0x00 != stackBlockOffset) append(cg.stackFreeAsm());
-	}
-	
-	
-	public Byte reserveReg() {
-		if(!regsPool.isEmpty()) {
-			Byte reg = regsPool.remove(0x00);
-			putUsedReg(reg);
-			return reg;
-		}
-		return null;
-	}
-	public void releaseReg(List<Byte> regs) {
-		for(Byte reg : regs) {
-			if(null != reg) regsPool.add(reg);
-		}
+		//super.build(cg);
 	}
 
-	
-	//cells(null != oldCells - генерация локальных переменных при вызове не нативного метода):
-	//регистр - не меняем, просто push/pop(все регистры проверяем в первую очередь)
-	//стек - копируем в новые cells
-	//куча - копируем в новые cells
-	//остальное просто используем старые cells
-
-	public CGCell[] memAllocate(int size, CGCell[] oldCells) throws CompileException {
+	@Override
+	//Выделение ячеек для переданных параметров (только стек)
+	public CGCell[] memAllocate(int size) throws CompileException {
 		CGCell[] cells = new CGCell[size];
 		for(int i=0; i<size; i++) {
-			if(null != oldCells) {
-				CGCell oldCell = oldCells[i];
-				if(CGCell.Type.REG == oldCell.getType()) {
-					byte reg = (byte)oldCell.getNum();
-					int index = regsPool.indexOf(reg);
-					if(-1 != index) {
-						regsPool.remove(index);
-						putUsedReg((byte)reg);
-						cells[i] = new CGCell(CGCell.Type.REG, (byte)reg);
-					}
-					else throw new CompileException("Register already used for allocate");
-				}
-				else if(CGCell.Type.STACK == oldCell.getType()) {
-					cells[i] = new CGCell(CGCell.Type.STACK, stackBlockOffset++);
-				}
-				else {
-					throw new CompileException("Unexpected cell type " + oldCell.getType() + " for allocate");
-				}
-			}
-			else {
-				if(!regsPool.isEmpty()) {
-					Byte reg = regsPool.remove(0x00);
-					putUsedReg(reg);
-					cells[i] = new CGCell(CGCell.Type.REG, reg);
-				}
-				else {
-					cells[i] = new CGCell(CGCell.Type.STACK, stackBlockOffset++);
-				}
-			}
+			cells[i] = new CGCell(CGCell.Type.STACK, stackBlockOffset++);
 		}
 		return cells;
 	}
-	
+
+	//TODO работает не корректно(не переиспользует регистры в вызванном методе)
+	public RegPair borrowReg() {
+		for(RegPair pair : regsPool) {
+			if(pair.isFree()) {
+				pair.setFree(false);
+				return pair;
+			}
+		}
+		return null;
+	}
+	public RegPair getReg(byte reg) {
+		for(RegPair pair : regsPool) {
+			if(pair.getReg() == reg) {
+				return pair;
+			}
+		}
+		return null;
+	}
+
+	@Override
+	public boolean isFreeReg(byte reg) {
+		RegPair regPair = getReg(reg);
+		return null == regPair || regPair.isFree();
+	}
+
 	public CGLabelScope getLabel() {
 		return lbScope;
 	}
@@ -138,6 +103,6 @@ public class CGMethodScope extends CGBlockScope {
 	
 	@Override
 	public String getLName() {
-		return "m" + name.toUpperCase();
+		return "M" + name;
 	}
 }

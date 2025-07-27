@@ -29,6 +29,8 @@ public class ParameterNode extends AstNode {
 	private			VarType	type;
     private	final	String	name;
 	private	final	boolean	isFinal;
+	/* не требуется
+	private			CGScope	cgScope;*/
 	
 	public ParameterNode(TokenBuffer tb, MessageContainer mc) throws CompileException {
 		super(tb, mc);
@@ -111,11 +113,19 @@ public class ParameterNode extends AstNode {
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		/* не требуется
+		cgScope = cg.getScope();*/
+		
 		// Проверка типа параметра
 		if (VarType.UNKNOWN == type || VarType.NULL == type) {
 			markError("Invalid parameter type: " + type);
 		}
-
+		/* не требуеся
+		symbol = scope.resolve(name);
+		if(null == symbol) {
+			markError("TODO Parameter not found: " + name);
+		}*/
+		
 		// Дополнительные проверки для массивов
 		if (type.isArray()) {
 			// Проверяем тип элементов массива
@@ -138,6 +148,19 @@ public class ParameterNode extends AstNode {
 		return true;
 	}
 
+	@Override
+	public Object codeGen(CodeGenerator cg) throws Exception {
+/*		int refTypeSize = 1; // TODO Определить значение на базе количества используемых типов класса(также используется в MethodCallExpression)
+		
+		byte accReg=16;
+		if(type.isObject()) {
+			for(int i=0; i<refTypeSize; i++) {
+				cg.popRegAsm(accReg+i);
+			}
+		}*/
+		return null;
+	}
+	
 	@Override
 	public List<AstNode> getChildren() {
 		return null;

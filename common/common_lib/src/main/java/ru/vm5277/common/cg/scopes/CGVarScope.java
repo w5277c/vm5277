@@ -32,19 +32,20 @@ public class CGVarScope extends CGCellsScope {
 		this.isConstant = isConstant;
 	}
 	
-	public void build(CGCell[] oldCells) throws CompileException {
-		if(verbose) append(new CGIText(";build " + toString()));
+	public void build() throws CompileException {
+		if(VERBOSE_LO <= verbose) append(new CGIText(";build " + toString()));
 	
 		if(!isConstant) {
-			if(parent instanceof CGMethodScope) {
-				cells = ((CGMethodScope)parent).memAllocate(size, oldCells);
+			if(parent instanceof CGMethodScope) { // Используется при вызове метода(передача параметров)
+				// Выделять память не нужно, быдет использована обычнаякомбинаия push
+				cells = ((CGMethodScope)parent).memAllocate(size);
 				((CGMethodScope)parent).addLocal(this);
-				append(new CGIText(";alloc " + getPath('.') + " " + Arrays.toString(cells)));
+				if(VERBOSE_LO <= verbose) append(new CGIText(";alloc " + getPath('.') + " " + Arrays.toString(cells)));
 			}
-			else if(parent instanceof CGBlockScope) {
-				if(null == oldCells) cells = ((CGBlockScope)parent).memAllocate(size);
+			else if(parent instanceof CGBlockScope) { // Инициализация переменной в блоке
+				cells = ((CGBlockScope)parent).memAllocate(size);
 				((CGBlockScope)parent).addLocal(this);
-				append(new CGIText(";alloc " + getPath('.') + " " + Arrays.toString(cells)));
+				if(VERBOSE_LO <= verbose) append(new CGIText(";alloc " + getPath('.') + " " + Arrays.toString(cells)));
 			}
 			else {
 				throw new CompileException("TODO unexpected CGScope:" + parent + " for local init");

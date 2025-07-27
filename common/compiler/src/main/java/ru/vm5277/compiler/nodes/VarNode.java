@@ -149,7 +149,7 @@ public class VarNode extends AstNode {
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		try {
-			symbol.setCGScope(cg.enterLocal(type, VarType.CSTR == type, name));
+			symbol.setCGScope(cg.enterLocal(type, (-1 == type.getSize() ? cg.getRefSize() : type.getSize()), VarType.CSTR == type, name));
 // Проверка инициализации final-полей
 			if (isFinal() && initializer == null) markError("Final variable  '" + name + "' must be initialized");
 
@@ -191,8 +191,8 @@ public class VarNode extends AstNode {
 
 		CGScope cgScope = symbol.getCGScope();
 		
-		boolean accUsed = false;
-		((CGVarScope)cgScope).build(null);
+		Boolean accUsed = null;
+		((CGVarScope)cgScope).build();
 		
 		if(VarType.CSTR == type) {
 			if(initializer instanceof LiteralExpression) {
@@ -207,13 +207,12 @@ public class VarNode extends AstNode {
 		}
 		else {
 			if(initializer instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
-				cg.loadConstToAcc(cgScope, ((CGVarScope)cgScope).getSize(), ((LiteralExpression)initializer).getNumValue());
-				cg.accToCells(cgScope, (CGVarScope)cgScope);
-				accUsed = true;
+				CGVarScope vScope = ((CGVarScope)cgScope);
+				cg.constToCells(cgScope, vScope.getStackOffset(), ((LiteralExpression)initializer).getNumValue(), vScope.getCells());
 			}
 			else if(initializer instanceof FieldAccessExpression) {
-				cg.loadConstToAcc(cgScope, ((CGVarScope)cgScope).getSize(), -1);
-				cg.accToCells(cgScope, (CGVarScope)cgScope);
+				CGVarScope vScope = ((CGVarScope)cgScope);
+				cg.constToCells(cgScope, vScope.getStackOffset(), -1, vScope.getCells());
 				accUsed = true;
 			}
 			else if(initializer instanceof MethodCallExpression) {

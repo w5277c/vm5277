@@ -32,11 +32,11 @@ public class CGFieldScope extends CGCellsScope {
 	}
 	
 	public void build() throws CompileException {
-		if(verbose) append(new CGIText(";build " + toString()));
+		if(VERBOSE_LO <= verbose) append(new CGIText(";build " + toString()));
 		
 		cells = ((CGClassScope)parent).memAllocate(size, isStatic);
 		((CGClassScope)parent).addField(this);
-		append(new CGIText(";alloc " + getPath('.') + " " + Arrays.toString(cells)));
+		if(VERBOSE_LO <= verbose) append(new CGIText(";alloc " + getPath('.') + " " + Arrays.toString(cells)));
 	}
 	
 	@Override

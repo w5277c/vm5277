@@ -137,7 +137,7 @@ public class ReturnNode extends CommandNode {
 			//ReturnNode не имеет собственного CGScope, выражение видит CGMethodScope
 			if(expr instanceof LiteralExpression) {
 				//cg.setAcc(cgScope, returnType.getSize(), ((LiteralExpression)expr).getNumValue());
-				cg.loadConstToAcc(cgScope, returnType.getSize(), ((LiteralExpression)expr).getNumValue());
+				cg.constToAcc(cgScope, returnType.getSize(), ((LiteralExpression)expr).getNumValue());
 			}
 		}
 		cg.eReturn(cgScope, returnType.getSize());

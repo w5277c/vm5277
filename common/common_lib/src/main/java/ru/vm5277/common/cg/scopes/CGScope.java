@@ -21,6 +21,9 @@ import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGIText;
 
 public class CGScope extends CGIContainer {
+	public		final	static	int						VERBOSE_NO	= 0;
+	public		final	static	int						VERBOSE_LO	= 1;
+	public		final	static	int						VERBOSE_HI	= 2;
 	private				static	int						idCntr		= 0;
 	protected					String					name;
 	protected					CGScope					parent;
@@ -29,7 +32,7 @@ public class CGScope extends CGIContainer {
 	
 	protected					int						resId;
 	private						int						sbPos		= 0;
-	public				static	boolean					verbose;
+	public				static	int						verbose;
 	
 	public static int genId() {
 		return idCntr++;
@@ -44,8 +47,8 @@ public class CGScope extends CGIContainer {
 		this.name = name;
 		this.resId = resId;
 		
-		if(verbose && !(this instanceof CGExpressionScope)) {
-			append(new CGIText(";CG: " + getClass().getSimpleName() + " " + name + ", resId:" + resId));
+		if(VERBOSE_HI == verbose && !(this instanceof CGExpressionScope)) {
+			append(new CGIText(";CG: " + getClass().getSimpleName() + (name.isEmpty() ? "" :  " " + name) + ", resId:" + resId));
 		}
 		
 		if(null != parent) {
@@ -119,6 +122,15 @@ public class CGScope extends CGIContainer {
 		return null;
 	}
 	
+	public CGMethodScope getMethodScope() {
+		CGScope _scope = this;
+		while(null != _scope) {
+			if(_scope instanceof CGMethodScope) return (CGMethodScope)_scope;
+			_scope = _scope.getParent();
+		}
+		return null;
+	}
+
 	@Override
 	public String toString() {
 		return getClass().getSimpleName() + ":" + name;

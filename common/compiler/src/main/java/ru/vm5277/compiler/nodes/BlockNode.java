@@ -21,6 +21,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
@@ -45,6 +47,7 @@ public class BlockNode extends AstNode {
 	private	List<AstNode>			children	= new ArrayList<>();
 	private	Map<String, LabelNode>	labels		= new HashMap<>();
 	private	BlockScope				blockScope;
+	private	CGBlockScope			cgScope;
 	
 	public BlockNode() {
 	}
@@ -155,27 +158,14 @@ public class BlockNode extends AstNode {
 		consumeToken(tb, Delimiter.RIGHT_BRACE);
     }
 
-	public BlockNode(MessageContainer mc) throws CompileException {
-        super(null, mc);
-	}
-	
 	public static  boolean hasReturnStatement(AstNode node) {
 		if (null == node) return false;
 
 		// Если это return-выражение
 		if (node instanceof ReturnNode) return true;
 
-		// Если это блок, проверяем все его декларации
-		if (node instanceof BlockNode) {
-			BlockNode block = (BlockNode)node;
-			for (AstNode nodes : block.getChildren()) {
-				if (hasReturnStatement(nodes)) {
-					return true;
-				}
-			}
-		}
-		// Для других узлов проверяем их дочерние блоки
-		else {
+		// Проверяем дочерние блоки
+		if(null != node.getChildren()) {
 			for (AstNode _node : node.getChildren()) {
 				if (hasReturnStatement(_node)) {
 					return true;
@@ -247,6 +237,8 @@ public class BlockNode extends AstNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		cgScope = cg.enterBlock();
+		
 		boolean inTryBlock = false;
 		TryNode currentTryNode = null;
 
@@ -273,11 +265,11 @@ public class BlockNode extends AstNode {
 			}
 
 			// Если это конец try-block, сбрасываем флаг
-            if (inTryBlock && node == currentTryNode.getEndNode()) {
-                inTryBlock = false;
-                currentTryNode = null;
-            }
-			
+			if (inTryBlock && node == currentTryNode.getEndNode()) {
+				inTryBlock = false;
+				currentTryNode = null;
+			}
+
 			// Проверяем недостижимый код после прерывающих инструкций
 			if (i > 0 && isControlFlowInterrupted(children.get(i - 1))) {
 				markError("Unreachable code after " + children.get(i - 1).getClass().getSimpleName());
@@ -285,6 +277,8 @@ public class BlockNode extends AstNode {
 				break;
 			}
 		}
+		
+		cg.leaveBlock();
 		return true;
 	}
 
@@ -292,6 +286,8 @@ public class BlockNode extends AstNode {
 	public Object codeGen(CodeGenerator cg) throws Exception {
 		if(cgDone) return null;
 		cgDone = true;
+		
+		cgScope.build(cg);
 		
 		for(AstNode node : children) {
 			//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
@@ -308,6 +304,10 @@ public class BlockNode extends AstNode {
 		return getClass().getSimpleName();
 	}
 
+	public CGBlockScope getCGScope() {
+		return cgScope;
+	}
+	
 	@Override
 	public List<AstNode> getChildren() {
 		return children;

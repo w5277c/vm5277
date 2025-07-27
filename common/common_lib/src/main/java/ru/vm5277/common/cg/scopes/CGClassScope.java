@@ -62,6 +62,6 @@ public class CGClassScope extends CGScope {
 	
 	@Override
 	public String getLName() {
-		return "c" + name.toUpperCase();
+		return "C" + name;
 	}
 }

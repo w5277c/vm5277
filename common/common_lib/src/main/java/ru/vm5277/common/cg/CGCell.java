@@ -21,17 +21,26 @@ public class CGCell {
 		STACK,	//блок памяти выделенный в стеке
 		STAT,	//глобальный блок памяти выделенный под статические переменные
 		HEAP,	//блок памяти выделенный в инстансе класса
-		RET;	//результат возвращенный методом, регистры z и y
+
+		RET,	//результат возвращенный методом, регистры z и y
+		LABEL,	//метка
+		REF;	//адрес на объект(класс, массив)
 	}
 	
 	private	Type	type;
 	private	int		num;
+	private	String	label;
 	
 	public CGCell(Type type, int num) {
 		this.type = type;
 		this.num = num;
 	}
 	
+	public CGCell(String label) {
+		this.type = Type.LABEL;
+		this.label = label;
+	}
+
 	public Type getType() {
 		return type;
 	}
@@ -40,8 +49,12 @@ public class CGCell {
 		return num;
 	}
 	
+	public String getLabel() {
+		return label;
+	}
+	
 	@Override
 	public String toString() {
-		return type + ":" + num;
+		return (Type.LABEL == type ? label + ":" : (type + ":" + num));
 	}
 }

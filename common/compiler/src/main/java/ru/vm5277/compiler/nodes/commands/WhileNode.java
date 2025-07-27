@@ -19,12 +19,12 @@ import java.util.Arrays;
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -36,7 +36,7 @@ public class WhileNode extends CommandNode {
 	private	ExpressionNode	condition;
 	private	BlockNode		blockNode;
 	private	BlockScope		blockScope;
-
+		
 	public WhileNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
 
@@ -92,6 +92,8 @@ public class WhileNode extends CommandNode {
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		cgScope = cg.getScope();
+		
 		// Проверка типа условия
 		if (null != condition) {
 			if(condition.postAnalyze(scope, cg)) {
@@ -104,7 +106,9 @@ public class WhileNode extends CommandNode {
 		}
 
 		// Анализ тела цикла
-		if (null != blockNode) blockNode.postAnalyze(blockScope, cg);
+		if (null != blockNode) {
+			blockNode.postAnalyze(blockScope, cg);
+		}
 		
 		// Проверяем бесконечный цикл с возвратом
 		if (condition instanceof LiteralExpression && Boolean.TRUE.equals(((LiteralExpression)condition).getValue()) &&	isControlFlowInterrupted(blockNode)) {
@@ -122,20 +126,14 @@ public class WhileNode extends CommandNode {
 		if(condition instanceof LiteralExpression) {
 			LiteralExpression le = (LiteralExpression)condition;
 			if(0x00 != le.getNumValue()) {
-				CGBlockScope bodyResScope = cg.enterBlock();
 				blockNode.codeGen(cg);
-				cg.leaveBlock();
-				cg.eWhile(null, bodyResScope);
+				cg.eWhile(cgScope, null, blockNode.getCGScope());
 			}
 		}
 		else {
-			CGBlockScope condResScope = cg.enterBlock();
 			condition.codeGen(cg);
-			cg.leaveBlock();
-			CGBlockScope bodyResScope = cg.enterBlock();
 			blockNode.codeGen(cg);
-			cg.leaveBlock();
-			cg.eWhile(condResScope, bodyResScope);
+			cg.eWhile(cgScope, condition.getSymbol().getCGScope(), blockNode.getCGScope());
 		}
 		
 

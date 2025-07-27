@@ -127,7 +127,7 @@ public class LiteralExpression extends ExpressionNode {
 //				cg.setAcc(cScope, 0x01, 0);
 //			}
 			//accum.set(scope, size, value);
-			cg.loadConstToAcc(cScope, cScope.getSize(), getNumValue());
+			cg.constToAcc(cScope, cScope.getSize(), getNumValue());
 		}
 		return null;
 	}

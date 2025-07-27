@@ -228,7 +228,7 @@ public class ClassScope extends Scope {
 		return null;
 	}
 	
-	public MethodSymbol resolveMethod(String methodName, List<VarType> argTypes) throws CompileException {
+	public MethodSymbol resolveMethod(String methodName, VarType[] argTypes) throws CompileException {
 		// Ищем методы в текущем классе
 		List<MethodSymbol> candidates = methods.get(methodName);
 		if (null == candidates) return null;
@@ -248,14 +248,14 @@ public class ClassScope extends Scope {
 	}
 */
 	
-	private boolean isApplicable(MethodSymbol method, List<VarType> argTypes) throws CompileException {
+	private boolean isApplicable(MethodSymbol method, VarType[] argTypes) throws CompileException {
 		List<VarType> paramTypes = method.getParameterTypes();
-		if (paramTypes.size() != argTypes.size()) {
+		if (paramTypes.size() != argTypes.length) {
 			return false;
 		}
 
 		for (int i=0; i<paramTypes.size(); i++) {
-			if (!AstNode.isCompatibleWith(this, paramTypes.get(i), argTypes.get(i))) {
+			if (!AstNode.isCompatibleWith(this, paramTypes.get(i), argTypes[i])) {
 				return false;
 			}
 		}

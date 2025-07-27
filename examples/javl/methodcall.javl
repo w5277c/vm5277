@@ -13,27 +13,19 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ru.vm5277.common.cg.scopes;
+import rtos.System;
 
-public class CGLabelScope extends CGScope {
-	private	static	int		idCntr	= 0;
-	private			boolean	isUsed;
-	
-	
-	public CGLabelScope(CGScope scope, Integer resId, String name, boolean isUsed) {
-		super();
-		
-		this.resId = (null == resId ? idCntr++ : resId);
-		this.name = "Javl" + (null == scope ? "" : scope.getLPath()) + (null != name ? name : "") + this.resId;
-		this.isUsed = isUsed;
-	}
+class Main {
+    public static void main() {
+		byte src1 = 1;
+		short src2 = 2;
+		byte result = inc(src1, src2);
+		System.outNum(result);
+		System.stop();
+    }
 
-	public void setUsed() {
-		isUsed = true;
-	}
-	
-	@Override
-	public String getSource() {
-		return isUsed ? name + ":\n" : "";
+    private byte inc(byte val1, short val2) {
+		byte tmp = 3;
+		return (byte)(val1+val2+tmp);
 	}
 }

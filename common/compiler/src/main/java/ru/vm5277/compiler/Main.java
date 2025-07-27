@@ -63,7 +63,7 @@ public class Main {
 		String mcu = null;
 		Integer	core_freq = null;
 		String source = null;
-		boolean cgVerbose = false;
+		int cgVerbose = 0;
 		
 		if(0x02 <= args.length) {
 			String[] parts = args[0x00].split(":");
@@ -91,9 +91,22 @@ public class Main {
 							System.err.println("[ERROR] Invalid parameter " + arg + " value: " + value);
 						}
 					}
-				}
-				else if(arg.equalsIgnoreCase("--cg_verbose")) {
-					cgVerbose = true;
+					else if(arg.equalsIgnoreCase("--cg-verbose")) {
+						String value = args[++i];
+						try {
+							cgVerbose = Integer.parseInt(value);
+							if(0>cgVerbose || 2<cgVerbose) {
+								System.err.println("[ERROR] Invalid parameter " + arg + " value: " + value);
+							}
+						}
+						catch(Exception e) {
+							System.err.println("[ERROR] Invalid parameter " + arg + " value: " + value);
+						}
+					}
+					else {
+						System.err.println("[ERROR] Invalid parameter: " + arg);
+						System.exit(0);
+					}
 				}
 				else {
 					System.err.println("[ERROR] Invalid parameter: " + arg);
@@ -192,7 +205,7 @@ public class Main {
 		System.out.println("  -F, --freq <MHz>\tMCU clock frequency in MHz (default: platform specific)");
 		System.out.println("  -P, --path <dir>\tCustom toolkit directory path");
 		System.out.println("  -I, --include <dir>\tAdditional include path(s)");
-		System.out.println("      --cg_verbose\t\tGenerate detailed codegen info");
+		System.out.println("      --cg-verbose 0-2\t\tGenerate detailed codegen info");
 		System.out.println("  -v, --version\t\tDisplay version");
 		System.out.println("  -h, --help\t\tShow this help");
 		System.out.println();

@@ -23,10 +23,10 @@ import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
-import ru.vm5277.compiler.semantic.AstHolder;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
@@ -62,13 +62,8 @@ public class BinaryExpression extends ExpressionNode {
 	@Override
 	public VarType getType(Scope scope) throws CompileException {
 		// Получаем типы операндов
-		VarType leftType = leftExpr.getType(scope);
-		VarType rightType = rightExpr.getType(scope);
-
-		// Проверяем совместимость типов
-		if (!isCompatibleWith(scope, leftType, rightType)) {
-			throw new CompileException("Type mismatch in binary operation: " + leftType + " " + operator + " " + rightType);
-		}
+		leftType = leftExpr.getType(scope);
+		rightType = rightExpr.getType(scope);
 
 		if (Operator.PLUS == operator && VarType.CSTR == leftType) {
 			return VarType.CSTR;
@@ -159,13 +154,6 @@ public class BinaryExpression extends ExpressionNode {
 	            }
 			}
 
-			// Проверка совместимости типов
-			if (!isCompatibleWith(scope, leftType, rightType)) {
-				markError("Type mismatch: " + leftType.getName() + " " + operator + " " + rightType.getName());
-				cg.leaveExpression();
-				return false;
-			}
-			
 			// Специфичные проверки операторов
 			if (operator.isLogical()) {
 				if (!leftType.isBoolean() || !rightType.isBoolean()) {
@@ -173,29 +161,15 @@ public class BinaryExpression extends ExpressionNode {
 					cg.leaveExpression();
 					return false;
 				}
-				cg.leaveExpression();
-				return true;
 			}
-
-			if (operator.isBitwise()) {
+			else if (operator.isBitwise()) {
 				if (!leftType.isInteger() || !rightType.isInteger()) {
 					markError("Bitwise operators require integer operands");
 					cg.leaveExpression();
 					return false;
 				}
-
-				// Запрет смешивания разных целочисленных типов
-				if (leftType != rightType) {
-					markError("Bitwise operations require identical integer types");
-					cg.leaveExpression();
-					return false;
-				}
-				cg.leaveExpression();
-				return true;
 			}
-			
-			// Проверка деления на ноль (универсальная для всех типов)
-			if ((Operator.DIV == operator || Operator.MOD == operator)) {
+			else if ((Operator.DIV == operator || Operator.MOD == operator)) { // Проверка деления на ноль (универсальная для всех типов)
 				if (rightExpr instanceof LiteralExpression) {
 					Object val = ((LiteralExpression)rightExpr).getValue();
 					boolean isZero = false;
@@ -209,17 +183,8 @@ public class BinaryExpression extends ExpressionNode {
 						return false;
 					}
 				}
-				else {
-					// Для не-литералов предупреждаем о потенциальном делении на ноль
-					if (rightType.isNumeric() && !rightType.isBoolean()) {
-						//TODO constant folding...
-						markWarning("Potential division by zero - runtime check required");
-					}
-				}
 			}
-			
-			// Проверки для арифметических операций
-			if (operator.isArithmetic()) {
+			else if (operator.isArithmetic()) { // Проверки для арифметических операций
 				// Проверки для численных типов
 				if (leftExpr instanceof LiteralExpression && rightExpr instanceof LiteralExpression) {
 					LiteralExpression leftLE = (LiteralExpression)leftExpr;
@@ -284,61 +249,62 @@ public class BinaryExpression extends ExpressionNode {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg) throws Exception {
-		Object rl = depCodeGen(cg, leftExpr.getSymbol());
-		Object rr = depCodeGen(cg, rightExpr.getSymbol());
-		
-		if(null == rl && null == rr) {
-			if(rightExpr instanceof VarFieldExpression) {
-				rr = (CGCellsScope)rightExpr.getSymbol().getCGScope();
-				cg.cellsToAcc(cgScope.getParent(), (CGCellsScope)rr);
-			}
-			else if(leftExpr instanceof VarFieldExpression) {
-				rl = (CGCellsScope)leftExpr.getSymbol().getCGScope();
-				cg.cellsToAcc(cgScope.getParent(), (CGCellsScope)rl);
-			}		
-		}
-
-		if(null == rl && null == rr) {
-			throw new CompileException("Both operands not used accum:" + toString());
-		}	
-
-		ExpressionNode noAccExpr = rightExpr;
+		// Изначально сохраняем порядок left/right
+		ExpressionNode expr1 = leftExpr;
+		ExpressionNode expr2 = rightExpr;
+		// Оптимизация порядка для коммутативных операций
 		if(operator.isCommutative()) {
-			if(null != rl && null != rr) { //TODO похоже ошибка, здесь я пытаюсь выяснить порядок генерации кода, но resId генерируется в postAnalyze!
-				if(((CGScope)rl).getResId()<((CGScope)rr).getResId()) noAccExpr = leftExpr;
+			if(leftExpr instanceof VarFieldExpression || leftExpr instanceof LiteralExpression) {
+				expr1 = rightExpr;
+				expr2 = leftExpr;
 			}
-			else if(null != rr) noAccExpr = leftExpr;
+		}
+
+		// Если expr2 переменная или поле(т.е. содержит cells)
+		if(expr2 instanceof VarFieldExpression) {
+			// Не строим код для expr2(он разместит значение в acc), а нас интересует занчение в cells(только выполняем зависимость)
+			depCodeGen(cg, expr2.getSymbol());
+			// Строим код для expr1(результат в аккумуляторе)
+			if(null == expr1.codeGen(cg)) {
+				// Явно не доработанный код, выражение всегда должно помещать результат в аккумулятор
+				throw new CompileException("Accum not used for operand:" + expr1);
+			}
+			CGCellsScope cScope = (CGCellsScope)expr2.getSymbol().getCGScope();
+			cg.cellsAction(cgScope.getParent(), (cScope instanceof CGVarScope ? ((CGVarScope)cScope).getStackOffset() : 0), cScope.getCells(), operator);
+		}
+		else if(expr2 instanceof LiteralExpression) {
+			// Это константа, код не стоим, заивисимости нет
+			// Строим код для expr1(результат в аккумуляторе)
+			if(null == expr1.codeGen(cg)) {
+				// Явно не доработанный код, выражение всегда должно помещать результат в аккумулятор
+				throw new CompileException("Accum not used for operand:" + expr1);
+			}
+			cg.constAction(cgScope.getParent(), operator, ((LiteralExpression)expr2).getNumValue());
 		}
 		else {
-			if(noAccExpr == leftExpr) {
-				rl = (CGCellsScope)leftExpr.getSymbol().getCGScope();
-				cg.cellsToAcc(cgScope.getParent(), (CGCellsScope)rl);
-				noAccExpr = leftExpr;
+			//CastExprewssion, BinaryExpression и другие
+			if(null == expr2.codeGen(cg)) {
+				// Явно не доработанный код, выражение всегда должно помещать результат в аккумулятор
+				throw new CompileException("Accum not used for operand:" + expr2);
+			}					
+
+			// Определяем максмальный размер операнда
+			int size = (leftType.getSize() > rightType.getSize() ? leftType.getSize() : rightType.getSize());
+			// Код отстроен и результат может быть только в аккумуляторе, сохраняем его
+			cg.pushAcc(cgScope.getParent(), size);
+
+			// Строим код для expr1(результат в аккумуляторе)
+			if(null == expr1.codeGen(cg)) {
+				// Явно не доработанный код, выражение всегда должно помещать результат в аккумулятор
+				throw new CompileException("Accum not used for operand:" + expr1);
 			}
+
+			// Восстанавливаем аккумулятор expr2 во ret cells(как временное хранилище) 
+			cg.popRet(cgScope.getParent(), size);
+			// Выполняем операцию, левый операнд - аккумулятор, правый операнд - ret
+			cg.cellsAction(cgScope.getParent(), 0, cg.getRetCells(size), operator);
 		}
-		
-		// Генерация кода для левого и правого операндов
-		if(noAccExpr instanceof VarFieldExpression) {
-			VarFieldExpression ve = (VarFieldExpression)noAccExpr;
-			if(ve.getSymbol() instanceof AstHolder) {
-				cg.cellsAction(cgScope.getParent(), (CGCellsScope)ve.getSymbol().getCGScope(), operator);
-			}
-			else {
-				throw new CompileException("Unsupported:" + ve.getSymbol());
-			}
-		}
-		else if(noAccExpr instanceof LiteralExpression) {
-			LiteralExpression le = (LiteralExpression)noAccExpr;
-			cg.constAction(cgScope.getParent(), operator, le.getNumValue());
-		}
-		else if(noAccExpr instanceof MethodCallExpression) {
-			MethodCallExpression mce = (MethodCallExpression)noAccExpr;
-			int t=3434;
-		}
-		else {
-			throw new CompileException("Unsupported:" + rightExpr);
-		}
-		return null;
+		return true;
 	}
 
 	@Override

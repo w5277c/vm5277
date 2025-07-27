@@ -22,7 +22,6 @@ import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.AliasSymbol;
-import ru.vm5277.compiler.semantic.AstHolder;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.ClassSymbol;
 import ru.vm5277.compiler.semantic.Scope;
@@ -43,7 +42,7 @@ public class VarFieldExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public VarType getType(Scope scope) {
+	public VarType getType(Scope scope) throws CompileException {
 		if (symbol == null) {
 			symbol = scope.resolve(value);
 			if(null != symbol) {
@@ -57,7 +56,8 @@ public class VarFieldExpression extends ExpressionNode {
 				}
 			}
         }
-        return null == symbol ? null : symbol.getType();
+        if(null == symbol) throw new CompileException("Can't resolve: " + value);
+		return symbol.getType();
 	}
 	
 	@Override
@@ -103,7 +103,32 @@ public class VarFieldExpression extends ExpressionNode {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg) throws Exception {
+		// Выполняет запись значения в аккумулятор. Но зачастую это не требуется, достаточно вызвать depCodeGen
 		if(null == depCodeGen(cg)) {
+			if(symbol instanceof AliasSymbol) {
+				Symbol  vSymbol = scope.resolve(value);
+				while(vSymbol instanceof AliasSymbol) {
+					symbol = ((AliasSymbol)vSymbol).getSymbol();
+					vSymbol = scope.resolve(symbol.getName());
+					if(null != vSymbol && null != vSymbol.getCGScope()) {
+						depCodeGen(cg);
+						CGVarScope vScope = (CGVarScope)vSymbol.getCGScope();
+						cg.cellsToAcc(cgScope.getParent(), vScope);
+						//Назначаем алиас ссылающийся на реальную переменную
+						symbol = vSymbol;
+						break;
+					}
+				}
+			}
+			else {
+				CGVarScope vScope = (CGVarScope)symbol.getCGScope();
+				cg.cellsToAcc(cgScope, vScope);
+			}
+		}
+		return true;
+		
+		// Это странный код, боюсь поломать
+/*		if(null == depCodeGen(cg)) {
 			//Зависимость уже обработана, используем переменную
 			if(symbol instanceof AliasSymbol) {
 				Symbol  vSymbol = scope.resolve(value);
@@ -122,11 +147,18 @@ public class VarFieldExpression extends ExpressionNode {
 			}
 			else {
 				CGVarScope vScope = (CGVarScope)symbol.getCGScope();
+				//Двойное добавление инструкции при вызове нативного метода
+				
+//					byte port = GPIO.PB1;
+//					GPIO.modeOut(port);
+//					GPIO.invert(port);
+				
+
 				cg.cellsToAcc(cgScope.getParent(), vScope);
 			}
 
 //cg.cellsToAcc(cgScope.getParent(), (CGVarScope)cgScope.getParent());
 		}
-		return null;
+		return null;*/
 	}
 }

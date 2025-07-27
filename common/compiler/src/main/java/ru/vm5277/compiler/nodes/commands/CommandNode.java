@@ -17,6 +17,7 @@ package ru.vm5277.compiler.nodes.commands;
 
 import java.util.Arrays;
 import java.util.List;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -73,6 +74,8 @@ public abstract class CommandNode extends AstNode {
 		}
 	}
 
+	protected	CGScope	cgScope;
+	
 	public CommandNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
 	}
@@ -101,7 +104,7 @@ public abstract class CommandNode extends AstNode {
 
 		return false;
 	}
-
+	
 	protected AstCase parseCase(TokenBuffer tb, MessageContainer mc) {
 		consumeToken(tb); // Потребляем "case"
 
