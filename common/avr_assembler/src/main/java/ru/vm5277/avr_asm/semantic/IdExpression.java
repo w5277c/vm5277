@@ -18,7 +18,7 @@ package ru.vm5277.avr_asm.semantic;
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.scope.VariableSymbol;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class IdExpression extends Expression {
@@ -26,12 +26,12 @@ public class IdExpression extends Expression {
 	private	String	name;
 	private	Long	value;
 	
-    public IdExpression(TokenBuffer tb, Scope scope, MessageContainer mc, String name) throws ParseException {
+    public IdExpression(TokenBuffer tb, Scope scope, MessageContainer mc, String name) throws CompileException {
         this.scope = scope;
 		this.name = name;
     }
     
-	public Long getNumericValue() throws ParseException {
+	public Long getNumericValue() throws CompileException {
 		if(null == value) {
 			VariableSymbol symbol = scope.resolveVariable(name);
 			if(null != symbol) {

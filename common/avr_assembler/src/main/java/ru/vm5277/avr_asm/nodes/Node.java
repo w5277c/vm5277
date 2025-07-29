@@ -21,7 +21,7 @@ import ru.vm5277.avr_asm.Delimiter;
 import ru.vm5277.avr_asm.TokenType;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.Operator;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
@@ -45,23 +45,23 @@ public class Node {
     }
 	
 	
-	public static Token consumeToken(TokenBuffer tb, TokenType expectedType) throws ParseException {
+	public static Token consumeToken(TokenBuffer tb, TokenType expectedType) throws CompileException {
 		if (tb.current().getType() == expectedType) return tb.consume();
-		else throw new ParseException("Expected " + expectedType + ", but got " + tb.current().getType(), tb.getSP());
+		else throw new CompileException("Expected " + expectedType + ", but got " + tb.current().getType(), tb.getSP());
     }
-	public static Token consumeToken(TokenBuffer tb, Delimiter delimiter) throws ParseException {
+	public static Token consumeToken(TokenBuffer tb, Delimiter delimiter) throws CompileException {
 		if (TokenType.DELIMITER == tb.current().getType()) {
             if(delimiter == tb.current().getValue()) return tb.consume();
-			else throw new ParseException("Expected delimiter " + delimiter + ", but got " + tb.current().getValue(), tb.getSP());
+			else throw new CompileException("Expected delimiter " + delimiter + ", but got " + tb.current().getValue(), tb.getSP());
         }
-		else throw new ParseException("Expected " + TokenType.DELIMITER + ", but got " + tb.current().getType(), tb.getSP());
+		else throw new CompileException("Expected " + TokenType.DELIMITER + ", but got " + tb.current().getType(), tb.getSP());
     }
-	public static Token consumeToken(TokenBuffer tb, Operator operator) throws ParseException {
+	public static Token consumeToken(TokenBuffer tb, Operator operator) throws CompileException {
 		if (TokenType.OPERATOR == tb.current().getType()) {
             if(operator == tb.current().getValue()) return tb.consume();
-			else throw new ParseException("Expected operator " + operator + ", but got " + tb.current().getValue(), tb.getSP());
+			else throw new CompileException("Expected operator " + operator + ", but got " + tb.current().getValue(), tb.getSP());
         }
-		else throw new ParseException("Expected " + TokenType.OPERATOR + ", but got " + tb.current().getType(), tb.getSP());
+		else throw new CompileException("Expected " + TokenType.OPERATOR + ", but got " + tb.current().getType(), tb.getSP());
     }
 
 	public WarningMessage markWarning(String text) {
@@ -75,7 +75,7 @@ public class Node {
 		return message;
 	}
 
-	public ErrorMessage markError(ParseException e) {
+	public ErrorMessage markError(CompileException e) {
 		ErrorMessage message = new ErrorMessage(e.getMessage(), sp);
 		if(null == error) error = message;
 		mc.add(message);

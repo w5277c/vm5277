@@ -22,11 +22,11 @@ import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.Operator;
 import ru.vm5277.avr_asm.TokenType;
 import ru.vm5277.common.SourcePosition;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class EquNode {
-	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
+	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
 		String name = ((String)Node.consumeToken(tb, TokenType.ID).getValue()).toLowerCase();
 		Node.consumeToken(tb, Operator.ASSIGN);
 		SourcePosition sp = tb.getSP();
@@ -34,7 +34,7 @@ public class EquNode {
 		Long value = Expression.getLong(expr, tb.getSP());
 		if(null == value) {
 			tb.skipLine();
-			throw new ParseException("Unable to resolve constant: '" + expr + "'", sp);
+			throw new CompileException("Unable to resolve constant: '" + expr + "'", sp);
 		}
 		scope.setVariable(new VariableSymbol(name, value, true), tb.getSP());
 		

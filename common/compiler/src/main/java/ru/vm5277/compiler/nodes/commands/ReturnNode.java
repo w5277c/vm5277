@@ -86,7 +86,7 @@ public class ReturnNode extends CommandNode {
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		cgScope = cg.getScope();
+		cgScope = cg.enterCommand();
 	
 		// Находим ближайший MethodScope
 		MethodScope methodScope = findEnclosingMethodScope(scope);
@@ -105,6 +105,7 @@ public class ReturnNode extends CommandNode {
 				if (returnType.isVoid()) markError("Non-void method must return a value");
 				else {
 					if(!expr.postAnalyze(scope, cg)) {
+						cg.leaveCommand();
 						return false;
 					}
 					// Проверяем тип выражения
@@ -123,6 +124,8 @@ public class ReturnNode extends CommandNode {
 				}
 			}
 		}
+		
+		cg.leaveCommand();
 		return true;
 	}
 	

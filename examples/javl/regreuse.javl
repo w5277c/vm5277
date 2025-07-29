@@ -1,0 +1,27 @@
+import rtos.System;
+
+class Main {
+    public static void main() {
+		byte a = 100;
+        {
+            byte b = 10;
+            byte c = 20;
+            System.out(b + c + a);
+        }
+
+        {
+            byte d = 30;
+            byte e = 40;
+            System.out(d + e);
+
+            {
+                byte f = 50;
+                System.out(f);
+            }
+        }
+
+        byte g = 60;
+        byte h = 70;
+        System.out(a + g + h);
+    }
+}

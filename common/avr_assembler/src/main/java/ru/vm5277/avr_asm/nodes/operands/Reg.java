@@ -21,7 +21,7 @@ import ru.vm5277.avr_asm.semantic.IRegExpression;
 import ru.vm5277.avr_asm.semantic.IdExpression;
 import ru.vm5277.avr_asm.semantic.LiteralExpression;
 import ru.vm5277.common.SourcePosition;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class Reg {
 	protected	int	id;
@@ -32,7 +32,7 @@ public class Reg {
 		this.id = id;
 	}
 	
-	public Reg(Scope scope, SourcePosition sp, Expression expr) throws ParseException {
+	public Reg(Scope scope, SourcePosition sp, Expression expr) throws CompileException {
 		if(expr instanceof LiteralExpression) {
 			String str = (String)((LiteralExpression)expr).getValue();
 			switch (str) {
@@ -46,14 +46,14 @@ public class Reg {
 				case "z+": id=30; inc=true; break;
 				case "-z": id=30; dec=true; break;
 				default:
-					throw new ParseException("TODO ожидаем регистр, получили " + expr, sp);
+					throw new CompileException("TODO ожидаем регистр, получили " + expr, sp);
 			}
 		}
 		else if(expr instanceof IdExpression) {
 			String str = (String)((IdExpression)expr).getId();
 			Byte result = scope.resolveReg(str);
 			if(null == result) {
-				throw new ParseException("Unable to resolve register '" + str + "'", sp); 
+				throw new CompileException("Unable to resolve register '" + str + "'", sp); 
 			}
 			id = result;
 		}
@@ -61,10 +61,10 @@ public class Reg {
 			id = ((IRegExpression)expr).getId();
 		}
 		else {
-			throw new ParseException("TODO ожидаем регистр, получили " + expr, sp);
+			throw new CompileException("TODO ожидаем регистр, получили " + expr, sp);
 		}
 		if(0x00>id || 0x1f<id) {
-			throw new ParseException("TODO ожидаем регистр, получили " + id, sp);
+			throw new CompileException("TODO ожидаем регистр, получили " + id, sp);
 		}
 	}
 	public Reg(byte id) {

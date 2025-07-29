@@ -40,6 +40,7 @@ import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.compiler.Case;
 import static ru.vm5277.common.cg.OperandType.LITERAL;
+import ru.vm5277.common.cg.scopes.CGCommandScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
@@ -171,21 +172,30 @@ public abstract class CodeGenerator extends CGScope {
 	
 	
 	public CGExpressionScope enterExpression() throws CompileException {
-		if(isExpressionScope()) {
+/*		if(isExpressionScope()) {
 			((CGExpressionScope)scope).enter();
 		}
 		else {
 			accum.setSize(0x01);
-
+*/
 			scope = new CGExpressionScope(scope);
-		}
+//		}
 		return (CGExpressionScope)scope;
 	}
 	
 	public void leaveExpression() {
-		if(0==((CGExpressionScope)scope).leave()) {
+//		if(0==((CGExpressionScope)scope).leave()) {
 			scope = scope.free();
-		}
+//		}
+	}
+
+	public CGCommandScope enterCommand() {
+		scope = new CGCommandScope(scope);
+		return (CGCommandScope)scope;
+	}
+	
+	public void leaveCommand() {
+		scope = scope.free();
 	}
 
 	public void defineStr(CGCellsScope cScope, String text) {
@@ -247,6 +257,7 @@ public abstract class CodeGenerator extends CGScope {
 //	public abstract void setValueByIndex(Operand op, int size, List<Byte> tempRegs) throws CompileException;
 	public abstract CGItem stackAllocAsm(int size);
 	public abstract CGItem stackFreeAsm();
+	public abstract void stackFree(CGScope scope, int size);
 	public abstract String getVersion();
 
 	protected long getNum(Operand op) throws CompileException {
@@ -337,7 +348,7 @@ public abstract class CodeGenerator extends CGScope {
 	public void setDpStackAlloc() {
 		dpStackAlloc = true;
 	}
-	
+
 	public CGScope getScope() {
 		return scope;
 	}

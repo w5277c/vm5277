@@ -296,6 +296,8 @@ public class BlockNode extends AstNode {
 			}
 		}
 		
+		cgScope.restoreRegsPool();
+		
 		return null;
 	}
 	

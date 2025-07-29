@@ -15,7 +15,7 @@
  */
 package ru.vm5277.avr_asm.semantic;
 
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class IRegExpression extends Expression {
 	protected	int	id;
@@ -28,7 +28,7 @@ public class IRegExpression extends Expression {
 		this.inc = isInc;
 	}
 	
-	public IRegExpression(String ireg) throws ParseException {
+	public IRegExpression(String ireg) throws CompileException {
 		switch (ireg) {
 			case "x": id=26; break;
 			case "x+": id=26; inc=true; break;
@@ -40,7 +40,7 @@ public class IRegExpression extends Expression {
 			case "z+": id=30; inc=true; break;
 			case "-z": id=30; dec=true; break;
 			default:
-				throw new ParseException("TODO ожидаем индексный регистр, получили " + ireg, sp);
+				throw new CompileException("TODO ожидаем индексный регистр, получили " + ireg, sp);
 		}
 	}
 

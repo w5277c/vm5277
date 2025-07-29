@@ -13,6 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+/*
+ * TODO:
+ * Добавить директивы .REPT и .ENDR, повторяет блок N раз
+ */
+
 package ru.vm5277.avr_asm;
 
 import java.io.BufferedWriter;
@@ -34,7 +40,7 @@ import ru.vm5277.avr_asm.scope.MacroCallSymbol;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.exceptions.CriticalParseException;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 
@@ -157,7 +163,7 @@ public class Main {
 		}
 		
 		try {scope.leaveImport(null);} //TODO не проверяю на MessageContainerIsFullException
-		catch(ParseException e) {mc.add(e.getErrorMessage());}
+		catch(CompileException e) {mc.add(e.getErrorMessage());}
 		catch(CriticalParseException e) {mc.add(e.getErrorMessage()); throw e;}
 
 		if(null != mapFile) try {scope.makeMap(mapFile);} catch(Exception e) {e.printStackTrace();}

@@ -57,9 +57,8 @@ public class CGMethodScope extends CGBlockScope {
 		//super.build(cg);
 	}
 
-	@Override
 	//Выделение ячеек для переданных параметров (только стек)
-	public CGCell[] memAllocate(int size) throws CompileException {
+	public CGCell[] paramAllocate(int size) throws CompileException {
 		CGCell[] cells = new CGCell[size];
 		for(int i=0; i<size; i++) {
 			cells[i] = new CGCell(CGCell.Type.STACK, stackBlockOffset++);

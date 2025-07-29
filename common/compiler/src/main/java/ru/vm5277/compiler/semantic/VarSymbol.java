@@ -21,6 +21,7 @@ import ru.vm5277.compiler.nodes.AstNode;
 public class VarSymbol extends Symbol implements AstHolder {
 	private	final	Scope	scope;
 	private			AstNode	astNode;
+	private			int		accessCntr	= 0;
 	
 	public VarSymbol(String name, VarType returnType, boolean isFinal, boolean isStatic, Scope scope, AstNode astNode) {
 		super(name, returnType, isFinal, isStatic);
@@ -42,6 +43,13 @@ public class VarSymbol extends Symbol implements AstHolder {
 		return astNode;
 	}
 
+	public void markUsed() {
+		accessCntr++;
+	}
+	public int getAccessCntr() {
+		return accessCntr;
+	}
+	
 	@Override
 	public String toString() {
 		String parentName = "";

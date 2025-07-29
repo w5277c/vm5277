@@ -22,11 +22,11 @@ import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.avr_asm.TokenType;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class SetNode {
-	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
+	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
 		SourcePosition sp = tb.getSP();
 		String name = ((String)Node.consumeToken(tb, TokenType.ID).getValue()).toLowerCase();
 		Node.consumeToken(tb, Operator.ASSIGN);
@@ -34,7 +34,7 @@ public class SetNode {
 		Long value = Expression.getLong(expr, sp);
 		if(null == value) {
 			tb.skipLine();
-			throw new ParseException("Cannot resolve constant '" + expr + "'", sp);
+			throw new CompileException("Cannot resolve constant '" + expr + "'", sp);
 		}
 		scope.setVariable(new VariableSymbol(name, value, false), sp);
 

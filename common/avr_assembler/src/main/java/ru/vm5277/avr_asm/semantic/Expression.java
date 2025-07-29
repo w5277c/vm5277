@@ -23,7 +23,7 @@ import ru.vm5277.avr_asm.Keyword;
 import ru.vm5277.avr_asm.Delimiter;
 import ru.vm5277.avr_asm.TokenType;
 import ru.vm5277.common.Operator;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.avr_asm.tokens.Token;
 import static ru.vm5277.common.Operator.AND;
@@ -51,12 +51,12 @@ public class Expression extends Node {
 	protected Expression() {
 	}
 
-	public static Expression parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
+	public static Expression parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
 		return parseBinary(tb, scope, mc, 0);
 	}
 	
 	// TODO свертывание не выполняется для BinaryExpression из parseFunction
-	private static Expression parseBinary(TokenBuffer tb, Scope scope, MessageContainer mc, int minPrecedence) throws ParseException {
+	private static Expression parseBinary(TokenBuffer tb, Scope scope, MessageContainer mc, int minPrecedence) throws CompileException {
         Expression left = parseUnary(tb, scope, mc);
 
 		while (tb.match(TokenType.OPERATOR)) {
@@ -78,7 +78,7 @@ public class Expression extends Node {
         return left;
     }
 	
-	private static Expression parseUnary(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
+	private static Expression parseUnary(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
 		if (tb.match(TokenType.OPERATOR)) {
 			Operator operator = ((Operator)tb.current().getValue()); //TODO check it
 			if(operator.isUnary()) {
@@ -94,7 +94,7 @@ public class Expression extends Node {
 		return parsePrimary(tb, scope, mc);
 	}
 
-	private static Expression parsePrimary(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
+	private static Expression parsePrimary(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
 		Token token = tb.current();
 		
 		if(tb.match(TokenType.MACRO_PARAM)) {
@@ -106,7 +106,7 @@ public class Expression extends Node {
 				return result;
 			}
 			else {
-				throw new ParseException("Got macro param without macro: " + token, tb.current().getSP());
+				throw new CompileException("Got macro param without macro: " + token, tb.current().getSP());
 			}
 		}
 		else if(tb.match(TokenType.NUMBER) || tb.match(TokenType.STRING) || tb.match(TokenType.CHAR) || tb.match(TokenType.LITERAL)) {
@@ -138,15 +138,15 @@ public class Expression extends Node {
 			return new IdExpression(tb, scope, mc, name);
 		}
 		else {
-			throw new ParseException("Unexpected token in expression: " + token, tb.current().getSP());
+			throw new CompileException("Unexpected token in expression: " + token, tb.current().getSP());
         }
     }
 	
-	private static Expression parseFunction(TokenBuffer tb, Scope scope, MessageContainer mc, String name) throws ParseException {
+	private static Expression parseFunction(TokenBuffer tb, Scope scope, MessageContainer mc, String name) throws CompileException {
 		Expression expr = Expression.parse(tb, scope, mc);
 		
 		Long value = null;
-		try {value = getLong(expr, null);} catch(ParseException e) {}
+		try {value = getLong(expr, null);} catch(CompileException e) {}
 		if(null != value) {
 			if(Keyword.LOW.getName().equals(name) || Keyword.BYTE1.getName().equals(name)) return new LiteralExpression(value & 0xff);
 			else if(Keyword.HIGH.getName().equals(name) || Keyword.BYTE2.getName().equals(name)) return new LiteralExpression((value >> 8) & 0xff);
@@ -164,7 +164,7 @@ public class Expression extends Node {
 				return new LiteralExpression(result);
 			}
 			else {
-				throw new ParseException("Unsupported function: " + name, tb.getSP());
+				throw new CompileException("Unsupported function: " + name, tb.getSP());
 			}
 		}
 		else {
@@ -179,13 +179,13 @@ public class Expression extends Node {
 				expr = new BinaryExpression(tb, scope, mc, new LiteralExpression(1), Operator.SHL, expr);
 			}
 			else {
-				throw new ParseException("Unsupported function: " + name, tb.getSP());
+				throw new CompileException("Unsupported function: " + name, tb.getSP());
 			}
 		}
 		return expr;
 	}
 	
-	private static long getLong(Object obj) throws ParseException {
+	private static long getLong(Object obj) throws CompileException {
 		if(obj instanceof Integer) {
 			return ((Integer)obj).longValue();
 		}
@@ -198,10 +198,10 @@ public class Expression extends Node {
 		if(obj instanceof String && 0x01==((String)obj).length()) {
 			return ((String)obj).charAt(0);
 		}
-		throw new ParseException("TODO не поддерживаемый тип значения:" + obj, null);
+		throw new CompileException("TODO не поддерживаемый тип значения:" + obj, null);
 	}
 
-	public static Long getLong(Expression expr, SourcePosition sp) throws ParseException {
+	public static Long getLong(Expression expr, SourcePosition sp) throws CompileException {
 		if(expr instanceof IdExpression) {
 			return ((IdExpression)expr).getNumericValue();
 		}
@@ -212,11 +212,11 @@ public class Expression extends Node {
 			Expression folded = Expression.fold(expr);
 			if (null != folded && folded instanceof LiteralExpression) return Expression.getLong(((LiteralExpression)folded).getValue());
 		}
-		throw new ParseException("Expression '" + expr + "' with type '" + expr.getClass().getSimpleName() + "' is not supported", sp);
+		throw new CompileException("Expression '" + expr + "' with type '" + expr.getClass().getSimpleName() + "' is not supported", sp);
 	}
 
 	
-	public static Expression fold(Expression expr) throws ParseException {
+	public static Expression fold(Expression expr) throws CompileException {
 		if (expr instanceof BinaryExpression) {
 			BinaryExpression binaryExpr = (BinaryExpression)expr;
 			Operator operator = binaryExpr.getOp();
@@ -249,7 +249,7 @@ public class Expression extends Node {
 					case NOT:		return new LiteralExpression(leftVal != rightVal);
 				}
 			}
-			catch (ParseException e) {}
+			catch (CompileException e) {}
 			return null;
 		}
 		
@@ -282,7 +282,7 @@ public class Expression extends Node {
 				Long value = ((IdExpression)expr).getNumericValue();
 				return new LiteralExpression(value);
 			}
-			catch (ParseException e) {}
+			catch (CompileException e) {}
 		}
 		return null;
 	}

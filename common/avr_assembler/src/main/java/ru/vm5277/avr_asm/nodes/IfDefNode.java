@@ -20,11 +20,11 @@ import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.TokenType;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.exceptions.CriticalParseException;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class IfDefNode {
-	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException, CriticalParseException {
+	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException, CriticalParseException {
 		SourcePosition sp = tb.getSP();
 		String id = (String)Node.consumeToken(tb,TokenType.ID).getValue();
 		scope.getIncludeSymbol().blockStart(null == scope.resolveVariable(id) && null == scope.resolveLabel(id), sp);

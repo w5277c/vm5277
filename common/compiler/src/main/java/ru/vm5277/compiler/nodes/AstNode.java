@@ -62,6 +62,8 @@ public abstract class AstNode extends SemanticAnalyzer {
 	protected			Symbol					symbol;
 	protected			boolean					cgDone;
 
+	private				CGScope					depCGScope;
+	
 	protected AstNode() {
 	}
 	
@@ -88,39 +90,19 @@ public abstract class AstNode extends SemanticAnalyzer {
 	}
 
 	protected AstNode parseStatement() throws CompileException {
+		sp = tb.getSP();
 		if (tb.match(TokenType.COMMAND)) {
 			return parseCommand();
 		}
-		else if (tb.match(TokenType.ID)) {
-			// Парсим цепочку выражений (включая вызовы методов)
-			ExpressionNode expr = parseFullQualifiedExpression(tb);
-
-			// Если statement заканчивается точкой с запятой (но не в case-выражениях и т.д.)
-			if (tb.match(Delimiter.SEMICOLON)) {
-				AstNode.this.consumeToken(tb, Delimiter.SEMICOLON);
-			}
-			else {
-				throw new CompileException("Expected ';' after statement", sp);
-			}
+		else if (tb.match(TokenType.ID) || tb.match(TokenType.OPERATOR)) {
+			// Делегируем всю работу парсеру выражений
+			ExpressionNode expr = new ExpressionNode(tb, mc).parse();
+			consumeToken(tb, Delimiter.SEMICOLON);
 			return expr;
-		}
-		else if (tb.match(Operator.INC) || tb.match(Operator.DEC)) {
-				ExpressionNode expr = new ExpressionNode(tb, mc).parse();
-				consumeToken(tb, Delimiter.SEMICOLON);
-				return expr;
 		}
 		else if (tb.match(Delimiter.LEFT_BRACE)) {
 			return new BlockNode(tb, mc);
 		}
-/*		else if(tb.match(TokenType.OPERATOR)) {
-			Operator operator = (Operator)tb.current().getValue();
-			if (Operator.INC == operator || Operator.DEC == operator || operator.isAssignment()) {
-				ExpressionNode expr = new ExpressionParser(tb).parse();
-				tb.consume(Delimiter.SEMICOLON);
-				return expr;
-			}
-			throw new ParseError("Unexpected operator: " + operator, tb.current().getLine(), tb.current().getColumn());
-		}*/
 		CompileException e = parserError("Unexpected statement token: " + tb.current());
 		tb.skip(Delimiter.SEMICOLON, Delimiter.LEFT_BRACE);
 		throw e;
@@ -503,5 +485,13 @@ public abstract class AstNode extends SemanticAnalyzer {
 			}
 		}
 		return null;
+	}
+	
+	// TODO костыль
+	public void setDepCGScope(CGScope cgScope) {
+		this.depCGScope = cgScope;
+	}
+	public CGScope getDepCGScope() {
+		return depCGScope;
 	}
 }

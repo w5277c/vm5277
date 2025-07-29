@@ -25,12 +25,12 @@ import ru.vm5277.avr_asm.semantic.LiteralExpression;
 import ru.vm5277.avr_asm.Delimiter;
 import ru.vm5277.avr_asm.TokenType;
 import ru.vm5277.common.SourcePosition;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 
 public class DataNode {
-	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc, int valueSize) throws ParseException {
+	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc, int valueSize) throws CompileException {
 		SourcePosition sp = tb.getSP();
 		
 		try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
@@ -46,11 +46,11 @@ public class DataNode {
 					Long value = Expression.getLong(expr, tb.getSP());
 					if(null == value) {
 						tb.skipLine();
-						throw new ParseException("Cannot resolve expression: '" + expr + "'", _sp);
+						throw new CompileException("Cannot resolve expression: '" + expr + "'", _sp);
 					}
 					if(value >= (1<<(valueSize*8))) {
 						tb.skipLine();
-						throw new ParseException("Value " + value + " exceeds " + valueSize*8 + "-bit range", _sp);
+						throw new CompileException("Value " + value + " exceeds " + valueSize*8 + "-bit range", _sp);
 					}
 					tmp = new byte[valueSize];
 					for(int i=0; i<valueSize; i++) {
@@ -68,7 +68,7 @@ public class DataNode {
 			if(0 != baos.size()) {
 				if(0 != (baos.size()&0x01)) {
 					if(Scope.STRICT_STRONG == Scope.getStrincLevel()) {
-						throw new ParseException("Odd-sized FLASH data", sp);
+						throw new CompileException("Odd-sized FLASH data", sp);
 					}
 					else if(Scope.STRICT_LIGHT == Scope.getStrincLevel()) {
 						mc.add(new WarningMessage("Odd-sized FLASH data", sp));
@@ -88,7 +88,7 @@ public class DataNode {
 			Node.consumeToken(tb, TokenType.NEWLINE);
 		}
 		catch(Exception e) {
-			throw new ParseException(e.getMessage(), sp);
+			throw new CompileException(e.getMessage(), sp);
 		}
 	}
 }

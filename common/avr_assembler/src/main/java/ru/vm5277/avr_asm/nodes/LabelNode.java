@@ -18,11 +18,11 @@ package ru.vm5277.avr_asm.nodes;
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.TokenType;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class LabelNode {
-	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
+	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
 		String name = ((String)Node.consumeToken(tb, TokenType.LABEL).getValue()).toLowerCase();
 		int addr = scope.addLabel(name, tb.getSP());
 		scope.list(name + ": " + String.format("0x%04X", addr));

@@ -92,7 +92,7 @@ public class WhileNode extends CommandNode {
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		cgScope = cg.getScope();
+		cgScope = cg.enterCommand();
 		
 		// Проверка типа условия
 		if (null != condition) {
@@ -115,6 +115,7 @@ public class WhileNode extends CommandNode {
 			markWarning("Code after infinite while loop is unreachable");
 		}
 
+		cg.leaveCommand();
 		return true;
 	}
 	

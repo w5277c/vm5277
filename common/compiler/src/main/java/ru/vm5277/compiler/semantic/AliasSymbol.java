@@ -44,6 +44,14 @@ public class AliasSymbol extends Symbol {
 		return symbol.isNative();
 	}
 	
+	public void markUsed() {
+		if(symbol instanceof VarSymbol) ((VarSymbol)symbol).markUsed();
+	}
+	public int getAccessCntr() {
+		if(symbol instanceof VarSymbol) return ((VarSymbol)symbol).getAccessCntr();
+		return -1;
+	}
+	
 	@Override
 	public String toString() {
 		return	(isNative() ? "native " : "") + (isFinal() ? "final " : "") + (isStatic() ? "static " : "") + type + " " + name;

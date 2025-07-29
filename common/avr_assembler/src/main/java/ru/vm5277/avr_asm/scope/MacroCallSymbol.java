@@ -21,7 +21,7 @@ import java.util.Map;
 import ru.vm5277.avr_asm.nodes.Node;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.SourcePosition;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class MacroCallSymbol extends Symbol {
 	private	final	List<Expression>			params;
@@ -39,16 +39,16 @@ public class MacroCallSymbol extends Symbol {
 		return params;
 	}
 
-	public void addLabel(String name, SourcePosition sp, int address) throws ParseException {
-		if(labels.keySet().contains(name)) throw new ParseException("Label '" + name + "' already defined", sp);
-		if(variables.keySet().contains(name)) throw new ParseException("Symbol '" + name + "' already defined as variable", sp);
+	public void addLabel(String name, SourcePosition sp, int address) throws CompileException {
+		if(labels.keySet().contains(name)) throw new CompileException("Label '" + name + "' already defined", sp);
+		if(variables.keySet().contains(name)) throw new CompileException("Symbol '" + name + "' already defined as variable", sp);
 		labels.put(name, address);
 	}
 
-	void addVariable(VariableSymbol variableSymbol, SourcePosition sp, int address) throws ParseException {
+	void addVariable(VariableSymbol variableSymbol, SourcePosition sp, int address) throws CompileException {
 		String name = variableSymbol.getName();
 		VariableSymbol vs = variables.get(name);
-		if(null != vs && vs.isConstant()) throw new ParseException("TODO Нельзя переписать значение константы:" + name, sp);
+		if(null != vs && vs.isConstant()) throw new CompileException("TODO Нельзя переписать значение константы:" + name, sp);
 		variables.put(name, vs);
 
 	}

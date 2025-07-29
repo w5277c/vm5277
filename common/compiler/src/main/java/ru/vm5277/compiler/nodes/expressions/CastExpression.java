@@ -23,6 +23,7 @@ import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.cg.CodeGenerator;
 import java.util.List;
 import java.util.Arrays;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.nodes.AstNode;
 
 public class CastExpression extends ExpressionNode {

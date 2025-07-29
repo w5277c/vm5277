@@ -19,11 +19,11 @@ import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.TokenType;
 import ru.vm5277.common.exceptions.CriticalParseException;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class EndIfNode {
-	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException, CriticalParseException {
+	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException, CriticalParseException {
 		scope.getIncludeSymbol().blockEnd(tb.getSP());
 
 		scope.list(".ENDIF");

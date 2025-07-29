@@ -28,7 +28,7 @@ import ru.vm5277.avr_asm.Delimiter;
 import ru.vm5277.avr_asm.TokenType;
 import ru.vm5277.avr_asm.scope.MacroCallSymbol;
 import ru.vm5277.common.exceptions.CriticalParseException;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.avr_asm.tokens.Token;
 import ru.vm5277.common.SourcePosition;
@@ -44,7 +44,7 @@ public class MacroNode extends Node {
 		return callSymbol;
 	}
 	
-	public static void parseDef(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
+	public static void parseDef(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
 		try{
 			SourcePosition sp = tb.getSP();
 			String name = ((String)Node.consumeToken(tb, TokenType.ID).getValue()).toLowerCase();
@@ -52,7 +52,7 @@ public class MacroNode extends Node {
 
 			scope.list(".MACRO " + name);
 		}
-		catch(ParseException e) {
+		catch(CompileException e) {
 			mc.add(e.getErrorMessage());
 			tb.skipLine();
 		}
@@ -60,7 +60,7 @@ public class MacroNode extends Node {
 	}
 	
 	public static MacroNode parseCall(TokenBuffer tb, Scope scope, MessageContainer mc, Map<Path, SourceType> sourcePaths, MacroDefSymbol macro)
-																												throws ParseException, CriticalParseException {
+																												throws CompileException, CriticalParseException {
 		SourcePosition callSP = tb.getSP();
 		MacroCallSymbol symbol = null;
 		tb.consume();

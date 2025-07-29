@@ -21,20 +21,20 @@ import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.avr_asm.TokenType;
 import ru.vm5277.avr_asm.scope.CodeSegment;
 import ru.vm5277.common.SourcePosition;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class OrgNode {
-	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
+	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
 		SourcePosition sp = tb.getSP();
 		CodeSegment cSeg = scope.getCSeg();
 		Expression expr = Expression.parse(tb, scope, mc);
 		Long value = Expression.getLong(expr, sp);
 		if(null == value) {
 			tb.skipLine();
-			throw new ParseException("Cannot resolve constant '" + expr + "'", sp);
+			throw new CompileException("Cannot resolve constant '" + expr + "'", sp);
 		}
-		if(0>value || value>cSeg.getWSize()) throw new ParseException("Address 0x" + Long.toHexString(value) + " exceeds flash memory size", sp);
+		if(0>value || value>cSeg.getWSize()) throw new CompileException("Address 0x" + Long.toHexString(value) + " exceeds flash memory size", sp);
 		
 		scope.getCSeg().setPC(value.intValue());
 		

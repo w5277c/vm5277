@@ -399,12 +399,12 @@ public class ExpressionNode extends AstNode {
 			InstanceOfExpression ioe = (InstanceOfExpression)this;
 
 			// Оптимизация через флаг из postAnalyze
-			if (ioe.isFulfillsContract()) return new LiteralExpression(tb, mc, true);
+			if (ioe.isFulfillsContract()) return new LiteralExpression(tb, mc, true, cgScope);
 
 			// Оптимизация для final объектов
 			if (ioe.getLeft() instanceof VarFieldExpression) {
 				if(ioe.getLeftType().isPrimitive() && ioe.getLeftType() == ioe.getRightType()) {
-					return new LiteralExpression(tb, mc, true);
+					return new LiteralExpression(tb, mc, true, cgScope);
 				}
 
 				VarFieldExpression varExpr = (VarFieldExpression)ioe.getLeft();
@@ -419,21 +419,21 @@ public class ExpressionNode extends AstNode {
 						if(null != varSymbol) leftType = varSymbol.getType();
 					}
 					// Точное совпадение типов
-					if (leftType == ioe.getRightType()) return new LiteralExpression(tb, mc, true);
+					if (leftType == ioe.getRightType()) return new LiteralExpression(tb, mc, true, cgScope);
 
 					// Массивы одинаковой размерности
 					if (leftType.isArray() && ioe.getRightType().isArray()) {
 						// Совпадает размерность?
-						if (leftType.getArrayDepth() != ioe.getRightType().getArrayDepth())  return new LiteralExpression(tb, mc, false);
+						if (leftType.getArrayDepth() != ioe.getRightType().getArrayDepth())  return new LiteralExpression(tb, mc, false, cgScope);
 
 						// Object[] совместим с любым массивом
-						if ("Object".equals(ioe.getRightType().getClassName())) return new LiteralExpression(tb, mc, true);
+						if ("Object".equals(ioe.getRightType().getClassName())) return new LiteralExpression(tb, mc, true, cgScope);
 
 						// Проверка типа элементов
-						if (leftType.getClassName().equals(ioe.getRightType().getClassName())) return new LiteralExpression(tb, mc, true);
+						if (leftType.getClassName().equals(ioe.getRightType().getClassName())) return new LiteralExpression(tb, mc, true, cgScope);
 						
 						// Все остальные случаи -> false
-						return new LiteralExpression(tb, mc, false);
+						return new LiteralExpression(tb, mc, false, cgScope);
 					}
 				}
 			}
@@ -450,9 +450,12 @@ public class ExpressionNode extends AstNode {
 		
 		if (this instanceof BinaryExpression) {
 			BinaryExpression bin = (BinaryExpression) this;
-			ExpressionNode left = bin.getLeft().optimizeWithScope(scope);
-			ExpressionNode right = bin.getRight().optimizeWithScope(scope);
-			return optimizeOperationChain(left, bin.getOperator(), right, 0);
+			ExpressionNode _left = bin.getLeft().optimizeWithScope(scope);
+			ExpressionNode _right = bin.getRight().optimizeWithScope(scope);
+			ExpressionNode result = optimizeOperationChain(	null == _left ? bin.getLeft() : _left, bin.getOperator(),
+															null == _right ? bin.getRight(): _right, 0);
+			result.setCGScope(cgScope);
+			return result;
 		}
 		return null;
 	}
@@ -813,7 +816,20 @@ public class ExpressionNode extends AstNode {
 		return null;
 	}
 	
-	public void setSymbol(Symbol symbol) {
-		this.symbol = symbol;
+	public CGScope getCGScope() {
+		return cgScope;
+	}
+	
+	protected void setCGScope(CGScope scope) {
+		this.cgScope = scope;
+		// TODO Костыль?
+		// Рекурсивно устанавливаем scope для всех дочерних узлов
+		if(null != getChildren()) {
+			for (AstNode child : getChildren()) {
+				if (child instanceof ExpressionNode) {
+					((ExpressionNode)child).setCGScope(scope);
+				}
+			}
+		}
 	}
 }

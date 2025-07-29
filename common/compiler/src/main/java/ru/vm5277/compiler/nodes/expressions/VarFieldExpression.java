@@ -16,6 +16,7 @@
 package ru.vm5277.compiler.nodes.expressions;
 
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
@@ -26,6 +27,7 @@ import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.ClassSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
+import ru.vm5277.compiler.semantic.VarSymbol;
 
 public class VarFieldExpression extends ExpressionNode {
     private final	String	value;
@@ -86,7 +88,7 @@ public class VarFieldExpression extends ExpressionNode {
 				if(null == symbol) {
 					ClassScope classScope = scope.getThis().resolveClass(value);
 					if(null != classScope) {
-						//symbol = new Symbol(value, VarType.fromClassName(value), false, false);
+						// TODO что здесь делает ClassSymbol? 
 						symbol = new ClassSymbol(value, VarType.fromClassName(value), false, false, classScope);
 					}
 				}
@@ -97,12 +99,16 @@ public class VarFieldExpression extends ExpressionNode {
 			markError("Variable '" + value + "' is not declared");
 			result = false;
 		}
+		
+		if(symbol instanceof VarSymbol) ((VarSymbol)symbol).markUsed();
+		
 		cg.leaveExpression();
 		return result;
 	}
 	
 	@Override
 	public Object codeGen(CodeGenerator cg) throws Exception {
+		CGScope oldCGScope = cg.setScope(cgScope);
 		// Выполняет запись значения в аккумулятор. Но зачастую это не требуется, достаточно вызвать depCodeGen
 		if(null == depCodeGen(cg)) {
 			if(symbol instanceof AliasSymbol) {
@@ -113,7 +119,7 @@ public class VarFieldExpression extends ExpressionNode {
 					if(null != vSymbol && null != vSymbol.getCGScope()) {
 						depCodeGen(cg);
 						CGVarScope vScope = (CGVarScope)vSymbol.getCGScope();
-						cg.cellsToAcc(cgScope.getParent(), vScope);
+						cg.cellsToAcc(cgScope, vScope);
 						//Назначаем алиас ссылающийся на реальную переменную
 						symbol = vSymbol;
 						break;
@@ -125,6 +131,7 @@ public class VarFieldExpression extends ExpressionNode {
 				cg.cellsToAcc(cgScope, vScope);
 			}
 		}
+		cg.setScope(oldCGScope);
 		return true;
 		
 		// Это странный код, боюсь поломать

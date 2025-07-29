@@ -21,12 +21,12 @@ import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.avr_asm.TokenType;
 import ru.vm5277.avr_asm.semantic.Expression;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.InfoMessage;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class MessageNode {
-	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
+	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
 		SourcePosition sp = tb.getSP();
 		
 		Expression expr = Expression.parse(tb, scope, mc);

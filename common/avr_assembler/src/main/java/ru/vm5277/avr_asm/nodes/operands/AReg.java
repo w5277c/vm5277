@@ -18,14 +18,14 @@ package ru.vm5277.avr_asm.nodes.operands;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.SourcePosition;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class AReg extends Reg {
-	public AReg(Scope scope, SourcePosition sp, Expression expr) throws ParseException {
+	public AReg(Scope scope, SourcePosition sp, Expression expr) throws CompileException {
 		super(scope, sp, expr);
 		
 		if(24!=id && 26!=id && 28!=id && 30!=id) {
-			throw new ParseException("TODO ожидаем r24,XH,YH,ZH регистр, получили " + id, sp);
+			throw new CompileException("TODO ожидаем r24,XH,YH,ZH регистр, получили " + id, sp);
 		}
 	}
 }

@@ -20,5 +20,6 @@ public enum OperandType {
 	TYPE,		//reference? т.е. заполнен resId?
 	FLASH_RES,	//данные размещенные во FLASH области
 	LOCAL_RES,	//field или var, заполнен resId.
-	RETURN;		//возвращенное методом значение
+	RETURN,		//возвращенное методом значение
+	ACCUM;		//аккумулятор
 }

@@ -329,9 +329,14 @@ public class MethodCallExpression extends ExpressionNode {
 			Operand[] operands = null;
 			if(!args.isEmpty()) {
 				operands = new Operand[args.size()];
+				// TODO костыль. Похоже нужно управлять областью видимости универсально, а не точечно
+				// Необходимо, чтобы код зависимостей формировался не там, где он находится в древе AST, а там, где он необходим, что оптимально для выделения
+				// регистров
+				CGScope oldCGScope = cg.setScope(cgScope);//symbol.getCGScope());
 				for(int i=0; i<args.size(); i++) {
 					operands[i]= makeNativeOperand(cg, args.get(i));
 				}
+				cg.setScope(oldCGScope);
 			}
 
 			VarType[] params = null;
@@ -347,26 +352,56 @@ public class MethodCallExpression extends ExpressionNode {
 		else {
 			CGLabelScope rpCGScope = null;
 			int refTypeSize = 1; // TODO Определить значение на базе количества используемых типов класса
+			int stackOffset = 0;
 
 			if(!args.isEmpty()) {
 				CGScope oldCGScope = cg.setScope(symbol.getCGScope());
 				
+				// Сначала(для ссылочных параметров) нужно поместить в стек данные всех аргументов, размер которых больше refSize 
+				for(int i=0; i<args.size(); i++) {
+					// Получаем выражение передаваемое этому параметру
+					ExpressionNode argExpr = args.get(i);
+					// Выполняем зависимость
+					argExpr.depCodeGen(cg);
+					
+					Symbol paramSymbol = ((MethodSymbol)symbol).getParameters().get(i);
+					VarType paramVarType = paramSymbol.getType();
+					// Проверка на ссылочный параметр
+					if(paramVarType.isObject() || paramVarType.isReferenceType())	{
+						int exprTypeSize = argTypes[i].getSize();
+						if(-1 == exprTypeSize) exprTypeSize = cg.getRefSize();
+						// Проверяем, что размер занчения больше refSize
+						if(cg.getRefSize() < exprTypeSize) {
+							// Необходимо поместить данные в стек
+							if(argExpr instanceof LiteralExpression) {
+								cg.pushConst(cgScope, exprTypeSize, ((LiteralExpression)argExpr).getNumValue());
+							}
+							else if(argExpr instanceof VarFieldExpression) {
+								cg.pushCells(cgScope, exprTypeSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells());
+							}
+							else {
+								throw new CompileException("Unsupported expression:" + argExpr);
+							}
+							stackOffset += exprTypeSize;
+						}
+					}
+				}
+
 				// Помещаем в стек адрес возврата
 				rpCGScope = cg.makeLabel(cgScope.getMethodScope(), "RP", true);
 				cg.pushCells(cgScope, 2, new CGCell[]{new CGCell(rpCGScope.getLName())});
-				// Перед обращением к методу, нужно создать в нем необходимые переменные
+
+				stackOffset = 0;
+				// Теперь создаем необходимые переменные и формируем стек вызываемого метода
 				for(int i=0; i<args.size(); i++) {
 					// Получаем параметр вызываемого метода
-					Symbol pSymbol = ((MethodSymbol)symbol).getParameters().get(i);
-					VarType mVarType = pSymbol.getType();
+					Symbol paramSymbol = ((MethodSymbol)symbol).getParameters().get(i);
+					VarType paramVarType = paramSymbol.getType();
 
 					// Получаем выражение передаваемое этому параметру
-					ExpressionNode expr = args.get(i);
-					// Отстраиваем завивисимости
-					expr.depCodeGen(cg);
-
+					ExpressionNode argExpr = args.get(i);
 					// Получаю из scope вызываемого метода переменую с именем параметра(пустая переменная уже создана, или создан Alias)
-					Symbol vSymbol = ((MethodSymbol)symbol).getScope().resolve(pSymbol.getName());
+					Symbol vSymbol = ((MethodSymbol)symbol).getScope().resolve(paramSymbol.getName());
 					if(vSymbol instanceof AliasSymbol) {
 						// Это алиас, который нужно что???
 						throw new CompileException("Unsupported alias:" + vSymbol.toString());
@@ -375,7 +410,7 @@ public class MethodCallExpression extends ExpressionNode {
 						int exprTypeSize = argTypes[i].getSize();
 						if(-1 == exprTypeSize) exprTypeSize = cg.getRefSize();
 						// Создаем новую область видимости переменной в вызываемом методе
-						int varSize = mVarType.isObject() ? refTypeSize + exprTypeSize : exprTypeSize;
+						int varSize = paramVarType.isObject() ? refTypeSize + cg.getRefSize() : exprTypeSize;
 						CGVarScope dstVScope = cg.enterLocal(vSymbol.getType(), varSize, false, vSymbol.getName());
 						
 						// Выделяем память в стеке
@@ -383,36 +418,29 @@ public class MethodCallExpression extends ExpressionNode {
 						cg.leaveLocal();
 						vSymbol.setCGScope(dstVScope);
 
-						if(expr instanceof LiteralExpression) {
-							if(mVarType.isObject() || mVarType.isReferenceType())	{
-								// Если тип ожидаемого параметра Object(т.е. любой тип) или reference(класс, интерфес, массив),
-								// то передаем ид типа и адрес данных
-								// Мы не можем сразу передать данные даже для примитива, так как размер параметра фиксирован
-								cg.pushConst(cgScope, refTypeSize, argTypes[i].getId());
-								cg.pushCells(cgScope, cg.getRefSize(), ((CGCellsScope)expr.getSymbol().getCGScope()).getCells());
-							}
-							else {
-								cg.pushConst(cgScope, exprTypeSize, ((LiteralExpression)expr).getNumValue());
-							}
+						boolean isRef = paramVarType.isObject() || paramVarType.isReferenceType();
+						if(isRef)	{
+							// Если тип ожидаемого параметра Object(т.е. любой тип) или reference(класс, интерфес, массив),
+							// то сначала передаем ид типа
+							cg.pushConst(cgScope, refTypeSize, argTypes[i].getId());
 						}
-						else if(expr.getSymbol().getCGScope() instanceof CGCellsScope) {
-							if(mVarType.isObject() || mVarType.isReferenceType())	{
-								// Если тип ожидаемого параметра Object(т.е. любой тип) или reference(класс, интерфес, массив),
-								// то передаем ид типа и адрес данных
-								// Мы не можем сразу передать данные даже для примитива, так как размер параметра фиксирован
-								cg.pushConst(cgScope, refTypeSize, argTypes[i].getId());
-								cg.pushCells(cgScope, cg.getRefSize(), ((CGCellsScope)expr.getSymbol().getCGScope()).getCells());
+						// Если размер данных типа не более размера данных ссылки, то помещаем данные
+						if(!isRef || cg.getRefSize() >= exprTypeSize) {
+							if(argExpr instanceof LiteralExpression) {
+								cg.pushConst(cgScope, isRef ? cg.getRefSize() : exprTypeSize, ((LiteralExpression)argExpr).getNumValue());
+							}
+							else if(argExpr instanceof VarFieldExpression) {
+								cg.pushCells(cgScope, isRef ? cg.getRefSize() : exprTypeSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells());
 							}
 							else {
-								// Иначе, передаем данные примитивов
-								cg.pushCells(cgScope, exprTypeSize, ((CGCellsScope)expr.getSymbol().getCGScope()).getCells());
+								throw new CompileException("Unsupported expression:" + argExpr);
 							}
 						}
 						else {
-							// TODO массивы
-							throw new CompileException("Unsupported expression:" + expr.toString());
+							// Размер больше. Данные ранее созранены в стек
+							cg.pushConst(cgScope, cg.getRefSize(), stackOffset);
+							stackOffset += exprTypeSize;
 						}
-						//cg.accToCells(symbol.getCGScope(), dstVScope);
 					}
 				}
 				cg.setScope(oldCGScope);
@@ -420,8 +448,11 @@ public class MethodCallExpression extends ExpressionNode {
 			depCodeGen(cg);
 			
 			CGMethodScope mScope = (CGMethodScope)symbol.getCGScope();
-			cg.invokeMethod(cgScope.getParent(), className, symbol.getName(), type, argTypes, mScope);
-			if(null != rpCGScope) cgScope.getParent().append(rpCGScope);
+			cg.invokeMethod(cgScope, className, symbol.getName(), type, argTypes, mScope);
+			if(null != rpCGScope) cgScope.append(rpCGScope);
+			if(0 != stackOffset) {
+				cg.stackFree(cgScope, stackOffset);
+			}
 		}
 		
 		return null;
@@ -452,6 +483,11 @@ public class MethodCallExpression extends ExpressionNode {
 			CastExpression ce = (CastExpression)expr;
 			ce.codeGen(cg);
 			return makeNativeOperand(cg, ce.getOperand());
+		}
+		else if(expr instanceof BinaryExpression) {
+			BinaryExpression be = (BinaryExpression)expr;
+			be.codeGen(cg);
+			return new Operand(OperandType.ACCUM, null);
 		}
 		else throw new Exception("Unexpected expression:" + expr);
 	}

@@ -37,8 +37,8 @@ public class CGVarScope extends CGCellsScope {
 	
 		if(!isConstant) {
 			if(parent instanceof CGMethodScope) { // Используется при вызове метода(передача параметров)
-				// Выделять память не нужно, быдет использована обычнаякомбинаия push
-				cells = ((CGMethodScope)parent).memAllocate(size);
+				// Выделять память не нужно, будет использована обычная комбинация push
+				cells = ((CGMethodScope)parent).paramAllocate(size);
 				((CGMethodScope)parent).addLocal(this);
 				if(VERBOSE_LO <= verbose) append(new CGIText(";alloc " + getPath('.') + " " + Arrays.toString(cells)));
 			}
@@ -67,14 +67,6 @@ public class CGVarScope extends CGCellsScope {
 	
 	public boolean isConstant() {
 		return isConstant;
-	}
-	
-	public Integer getRegCellPos(byte reg) {
-		for(int pos=0; pos<cells.length;pos++) {
-			CGCell cell = cells[pos];
-			if(CGCell.Type.REG == cell.getType() && cell.getNum() == reg) return pos;
-		}
-		return null;
 	}
 	
 	@Override

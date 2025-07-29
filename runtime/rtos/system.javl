@@ -17,28 +17,12 @@
 public class System {
 	public static native void setParam(byte paramId, byte value);
 
-	public static void out(final Object obj) {
-		if(obj is byte as b) {
-			outNum(b);
-		}
-		else if(obj is short as s) {
-			outNum(s);
-		}
-		else if(obj is int as i) {
-			outNum(i);
-		}
-		else if(obj is cstr as c) {
-			outCStr(c);
-		}
-		//TODO throw 0xff;
-	}
-
-
 	public static native void outChar(byte b);
+
 	public static native void outCStr(cstr text);
-	public static native void outNum(byte i);
-	public static native void outNum(short i);
-	public static native void outNum(int i);
+	public static native void out(byte i);
+	public static native void out(short i);
+	public static native void out(int i);
 
 	public static native void stop();
 }

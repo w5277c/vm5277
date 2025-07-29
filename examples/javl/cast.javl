@@ -17,15 +17,18 @@ import rtos.System;
 
 class Main {
     public static void main() {
-//		int i = 0x01020304;
-//		byte b = (byte)i;
-//		System.outNum(b);
+		int i = 0x04030201;
+		System.outCStr("orig num:");
+		System.out(i);
+		System.outChar('\n');
 
-		byte b = (byte)0x0201;
-//		int i = (int)(short)(int)(short)b;
-		byte i = b;
+		i = (int)(short)(int)(short)i;
+		System.outCStr("short:");
+		System.out(i);
+		System.outChar('\n');
 
-//		byte i = (byte)b;
-		System.outNum(i);
+		System.outCStr("byte:");
+		System.out((byte)i);
+		System.outChar('\n');
     }
 }

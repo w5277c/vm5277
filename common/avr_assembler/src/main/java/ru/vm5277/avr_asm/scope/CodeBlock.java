@@ -15,7 +15,7 @@
  */
 package ru.vm5277.avr_asm.scope;
 
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 
 
 public class CodeBlock {
@@ -30,13 +30,13 @@ public class CodeBlock {
 		this.startWAddress = startWAddress;
 	}
 
-	public void writeOpcode(int opcode) throws ParseException {
+	public void writeOpcode(int opcode) throws CompileException {
 		byte[] bdata = new byte[0x02];
 		bdata[0x01] = (byte)((opcode >> 0x08) & 0xff);
 		bdata[0x00] = (byte)(opcode & 0xff);
 		write(bdata, 0x01);
 	}
-	public void writeDoubleOpcode(long opcode) throws ParseException {
+	public void writeDoubleOpcode(long opcode) throws CompileException {
 		byte[] bdata = new byte[0x04];
 		bdata[0x01] = (byte)((opcode >> 0x18) & 0xff);
 		bdata[0x00] = (byte)((opcode >> 0x10) & 0xff);

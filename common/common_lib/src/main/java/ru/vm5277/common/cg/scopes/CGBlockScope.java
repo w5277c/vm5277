@@ -34,7 +34,6 @@ import ru.vm5277.common.exceptions.CompileException;
 public class CGBlockScope extends CGScope {
 	private		final	Map<Integer, CGVarScope>	locals				= new HashMap<>();
 	protected			int							stackBlockOffset	= 0;
-//	protected	final	List<Byte>					usedRegs;	// Регистры использованные из списка свободных
 	private				Set<RegPair>				usedPool			= new HashSet<>(); // Использованные регистры из regsPool метода
 	private				CGMethodScope				mScope;
 	
@@ -83,6 +82,7 @@ public class CGBlockScope extends CGScope {
 		if(null != lScope) return lScope;
 		
 		if(null != parent && parent instanceof CGBlockScope) return ((CGBlockScope)parent).getLocal(resId);
+		if(null != parent && parent instanceof CGCommandScope) return parent.getBlockScope().getLocal(resId);
 		return null;
 	}
 
@@ -130,7 +130,7 @@ public class CGBlockScope extends CGScope {
 		}
 		return cells;
 	}
-	
+
 /*
 	public Byte reserveReg() {
 		if(!regsPool.isEmpty()) {

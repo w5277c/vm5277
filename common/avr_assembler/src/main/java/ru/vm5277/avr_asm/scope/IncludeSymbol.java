@@ -17,7 +17,7 @@ package ru.vm5277.avr_asm.scope;
 
 import java.util.Stack;
 import ru.vm5277.common.SourcePosition;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class IncludeSymbol extends Symbol {
 	private					int										blockCntr		= 0;
@@ -56,7 +56,7 @@ public class IncludeSymbol extends Symbol {
 		return  blockCntr;
 	}
 
-	public void blockEnd(SourcePosition sp) throws ParseException {
+	public void blockEnd(SourcePosition sp) throws CompileException {
 		elseIfSkip = false;
 		blockSuccess = false;
 		
@@ -65,7 +65,7 @@ public class IncludeSymbol extends Symbol {
 			blockSkip.pop();
 		}
 		else {
-			throw new ParseException("END directive without matching block (no IF/IFDEF/etc opened)", sp);
+			throw new CompileException("END directive without matching block (no IF/IFDEF/etc opened)", sp);
 		}
 	}
 	

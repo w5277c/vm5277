@@ -178,4 +178,20 @@ public enum Operator {
 	public boolean isLeftAssociative() {
 		return !(this.isAssignment() || this == Operator.TERNARY);
 	}
+	
+	public Operator toArithmetic() {
+		switch(this) {
+			case AND_ASSIGN: return BIT_AND;
+			case DIV_ASSIGN: return DIV;
+			case MINUS_ASSIGN: return MINUS;
+			case MOD_ASSIGN: return MOD;
+			case MULT_ASSIGN: return MULT;
+			case OR_ASSIGN: return BIT_OR;
+			case PLUS_ASSIGN: return PLUS;
+			case SHL_ASSIGN: return SHL;
+			case SHR_ASSIGN: return SHR;
+			case XOR_ASSIGN: return BIT_XOR;
+		}
+		return null;
+	}
 }

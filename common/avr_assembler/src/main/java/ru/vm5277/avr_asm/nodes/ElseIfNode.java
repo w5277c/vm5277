@@ -21,12 +21,12 @@ import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.avr_asm.TokenType;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.exceptions.CriticalParseException;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class ElseIfNode {
-	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException, CriticalParseException {
+	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException, CriticalParseException {
 		SourcePosition sp = tb.getSP();
 		Long value = 0x00l;
 		Expression expr = Expression.parse(tb, scope, mc);

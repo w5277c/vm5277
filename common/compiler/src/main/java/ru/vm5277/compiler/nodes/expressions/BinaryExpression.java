@@ -21,6 +21,7 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.common.Operator;
+import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
@@ -249,6 +250,10 @@ public class BinaryExpression extends ExpressionNode {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg) throws Exception {
+		// TODO костыль. Похоже нужно управлять областью видимости универсально, а не точечно
+		// Необходимо, чтобы код зависимостей формировался не там, где он находится в древе AST, а там, где он необходим, что оптимально для выделения регистров
+		CGScope oldCGScope = cg.setScope(cgScope); //В таком виде верный порядок использования регистров
+		
 		// Изначально сохраняем порядок left/right
 		ExpressionNode expr1 = leftExpr;
 		ExpressionNode expr2 = rightExpr;
@@ -260,6 +265,7 @@ public class BinaryExpression extends ExpressionNode {
 			}
 		}
 
+		Operator op = (operator.isAssignment() ? operator.toArithmetic() : operator);
 		// Если expr2 переменная или поле(т.е. содержит cells)
 		if(expr2 instanceof VarFieldExpression) {
 			// Не строим код для expr2(он разместит значение в acc), а нас интересует занчение в cells(только выполняем зависимость)
@@ -270,7 +276,13 @@ public class BinaryExpression extends ExpressionNode {
 				throw new CompileException("Accum not used for operand:" + expr1);
 			}
 			CGCellsScope cScope = (CGCellsScope)expr2.getSymbol().getCGScope();
-			cg.cellsAction(cgScope.getParent(), (cScope instanceof CGVarScope ? ((CGVarScope)cScope).getStackOffset() : 0), cScope.getCells(), operator);
+			if(null != op) {
+				cg.cellsAction(cgScope, (cScope instanceof CGVarScope ? ((CGVarScope)cScope).getStackOffset() : 0), cScope.getCells(), op);
+			}
+			if(operator.isAssignment()) {
+				// TODO
+				cg.accToCells(cgScope, cScope);
+			}
 		}
 		else if(expr2 instanceof LiteralExpression) {
 			// Это константа, код не стоим, заивисимости нет
@@ -279,7 +291,18 @@ public class BinaryExpression extends ExpressionNode {
 				// Явно не доработанный код, выражение всегда должно помещать результат в аккумулятор
 				throw new CompileException("Accum not used for operand:" + expr1);
 			}
-			cg.constAction(cgScope.getParent(), operator, ((LiteralExpression)expr2).getNumValue());
+			if(null != op) {
+				cg.constAction(cgScope, op, ((LiteralExpression)expr2).getNumValue());
+			}
+			if(operator.isAssignment()) {
+				CGCellsScope cScope = (CGCellsScope)expr1.getSymbol().getCGScope();
+				if(Operator.ASSIGN == operator) {
+					cg.constToCells(cgScope, 0, ((LiteralExpression)expr2).getNumValue(), cScope.getCells());
+				}
+				else {
+					cg.accToCells(cgScope, cScope);
+				}
+			}
 		}
 		else {
 			//CastExprewssion, BinaryExpression и другие
@@ -291,7 +314,9 @@ public class BinaryExpression extends ExpressionNode {
 			// Определяем максмальный размер операнда
 			int size = (leftType.getSize() > rightType.getSize() ? leftType.getSize() : rightType.getSize());
 			// Код отстроен и результат может быть только в аккумуляторе, сохраняем его
-			cg.pushAcc(cgScope.getParent(), size);
+			// TODO необходимо проверить!
+			// Если в expr1 не BinaryExpression, то сохранять аккумулятор не нужно?
+			if(expr1 instanceof BinaryExpression) cg.pushAcc(cgScope, size);
 
 			// Строим код для expr1(результат в аккумуляторе)
 			if(null == expr1.codeGen(cg)) {
@@ -300,10 +325,17 @@ public class BinaryExpression extends ExpressionNode {
 			}
 
 			// Восстанавливаем аккумулятор expr2 во ret cells(как временное хранилище) 
-			cg.popRet(cgScope.getParent(), size);
+			if(expr1 instanceof BinaryExpression) cg.popRet(cgScope, size);
 			// Выполняем операцию, левый операнд - аккумулятор, правый операнд - ret
-			cg.cellsAction(cgScope.getParent(), 0, cg.getRetCells(size), operator);
+			if(null != op) {
+				cg.cellsAction(cgScope, 0, cg.getRetCells(size), op);
+			}
+			if(operator.isAssignment()) {
+				// TODO
+				cg.accToCells(cgScope, (CGCellsScope)expr1.getSymbol().getCGScope());
+			}
 		}
+		cg.setScope(oldCGScope);
 		return true;
 	}
 

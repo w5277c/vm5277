@@ -35,7 +35,7 @@ import static ru.vm5277.avr_asm.Main.tabSize;
 import ru.vm5277.avr_asm.nodes.Node;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.exceptions.CriticalParseException;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class Scope {
 	protected	final	static	Map<String, Byte>			registers		= new HashMap<>();
@@ -70,41 +70,41 @@ public class Scope {
 	private final			Set<String>								includePaths	= new HashSet<>();
 	private					IncludeSymbol							currentInclude	= null;
 
-	public Scope(File sourceFile, InstrReader instrReader, BufferedWriter listWriter) throws ParseException {
+	public Scope(File sourceFile, InstrReader instrReader, BufferedWriter listWriter) throws CompileException {
 		this.instrReader = instrReader;
 		addImport(sourceFile.getAbsolutePath());
 		this.listWriter = listWriter;
 	}
 	
-	public void setDevice(String device) throws ParseException {
-		if(null != this.mcu) throw new ParseException("TODO устройство уже задано", null);
+	public void setDevice(String device) throws CompileException {
+		if(null != this.mcu) throw new CompileException("TODO устройство уже задано", null);
 		this.mcu = device;
 		instrReader.setMCU(device);
 	}
 	
-	public boolean addImport(String fullPath) throws ParseException {
-		if(null != currentMacroDef || isMacroDeploy()) throw new ParseException("Imports not allowed inside macro definitions", null);
+	public boolean addImport(String fullPath) throws CompileException {
+		if(null != currentMacroDef || isMacroDeploy()) throw new CompileException("Imports not allowed inside macro definitions", null);
 		
 		if(!includePaths.add(fullPath)) return false;
 		
 		currentInclude = new IncludeSymbol(fullPath, currentInclude);
 		return true;
 	}
-	public void leaveImport(SourcePosition sp) throws CriticalParseException, ParseException {
+	public void leaveImport(SourcePosition sp) throws CriticalParseException, CompileException {
 		IncludeSymbol cur = currentInclude;
 		currentInclude = currentInclude.getParent();
 		if(0 != cur.getBlockCntr()) {
-			throw new ParseException("Unbalanced conditional blocks (expected " + cur.getBlockCntr() + " more END directives)", sp);
+			throw new CompileException("Unbalanced conditional blocks (expected " + cur.getBlockCntr() + " more END directives)", sp);
 		}
 	}
 	
-	public int addLabel(String name, SourcePosition sp) throws ParseException {
-		if(labels.keySet().contains(name)) throw new ParseException("Label '" + name + "' already defined", sp); //TODO
-		if(null != registers.get(name)) throw new ParseException("TODO имя метки совпадает с регистром:" + name, sp);
+	public int addLabel(String name, SourcePosition sp) throws CompileException {
+		if(labels.keySet().contains(name)) throw new CompileException("Label '" + name + "' already defined", sp); //TODO
+		if(null != registers.get(name)) throw new CompileException("TODO имя метки совпадает с регистром:" + name, sp);
 		if(regAliases.keySet().contains(name)) {
-			throw new ParseException("TODO имя метки совпадает с алиасом регистра:" + name, sp);
+			throw new CompileException("TODO имя метки совпадает с алиасом регистра:" + name, sp);
 		}
-		if(name.equals("pc") || variables.keySet().contains(name)) throw new ParseException("Symbol '" + name + "' already defined as variable", sp);
+		if(name.equals("pc") || variables.keySet().contains(name)) throw new CompileException("Symbol '" + name + "' already defined as variable", sp);
 		
 		int addr = cSeg.getPC();
 		if(isMacroDeploy()) {
@@ -117,13 +117,13 @@ public class Scope {
 		return addr;
 	}
 	
-	public void setVariable(VariableSymbol variableSymbol, SourcePosition sp) throws ParseException {
+	public void setVariable(VariableSymbol variableSymbol, SourcePosition sp) throws CompileException {
 		String varName = variableSymbol.getName();
-		if(varName.equals("pc")) throw new ParseException("TODO нельзя использовать регистр PC в качестве переменной", sp);
-		if(null != registers.get(varName)) throw new ParseException("TODO имя переменной совпадает с регистром:" + varName, sp);
-		if(regAliases.keySet().contains(varName)) throw new ParseException("TODO имя переменной совпадает с алиасом регистра:" + varName, sp);
+		if(varName.equals("pc")) throw new CompileException("TODO нельзя использовать регистр PC в качестве переменной", sp);
+		if(null != registers.get(varName)) throw new CompileException("TODO имя переменной совпадает с регистром:" + varName, sp);
+		if(regAliases.keySet().contains(varName)) throw new CompileException("TODO имя переменной совпадает с алиасом регистра:" + varName, sp);
 		VariableSymbol vs = variables.get(varName);
-		if(null != vs && vs.isConstant()) throw new ParseException("TODO Нельзя переписать значение константы:" + varName, sp);
+		if(null != vs && vs.isConstant()) throw new CompileException("TODO Нельзя переписать значение константы:" + varName, sp);
 		if(isMacroDeploy()) {
 			MacroCallSymbol symbol = macroDeploys.getLast();
 			symbol.addVariable(variableSymbol, sp, cSeg.getPC());
@@ -133,7 +133,7 @@ public class Scope {
 		}
 	}
 
-	public VariableSymbol resolveVariable(String name) throws ParseException {
+	public VariableSymbol resolveVariable(String name) throws CompileException {
 		if(name.equals("pc")) {
 			return new VariableSymbol(name, cSeg.getPC()-1, true); //TODO Костыль?
 		}
@@ -178,25 +178,25 @@ public class Scope {
 		return labels.get(name);
 	}
 	
-	public void addRegAlias(String alias, byte regId, SourcePosition sp) throws ParseException {
-		if(null != currentMacroDef) throw new ParseException("Regster aliases not allowed inside macro definitions", sp);
-		if(regAliases.keySet().contains(alias)) throw new ParseException("TODO алиас уже занят:" + alias, sp);
+	public void addRegAlias(String alias, byte regId, SourcePosition sp) throws CompileException {
+		if(null != currentMacroDef) throw new CompileException("Regster aliases not allowed inside macro definitions", sp);
+		if(regAliases.keySet().contains(alias)) throw new CompileException("TODO алиас уже занят:" + alias, sp);
 		regAliases.put(alias, regId);
 	}
 	public void removeRegAlias(String alias) {
 		regAliases.remove(alias);
 	}
 
-	public void beginMacro(MacroDefSymbol macro, SourcePosition sp) throws ParseException {
-		if(null != currentMacroDef || isMacroDeploy()) throw new ParseException("TODO Вложенные макросы не поддерживаются", sp);
+	public void beginMacro(MacroDefSymbol macro, SourcePosition sp) throws CompileException {
+		if(null != currentMacroDef || isMacroDeploy()) throw new CompileException("TODO Вложенные макросы не поддерживаются", sp);
 		currentMacroDef = macro;
 		if(macros.keySet().contains(macro.getName())) {
-			throw new ParseException("TODO максрос с таким именем уже существует:" + macro.getName(), sp);
+			throw new CompileException("TODO максрос с таким именем уже существует:" + macro.getName(), sp);
 		}
 		macros.put(macro.getName(), macro);
 	}
-	public void endMacro(SourcePosition sp) throws ParseException {
-		if(null == currentMacroDef) throw new ParseException("TODO Вложенные конца макроа без его начала", sp);
+	public void endMacro(SourcePosition sp) throws CompileException {
+		if(null == currentMacroDef) throw new CompileException("TODO Вложенные конца макроа без его начала", sp);
 		currentMacroDef = null;
 	}
 	
@@ -249,13 +249,13 @@ public class Scope {
 		return instrReader;
 	}
 	
-	public CodeSegment getCSeg() throws ParseException {
+	public CodeSegment getCSeg() throws CompileException {
 		if(null == cSeg) {
 			VariableSymbol vs = resolveVariable("flash_size");
 			if(null != vs) {
 				cSeg = new CodeSegment(((int)vs.getValue())/2);
 			}
-			else throw new ParseException("TODO не найдена константа FLASH_SIZE", null);
+			else throw new CompileException("TODO не найдена константа FLASH_SIZE", null);
 		}
 		return cSeg;
 	}

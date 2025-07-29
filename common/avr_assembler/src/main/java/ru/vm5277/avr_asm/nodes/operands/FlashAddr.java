@@ -18,17 +18,17 @@ package ru.vm5277.avr_asm.nodes.operands;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.SourcePosition;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 
 public class FlashAddr extends Const {
-	public FlashAddr(MessageContainer mc, Scope scope, SourcePosition sp, Expression expr, int min, int max, int bits, int addr) throws ParseException {
+	public FlashAddr(MessageContainer mc, Scope scope, SourcePosition sp, Expression expr, int min, int max, int bits, int addr) throws CompileException {
 		this.bits = bits;
 		
 		Long _value = Expression.getLong(expr, sp);
 		if(null == _value) {
-			throw new ParseException("Unable to resolve address: " + expr, sp);
+			throw new CompileException("Unable to resolve address: " + expr, sp);
 		}
 		value = _value - addr;
 		

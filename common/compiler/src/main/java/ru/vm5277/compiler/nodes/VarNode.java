@@ -162,20 +162,21 @@ public class VarNode extends AstNode {
 			}
 
 			// Проверка совместимости типов
+			if(null != initializer) {
+				VarType initType = initializer.getType(scope);
+				if (!isCompatibleWith(scope, type, initType)) {
+					markError("Type mismatch: cannot assign " + initType + " to " + type);
+				}
 
-			VarType initType = initializer.getType(scope);
-			if (!isCompatibleWith(scope, type, initType)) {
-				markError("Type mismatch: cannot assign " + initType + " to " + type);
-			}
-			
-			// Дополнительная проверка на сужающее преобразование
-			if (type.isNumeric() && initType.isNumeric() && type.getSize() < initType.getSize()) { //TODO верятно нужно и в других местах
-				markError("Narrowing conversion from " + initType + " to " + type + " requires explicit cast"); 
-			}
-			
-			ExpressionNode optimizedExpr = initializer.optimizeWithScope(scope);
-			if(null != optimizedExpr) {
-				initializer = optimizedExpr;
+				// Дополнительная проверка на сужающее преобразование
+				if (type.isNumeric() && initType.isNumeric() && type.getSize() < initType.getSize()) { //TODO верятно нужно и в других местах
+					markError("Narrowing conversion from " + initType + " to " + type + " requires explicit cast"); 
+				}
+
+				ExpressionNode optimizedExpr = initializer.optimizeWithScope(scope);
+				if(null != optimizedExpr) {
+					initializer = optimizedExpr;
+				}
 			}
 		}
 		catch (CompileException e) {markError(e);}
@@ -189,16 +190,18 @@ public class VarNode extends AstNode {
 		if(cgDone) return null;
 		cgDone = true;
 
-		CGScope cgScope = symbol.getCGScope();
+		CGVarScope vScope = ((CGVarScope)symbol.getCGScope());
+		
+		// !!! Нужно,чтобы выражение строилось именно в данном CGScope(актуально, если метод вызван через depCodeGen(у него как правило другой CGScope))
+		CGScope oldCGScope = cg.setScope(vScope);
 		
 		Boolean accUsed = null;
-		((CGVarScope)cgScope).build();
-		
+		vScope.build();
 		if(VarType.CSTR == type) {
 			if(initializer instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)initializer;
 				if(VarType.CSTR == le.getType(null)) {
-					cg.defineStr((CGVarScope)cgScope, (String)le.getValue());
+					cg.defineStr(vScope, (String)le.getValue());
 					//TODO рудимент?
 					//symbol.getConstantOperand().setValue(cgScope.getResId());
 				}
@@ -206,26 +209,27 @@ public class VarNode extends AstNode {
 			else throw new Exception("unexpected expression:" + initializer + " for constant");
 		}
 		else {
-			if(initializer instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
-				CGVarScope vScope = ((CGVarScope)cgScope);
-				cg.constToCells(cgScope, vScope.getStackOffset(), ((LiteralExpression)initializer).getNumValue(), vScope.getCells());
+			if(null == initializer) {
+				cg.constToCells(cg.getScope(), vScope.getStackOffset(), 0, vScope.getCells());
+			}
+			else if(initializer instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
+				cg.constToCells(cg.getScope(), vScope.getStackOffset(), ((LiteralExpression)initializer).getNumValue(), vScope.getCells());
 			}
 			else if(initializer instanceof FieldAccessExpression) {
-				CGVarScope vScope = ((CGVarScope)cgScope);
-				cg.constToCells(cgScope, vScope.getStackOffset(), -1, vScope.getCells());
+				cg.constToCells(cg.getScope(), vScope.getStackOffset(), -1, vScope.getCells());
 				accUsed = true;
 			}
 			else if(initializer instanceof MethodCallExpression) {
 				initializer.codeGen(cg);
-				cg.retToCells(cgScope, (CGVarScope)cgScope);
+				cg.retToCells(cg.getScope(), vScope);
 			}
 			else {
 				initializer.codeGen(cg);
-				cg.accToCells(cgScope, (CGVarScope)cgScope);
+				cg.accToCells(cg.getScope(), vScope);
 				accUsed = true;
 			}
 		}
-		
+		cg.setScope(oldCGScope);
 		return accUsed;
 	}
 

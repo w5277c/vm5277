@@ -19,11 +19,11 @@ import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.common.Operator;
 import ru.vm5277.avr_asm.TokenType;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class DefNode {
-	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
+	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
 		String alias = (String)Node.consumeToken(tb, TokenType.ID).getValue();
 		Node.consumeToken(tb, Operator.ASSIGN);
 		String str = (String)Node.consumeToken(tb, TokenType.ID).getValue();
@@ -32,7 +32,7 @@ public class DefNode {
 			scope.addRegAlias(alias, reg, tb.getSP());
 		}
 		else {
-			throw new ParseException("Invalid register expression: " + str, tb.getSP());
+			throw new CompileException("Invalid register expression: " + str, tb.getSP());
 		}
 		scope.list(".DEF " + alias + " = r" + reg);
 		Node.consumeToken(tb, TokenType.NEWLINE);

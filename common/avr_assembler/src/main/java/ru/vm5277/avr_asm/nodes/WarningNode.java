@@ -19,12 +19,12 @@ import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.avr_asm.TokenType;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 
 public class WarningNode {
-	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
+	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
 		SourcePosition sp = tb.getSP();
 		String text = (String)Node.consumeToken(tb, TokenType.STRING).getValue();
 		mc.add(new WarningMessage(text, sp));

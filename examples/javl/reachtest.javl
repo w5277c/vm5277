@@ -21,32 +21,35 @@ import rtos.system;
 //NOT SUPPORTED YET
 
 class Main {
-	int t1 = 0x11223344;
-	int t2 = 0x0001ffff;
-	int t9 = 1;
-	int t5 = t1+t2;
+//	int t1 = 0x11223344;
+//	int t2 = 0x0001ffff;
+//	int t9 = 1;
+//	int t5 = t1+t2;
 
 	static class A {
-		public static int x() {
+		public static byte x() {
 			return 5*2;
 		}
 	}
 
-	static class B {
-		public static void yep() {
-			byte hi=1;
-		}
-		public static void nop() {
-			byte hi=0;
-		}
-	}
+//	static class B {
+//		public static void yep() {
+//			byte hi=1;
+//		}
+//		public static void nop() {
+//			byte hi=0;
+//		}
+//	}
 
     public static void main() {
-		B.yep();
-		int t3 = t5+A.x();
+//		B.yep();
+//		int t3 = t5+A.x();
 //		int t=0x01000000;
 //		int t3 = t1+t5;
-		int t4 = t5+t1;
-		System.outNum(t3);
+//		int t4 = t5+t1;
+		//byte g=A.x();
+		System.out(A.x());
+
+		System.stop();
     }
 }

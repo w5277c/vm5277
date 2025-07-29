@@ -18,15 +18,15 @@ package ru.vm5277.avr_asm.nodes.operands;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.SourcePosition;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class IOReg {
 	private	int	id;
 
-	public IOReg(Scope scope, SourcePosition sp, Expression expr) throws ParseException {
+	public IOReg(Scope scope, SourcePosition sp, Expression expr) throws CompileException {
 		id = Expression.getLong(expr, sp).intValue();
 		if(0>id || 0x1f<id) {
-			throw new ParseException("TODO ожидаем IO регистр(0-31), получили " + id, sp);
+			throw new CompileException("TODO ожидаем IO регистр(0-31), получили " + id, sp);
 		}
 	}
 	

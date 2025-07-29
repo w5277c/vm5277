@@ -22,7 +22,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import ru.vm5277.avr_asm.output.Builder;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class CodeSegment {
 	private			int							PCReg				= 0x0000;
@@ -30,8 +30,8 @@ public class CodeSegment {
 	private			HashMap<Integer,CodeBlock>	blocksByStartAddr	= new HashMap<>();
 	private			CodeBlock					curBlock			= null;
 	
-	public CodeSegment(int wSize) throws ParseException {
-		if(0>wSize) throw new ParseException("TODO размер памяти не может быть отрицательным", null);
+	public CodeSegment(int wSize) throws CompileException {
+		if(0>wSize) throw new CompileException("TODO размер памяти не может быть отрицательным", null);
 		this.wSize = wSize;
 	}
 

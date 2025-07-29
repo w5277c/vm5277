@@ -16,15 +16,15 @@
 package ru.vm5277.avr_asm.nodes.operands;
 
 import ru.vm5277.common.SourcePosition;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class IReg extends Reg {
 	
-	public IReg(SourcePosition sp, int id) throws ParseException {
+	public IReg(SourcePosition sp, int id) throws CompileException {
 		super(id);
 		
 		if(26!=id && 28!=id && 30!=id) {
-			throw new ParseException("TODO ожидаем XH,YH,ZH регистр, получили " + id, sp);
+			throw new CompileException("TODO ожидаем XH,YH,ZH регистр, получили " + id, sp);
 		}
 	}
 }

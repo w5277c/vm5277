@@ -24,7 +24,7 @@ import java.util.Map;
 import ru.vm5277.avr_asm.scope.MacroDefSymbol;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.common.exceptions.CriticalParseException;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.avr_asm.tokens.Token;
@@ -135,7 +135,7 @@ public class Parser {
 					}
 					if(tb.match(TokenType.MNEMONIC)) {
 						try {secondPassNodes.add(new MnemNode(tb, scope, mc));}
-						catch(ParseException e) {
+						catch(CompileException e) {
 							mc.add(e.getErrorMessage());
 						}
 						continue;
@@ -166,7 +166,7 @@ public class Parser {
 				mc.add(new ErrorMessage("Unexpected statement token: " + tb.consume().getType(), tb.getSP()));
 				tb.skipLine();
 			}
-			catch(ParseException e) {
+			catch(CompileException e) {
 				mc.add(e.getErrorMessage());
 				tb.skipLine();
 			}

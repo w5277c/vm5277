@@ -34,7 +34,7 @@ import ru.vm5277.avr_asm.nodes.operands.IOReg;
 import ru.vm5277.avr_asm.semantic.BinaryExpression;
 import ru.vm5277.avr_asm.semantic.IRegExpression;
 import ru.vm5277.common.Operator;
-import ru.vm5277.common.exceptions.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
@@ -48,7 +48,7 @@ public class MnemNode extends Node {
 	private			CodeBlock					block;
 	private			int							addr;
 	
-	public MnemNode(TokenBuffer tb, Scope scope, MessageContainer mc) throws ParseException {
+	public MnemNode(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
 		super(tb, scope, mc);
 		
 		mnemonic = ((String)tb.consume().getValue()).toLowerCase();
@@ -59,7 +59,7 @@ public class MnemNode extends Node {
 			}
 		}
 		if(supported.isEmpty()) {
-			throw new ParseException("//TODO не поддерживаемая мнемоника: " + mnemonic, sp);
+			throw new CompileException("//TODO не поддерживаемая мнемоника: " + mnemonic, sp);
 		}
 
 		Instruction instr = (Instruction)supported.values().toArray()[0x00];

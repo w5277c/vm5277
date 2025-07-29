@@ -56,6 +56,9 @@ import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
+// TODO Кодогенератор НЕ ДОЛЖЕН выполнять работу оптимизатора, т.е. не нужно формировать movw вместо двух mov и тому подобное. Так как оптимизатор справится с
+// этой задачей лучше, а кодогенератор может ему помешать.
+
 public class Generator extends CodeGenerator {
 	private	final	static	String				VERSION		= "0.1";
 	private	final	static	byte[]				usableRegs	= new byte[]{20,21,22,23,24,25,26,27,   19,18,17};
@@ -92,6 +95,31 @@ public class Generator extends CodeGenerator {
 		}
 		return new CGIAsm("rcall stk_free");
 	}
+
+	@Override
+	public void stackFree(CGScope scope, int size) {
+		if(0 == size) return;
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";free stack by " + size));
+		if(size < (def_sph ? 9 : 6)) {
+			for(int i=0; i<size; i++) {
+				scope.append(new CGIAsm("pop r16;"));
+			}
+		}
+		else {
+			scope.append(new CGIAsm("lds r16,SREG"));
+			scope.append(new CGIAsm("cli"));
+			scope.append(new CGIAsm("in _SPL,SPL"));
+			scope.append(new CGIAsm("subi _SPL,low(-" + size + ")"));
+			scope.append(new CGIAsm("out SPL,_SPL"));
+			if(def_sph) {
+				scope.append(new CGIAsm("in _SPH,SPH"));
+				scope.append(new CGIAsm("sbci _SPH,high(-" + size + ")"));
+				scope.append(new CGIAsm("out SPH,_SPH"));
+			}
+			scope.append(new CGIAsm("sts SREG,r16"));
+		}
+	}
+	
 	@Override
 	public CGIAsm pushRegAsm(int reg) {return new CGIAsm("push r"+reg+"");}
 	@Override
@@ -283,7 +311,7 @@ public class Generator extends CodeGenerator {
 			CGVarScope vScope = (CGVarScope)cScope;
 			if(!vScope.isConstant()) {
 				if(VERBOSE_LO <= verbose) scope.append(new CGIText(";var '" + vScope.getName() + "'->accum"));
-				varToRegs(scope, vScope, getAccRegs(vScope.getSize()));
+				varToRegs(scope, vScope.getCells(), getAccRegs(vScope.getSize()));
 			}
 			else {
 // Не нужно, invokeNative сразу записыапет значение в нужные регистры				
@@ -310,13 +338,13 @@ public class Generator extends CodeGenerator {
 		accum.setSize(type.getSize());
 	}
 
-	public void varToRegs(CGScope scope, CGVarScope vScope, byte[] registers) throws CompileException {
-		accum.setSize(vScope.getSize());
+	public void varToRegs(CGScope scope, CGCell[] cells, byte[] registers) throws CompileException {
+		accum.setSize(cells.length);
 		//Map<Byte, String> popRegs = new HashMap<>();
 		LinkedList<Byte> popRegs = new LinkedList<>();
 		
 		for(int i=0; i<registers.length; i++) {
-			CGCell cell = vScope.getCells()[i];
+			CGCell cell = cells[i];
 			byte srcReg = (byte)cell.getNum();
 			byte dstReg = registers[i];
 
@@ -325,19 +353,19 @@ public class Generator extends CodeGenerator {
 					if(srcReg == dstReg) continue; // регистры совпались, ничего не делаем
 					
 					if(!popRegs.contains(dstReg)) {
-						if(	i != (registers.length-1) && isEven(srcReg) && isEven(dstReg) && CGCell.Type.REG == vScope.getCells()[i+1].getType() &&
-							(srcReg+1)==vScope.getCells()[i+1].getNum() && (dstReg+1)==registers[i+1]) { // подходит для инструкции movw
+						if(	i != (registers.length-1) && isEven(srcReg) && isEven(dstReg) && CGCell.Type.REG == cells[i+1].getType() &&
+							(srcReg+1)==cells[i+1].getNum() && (dstReg+1)==registers[i+1]) { // подходит для инструкции movw
 						
-							Integer pos = vScope.getRegCellPos(dstReg);
-							if(null==pos || pos<=i) {
+							int pos = getCellsPos(cells, dstReg);
+							if(pos<=i) {
 								scope.append(new CGIAsm("movw r" + dstReg + ",r" + srcReg));
 								i++;
 								continue;
 							}
 						}
 						
-						Integer pos = vScope.getRegCellPos(dstReg);
-						if(null != pos && pos > i) {
+						int pos = getCellsPos(cells, dstReg);
+						if(pos > i) {
 							scope.append(new CGIAsm("push r" + dstReg));
 							popRegs.addFirst(srcReg);
 						}
@@ -345,7 +373,7 @@ public class Generator extends CodeGenerator {
 					}
 					break;
 				case STACK:
-					if(cell.getNum() <= (64-vScope.getSize())) {
+					if(cell.getNum() <= (64-cells.length)) {
 						scope.append(new CGIAsm("ldd r" + dstReg + ",y+" + cell.getNum()));
 					}
 					else {
@@ -492,6 +520,14 @@ public class Generator extends CodeGenerator {
 	public int getRegPos(byte[] regs, int offset, byte reg) {
 		for(int i=offset; i<regs.length; i++) {
 			if(regs[i] == reg) return i;
+		}
+		return -1;
+	}
+	
+	public int getCellsPos(CGCell[] cells, byte reg) {
+		for(int pos=0; pos<cells.length;pos++) {
+			CGCell cell = cells[pos];
+			if(CGCell.Type.REG == cell.getType() && cell.getNum() == reg) return pos;
 		}
 		return -1;
 	}
@@ -875,7 +911,7 @@ public class Generator extends CodeGenerator {
 
 								for(int f=0; f<regs.length;f++) if(!bScope.isFreeReg(regs[f])) scope.append(pushRegAsm(regs[f]));
 								if(VERBOSE_LO <= verbose) scope.append(new CGIText("\t;load method param"));
-								varToRegs(scope, vScope, regs);
+								varToRegs(scope, vScope.getCells(), regs);
 								for(int f=regs.length-1; f>=0;f--) if(!bScope.isFreeReg(regs[f])) scope.append(popRegAsm(regs[f]));
 							}
 							else {
@@ -885,6 +921,17 @@ public class Generator extends CodeGenerator {
 						else {
 							throw new CompileException("CG: InvokeNative: local not found resId: " + op.getValue());
 						}
+					}
+					else if(OperandType.ACCUM == op.getOperandType()) {
+						CGCell[] cells = new CGCell[regs.length];
+						byte[] accRegs =getAccRegs(regs.length);
+						for(int f=0; f<regs.length;f++) {
+							if(!bScope.isFreeReg(regs[f])) scope.append(pushRegAsm(regs[f]));
+							cells[f] = new CGCell(CGCell.Type.REG, accRegs[f]);
+						}
+						if(VERBOSE_LO <= verbose) scope.append(new CGIText("\t;load method param"));
+						varToRegs(scope, cells, regs);
+						for(int f=regs.length-1; f>=0;f--) if(!bScope.isFreeReg(regs[f])) scope.append(popRegAsm(regs[f]));
 					}
 					else if(OperandType.FLASH_RES == op.getOperandType()) {
 						if(0x00 == regs.length || 0x02<regs.length) {

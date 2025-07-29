@@ -17,6 +17,7 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -31,6 +32,13 @@ public class LiteralExpression extends ExpressionNode {
         super(tb, mc);
         
 		this.value = value;
+    }
+
+	protected LiteralExpression(TokenBuffer tb, MessageContainer mc, Object value, CGScope cgScope) {
+        super(tb, mc);
+        
+		this.value = value;
+		this.cgScope = cgScope;
     }
     
 	@Override
@@ -120,15 +128,16 @@ public class LiteralExpression extends ExpressionNode {
 	@Override
 	public Object codeGen(CodeGenerator cg) throws Exception {
 		//TODO перенести код в VarNode и FieldNode
-		if(cgScope.getParent() instanceof CGCellsScope) {
-			CGCellsScope cScope = (CGCellsScope)cgScope.getParent();
+		//TODO отключен
+//		if(cgScope.getParent() instanceof CGCellsScope) {
+//			CGCellsScope cScope = (CGCellsScope)cgScope.getParent();
 
 //			if(VarType.NULL == cScope.getType()) {
 //				cg.setAcc(cScope, 0x01, 0);
 //			}
 			//accum.set(scope, size, value);
-			cg.constToAcc(cScope, cScope.getSize(), getNumValue());
-		}
+//			cg.constToAcc(cScope, cScope.getSize(), getNumValue());
+//		}
 		return null;
 	}
 }

@@ -15,7 +15,7 @@
  */
 package ru.vm5277.avr_asm;
 
-import java.text.ParseException;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class Instruction {
 	public	final	static	String	FLAGS_NONE	= "none";
@@ -53,10 +53,10 @@ public class Instruction {
 	private	int			opcode;
 	private	String[]	operands;
 	
-	public Instruction(String line) throws ParseException {
+	public Instruction(String line) throws CompileException {
 		String parts[] = line.trim().toLowerCase().split("\\s+");
 		if(0x07!=parts.length) {
-			throw new ParseException("Expected 7 parameters for instruction, got [" + parts.length + "] in: " + line, 0);
+			throw new CompileException("Expected 7 parameters for instruction, got [" + parts.length + "] in: " + line);
 		}
 		
 		id = parts[0x00];
@@ -65,7 +65,7 @@ public class Instruction {
 		
 		flags = parts[0x02];
 		if(!flags.equals(FLAGS_NONE) && !flags.equals(FLAGS_SREGS) && !flags.replaceAll("[zcnvtish]", "").isEmpty()) {
-			throw new ParseException("Unknown flag[s] in:" + line, 0);
+			throw new CompileException("Unknown flag[s] in:" + line);
 		}
 		
 		if(!parts[0x03].equals("-")) {
