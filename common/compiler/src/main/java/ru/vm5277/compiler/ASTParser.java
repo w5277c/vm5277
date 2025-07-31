@@ -26,6 +26,7 @@ import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.ClassNode;
 import ru.vm5277.compiler.nodes.ImportNode;
+import ru.vm5277.compiler.nodes.InterfaceNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.tokens.Token;
 
@@ -59,9 +60,21 @@ public class ASTParser extends AstNode {
 		}
 		
 		Set<Keyword> modifiers = collectModifiers(tb);
-		if(tb.match(TokenType.OOP, Keyword.CLASS)) {
+		if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
 			try {
-				classNode = new ClassNode(tb, mc, modifiers, null, importedClasses);
+				InterfaceNode iNode = new InterfaceNode(tb, mc, modifiers, null, importedClasses);
+				iNode.parse();
+				classNode = iNode;
+			}
+			catch(CompileException e) {
+				// Парсинг прерван (дальнейший парсинг файла бессмыслен)
+			}
+		}
+		else if(tb.match(TokenType.OOP, Keyword.CLASS)) {
+			try {
+				ClassNode cNode = new ClassNode(tb, mc, modifiers, null, importedClasses);
+				cNode.parse();
+				classNode = cNode;
 			}
 			catch(CompileException e) {
 				// Парсинг прерван (дальнейший парсинг файла бессмыслен)

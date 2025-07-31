@@ -435,6 +435,14 @@ public class Generator extends CodeGenerator {
 				case RET:
 					body.append(new CGIAsm("ldi r" + getRetRegs(0x04)[i] + "," + (value&0xff)));
 					break;
+				case HEAP:
+					if(0==i) {
+						scope.append(new CGIAsm("ldi r30,low(" + cells[0x00].getNum() + ")"));
+						scope.append(new CGIAsm("ldi r31,high(" + cells[0x00].getNum() + ")"));
+					}
+					scope.append(new CGIAsm("ldi r16," + (value&0xff)));
+					scope.append(new CGIAsm("std z+" + (cell.getNum()-cells[0x00].getNum()) + ",r16"));
+					break;
 				default: throw new CompileException("Unsupported cell type:" + cell.getType());
 			}
 			value >>= 0x08;
@@ -1008,12 +1016,12 @@ public class Generator extends CodeGenerator {
 		thenBlockScope.prepend(thenLbScope);
 		
 
-		String optimizedBrInst = Optimizator.localWithConstantComparingCondition((CGExpressionScope)condBlockScope.getItems().get(1));
-		boolean optimized = false;
-		String brInstr = null == optimizedBrInst ? "brne" : optimizedBrInst;
+//		String optimizedBrInst = Optimizator.localWithConstantComparingCondition((CGExpressionScope)condBlockScope.getItems().get(1));
+//		boolean optimized = false;
+		String brInstr = "brne";//null == optimizedBrInst ? "brne" : optimizedBrInst;
 		
 
-		if(null == optimizedBrInst) condBlockScope.append(new CGIAsm("cpi r16,0x01"));
+		//if(null == optimizedBrInst) condBlockScope.append(new CGIAsm("cpi r16,0x01"));
 		if(null != elseBlockScope) {
 			condBlockScope.append(new CGIAsm(brInstr + " " + elseLbScope.getName())); //TODO необходима проверка длины прыжка
 			thenBlockScope.append(new CGIAsm("rjmp " + endLbScope.getName())); //TODO необходима проверка длины прыжка

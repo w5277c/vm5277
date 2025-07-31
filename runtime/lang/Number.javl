@@ -1,0 +1,7 @@
+public interface Number {
+  bool toBool();
+  byte toByte();
+  short toShort();
+  int toInt();
+  fixed toFixed();
+}

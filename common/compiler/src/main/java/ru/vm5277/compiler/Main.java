@@ -16,12 +16,15 @@
 package ru.vm5277.compiler;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import ru.vm5277.common.FSUtils;
+import ru.vm5277.common.SourceType;
 import ru.vm5277.common.SystemParam;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.messages.ErrorMessage;
@@ -41,6 +44,9 @@ public class Main {
 	public			static	String	launchMethodName	= "main";
 	
 	public static void main(String[] args) throws IOException, Exception {
+		long startTimestamp = System.currentTimeMillis();
+		System.out.println("Javl Compiler v" + VERSION + " started");
+		
 		isWindows = (null != System.getProperty("os.name") && System.getProperty("os.name").toLowerCase().contains("windows"));
 
 		toolkitPath = FSUtils.getToolkitPath();
@@ -130,12 +136,18 @@ public class Main {
 			System.exit(0);
 		}
 		
+		Path libPath = toolkitPath.resolve("defs").resolve(platform).normalize();
+		if(!libPath.toFile().exists()) {
+			//TODO showInvalidLibDir(libPath);
+			System.exit(0);
+		}
+
 		MessageContainer mc = new MessageContainer(8, true, false);
 		
 		Path runtimePath = toolkitPath.resolve("runtime").normalize();
-		File sourceFile = new File(source);
-		Path basePath = sourceFile.getParentFile().toPath();
-		Lexer lexer = new Lexer(sourceFile, mc);
+		Path sourcePath = FSUtils.resolve(toolkitPath, source);
+		Path basePath = sourcePath.getParent();
+		Lexer lexer = new Lexer(sourcePath.toFile(), mc);
 		
 		ClassScope globalScope = new ClassScope();
 		globalScope.addInterface(new InterfaceSymbol("Object"));
@@ -151,12 +163,21 @@ public class Main {
 		CodeGenerator cg = PlatformLoader.loadGenerator(platform, libDir, nbr.getMap(), params);
 		CodeGenerator.verbose = cgVerbose;
 		
+		long timestamp = System.currentTimeMillis();
+		System.out.println("Parsing...");
 		ASTParser parser = new ASTParser(runtimePath, basePath, lexer.getTokens(), mc);
 		ClassNode clazz = parser.getClazz();
+		float time = (System.currentTimeMillis() - timestamp) / 1000f;
+		System.out.println("Parsing done, time:" + String.format(Locale.US, "%.2f", time) + " s");
+		timestamp = System.currentTimeMillis();
+		System.out.println("Semantic...");
 		SemanticAnalyzer.analyze(globalScope, parser.getClazz(), cg);
+		time = (System.currentTimeMillis() - timestamp) / 1000f;
+		System.out.println("Semantic done, time:" + String.format(Locale.US, "%.2f", time) + " s");
+
 		//ReachableAnalyzer.analyze(parser.getClazz(), launchMethodName, mc);
 
-		new ASTPrinter(parser.getClazz());
+		//new ASTPrinter(parser.getClazz());
 		if(0 == mc.getErrorCntr()) {
 			try {
 				MethodNode launchNode = null;
@@ -172,9 +193,37 @@ public class Main {
 				}
 
 				if(null != launchNode) {
+					timestamp = System.currentTimeMillis();
+					System.out.println("Codegen...");
+
 					launchNode.codeGen(cg, true);
 					cg.build();
-					System.out.println("\n" + cg.getAsm());
+					//System.out.println("\n" + cg.getAsm());
+					
+					Path targetPath = basePath.resolve("target").normalize();
+					targetPath.toFile().mkdirs();
+					
+					Map<Path, SourceType> sourcePaths	= new HashMap<>();
+					sourcePaths.put(targetPath, SourceType.BASE);
+					sourcePaths.put(rtosPath, SourceType.RTOS);
+					sourcePaths.put(libPath, SourceType.LIB);
+					Path asmPath = targetPath.resolve(FSUtils.getBaseName(sourcePath));
+					
+					File asmFile = new File(asmPath.toString() + ".asm");
+					asmFile.createNewFile();
+					FileWriter fw = new FileWriter(asmFile);
+					fw.write(cg.getAsm());
+					fw.close();
+					
+					time = (System.currentTimeMillis() - timestamp) / 1000f;
+					System.out.println("Codegen done, time:" + String.format(Locale.US, "%.2f", time) + " s");
+
+					timestamp = System.currentTimeMillis();
+					System.out.println("Assembling...");
+					PlatformLoader.loadAssembler(platform, libDir, mc, asmFile.toPath(), sourcePaths, asmPath.toString());
+					time = (System.currentTimeMillis() - timestamp) / 1000f;
+					System.out.println("Assembling done, time:" + String.format(Locale.US, "%.2f", time) + " s");
+
 				}
 				else {
 					mc.add(new ErrorMessage("TODO Can't find launch point 'public static void main() {...'", null));
@@ -185,6 +234,9 @@ public class Main {
 			}
 			
 		}
+		time = (System.currentTimeMillis() - startTimestamp) / 1000f;
+		System.out.println("Total time:" + String.format(Locale.US, "%.2f", time) + " s");
+
     }
 	
 	private static void showHelp() {
@@ -206,6 +258,17 @@ public class Main {
 		System.out.println("  -P, --path <dir>\tCustom toolkit directory path");
 		System.out.println("  -I, --include <dir>\tAdditional include path(s)");
 		System.out.println("      --cg-verbose 0-2\t\tGenerate detailed codegen info");
+		System.out.println("  -ao, --asm-output <file> Output HEX file (default: <input>.hex)");
+		System.out.println("  -af, --asm-format <fmt>  Output format (hex, bin)");
+		System.out.println("                     hex     - Intel HEX (default)");
+		System.out.println("                     bin     - Raw binary");
+		System.out.println("  -as, --asm-strict <strong|light|none> Ambiguity handling level");
+		System.out.println("                     strong  - Treat as error");
+		System.out.println("                     light   - Show warning (default)");
+		System.out.println("                     none    - Silent mode");
+		System.out.println("  -ac, --asm-code <file> Generate source code asm file");
+		System.out.println("  -am, --asm-map <file>	Generate memory map file");
+		System.out.println("  -al, --asm-list <file> Generate assembly listing file");
 		System.out.println("  -v, --version\t\tDisplay version");
 		System.out.println("  -h, --help\t\tShow this help");
 		System.out.println();

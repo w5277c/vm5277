@@ -13,19 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 import rtos.System;
-//import rtos.RTOSParam;
-//import hal.gpio;
+import rtos.RTOSParam;
+import hal.GPIO;
 
 class Main {
     public static void main() {
-//		System.setParam(RTOSParam.CORE_FREQ, 16);
-//		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
-//		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
+		System.setParam(RTOSParam.CORE_FREQ, 16);
+		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
+		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
 
 		cstr text="Hello world!\r\nПривет!\r\n";
 		System.outCStr(text);
 
-//		System.stop();
+		System.stop();
     }
 }

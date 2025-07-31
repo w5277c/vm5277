@@ -14,31 +14,30 @@
  * limitations under the License.
  */
 import rtos.System;
-import rtos.RTOSParam;
-import rtos.Thread;
-import hal.GPIO;
-
+//import lang.Byte;
 
 class Main {
-    public static void main() {
-		System.setParam(RTOSParam.CORE_FREQ, 16);
-		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
-		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
+	public interface Number {
+		byte toByte();
+	}
 
-		byte port = GPIO.PB1;
-		GPIO.modeOut(port);
-		while(true) {
-			Thread.waitMS(250);
-			GPIO.invert(port);
+	public class Byte implements Number {
+		private	byte	value;
+
+		public Byte(byte value) {
+			this.value = value;
 		}
-    }
 
-    /* TODO ввести class:
-    GPIOPin pin = new GPIOPin(GPIO.PB1);
-    pin.setHi();
-    pin.setLo();
-    pin.invert();
-    bool isHi = pin.isHi();
-    bool isOutMode = pin.isOutMode();
-    */
+		public byte toByte() {
+			return value;
+		}
+	}
+
+
+
+    public static void main() {
+		private Byte b = new Byte(0x01);
+
+		System.out(b.toByte());
+    }
 }

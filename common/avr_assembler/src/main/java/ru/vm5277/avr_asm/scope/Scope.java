@@ -30,8 +30,9 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import ru.vm5277.avr_asm.Assembler;
 import ru.vm5277.avr_asm.InstrReader;
-import static ru.vm5277.avr_asm.Main.tabSize;
+import static ru.vm5277.avr_asm.Assembler.tabSize;
 import ru.vm5277.avr_asm.nodes.Node;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.exceptions.CriticalParseException;
@@ -45,9 +46,6 @@ public class Scope {
 			registers.put("r"+i, i);
 		}
 	}
-	public	final	static	int										STRICT_STRONG	= 1;
-	public	final	static	int										STRICT_LIGHT	= 2;
-	public	final	static	int										STRICT_NONE		= 3;
 	private					String									name;
 	private			static	String									mcu				= null;
 	private			static	InstrReader								instrReader;
@@ -55,7 +53,7 @@ public class Scope {
 	private					boolean									listEnabled		= true;
 	private					boolean									listMacEnabled	= true;
 	private					boolean									overlapAllowed	= true;
-	private			static	int										strictLevel		= STRICT_LIGHT;
+	private			static	int										strictLevel		= Assembler.STRICT_LIGHT;
 	private	final			Map<String, Byte>						regAliases		= new HashMap<>();	// Алиасы регистров
 	private	final			Map<String, VariableSymbol>				variables		= new HashMap<>();
 	private	final			Map<String, Integer>					labels			= new HashMap<>();

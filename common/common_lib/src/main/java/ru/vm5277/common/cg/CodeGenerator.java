@@ -63,55 +63,45 @@ public abstract class CodeGenerator extends CGScope {
 	}
 	
 	public CGClassScope enterClass(VarType type, int[] intrerfaceIds, String name, boolean isRoot) {
-		if(VERBOSE_HI == verbose) append(new CGIText(";CG: enterClass " + name));
 		scope = new CGClassScope(scope, genId(), type, intrerfaceIds, name, null != scope && isRoot);
 		return (CGClassScope)scope;
 	}
 	public void leaveClass() {
-		if(VERBOSE_HI == verbose) scope.append(new CGIText(";CG: leaveClass"));
 		if(null != scope.getParent()) scope = scope.free(); // оставялем верхний класс в зоне видимости
 		
 		//TODO
 	}
 
 	public CGInterfaceScope enterInterface(VarType type, int[] intrerfaceIds, String name) {
-		if(VERBOSE_HI == verbose) scope.append(new CGIText(";CG: enterInterface " + name));
 		scope = new CGInterfaceScope(scope, genId(), type, intrerfaceIds, name);
 		return (CGInterfaceScope)scope;
 	}
 	public void leaveInterface() {
-		if(VERBOSE_HI == verbose) scope.append(new CGIText(";CG: leaveInterface"));
 		scope = scope.free();
 		//TODO
 	}
 
 	public CGMethodScope enterConstructor(VarType[] types) {
-		if(VERBOSE_HI == verbose) scope.append(new CGIText(";CG: enterConstructor"));
 		scope = new CGMethodScope(this, (CGClassScope)scope, genId(), VarType.NULL, types, "constr", buildRegsPool());
 		return (CGMethodScope)scope;
 	}
 	public void leaveConstructor() {
-		if(VERBOSE_HI == verbose) scope.append(new CGIText(";CG: leaveConstructor"));
 		scope = scope.free();
 	}
 
 	public CGMethodScope enterMethod(VarType type, VarType[] types, String name) {
-		if(VERBOSE_HI == verbose) scope.append(new CGIText(";CG: enterMethod " + name));
 		scope = new CGMethodScope(this, (CGClassScope)scope, genId(), type, types, name, buildRegsPool());
 		return (CGMethodScope)scope;
 	}
 	public void leaveMethod() {
-		if(VERBOSE_HI == verbose) scope.append(new CGIText(";CG: leaveMethod"));
 		scope = scope.free();
 	}
 
 	public CGBlockScope enterBlock() {
-		if(VERBOSE_HI == verbose) scope.append(new CGIText(";CG: enterBlock"));
 		scope = new CGBlockScope(scope, genId());
 		return (CGBlockScope)scope;
 	}
 	public void leaveBlock() {
-		if(VERBOSE_HI == verbose) scope.append(new CGIText(";CG: leaveBlock"));
 /*		CGBlockScope bScope = (CGBlockScope)scope;
 
 		if(!bScope.getUsedRegs().isEmpty()) {
@@ -137,14 +127,12 @@ public abstract class CodeGenerator extends CGScope {
 		scope = scope.free();
 	}
 
-	public CGVarScope enterLocal(VarType type, int size, boolean isConstant, String name) throws CompileException { //TODO сделать индексацию вместо имен
-		if(VERBOSE_HI == verbose) scope.append(new CGIText(";CG: enterVar " + name));
+	public CGVarScope enterLocal(VarType type, int size, boolean isConstant, String name) throws CompileException {
 		this.scope = new CGVarScope(scope, genId(), type, size, isConstant, name);
 
 		return (CGVarScope)this.scope;
 	}
 	public void leaveLocal() {
-		if(VERBOSE_HI == verbose) scope.append(new CGIText(";CG: leaveVar"));
 /*		CGLocalScope lScope = (CGLocalScope)scope;
 		if(lScope.isConstant()) {
 			lScope.setDataSymbol(flashData.get(lScope.getResId()));
@@ -159,13 +147,11 @@ public abstract class CodeGenerator extends CGScope {
 		//TODO
 	}
 	public CGFieldScope enterField(VarType type, boolean isStatic, String name) throws CompileException {
-		if(VERBOSE_HI == verbose) scope.append(new CGIText(";CG: enterField " + name));
 		scope = new CGFieldScope((CGClassScope)scope, genId(), type, (-1 == type.getSize() ? getRefSize() : type.getSize()), isStatic, name);
 
 		return (CGFieldScope)scope;
 	}
 	public void leaveField() {
-		if(VERBOSE_HI == verbose) scope.append(new CGIText(";CG: leaveField"));
 		scope = scope.free();
 		//TODO
 	}
@@ -199,7 +185,6 @@ public abstract class CodeGenerator extends CGScope {
 	}
 
 	public void defineStr(CGCellsScope cScope, String text) {
-		//flashData.put(lScope.getResId(), new DataSymbol(lScope, "javl_" + scope.getParent().getPath("_")+"_r"+resId, -1, text));
 		DataSymbol ds = new DataSymbol("JavlD" + cScope.getResId(), -1, text);
 		flashData.put(cScope.getResId(), ds);
 		cScope.setDataSymbol(ds);

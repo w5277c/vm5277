@@ -188,6 +188,10 @@ public class InstanceOfExpression extends ExpressionNode {
 		return fulfillsContract;
 	}
 	
+	public String getVarName() {
+		return varName;
+	}
+	
 	@Override
 	public Object codeGen(CodeGenerator cg) throws Exception {
 		//Обходимся без рантайма, пока в левой части примитив или это константа

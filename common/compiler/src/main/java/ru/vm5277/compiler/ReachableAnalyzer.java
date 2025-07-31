@@ -29,7 +29,7 @@ import ru.vm5277.compiler.semantic.VarSymbol;
 
 class ReachableAnalyzer {
 	public static void analyze(ClassNode clazz, String launchMethod, MessageContainer mc) {
-		ClassBlockNode classBlockNode = clazz.getBody();
+/*		ClassBlockNode classBlockNode = clazz.getBody();
 		for(AstNode node : classBlockNode.getChildren()) {
 			if(node instanceof MethodNode) {
 				MethodNode mNode = (MethodNode)node;
@@ -39,7 +39,7 @@ class ReachableAnalyzer {
 					break;
 				}
 			}
-		}
+		}*/
 	}
 	
 	private static void visit(AstNode parentNode, MessageContainer mc, boolean mustUsed) {

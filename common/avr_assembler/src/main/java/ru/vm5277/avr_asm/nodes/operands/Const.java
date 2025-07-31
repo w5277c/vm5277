@@ -15,6 +15,7 @@
  */
 package ru.vm5277.avr_asm.nodes.operands;
 
+import ru.vm5277.avr_asm.Assembler;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.SourcePosition;
@@ -38,10 +39,10 @@ public class Const {
 		}
 
 		long mask = (1<<bits)-1;
-		if(Scope.STRICT_STRONG != Scope.getStrincLevel() && 0==min && _value>max) {
+		if(Assembler.STRICT_STRONG != Scope.getStrincLevel() && 0==min && _value>max) {
 			long new_value = _value & mask;
 			if(new_value<=max) {
-				if(Scope.STRICT_NONE != Scope.getStrincLevel()) {
+				if(Assembler.STRICT_NONE != Scope.getStrincLevel()) {
 					mc.add(new WarningMessage("Constant value " + _value + " exceeds " + bits + "-bit range. Truncated to: " + new_value, sp));
 				}
 				_value = new_value;

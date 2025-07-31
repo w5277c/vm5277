@@ -17,8 +17,6 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.ArrayList;
 import java.util.List;
-import ru.vm5277.common.cg.Operand;
-import ru.vm5277.common.cg.OperandType;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.Operator;
@@ -37,6 +35,7 @@ import ru.vm5277.compiler.nodes.VarNode;
 import ru.vm5277.compiler.semantic.AstHolder;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
+import ru.vm5277.compiler.semantic.VarSymbol;
 import ru.vm5277.compiler.tokens.Token;
 
 public class ExpressionNode extends AstNode {
@@ -412,12 +411,18 @@ public class ExpressionNode extends AstNode {
 
 				if (null != varSymbol && varSymbol.isFinal() && ioe.getLeftType() != null && ioe.getRightType() != null) {
 					VarType leftType = ioe.getLeftType();
-					Operand op = null;//varSymbol.getConstantOperand();
-					//TODO
-					if(null != op && OperandType.TYPE == op.getOperandType()) {
-						varSymbol = scope.resolve((String)op.getValue());
-						if(null != varSymbol) leftType = varSymbol.getType();
+					if(varSymbol instanceof VarSymbol) {
+						AstNode node = ((VarSymbol)varSymbol).getNode();
+						if(node instanceof VarNode) {
+							ExpressionNode expr = ((VarNode)node).getInitializer();
+							if(null != expr) leftType = expr.getType(scope);
+						}
+						else if(node instanceof FieldNode) {
+							ExpressionNode expr = ((FieldNode)node).getInitializer();
+							if(null != expr) leftType = expr.getType(scope);
+						}
 					}
+
 					// Точное совпадение типов
 					if (leftType == ioe.getRightType()) return new LiteralExpression(tb, mc, true, cgScope);
 
@@ -427,7 +432,7 @@ public class ExpressionNode extends AstNode {
 						if (leftType.getArrayDepth() != ioe.getRightType().getArrayDepth())  return new LiteralExpression(tb, mc, false, cgScope);
 
 						// Object[] совместим с любым массивом
-						if ("Object".equals(ioe.getRightType().getClassName())) return new LiteralExpression(tb, mc, true, cgScope);
+						if (ioe.getRightType().isObject()) return new LiteralExpression(tb, mc, true, cgScope);
 
 						// Проверка типа элементов
 						if (leftType.getClassName().equals(ioe.getRightType().getClassName())) return new LiteralExpression(tb, mc, true, cgScope);
@@ -724,11 +729,10 @@ public class ExpressionNode extends AstNode {
 			consumeToken(tb); // Потребляем 'new'
 
 			// Парсим имя класса
-			String className = consumeToken(tb, TokenType.ID).getValue().toString();
-
+			TypeReferenceExpression expr = parseTypeReference();
 			// Парсим аргументы конструктора
 			List<ExpressionNode> args = parseArguments(tb);
-			return new NewExpression(tb, mc, className, args);
+			return new NewExpression(tb, mc, expr, args);
 		}
 		if(tb.match(TokenType.NUMBER) || tb.match(TokenType.STRING) || tb.match(TokenType.CHAR) || tb.match(TokenType.LITERAL)) {
 			consumeToken(tb);
@@ -740,7 +744,7 @@ public class ExpressionNode extends AstNode {
 			consumeToken(tb, Delimiter.RIGHT_PAREN);
 			return expr;
 		}
-		else if(tb.match(TokenType.ID)) {
+		else if(tb.match(TokenType.ID) || tb.match(TokenType.OOP, Keyword.THIS)) {
 			ExpressionNode expr = parseFullQualifiedExpression(tb);
 
 			// Парсим цепочку идентификаторов через точки

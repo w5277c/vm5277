@@ -18,7 +18,6 @@ package ru.vm5277.common.cg.scopes;
 import java.util.HashMap;
 import java.util.Map;
 import ru.vm5277.common.cg.items.CGIContainer;
-import ru.vm5277.common.cg.items.CGIText;
 
 public class CGScope extends CGIContainer {
 	public		final	static	int						VERBOSE_NO	= 0;
@@ -46,10 +45,6 @@ public class CGScope extends CGIContainer {
 		this.parent = parent;
 		this.name = name;
 		this.resId = resId;
-		
-		if(VERBOSE_HI == verbose && !(this instanceof CGExpressionScope)) {
-			append(new CGIText(";CG: " + getClass().getSimpleName() + (name.isEmpty() ? "" :  " " + name) + ", resId:" + resId));
-		}
 		
 		if(null != parent) {
 			parent.append(this);

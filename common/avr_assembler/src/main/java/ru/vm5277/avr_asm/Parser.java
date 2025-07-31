@@ -15,6 +15,7 @@
  */
 package ru.vm5277.avr_asm;
 
+import ru.vm5277.common.SourceType;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import ru.vm5277.avr_asm.nodes.DataNode;

@@ -44,7 +44,7 @@ import ru.vm5277.compiler.semantic.Symbol;
 import ru.vm5277.compiler.semantic.VarSymbol;
 
 public class MethodCallExpression extends ExpressionNode {
-	private	final	ExpressionNode			parent;
+	private			ExpressionNode			parent;
 	private	final	String					methodName;
 	private	final	List<ExpressionNode>	args;
 	private			VarType					type;
@@ -83,14 +83,9 @@ public class MethodCallExpression extends ExpressionNode {
 
 		// Проверка существования parent (если есть)
 		if (null == parentType && null != parent) {
-			try {
-				parentType = parent.getType(scope);
-				if (null == parentType) throw new CompileException("Cannot resolve:" + parent.toString());
-			}
-			catch (CompileException e) {
-				throw new CompileException("Invalid parent in method call: " + e.getMessage());
-			}
+			parentType = parent.getType(scope);
 		}
+		if (null == parentType) throw new CompileException("Cannot resolve:" + parent.toString());
 		
 		// Получаем типы аргументов
 		argTypes = new VarType[args.size()];
@@ -177,6 +172,19 @@ public class MethodCallExpression extends ExpressionNode {
 		}
 
 		if(null != parent) {
+			if(parent instanceof UnresolvedReferenceExpression) {
+				UnresolvedReferenceExpression ure = (UnresolvedReferenceExpression)parent;
+				if("this".equals(ure.getId())) {
+					parent = new ThisExpression(tb, mc);
+				}
+				else if(null != VarType.fromClassName(ure.getId())) {
+					parent = new TypeReferenceExpression(tb, mc, ure.getId());
+				}
+				else {
+					parent =  new VarFieldExpression(tb, mc, ure.getId());
+				}
+			}
+
 			if(!parent.preAnalyze()) {
 				return false;
 			}
@@ -207,9 +215,14 @@ public class MethodCallExpression extends ExpressionNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		try {type = getType(scope);} catch(CompileException e) {markError(e); return false;}; //TODO костыль, нужен для присваивания symbol
-
 		try {
+			ExpressionNode optimizedParentScope = parent.optimizeWithScope(scope);
+			if(null != optimizedParentScope) {
+				parent = optimizedParentScope;
+			}
+		
+			try {type = getType(scope);} catch(CompileException e) {markError(e); return false;}; //TODO костыль, нужен для присваивания symbol
+
 			cgScope = cg.enterExpression();		
 
 			// Проверка parent (если есть)
@@ -257,7 +270,14 @@ public class MethodCallExpression extends ExpressionNode {
 			String className = null;
 			if(null != parent) {
 				if(parent instanceof TypeReferenceExpression) {
-					className = ((TypeReferenceExpression)parent).getClassName();
+					TypeReferenceExpression tre = (TypeReferenceExpression)parent;
+					className = tre.getClassName();
+				}
+				else if(parent instanceof VarFieldExpression) {
+					className = ((VarFieldExpression)parent).getType(scope).getClassName();
+				}
+				else if(parent instanceof ThisExpression) {
+					className = scope.getThis().getName();
 				}
 				else {
 					markError(new CompileException("Unsupported parent type: " + parent.toString()));
@@ -357,7 +377,8 @@ public class MethodCallExpression extends ExpressionNode {
 			if(!args.isEmpty()) {
 				CGScope oldCGScope = cg.setScope(symbol.getCGScope());
 				
-				// Сначала(для ссылочных параметров) нужно поместить в стек данные всех аргументов, размер которых больше refSize 
+				// !!! Ввожу четкое разделение примитивов и ссылочных типов.
+/*				// Сначала(для ссылочных параметров) нужно поместить в стек данные всех аргументов, размер которых больше refSize 
 				for(int i=0; i<args.size(); i++) {
 					// Получаем выражение передаваемое этому параметру
 					ExpressionNode argExpr = args.get(i);
@@ -367,6 +388,7 @@ public class MethodCallExpression extends ExpressionNode {
 					Symbol paramSymbol = ((MethodSymbol)symbol).getParameters().get(i);
 					VarType paramVarType = paramSymbol.getType();
 					// Проверка на ссылочный параметр
+
 					if(paramVarType.isObject() || paramVarType.isReferenceType())	{
 						int exprTypeSize = argTypes[i].getSize();
 						if(-1 == exprTypeSize) exprTypeSize = cg.getRefSize();
@@ -386,7 +408,7 @@ public class MethodCallExpression extends ExpressionNode {
 						}
 					}
 				}
-
+*/
 				// Помещаем в стек адрес возврата
 				rpCGScope = cg.makeLabel(cgScope.getMethodScope(), "RP", true);
 				cg.pushCells(cgScope, 2, new CGCell[]{new CGCell(rpCGScope.getLName())});
@@ -400,6 +422,8 @@ public class MethodCallExpression extends ExpressionNode {
 
 					// Получаем выражение передаваемое этому параметру
 					ExpressionNode argExpr = args.get(i);
+					// Выполняем зависимость
+					argExpr.depCodeGen(cg);
 					// Получаю из scope вызываемого метода переменую с именем параметра(пустая переменная уже создана, или создан Alias)
 					Symbol vSymbol = ((MethodSymbol)symbol).getScope().resolve(paramSymbol.getName());
 					if(vSymbol instanceof AliasSymbol) {
@@ -418,29 +442,32 @@ public class MethodCallExpression extends ExpressionNode {
 						cg.leaveLocal();
 						vSymbol.setCGScope(dstVScope);
 
-						boolean isRef = paramVarType.isObject() || paramVarType.isReferenceType();
+/*						boolean isRef = paramVarType.isObject() || paramVarType.isReferenceType();
 						if(isRef)	{
 							// Если тип ожидаемого параметра Object(т.е. любой тип) или reference(класс, интерфес, массив),
 							// то сначала передаем ид типа
 							cg.pushConst(cgScope, refTypeSize, argTypes[i].getId());
 						}
-						// Если размер данных типа не более размера данных ссылки, то помещаем данные
-						if(!isRef || cg.getRefSize() >= exprTypeSize) {
+*/
+//						// Если размер данных типа не более размера данных ссылки, то помещаем данные
+//						if(!isRef || cg.getRefSize() >= exprTypeSize) {
 							if(argExpr instanceof LiteralExpression) {
-								cg.pushConst(cgScope, isRef ? cg.getRefSize() : exprTypeSize, ((LiteralExpression)argExpr).getNumValue());
+								//cg.pushConst(cgScope, isRef ? cg.getRefSize() : exprTypeSize, ((LiteralExpression)argExpr).getNumValue());
+								cg.pushConst(cgScope, exprTypeSize, ((LiteralExpression)argExpr).getNumValue());
 							}
 							else if(argExpr instanceof VarFieldExpression) {
-								cg.pushCells(cgScope, isRef ? cg.getRefSize() : exprTypeSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells());
+								//cg.pushCells(cgScope, isRef ? cg.getRefSize() : exprTypeSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells());
+								cg.pushCells(cgScope, exprTypeSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells());
 							}
 							else {
 								throw new CompileException("Unsupported expression:" + argExpr);
 							}
-						}
-						else {
-							// Размер больше. Данные ранее созранены в стек
-							cg.pushConst(cgScope, cg.getRefSize(), stackOffset);
-							stackOffset += exprTypeSize;
-						}
+//						}
+//						else {
+//							// Размер больше. Данные ранее созранены в стек
+//							cg.pushConst(cgScope, cg.getRefSize(), stackOffset);
+//							stackOffset += exprTypeSize;
+//						}
 					}
 				}
 				cg.setScope(oldCGScope);
@@ -472,7 +499,15 @@ public class MethodCallExpression extends ExpressionNode {
 		}
 		else if(expr instanceof LiteralExpression) {
 			LiteralExpression le = (LiteralExpression)expr;
-			return new Operand(OperandType.LITERAL, le.getNumValue());
+			if(VarType.CSTR == le.getType(null)) {
+				CGVarScope vScope = cg.enterLocal(VarType.CSTR, -1, true, null);
+				cg.leaveLocal();
+				cg.defineStr(vScope, (String)le.getValue());
+				return new Operand(OperandType.FLASH_RES, vScope.getResId());
+			}
+			else {
+				return new Operand(OperandType.LITERAL, le.getNumValue());
+			}
 		}
 		else if(expr instanceof MethodCallExpression) {
 			MethodCallExpression mce = (MethodCallExpression)expr;

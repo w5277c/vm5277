@@ -18,6 +18,7 @@ package ru.vm5277.avr_asm.nodes;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import javax.xml.bind.DatatypeConverter;
+import ru.vm5277.avr_asm.Assembler;
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
@@ -67,10 +68,10 @@ public class DataNode {
 			
 			if(0 != baos.size()) {
 				if(0 != (baos.size()&0x01)) {
-					if(Scope.STRICT_STRONG == Scope.getStrincLevel()) {
+					if(Assembler.STRICT_STRONG == Scope.getStrincLevel()) {
 						throw new CompileException("Odd-sized FLASH data", sp);
 					}
-					else if(Scope.STRICT_LIGHT == Scope.getStrincLevel()) {
+					else if(Assembler.STRICT_LIGHT == Scope.getStrincLevel()) {
 						mc.add(new WarningMessage("Odd-sized FLASH data", sp));
 					}
 					baos.write(0x00);

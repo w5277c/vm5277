@@ -8,7 +8,7 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>8</maven.compiler.release>
-        <exec.mainClass>ru.vm5277.avr_asm.Main</exec.mainClass>
+        <exec.mainClass>ru.vm5277.avr_asm.AvrAssembler</exec.mainClass>
     </properties>
     <build>
 	    <plugins>

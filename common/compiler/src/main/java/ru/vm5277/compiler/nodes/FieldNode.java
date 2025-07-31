@@ -140,21 +140,22 @@ public class FieldNode extends AstNode {
 			if (isFinal() && initializer == null) markError("Final field '" + name + "' must be initialized");
 
 			// Анализ инициализатора, если есть
-			if (initializer != null) initializer.postAnalyze(scope, cg);
+			if (initializer != null) {
+				initializer.postAnalyze(scope, cg);
+				// Проверка совместимости типов
+				VarType initType = initializer.getType(scope);
+				if (!isCompatibleWith(scope, type, initType)) {
+					markError("Type mismatch: cannot assign " + initType + " to " + type);
+				}
+				// Дополнительная проверка на сужающее преобразование
+				if (type.isNumeric() && initType.isNumeric() && type.getSize() < initType.getSize()) {
+					markError("Narrowing conversion from " + initType + " to " + type + " requires explicit cast");
+				}
 
-			// Проверка совместимости типов
-			VarType initType = initializer.getType(scope);
-			if (!isCompatibleWith(scope, type, initType)) {
-				markError("Type mismatch: cannot assign " + initType + " to " + type);
-			}
-			// Дополнительная проверка на сужающее преобразование
-			if (type.isNumeric() && initType.isNumeric() && type.getSize() < initType.getSize()) {
-				markError("Narrowing conversion from " + initType + " to " + type + " requires explicit cast");
-			}
-			
-			ExpressionNode optimizedExpr = initializer.optimizeWithScope(scope);
-			if(null != optimizedExpr) {
-				initializer = optimizedExpr;
+				ExpressionNode optimizedExpr = initializer.optimizeWithScope(scope);
+				if(null != optimizedExpr) {
+					initializer = optimizedExpr;
+				}
 			}
 		}
 		catch (CompileException e) {markError(e);}
@@ -168,9 +169,17 @@ public class FieldNode extends AstNode {
 		if(cgDone) return null;
 
 		cgDone = true;
-		((CGFieldScope)symbol.getCGScope()).build();
-		initializer.codeGen(cg);
-		cg.accToCells(symbol.getCGScope(), (CGFieldScope)symbol.getCGScope());
+		
+		CGFieldScope fScope = ((CGFieldScope)symbol.getCGScope());
+		fScope.build();
+
+		if(null == initializer) {
+			cg.constToCells(fScope, 0, 0, fScope.getCells());
+		}
+		else {
+			initializer.codeGen(cg);
+			cg.accToCells(fScope, fScope);
+		}
 
 		return true;
 	}

@@ -30,6 +30,7 @@ public class CGCell {
 	private	Type	type;
 	private	int		num;
 	private	String	label;
+	private	boolean	isRef;
 	
 	public CGCell(Type type, int num) {
 		this.type = type;

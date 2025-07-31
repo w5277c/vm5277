@@ -47,7 +47,9 @@ import ru.vm5277.compiler.nodes.commands.CommandNode.AstCase;
 import ru.vm5277.compiler.nodes.commands.ThrowNode;
 import ru.vm5277.compiler.nodes.commands.TryNode;
 import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
+import ru.vm5277.compiler.nodes.expressions.ThisExpression;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
+import ru.vm5277.compiler.nodes.expressions.UnresolvedReferenceExpression;
 import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
 import ru.vm5277.compiler.semantic.AstHolder;
 import ru.vm5277.compiler.semantic.Scope;
@@ -94,7 +96,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		if (tb.match(TokenType.COMMAND)) {
 			return parseCommand();
 		}
-		else if (tb.match(TokenType.ID) || tb.match(TokenType.OPERATOR)) {
+		else if (tb.match(TokenType.ID) || tb.match(TokenType.OPERATOR) || tb.match(TokenType.OOP, Keyword.THIS)) {
 			// Делегируем всю работу парсеру выражений
 			ExpressionNode expr = new ExpressionNode(tb, mc).parse();
 			consumeToken(tb, Delimiter.SEMICOLON);
@@ -108,7 +110,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		throw e;
 	}
 
-	protected ExpressionNode parseTypeReference() throws CompileException {
+	protected TypeReferenceExpression parseTypeReference() throws CompileException {
 		//TODO дублирование кода?
 		// Парсим цепочку идентификаторов через точки (для вложенных классов)
 		StringBuilder typeName = new StringBuilder();
@@ -194,15 +196,24 @@ public abstract class AstNode extends SemanticAnalyzer {
 		if(!tb.match(Delimiter.DOT)) {
 			if (tb.match(Delimiter.LEFT_PAREN)) {			
 				//Вызов метода текущего класса
-				return new MethodCallExpression(tb, mc, null, id, parseArguments(tb));
+				return new MethodCallExpression(tb, mc, new ThisExpression(tb, mc), id, parseArguments(tb));
 			}
 			else {
 				//Это имя переменной или поля
 				return new VarFieldExpression(tb, mc, id);
 			}
 		}
-		ExpressionNode parent = new TypeReferenceExpression(tb, mc, id);
 
+		ExpressionNode parent;
+		if("this".equals(id)) {
+			parent = new ThisExpression(tb, mc);
+		}
+		else if(null != VarType.fromClassName(id)) {
+			parent = new TypeReferenceExpression(tb, mc, id);
+		}
+		else {
+			parent = new UnresolvedReferenceExpression(tb, mc, id);
+		}
 		
 		// Обрабатываем цепочки вызовов через точку
 		while (tb.match(Delimiter.DOT)) {

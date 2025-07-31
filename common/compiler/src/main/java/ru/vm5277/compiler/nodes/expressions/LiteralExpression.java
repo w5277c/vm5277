@@ -68,10 +68,6 @@ public class LiteralExpression extends ExpressionNode {
 		return value instanceof Integer || value instanceof Long;
 	}
 	
-	public boolean isCstr() {
-		return value instanceof String;
-	}
-	
 	public long getNumValue() {
 		if(value instanceof Character) {
 			return (int)(Character)value;

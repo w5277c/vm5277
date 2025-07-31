@@ -15,10 +15,12 @@
  */
 package ru.vm5277.avr_asm.nodes;
 
+import ru.vm5277.common.SourceType;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
+import ru.vm5277.avr_asm.Assembler;
 import ru.vm5277.avr_asm.Lexer;
 import ru.vm5277.avr_asm.Parser;
 import ru.vm5277.avr_asm.TokenBuffer;
@@ -48,7 +50,7 @@ public class IncludeNode {
 		if(null == sourcePath) throw new CompileException("Import file not found: " + importPath, tb.getSP());
 
 		if(!scope.addImport(sourcePath.toString())) {
-			if(Scope.STRICT_STRONG == Scope.getStrincLevel()) {
+			if(Assembler.STRICT_STRONG == Scope.getStrincLevel()) {
 				mc.add(new WarningMessage("File '" + importPath + "' already imported", tb.getSP()));
 			}
 		}

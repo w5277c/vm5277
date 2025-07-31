@@ -17,6 +17,7 @@ package ru.vm5277.avr_asm.nodes;
 
 import java.util.HashMap;
 import java.util.Map;
+import ru.vm5277.avr_asm.Assembler;
 import ru.vm5277.avr_asm.Instruction;
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.nodes.operands.Const;
@@ -154,10 +155,10 @@ public class MnemNode extends Node {
 						Reg reg = new Reg(scope, sp, expr2);
 						if(null != i) {
 							if(ire.getId() == (reg.getId()&0x01) && (ire.isDec() || ire.isInc())) {
-								if(Scope.STRICT_STRONG == Scope.getStrincLevel()) {
+								if(Assembler.STRICT_STRONG == Scope.getStrincLevel()) {
 									mc.add(new ErrorMessage("TODO undefined combination " + ire + " with " + expr2, sp));
 								}
-								else if(Scope.STRICT_LIGHT == Scope.getStrincLevel()) {
+								else if(Assembler.STRICT_LIGHT == Scope.getStrincLevel()) {
 									mc.add(new WarningMessage("TODO undefined combination " + ire + " with " + expr2, sp));
 								}
 							}
@@ -174,10 +175,10 @@ public class MnemNode extends Node {
 						Reg reg = new Reg(scope, sp, expr1);
 						if(null != i) {
 							if(ire.getId() == (reg.getId()&0x01) && (ire.isDec() || ire.isInc())) {
-								if(Scope.STRICT_STRONG == Scope.getStrincLevel()) {
+								if(Assembler.STRICT_STRONG == Scope.getStrincLevel()) {
 									mc.add(new ErrorMessage("TODO undefined combination " + ire + " with " + expr1, sp));
 								}
-								else if(Scope.STRICT_LIGHT == Scope.getStrincLevel()) {
+								else if(Assembler.STRICT_LIGHT == Scope.getStrincLevel()) {
 									mc.add(new WarningMessage("TODO undefined combination " + ire + " with " + expr1, sp));
 								}
 							}

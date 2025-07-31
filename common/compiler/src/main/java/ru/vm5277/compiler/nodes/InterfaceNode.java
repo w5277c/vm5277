@@ -15,12 +15,10 @@
  */
 package ru.vm5277.compiler.nodes;
 
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
@@ -32,57 +30,23 @@ import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.InterfaceSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 
-public class InterfaceNode extends AstNode {
-	private	final	Set<Keyword>		modifiers;
-	private			String				name;
-	private			String				parentClassName;
-	private			List<String>		interfaces		= new ArrayList<>();
-	private			InterfaceBodyNode	blockNode;
+public class InterfaceNode extends ClassNode {
+	private			InterfaceBodyNode	blockIfaceNode;
 
-	public InterfaceNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, String parentClassName) throws CompileException {
-		super(tb, mc);
-		
-		this.modifiers = modifiers;
-		this.parentClassName = parentClassName;
-		
-		// Парсинг заголовка класса
-        consumeToken(tb);	// Пропуск interface токена
-		try {
-			this.name = (String)consumeToken(tb, TokenType.ID).getValue();
-			VarType.addClassName(this.name);
-		}
-		catch(CompileException e) {markFirstError(e);} // ошибка в имени, оставляем null
-		
-        // Парсинг интерфейсов (если есть)
-		if (tb.match(Keyword.IMPLEMENTS)) {
-			consumeToken(tb);
-			while(true) {
-				try {
-					interfaces.add((String)consumeToken(tb, TokenType.ID).getValue());
-				}
-				catch(CompileException e) {markFirstError(e);} // встретили не ID интерфейса, пропускаем
-				if (!tb.match(Delimiter.COMMA)) break;
-				consumeToken(tb);
-			}
-		}
-        // Парсинг тела интерфейса
-		blockNode = new InterfaceBodyNode(tb, mc, name);
-	}
-	
-	public String getName() {
-		return name;
-	}
-	
-	public String getFullName() {
-		return null == parentClassName ? name : parentClassName + "." + name;
-	}
-	
-	public Set<Keyword> getModifiers() {
-		return modifiers;
+	public InterfaceNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, String parentClassName, List<ClassNode> importedClasses)
+																																	throws CompileException {
+		super(tb, mc, modifiers, parentClassName, importedClasses);
 	}
 
-	public InterfaceBodyNode getBody() {
-		return blockNode;
+	@Override
+	public void parse() throws CompileException {
+		// Парсинг тела интерфейса
+		blockIfaceNode = new InterfaceBodyNode(tb, mc, name);
+		int t=454;
+	}
+	
+	public InterfaceBodyNode getIfaceBody() {
+		return blockIfaceNode;
 	}
 	
 	@Override
@@ -90,11 +54,6 @@ public class InterfaceNode extends AstNode {
 		return "interface";
 	}
 	
-	@Override
-	public String toString() {
-		return getClass().getSimpleName() + ": " + modifiers + ", " + name + ", " + interfaces;
-	}
-
 	@Override
 	public boolean preAnalyze() {
 		try {validateName(name);} catch(CompileException e) {addMessage(e);	return false;}
@@ -106,7 +65,7 @@ public class InterfaceNode extends AstNode {
 		try{validateModifiers(modifiers, Keyword.PUBLIC);} catch(CompileException e) {addMessage(e);}
 		
 		// Анализ тела интерфейса
-		blockNode.preAnalyze();
+		blockIfaceNode.preAnalyze();
 
 		return true;
 	}
@@ -118,7 +77,7 @@ public class InterfaceNode extends AstNode {
 			if (scope instanceof ClassScope) {
 				((ClassScope)scope).addInterface(interfaceSymbol);
 			}
-			blockNode.declare(scope);
+			blockIfaceNode.declare(scope);
 		} 
 		catch (CompileException e) {
 			markError(e);
@@ -139,7 +98,7 @@ public class InterfaceNode extends AstNode {
 		cg.enterInterface(VarType.fromClassName(name), interfaceIds, name);
 
 		// Проверка что интерфейс не содержит конструкторов
-		for (AstNode decl : blockNode.getDeclarations()) {
+		for (AstNode decl : blockIfaceNode.getDeclarations()) {
 			if (decl instanceof MethodNode) {
 				MethodNode method = (MethodNode)decl;
 				if (method.isConstructor()) {
@@ -150,7 +109,7 @@ public class InterfaceNode extends AstNode {
 		}
 
 		
-		for (AstNode decl : blockNode.getDeclarations()) {
+		for (AstNode decl : blockIfaceNode.getDeclarations()) {
 			if (decl instanceof FieldNode) { // Проверка что все поля - public static final и инициализированы
 				FieldNode field = (FieldNode)decl;
 
@@ -169,7 +128,7 @@ public class InterfaceNode extends AstNode {
 		}
 
 		// Проверка вложенных интерфейсов
-		for (AstNode decl : blockNode.getDeclarations()) {
+		for (AstNode decl : blockIfaceNode.getDeclarations()) {
 			if (decl instanceof InterfaceNode) {
 				decl.postAnalyze(scope, cg);
 			}
@@ -194,7 +153,7 @@ public class InterfaceNode extends AstNode {
 			
 		cg.enterInterface(VarType.fromClassName(name), interfaceIds, name);
 		try {
-			blockNode.codeGen(cg);
+			blockIfaceNode.codeGen(cg);
 		}
 		finally {
 			cg.leaveInterface();
@@ -205,7 +164,7 @@ public class InterfaceNode extends AstNode {
 	
 	@Override
 	public List<AstNode> getChildren() {
-		return Arrays.asList(blockNode);
+		return Arrays.asList(blockIfaceNode);
 	}
 }
 

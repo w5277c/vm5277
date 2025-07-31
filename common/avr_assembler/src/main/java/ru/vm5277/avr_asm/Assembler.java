@@ -34,18 +34,19 @@ import java.util.Map;
 import ru.vm5277.avr_asm.nodes.MacroNode;
 import ru.vm5277.avr_asm.nodes.MnemNode;
 import ru.vm5277.avr_asm.nodes.Node;
-import ru.vm5277.avr_asm.nodes.SourceType;
+import ru.vm5277.common.SourceType;
 import ru.vm5277.avr_asm.output.IntelHexBuilder;
 import ru.vm5277.avr_asm.scope.MacroCallSymbol;
 import ru.vm5277.avr_asm.scope.Scope;
+import ru.vm5277.common.AssemblerInterface;
 import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 
-public class Main {
-	public	final	static	String	VERSION		= "0.2.0";
+public class Assembler implements AssemblerInterface {
+	public	final	static	String	VERSION		= "0.3";
 	public			static	int		tabSize		= 4;
 	public			static	boolean	isWindows;
 	public			static	Path	toolkitPath;
@@ -69,7 +70,7 @@ public class Main {
 
 		String mcu = null;
 		Map<Path, SourceType> sourcePaths	= new HashMap<>();
-		int stirctLevel = Scope.STRICT_LIGHT;
+		int stirctLevel = STRICT_LIGHT;
 		String format = "hex";
 		String mapFileName = null;
 		String listFileName = null;
@@ -96,8 +97,8 @@ public class Main {
 				}
 				else if(arg.equals("-s") || arg.equals("--strict")) {
 					String strictStr = args[i];
-					if(strictStr.equalsIgnoreCase("strong")) stirctLevel = Scope.STRICT_STRONG;
-					else if(strictStr.equalsIgnoreCase("none")) stirctLevel = Scope.STRICT_NONE;
+					if(strictStr.equalsIgnoreCase("strong")) stirctLevel = STRICT_STRONG;
+					else if(strictStr.equalsIgnoreCase("none")) stirctLevel = STRICT_NONE;
 					else if(!strictStr.equalsIgnoreCase("light")) {
 						showInvalidStrictLevel(strictStr);
 						System.exit(0);
@@ -144,6 +145,19 @@ public class Main {
 		if(1==Paths.get(outputFileName).getNameCount()) outputFileName = baseDir.resolve(outputFileName).normalize().toString();
 		
 		long timestamp = System.currentTimeMillis();
+		System.exit(new Assembler().exec(mc, mcu, sourcePath, sourcePaths, stirctLevel, outputFileName, mapFile, listWriter) ? 0 : 1);
+		float time = (System.currentTimeMillis() - timestamp) / 1000f;
+		System.out.println("Total time: " + String.format(Locale.US, "%.2f", time) + " s");
+	}
+
+	@Override
+	public boolean exec(	MessageContainer mc, String mcu, Path sourcePath, Map<Path, SourceType> sourcePaths, int stirctLevel,
+								String outputFileName, File mapFile, BufferedWriter listWriter) throws Exception {
+		
+		if(null == toolkitPath) {
+			toolkitPath = FSUtils.getToolkitPath();
+		}
+		
 		Path instrPath = toolkitPath.resolve("defs").resolve("avr");
 		InstrReader instrReader = new InstrReader(instrPath, mc);
 		Scope scope = new Scope(sourcePath.toFile(), instrReader, listWriter);
@@ -169,10 +183,9 @@ public class Main {
 		if(null != mapFile) try {scope.makeMap(mapFile);} catch(Exception e) {e.printStackTrace();}
 		if(null != listWriter) try {listWriter.close();} catch(Exception e) {e.printStackTrace();}
 		
-		
 		if(0 != mc.getErrorCntr()) {
 			System.out.println("\nBuild FAIL, warnings:" + mc.getWarningCntr() + ", errors:" + mc.getErrorCntr() + "/" + mc.getMaxErrorQnt());
-			System.exit(1);
+			return false;
 		}
 		else {
 			System.out.println();
@@ -183,16 +196,13 @@ public class Main {
 				scope.getCSeg().printStat();
 			}
 
-			float time = (System.currentTimeMillis() - timestamp) / 1000f;
-			System.out.println("\nparsed: " + mc.getLineQnt() + " lines, total time: " + String.format(Locale.US, "%.2f", time) + " s");
+			System.out.println("\nparsed: " + mc.getLineQnt() + " lines");
 			System.out.println("Build SUCCESS, warnings:" + mc.getWarningCntr());
-			System.exit(0);
+			return true;
 		}
-
-		System.out.println(System.currentTimeMillis()-timestamp);
 	}
-
-
+	
+	
 	private static void secondPass(Scope scope, MessageContainer mc, List<Node> nodes) {
 		for(Node node : nodes) {
 			if(node instanceof MnemNode) {

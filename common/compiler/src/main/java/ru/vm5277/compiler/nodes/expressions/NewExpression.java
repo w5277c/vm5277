@@ -15,36 +15,37 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
-import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
-import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class NewExpression extends ExpressionNode {
-	private	String					className;
+	private	TypeReferenceExpression	expr;
 	private	List<ExpressionNode>	args;
+	private	VarType					type;
 	
-	public NewExpression(TokenBuffer tb, MessageContainer mc, String className, List<ExpressionNode> args) {
+	public NewExpression(TokenBuffer tb, MessageContainer mc, TypeReferenceExpression expr, List<ExpressionNode> args) {
         super(tb, mc);
         
-		this.className = className;
+		this.expr = expr;
 		this.args = args;
     }
 	
-	
 	@Override
 	public VarType getType(Scope scope) {
-		return VarType.fromClassName(className);
+		if(null == type) {
+			try {type =  expr.getType(scope);} catch(CompileException e) {markError(e);}
+		}
+		return type;
 	}
 	
 	public String getName() {
-		return className;
+		return expr.getClassName();
 	}
 	
 	public List<ExpressionNode> getArgs() {
@@ -53,11 +54,15 @@ public class NewExpression extends ExpressionNode {
 	
 	@Override
 	public boolean preAnalyze() {
-		if (null == className|| className.isEmpty()) {
+		if (null == expr) {
 			markError("Class name cannot be empty");
 			return false;
 		}
 
+		if(!expr.preAnalyze()) {
+			return false;
+		}
+		
 		for (ExpressionNode arg : args) {
 			if (arg == null) {
 				markError("Constructor argument cannot be null");
@@ -71,17 +76,27 @@ public class NewExpression extends ExpressionNode {
 	}
 
 	@Override
+	public boolean declare(Scope scope) {
+		if(null == type) {
+			try {type =  expr.getType(scope);} catch(CompileException e) {markError(e);}
+		}
+		return true;
+	}
+	
+	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		try {
+//		try {
+			
+
 			// Проверяем аргументы конструктора
 			for (ExpressionNode arg : args) {
 				if (!arg.postAnalyze(scope, cg)) return false;
 			}
 
-			// Проверяем существование класса
-			ClassScope classScope = scope.getThis().resolveClass(className);
+/*			// Проверяем существование класса
+			ClassScope classScope = scope.getThis().resolveClass(expr);
 			if (null == classScope) {
-				markError("Class '" + className + "' not found");
+				markError("Class '" + expr + "' not found");
 				return false;
 			}
 
@@ -94,7 +109,7 @@ public class NewExpression extends ExpressionNode {
 				}
 
 				if (findMatchingConstructor(scope, constructors, argTypes) == null) {
-					markError("No valid constructor for class '" + className + "' with arguments: " + argTypes);
+					markError("No valid constructor for class '" + expr + "' with arguments: " + argTypes);
 					return false;
 				}
 			}
@@ -104,7 +119,8 @@ public class NewExpression extends ExpressionNode {
 		catch (CompileException e) {
 			markError(e.getMessage());
 			return false;
-		}
+		}*/
+return true;
 	}
 	
 	private MethodSymbol findMatchingConstructor(Scope scope, List<MethodSymbol> constructors, List<VarType> argTypes) throws CompileException {

@@ -21,7 +21,6 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.common.Operator;
-import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
@@ -112,11 +111,25 @@ public class BinaryExpression extends ExpressionNode {
 	}
 
 	@Override
+	public boolean declare(Scope scope) {
+		if (!leftExpr.declare(scope)) {
+			return false;
+		}
+		if (!rightExpr.declare(scope)) {
+			return false;
+		}
+		return true;
+	}
+	
+	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		try {
 			cgScope = cg.enterExpression();
 			// Анализ операндов
-			if (!leftExpr.postAnalyze(scope, cg) || !rightExpr.postAnalyze(scope, cg)) return false;
+			if (!leftExpr.postAnalyze(scope, cg) || !rightExpr.postAnalyze(scope, cg)) {
+				cg.leaveExpression();
+				return false;
+			}
 
 			leftType = leftExpr.getType(scope);
 			rightType = rightExpr.getType(scope);
@@ -242,7 +255,7 @@ public class BinaryExpression extends ExpressionNode {
 				}
 			}
 		}
-		catch(CompileException e) {markError(e); return false;}
+		catch(CompileException e) {markError(e); cg.leaveExpression(); return false;}
 
 		cg.leaveExpression();
 		return true;

@@ -21,7 +21,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
@@ -35,13 +34,13 @@ import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class ClassNode extends AstNode {
-	private	final	List<ClassNode>	importedClasses;
-	private	final	Set<Keyword>	modifiers;
-	private			String			name;
-	private			String			parentClassName;
-	private			List<String>	interfaces			= new ArrayList<>();
-	private			ClassBlockNode	blockNode;
-	private			ClassScope		classScope;
+	private		final	List<ClassNode>	importedClasses;
+	protected	final	Set<Keyword>	modifiers;
+	protected			String			name;
+	private				String			parentClassName;
+	protected			List<String>	interfaces			= new ArrayList<>();
+	private				ClassBlockNode	blockNode;
+	private				ClassScope		classScope;
 	
 	public ClassNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, String parentClassName, List<ClassNode> importedClasses)
 																																	throws CompileException {
@@ -71,7 +70,10 @@ public class ClassNode extends AstNode {
 				consumeToken(tb);
 			}
 		}
-        // Парсинг тела класса
+	}
+	
+	public void parse() throws CompileException {
+		// Парсинг тела класса
 		blockNode = new ClassBlockNode(tb, mc, name);
 	}
 	
@@ -153,7 +155,13 @@ public class ClassNode extends AstNode {
 		if(!interfaces.isEmpty()) {
 			interfaceIds = new int[interfaces.size()];
 			for(int i=0; i<interfaces.size(); i++) {
-				interfaceIds[i] = VarType.fromClassName(interfaces.get(i)).getId();
+				VarType iType = VarType.fromClassName(interfaces.get(i));
+				if(null == iType) {
+					markError("Interface not found: " + interfaces.get(i));
+					if(null != cg) cg.leaveClass();
+					return false;
+				}
+				interfaceIds[i] = iType.getId();
 			}
 		}
 

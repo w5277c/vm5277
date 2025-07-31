@@ -28,7 +28,7 @@ import ru.vm5277.compiler.semantic.FieldSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class FieldAccessExpression extends ExpressionNode {
-	private	final	ExpressionNode	target;
+	private			ExpressionNode	target;
 	private	final	String			fieldName;
 	
 	private			String			className;
@@ -87,6 +87,19 @@ public class FieldAccessExpression extends ExpressionNode {
 	@Override
 	public boolean declare(Scope scope) {
 		try {
+			if(target instanceof UnresolvedReferenceExpression) {
+				UnresolvedReferenceExpression ure = (UnresolvedReferenceExpression)target;
+				if("this".equals(ure.getId())) {
+					target = new ThisExpression(tb, mc);
+				}
+				else if(null != VarType.fromClassName(ure.getId())) {
+					target = new TypeReferenceExpression(tb, mc, ure.getId());
+				}
+				else {
+					target =  new VarFieldExpression(tb, mc, ure.getId());
+				}
+			}
+
 			if (target instanceof TypeReferenceExpression) {
 				TypeReferenceExpression tre = (TypeReferenceExpression) target;
 				className = tre.getClassName();
@@ -99,8 +112,12 @@ public class FieldAccessExpression extends ExpressionNode {
 					return false;
 				}
 			}
+			else if(target instanceof ThisExpression) {
+				symbol = scope.getThis().resolve(fieldName);
+			}
 			else {
 				// Нестатическое поле (this.field или obj.field)
+				
 				VarType targetType = target.getType(scope);
 				if (targetType == null || targetType.isPrimitive()) {
 					markError("Cannot access field of primitive type: " + targetType);
@@ -133,7 +150,7 @@ public class FieldAccessExpression extends ExpressionNode {
 		if(null == symbol) return false;
 		
 		// Проверка видимости поля
-		if (((FieldSymbol)symbol).isPrivate()) {
+		if (((FieldSymbol)symbol).isPrivate() && !scope.getThis().getName().equals(className)) {
 			markError("Private field '" + fieldName + "' is not accessible");
 			return false;
 		}

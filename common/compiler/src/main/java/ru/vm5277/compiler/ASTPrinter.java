@@ -18,6 +18,7 @@ package ru.vm5277.compiler;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.Operator;
+import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.compiler.nodes.ArrayDeclarationNode;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.BlockNode;
@@ -96,11 +97,11 @@ public class ASTPrinter {
 		if(null != cbn) {
 			out.put("{"); out.print(); out.extend();
 			for(AstNode node : cbn.getChildren()) {
-				if(node instanceof ClassNode) {
-					printClass((ClassNode)node);
-				}
-				else if(node instanceof InterfaceNode) {
+				if(node instanceof InterfaceNode) {
 					printInterface((InterfaceNode)node);
+				}
+				else if(node instanceof ClassNode) {
+					printClass((ClassNode)node);
 				}
 				else if(node instanceof MethodNode) {
 					printMethod((MethodNode)node);
@@ -131,7 +132,7 @@ public class ASTPrinter {
 	void printInterface(InterfaceNode iface) {
 		printModifiers(iface.getModifiers());
 		out.put("interface " + iface.getName() + " ");
-		InterfaceBodyNode ibn = iface.getBody();
+		InterfaceBodyNode ibn = iface.getIfaceBody();
 		if(null != ibn) {
 			out.put("{"); out.print(); out.extend();
 			for(AstNode node : ibn.getDeclarations()) {
@@ -170,9 +171,9 @@ public class ASTPrinter {
 		}
 		out.put(method.getName() + "(");
 		printParameters(method.getParameters());
-		out.put(") ");
+		out.put(")");
 		if(method.canThrow()) {
-			out.put("throws ");
+			out.put(" throws ");
 		}
 		BlockNode body = method.getBody();
 		if(null == body) {
@@ -180,6 +181,7 @@ public class ASTPrinter {
 			out.print();
 		}
 		else {
+			out.put(" ");
 			printBody(body);
 			out.print();
 		}
@@ -406,7 +408,7 @@ public class ASTPrinter {
 		}
 		else if (expr instanceof LiteralExpression) {
 			LiteralExpression le = (LiteralExpression)expr;
-			out.put(le.isCstr() ? "\"" + Token.toStringValue(le.getValue()) + "\"" : Token.toStringValue(le.getValue()));
+			out.put(VarType.CSTR == le.getType(null) ? "\"" + Token.toStringValue(le.getValue()) + "\"" : Token.toStringValue(le.getValue()));
 		}
 		else if(expr instanceof MethodCallExpression) {
 			MethodCallExpression mce = (MethodCallExpression)expr;
@@ -458,6 +460,9 @@ public class ASTPrinter {
 			printExpr(ie.getLeft());
 			out.put(" is ");
 			printExpr(ie.getTypeExpr());
+			if(null != ie.getVarName()) {
+				out.put(" as " + ie.getVarName());
+			}
 		}
 		else if(expr instanceof TypeReferenceExpression) {
 			TypeReferenceExpression te = (TypeReferenceExpression)expr;

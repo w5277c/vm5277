@@ -40,7 +40,7 @@ public class TypeReferenceExpression extends ExpressionNode {
 	@Override
 	public VarType getType(Scope scope) throws CompileException {
 		// Возвращаем тип-класс, если он существует
-		VarType type = VarType.fromClassName(className);
+		VarType type = VarType.fromClassName("this".equals(className) ? scope.getThis().getName() : className);
 		if (null != type && !type.isClassType()) throw new CompileException("Type '" + className + "' not found");
 
 		if(null == type) {

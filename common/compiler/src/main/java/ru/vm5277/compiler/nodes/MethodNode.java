@@ -45,12 +45,6 @@ public class MethodNode extends AstNode {
 	private			MethodScope			methodScope; // Добавляем поле для хранения области видимости
 	private			boolean				canThrow	= false;
 	
-	@Override
-	public String toString() {
-		return	StrUtils.toString(modifiers) + " " + returnType + " " + name + "(" + StrUtils.toString(parameters) + ")" +
-				(canThrow ? " throws" : "");
-	}
-	
 	public MethodNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType returnType, String name) throws CompileException {
 		super(tb, mc);
 		
@@ -275,7 +269,12 @@ public class MethodNode extends AstNode {
 			}
 		}
 
-		if(null != cg) cg.leaveMethod();
+		if(null == returnType) {
+			cg.leaveConstructor();
+		}
+		else {
+			cg.leaveMethod();
+		}
 		return true;
 	}
 	
@@ -318,5 +317,11 @@ public class MethodNode extends AstNode {
 	@Override
 	public List<AstNode> getChildren() {
 		return Arrays.asList(blockNode);
+	}
+	
+	@Override
+	public String toString() {
+		return	StrUtils.toString(modifiers) + " " + returnType + " " + name + "(" + StrUtils.toString(parameters) + ")" +
+				(canThrow ? " throws" : "");
 	}
 }

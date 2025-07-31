@@ -91,12 +91,16 @@ public class BlockNode extends AstNode {
 
 			// Обработка классов с модификаторами
 			if (tb.match(TokenType.OOP) && Keyword.CLASS == tb.current().getValue()) {
-				children.add(new ClassNode(tb, mc, modifiers, null, null));
+				ClassNode cNode = new ClassNode(tb, mc, modifiers, null, null);
+				cNode.parse();
+				children.add(cNode);
 				continue;
 			}
 			// Обработка интерфейсов с модификаторами
 			if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
-				children.add(new InterfaceNode(tb, mc, modifiers, null));
+				InterfaceNode iNode = new InterfaceNode(tb, mc, modifiers, null, null);
+				iNode.parse();
+				children.add(iNode);
 				continue;
 			}
 

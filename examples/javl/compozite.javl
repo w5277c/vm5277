@@ -15,7 +15,7 @@
  */
 import rtos.System;
 import rtos.RTOSParam;
-import hal.gpio;
+import hal.GPIO;
 
 class Main {
     public static void main() {

@@ -42,13 +42,17 @@ public class InterfaceBodyNode extends AstNode {
 
 			// Обработка вложенных интерфейсов
 			if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
-				children.add(new InterfaceNode(tb, mc, modifiers, null));
+				InterfaceNode iNode = new InterfaceNode(tb, mc, modifiers, null, null);
+				iNode.parse();
+				children.add(iNode);
 				continue;
 			}
 
 			// Обработка вложенных классов
 			if (tb.match(TokenType.OOP, Keyword.CLASS)) {
-				children.add(new ClassNode(tb, mc, modifiers, null, null));
+				ClassNode cNode = new ClassNode(tb, mc, modifiers, null, null);
+				cNode.parse();
+				children.add(cNode);
 				continue;
 			}
 
