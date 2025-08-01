@@ -109,7 +109,7 @@ public class MnemNode extends Node {
 				
 				if(null != operands[0x00]) switch (operands[0x00]) {
 					case Instruction.OPERAND_NONE: return true; // Чистый opcode уже записан
-					case Instruction.OPERAND_R:
+					case Instruction.OPERAND_R:		parse(instr, new Reg(scope, sp, expr1)); return true;
 					case Instruction.OPERAND_RH:	parse(instr, new HReg(scope, sp, expr1)); return true;
 					case Instruction.OPERAND_RR:	parse(instr, new Reg(scope, sp, expr1), new Reg(scope, sp, expr1)); return true;
 					case Instruction.OPERAND_K7S:	parse(instr, new FlashAddr(mc, scope, sp, expr1, -64, 63, 7, addr)); return true;

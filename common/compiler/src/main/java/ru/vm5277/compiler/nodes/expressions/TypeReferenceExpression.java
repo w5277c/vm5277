@@ -75,11 +75,6 @@ public class TypeReferenceExpression extends ExpressionNode {
 		}
 	}
 
-	@Override
-	public String toString() {
-		return "TypeReference: " + className;
-	}
-	
 	public String getName() {
 		return className;
 	}
@@ -88,5 +83,10 @@ public class TypeReferenceExpression extends ExpressionNode {
 	public Object codeGen(CodeGenerator cg) throws Exception {
 		//cg.setAcc(new Operand(VarType.CLASS, OperandType.TYPE, varType.getId()));
 		return null;
+	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + " " + className;
 	}
 }

@@ -16,7 +16,6 @@
 package ru.vm5277.compiler.nodes.expressions;
 
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
@@ -82,11 +81,6 @@ public class LiteralExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public String toString() {
-		return getClass().getSimpleName() + ":" + Token.toStringValue(value);
-    }
-	
-	@Override
 	public boolean preAnalyze() {
 		if (value == null) {
 			markError("Literal value cannot be null");
@@ -136,4 +130,9 @@ public class LiteralExpression extends ExpressionNode {
 //		}
 		return null;
 	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + " " + Token.toStringValue(value);
+    }
 }

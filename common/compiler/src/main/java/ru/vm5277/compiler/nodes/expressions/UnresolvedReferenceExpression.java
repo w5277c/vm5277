@@ -39,4 +39,9 @@ public class UnresolvedReferenceExpression extends ExpressionNode {
 	public String getId() {
 		return id;
 	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName();
+	}
 }

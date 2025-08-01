@@ -534,6 +534,6 @@ public class MethodCallExpression extends ExpressionNode {
 	
 	@Override
 	public String toString() {
-		return type + " " + parent.toString() + "." + methodName + (args.isEmpty() ? "()" : "(" + StrUtils.toString(argTypes)+ ")");
+		return getClass().getSimpleName() + " " + type + " " + parent.toString() + "." + methodName + "(" + StrUtils.toString(argTypes) + ")";
 	}
 }

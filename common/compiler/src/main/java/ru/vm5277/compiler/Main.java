@@ -15,6 +15,7 @@
  */
 package ru.vm5277.compiler;
 
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -70,6 +71,8 @@ public class Main {
 		Integer	core_freq = null;
 		String source = null;
 		int cgVerbose = 0;
+		boolean asmMap = false;
+		boolean asmList = false;
 		
 		if(0x02 <= args.length) {
 			String[] parts = args[0x00].split(":");
@@ -84,6 +87,7 @@ public class Main {
 				if(args.length > i+1) {
 					if(arg.equalsIgnoreCase("-P") || arg.equals("--path")) {
 						toolkitPath = FSUtils.resolveWithEnv(args[++i]);
+						continue;
 					}
 					else if(arg.equalsIgnoreCase("-F") || arg.equals("--freq")) {
 						String value = args[++i];
@@ -91,11 +95,14 @@ public class Main {
 							core_freq = Integer.parseInt(value);
 							if(0>=core_freq || 255<core_freq) {
 								System.err.println("[ERROR] Invalid parameter " + arg + " value: " + value);
+								break;
 							}
 						}
 						catch(Exception e) {
 							System.err.println("[ERROR] Invalid parameter " + arg + " value: " + value);
+							break;
 						}
+						continue;
 					}
 					else if(arg.equalsIgnoreCase("--cg-verbose")) {
 						String value = args[++i];
@@ -103,16 +110,22 @@ public class Main {
 							cgVerbose = Integer.parseInt(value);
 							if(0>cgVerbose || 2<cgVerbose) {
 								System.err.println("[ERROR] Invalid parameter " + arg + " value: " + value);
+								break;
 							}
 						}
 						catch(Exception e) {
 							System.err.println("[ERROR] Invalid parameter " + arg + " value: " + value);
+							break;
 						}
+						continue;
 					}
-					else {
-						System.err.println("[ERROR] Invalid parameter: " + arg);
-						System.exit(0);
-					}
+				}
+				
+				if(arg.equalsIgnoreCase("-am") || arg.equals("--asm-map")) {
+					asmMap = true;
+				}
+				else if(arg.equalsIgnoreCase("-al") || arg.equals("--ams-list")) {
+					asmList = true;
 				}
 				else {
 					System.err.println("[ERROR] Invalid parameter: " + arg);
@@ -215,12 +228,22 @@ public class Main {
 					fw.write(cg.getAsm());
 					fw.close();
 					
+					File asmMapFile = null;
+					if(asmMap) {
+						asmMapFile = new File(asmPath.toString() + ".map");
+					}
+					
+					BufferedWriter listBw = null;
+					if(asmList) {
+						listBw = new BufferedWriter(new FileWriter(new File(asmPath.toString() + ".lst")));
+					}
+					
 					time = (System.currentTimeMillis() - timestamp) / 1000f;
 					System.out.println("Codegen done, time:" + String.format(Locale.US, "%.2f", time) + " s");
 
 					timestamp = System.currentTimeMillis();
 					System.out.println("Assembling...");
-					PlatformLoader.loadAssembler(platform, libDir, mc, asmFile.toPath(), sourcePaths, asmPath.toString());
+					PlatformLoader.launchAssembler(platform, libDir, mc, asmFile.toPath(), sourcePaths, asmPath.toString(), asmMapFile, listBw);
 					time = (System.currentTimeMillis() - timestamp) / 1000f;
 					System.out.println("Assembling done, time:" + String.format(Locale.US, "%.2f", time) + " s");
 
@@ -258,17 +281,16 @@ public class Main {
 		System.out.println("  -P, --path <dir>\tCustom toolkit directory path");
 		System.out.println("  -I, --include <dir>\tAdditional include path(s)");
 		System.out.println("      --cg-verbose 0-2\t\tGenerate detailed codegen info");
-		System.out.println("  -ao, --asm-output <file> Output HEX file (default: <input>.hex)");
-		System.out.println("  -af, --asm-format <fmt>  Output format (hex, bin)");
+		System.out.println("  -ao, --asm-output <file> Output HEX file (default: <input>.hex)"); //TODO
+		System.out.println("  -af, --asm-format <fmt>  Output format (hex, bin)"); //TODO
 		System.out.println("                     hex     - Intel HEX (default)");
 		System.out.println("                     bin     - Raw binary");
-		System.out.println("  -as, --asm-strict <strong|light|none> Ambiguity handling level");
+		System.out.println("  -as, --asm-strict <strong|light|none> Ambiguity handling level"); //TODO
 		System.out.println("                     strong  - Treat as error");
 		System.out.println("                     light   - Show warning (default)");
 		System.out.println("                     none    - Silent mode");
-		System.out.println("  -ac, --asm-code <file> Generate source code asm file");
-		System.out.println("  -am, --asm-map <file>	Generate memory map file");
-		System.out.println("  -al, --asm-list <file> Generate assembly listing file");
+		System.out.println("  -am, --asm-map			Generate asm memory map file");
+		System.out.println("  -al, --asm-list			Generate asm listing file");
 		System.out.println("  -v, --version\t\tDisplay version");
 		System.out.println("  -h, --help\t\tShow this help");
 		System.out.println();

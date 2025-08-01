@@ -114,6 +114,6 @@ public class TernaryExpression extends ExpressionNode {
 
 	@Override
 	public String toString() {
-		return condition + " ? " + trueExpr + " : " + falseExpr;
+		return getClass().getSimpleName() + " " + condition + " ? " + trueExpr + " : " + falseExpr;
 	}
 }

@@ -14,32 +14,24 @@
  * limitations under the License.
  */
 
-import rtos.System;
-import rtos.RTOSParam;
-import rtos.Thread;
-import hal.GPIO;
+.include "math/mul8x8.asm"
+.IFNDEF OS_DIV10
+;--------------------------------------------------------
+OS_DIV10:
+;--------------------------------------------------------
+;Деление 8b числа на 10
+;IN: ACCUM_L-8b число
+;OUT: ACCUM_L-8b результат
+;--------------------------------------------------------
+	PUSH ACCUM_H
 
+	LDI ACCUM_L,205													;204.8
+	MCALL OS_MUL8X8
+	MOV ACCUM_L,ACCUM_H
+	LSR ACCUM_L
+	LSR ACCUM_L
+	LSR ACCUM_L
 
-class Main {
-    public static void main() {
-		System.setParam(RTOSParam.CORE_FREQ, 16);
-		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
-		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
-
-		byte port = GPIO.PB1;
-		GPIO.modeOut(port);
-		while(true) {
-			Thread.waitMS(250);
-			GPIO.invert(port);
-		}
-    }
-
-    /* TODO ввести class:
-    GPIOPin pin = new GPIOPin(GPIO.PB1);
-    pin.setHi();
-    pin.setLo();
-    pin.invert();
-    bool isHi = pin.isHi();
-    bool isOutMode = pin.isOutMode();
-    */
-}
+	POP ACCUM_H
+	RET
+.ENDIF

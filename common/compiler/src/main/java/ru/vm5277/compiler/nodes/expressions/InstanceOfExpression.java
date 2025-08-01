@@ -216,6 +216,6 @@ public class InstanceOfExpression extends ExpressionNode {
 	
 	@Override
 	public String toString() {
-		return leftExpr + " is " + rightExpr;
+		return getClass().getSimpleName() + " " + leftExpr + " is " + rightExpr + (null != varName ? " as " + varName : "");
 	}
 }

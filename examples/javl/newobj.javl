@@ -13,7 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 import rtos.System;
+import rtos.RTOSParam;
+import hal.GPIO;
 //import lang.Byte;
 
 class Main {
@@ -36,6 +39,10 @@ class Main {
 
 
     public static void main() {
+		System.setParam(RTOSParam.CORE_FREQ, 16);
+		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
+		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
+
 		private Byte b = new Byte(0x01);
 
 		System.out(b.toByte());

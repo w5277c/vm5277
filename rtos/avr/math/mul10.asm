@@ -14,32 +14,22 @@
  * limitations under the License.
  */
 
-import rtos.System;
-import rtos.RTOSParam;
-import rtos.Thread;
-import hal.GPIO;
+.IFNDEF OS_MUL10
+;--------------------------------------------------------;
+OS_MUL10:
+;--------------------------------------------------------
+;Умножение 8бит числа на 8бит число(быстрее чем OS_MUL8X8)
+;IN: ACCUM_L-число
+;OUT: ACCUM_L
+;--------------------------------------------------------
+	PUSH TEMP_L
 
+	LSL ACCUM_L
+	MOV TEMP_L,ACCUM_L
+	LSL ACCUM_L
+	LSL ACCUM_L
+	ADD ACCUM_L,TEMP_L
 
-class Main {
-    public static void main() {
-		System.setParam(RTOSParam.CORE_FREQ, 16);
-		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
-		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
-
-		byte port = GPIO.PB1;
-		GPIO.modeOut(port);
-		while(true) {
-			Thread.waitMS(250);
-			GPIO.invert(port);
-		}
-    }
-
-    /* TODO ввести class:
-    GPIOPin pin = new GPIOPin(GPIO.PB1);
-    pin.setHi();
-    pin.setLo();
-    pin.invert();
-    bool isHi = pin.isHi();
-    bool isOutMode = pin.isOutMode();
-    */
-}
+	POP TEMP_L
+	RET
+.ENDIF

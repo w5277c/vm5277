@@ -16,25 +16,25 @@
 
 ;---OS-FEATURES---------------------------------------------
 .IFNDEF OS_FT_IR_TABLE
-	.EQU	OS_FT_IR_TABLE							= 0x00	;Таблица прерываний
+	.SET	OS_FT_IR_TABLE							= 0x00	;Таблица прерываний
 .ENDIF
 .IFNDEF OS_FT_STDOUT
-	.EQU	OS_FT_STDOUT							= 0x00	;Вывод
+	.SET	OS_FT_STDOUT							= 0x00	;Вывод
 .ENDIF
 .IFNDEF OS_FT_WELCOME
-	.EQU	OS_FT_WELCOME							= 0x00	;Логировать приветственное сообщение
+	.SET	OS_FT_WELCOME							= 0x00	;Логировать приветственное сообщение
 .ENDIF
 .IFNDEF OS_FT_DIAG
-	.EQU	OS_FT_DIAG								= 0x00	;Логировать диагностику при инициализации
+	.SET	OS_FT_DIAG								= 0x00	;Логировать диагностику при инициализации
 .ENDIF
 .IFNDEF OS_FT_TIMER1
-	.EQU	OS_FT_TIMER1							= 0x00	;Таймер системного тика и механизма Threading
+	.SET	OS_FT_TIMER1							= 0x00	;Таймер системного тика и механизма Threading
 .ENDIF
 .IFNDEF OS_FT_TIMER2
-	.EQU	OS_FT_TIMER2							= 0x00	;Таймер для реализации программных таймеров драйверов
+	.SET	OS_FT_TIMER2							= 0x00	;Таймер для реализации программных таймеров драйверов
 .ENDIF
 .IFNDEF OS_FT_DRAM
-	.EQU	OS_FT_DRAM								= 0x00	;Функционал динамического выделения памяти
+	.SET	OS_FT_DRAM								= 0x00	;Функционал динамического выделения памяти
 .ENDIF
 
 .IF OS_FT_WELCOME == 0x01
@@ -57,6 +57,7 @@
 	.EQU	PORTx									= 0x02
 
 	.SET	JMP_SUPPORT								= 0x00	; Поддержка инструкций JMP и CALL(0 - не поддерживает)
+	.SET	MUL_SUPPORT								= 0x00	; Поддержка инструкций MUL,MULS,MULSU
 
 	.EQU	PA0										= (0x00<<4)|0x00
 	.EQU	PA1										= (0x00<<4)|0x01

@@ -63,11 +63,6 @@ public class VarFieldExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public String toString() {
-		return getClass().getSimpleName() + ": " + value;
-	}
-	
-	@Override
 	public boolean preAnalyze() {
 		if (null == value || value.isEmpty()) {
 			markError("Variable name cannot be empty");
@@ -167,5 +162,10 @@ public class VarFieldExpression extends ExpressionNode {
 //cg.cellsToAcc(cgScope.getParent(), (CGVarScope)cgScope.getParent());
 		}
 		return null;*/
+	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + ": " + value;
 	}
 }

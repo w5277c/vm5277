@@ -359,6 +359,6 @@ public class BinaryExpression extends ExpressionNode {
 
 	@Override
 	public String toString() {
-		return getClass().getSimpleName() + ": " + leftExpr + ", " + operator + ", " + rightExpr;
+		return getClass().getSimpleName() + "  " + leftExpr + ", " + operator + ", " + rightExpr;
 	}
 }

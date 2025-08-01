@@ -54,4 +54,9 @@ public class ThisExpression extends ExpressionNode {
 	public Object codeGen(CodeGenerator cg) throws Exception {
 		return null;
 	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName();
+	}
 }

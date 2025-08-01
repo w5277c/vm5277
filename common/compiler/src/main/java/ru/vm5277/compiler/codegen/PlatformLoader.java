@@ -58,8 +58,8 @@ public class PlatformLoader {
 		return (CodeGenerator) constructor.newInstance(platform + LIB_CG_POSTFIX, nbMap, params);
 	}
 	
-	public static boolean loadAssembler(	String platform, File libsDir, MessageContainer mc, Path sourcePath, Map<Path, SourceType> sourcePaths,
-													String outputFilename) throws Exception {
+	public static boolean launchAssembler(	String platform, File libsDir, MessageContainer mc, Path sourcePath, Map<Path, SourceType> sourcePaths,
+											String outputFilename, File mapFile, BufferedWriter listBW) throws Exception {
 		// Формируем имя JAR-файла
 		String jarName =  platform + LIB_ASM_POSTFIX + ".jar";
 		File jarFile = new File(libsDir + File.separator + jarName);
@@ -72,8 +72,10 @@ public class PlatformLoader {
 		// Загружаем класс (ожидаемое имя: ru.vm5277.PLATFORM_asm.Assembler)
 		String className = LIB_ASM_CLASSPREFIX + platform + LIB_ASM_CLASSPOSTFIX;
 		Class<?> asmClass = classLoader.loadClass(className);
-		Method method = asmClass.getMethod("exec", MessageContainer.class, String.class, Path.class, Map.class, int.class, String.class, File.class, BufferedWriter.class);
-		return (boolean) method.invoke(asmClass.newInstance(), mc, null, sourcePath, sourcePaths, AssemblerInterface.STRICT_LIGHT, outputFilename, null, null);
+		Method method = asmClass.getMethod(	"exec", MessageContainer.class, String.class, Path.class, Map.class, int.class, String.class, File.class,
+											BufferedWriter.class);
+		return (boolean) method.invoke(	asmClass.newInstance(), mc, null, sourcePath, sourcePaths, AssemblerInterface.STRICT_LIGHT, outputFilename, mapFile,
+										listBW);
 	}
 
 }

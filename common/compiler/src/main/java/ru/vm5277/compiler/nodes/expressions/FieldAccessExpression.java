@@ -75,9 +75,7 @@ public class FieldAccessExpression extends ExpressionNode {
 			return false;
 		}
 
-		if (target instanceof TypeReferenceExpression || target instanceof VarFieldExpression) {
-		}
-		else {
+		if (!(target instanceof TypeReferenceExpression || target instanceof VarFieldExpression || target instanceof ThisExpression)) {
 			markError("Invalid field access target: " + target.toString());
 			return false;
 		}
@@ -150,7 +148,7 @@ public class FieldAccessExpression extends ExpressionNode {
 		if(null == symbol) return false;
 		
 		// Проверка видимости поля
-		if (((FieldSymbol)symbol).isPrivate() && !scope.getThis().getName().equals(className)) {
+		if (((FieldSymbol)symbol).isPrivate() && !(target instanceof ThisExpression)) {
 			markError("Private field '" + fieldName + "' is not accessible");
 			return false;
 		}
@@ -174,5 +172,10 @@ public class FieldAccessExpression extends ExpressionNode {
 	@Override
 	public List<AstNode> getChildren() {
 		return Arrays.asList(target);
+	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + " " + target + "." + fieldName;
 	}
 }

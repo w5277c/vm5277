@@ -16,6 +16,7 @@
 package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.List;
+import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
@@ -163,5 +164,10 @@ return true;
 		cg.eNew(getType(null).getId(), operands, false);//TODO canThrow
 		
 		return null;
+	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + " " + expr + "(" + StrUtils.toString(args) + ")";
 	}
 }

@@ -18,6 +18,8 @@
 
 ;---CONSTANTS-----------------------------------------------
 	.SET	_MCALL_SIZE								= 0x02	;Размер макроса MCALL/MJMP: 1(RCALL)-2(CALL)
+	.SET	JMP_SUPPORT								= 0x01	;Поддержка JMP,CALL
+	.SET	MUL_SUPPORT								= 0x01	;Поддержка MUL,MULS,MULSU
 	.EQU	OS_IR_QNT								= 0x1a	;Количество перырваний(без RESET)
 	.EQU	OS_PCINT_PORTS_QNT						= 0x03	;Количество портов поддерживающих внешние прерывания(PCINT)
 	.EQU	OS_RAM_BORDER_SIZE						= 0x20	;Минимальное допустимое расстояние между вершинами FREE_RAM и STACK
