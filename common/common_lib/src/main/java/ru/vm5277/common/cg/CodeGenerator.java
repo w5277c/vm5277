@@ -215,6 +215,7 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract	void pushAcc(CGScope scope, int size);
 	public abstract	void popAcc(CGScope scope, int size);
 	public abstract	void popRet(CGScope scope, int size);
+	//public abstract void pushRef(CGScope scope, String label);
 	public abstract void invokeMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, CGMethodScope mScope)
 																																	throws CompileException;
 	public abstract void invokeNative(CGScope scope, String className, String methodName, String params, VarType type, Operand[] operands)
@@ -223,7 +224,7 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract void emitUnary(Operator op, Integer resId) throws CompileException;
 	
 	//TODO набор методов для реализации команд if, switch, for, loop и .т.д
-	public abstract void eNew(int typeId, long[] parameters, boolean canThrow);
+	public abstract void eNew(CGScope scope, VarType type, int size, boolean canThrow);
 	public abstract void eFree(Operand op);
 	public abstract void eIf(CGBlockScope conditionBlock, CGBlockScope thenBlock, CGBlockScope elseBlock);
 	public abstract void eTry(CGBlockScope blockScope, List<Case> cases, CGBlockScope defaultBlockScope);
@@ -288,11 +289,15 @@ public abstract class CodeGenerator extends CGScope {
 			append(new CGIText(".include \"sys/stack_alloc.asm\""));
 			append(new CGIText(".include \"sys/stack_free.asm\""));	
 		}
+		if(RTOSFeatures.contains(RTOSFeature.OS_FT_DRAM)) {
+			append(new CGIText(".include \"dmem/dram.asm\""));	
+		}
 		for(String include : includes) {
 			append(new CGIText(".include \"" + include + "\""));
 		}
 		append(new CGIText(""));
-
+		append(new CGIText("MAIN:"));
+		
 		for(int resId : flashData.keySet()) {
 			DataSymbol ds = flashData.get(resId);
 			append(new CGIText(ds.getLabel() + ":"));

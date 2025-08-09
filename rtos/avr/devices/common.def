@@ -44,7 +44,9 @@
 	.SET	OS_FT_IR_TABLE							= 0x01
 .ENDIF
 
-
+;---OS-RESULT-CODES-----------------------------------------; Универсальны коды ответов
+	.EQU	OSR_OK									= 0x00	;Успешно выполнено
+	.EQU	OSR_ALLOC_FAIL							= 0x01	;Ошибка выделения памяти
 
 .IFNDEF CORE_FREQ
 	.EQU	CORE_FREQ								= 8
@@ -145,12 +147,12 @@
 	.DEF	_SPH									= r13	;Альтернативный SPH
 	.DEF	ID_L									= r14
 	.DEF	ID_H									= r15
-	.DEF	ACCUM_L									= r16
+	.DEF	ACCUM_L									= r16	;Основные 4 регистра используемые для передачи параметров
 	.DEF	ACCUM_H									= r17
 	.DEF	ACCUM_EL								= r18
 	.DEF	ACCUM_EH								= r19
-	.DEF	FLAGS									= r20	;Регистр флагов
-	.DEF	LOOP_CNTR								= r21	;Регистр цикла
+	.DEF	RESULT									= r20	;Регистр результата операции или кода исключения
+	.DEF	FLAGS									= r21	;Регистр флагов
 	.DEF	TEMP_L									= r22
 	.DEF	TEMP_H									= r23
 	.DEF	TEMP_EL									= r24

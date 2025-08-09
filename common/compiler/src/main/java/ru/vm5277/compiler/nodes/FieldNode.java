@@ -24,10 +24,15 @@ import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
+import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
+import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
+import ru.vm5277.compiler.nodes.expressions.MethodCallExpression;
+import ru.vm5277.compiler.nodes.expressions.NewExpression;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.FieldSymbol;
 import ru.vm5277.compiler.semantic.Scope;
@@ -100,15 +105,27 @@ public class FieldNode extends AstNode {
 			addMessage(new WarningMessage("Field name should start with lowercase letter:" + name, sp));
 		}
 
+		if(null != initializer) {
+			if(!initializer.preAnalyze()) {
+				return false;
+			}
+		}
+
 		return true;
 	}
 
 	@Override
 	public boolean declare(Scope scope) {
+		if(null != initializer) {
+			if(!initializer.declare(scope)) {
+				return false;
+			}
+		}
+
 		if(scope instanceof ClassScope) {
 			ClassScope classScope = (ClassScope)scope;
 			boolean isFinal = modifiers.contains(Keyword.FINAL);
-			symbol = new FieldSymbol(name, type, isFinal, isStatic(), isPrivate(), classScope, this);
+			symbol = new FieldSymbol(name, type, isFinal || VarType.CSTR == type, isStatic(), isPrivate(), classScope, this);
 
 			//TODO рудимент
 			/*
@@ -141,7 +158,10 @@ public class FieldNode extends AstNode {
 
 			// Анализ инициализатора, если есть
 			if (initializer != null) {
-				initializer.postAnalyze(scope, cg);
+				if(!initializer.postAnalyze(scope, cg)) {
+					cg.leaveField();
+					return false;
+				}
 				// Проверка совместимости типов
 				VarType initType = initializer.getType(scope);
 				if (!isCompatibleWith(scope, type, initType)) {
@@ -154,7 +174,7 @@ public class FieldNode extends AstNode {
 
 				ExpressionNode optimizedExpr = initializer.optimizeWithScope(scope);
 				if(null != optimizedExpr) {
-					initializer = optimizedExpr;
+					initializer = optimizedExpr; //TODO не передаю сохданный Symbol?
 				}
 			}
 		}
@@ -167,21 +187,53 @@ public class FieldNode extends AstNode {
 	@Override
 	public Object codeGen(CodeGenerator cg) throws Exception {
 		if(cgDone) return null;
-
 		cgDone = true;
 		
 		CGFieldScope fScope = ((CGFieldScope)symbol.getCGScope());
+		CGScope oldCGScope = cg.setScope(fScope);
+		
+		Boolean accUsed = null;
 		fScope.build();
 
-		if(null == initializer) {
-			cg.constToCells(fScope, 0, 0, fScope.getCells());
+		if(VarType.CSTR == type) {
+			if(initializer instanceof LiteralExpression) {
+				LiteralExpression le = (LiteralExpression)initializer;
+				if(VarType.CSTR == le.getType(null)) {
+					cg.defineStr(fScope, (String)le.getValue());
+					//TODO рудимент?
+					//symbol.getConstantOperand().setValue(cgScope.getResId());
+				}
+			}
+			else throw new Exception("unexpected expression:" + initializer + " for constant");
 		}
 		else {
-			initializer.codeGen(cg);
-			cg.accToCells(fScope, fScope);
+			if(null == initializer) {
+				cg.constToCells(fScope, 0, 0, fScope.getCells());
+			}
+			else if(initializer instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
+				cg.constToCells(cg.getScope(), 0, ((LiteralExpression)initializer).getNumValue(), fScope.getCells());
+			}
+			else if(initializer instanceof FieldAccessExpression) {
+				cg.constToCells(cg.getScope(), 0, -1, fScope.getCells());
+				accUsed = true;
+			}
+			else if(initializer instanceof NewExpression) {
+				initializer.codeGen(cg);
+				accUsed = true;
+			}
+			else if(initializer instanceof MethodCallExpression) {
+				initializer.codeGen(cg);
+				cg.retToCells(cg.getScope(), fScope);
+			}
+			else {
+				initializer.codeGen(cg);
+				cg.accToCells(fScope, fScope);
+				accUsed = true;
+			}
 		}
-
-		return true;
+		
+		cg.setScope(oldCGScope);
+		return accUsed;
 	}
 
 	@Override

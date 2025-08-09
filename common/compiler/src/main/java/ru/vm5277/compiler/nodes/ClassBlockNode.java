@@ -33,8 +33,8 @@ import ru.vm5277.compiler.semantic.Symbol;
 
 public class ClassBlockNode extends AstNode {
 	protected	List<AstNode>	children	= new ArrayList<>();
-
-	public ClassBlockNode(TokenBuffer tb, MessageContainer mc, String className) throws CompileException {
+	
+	public ClassBlockNode(TokenBuffer tb, MessageContainer mc, ClassNode classNode) throws CompileException {
 		super(tb, mc);
         
 		consumeToken(tb, Delimiter.LEFT_BRACE); // в случае ошибки, останавливаем парсинг файла
@@ -61,7 +61,7 @@ public class ClassBlockNode extends AstNode {
 			VarType type = checkPrimtiveType();
 			boolean isClassName = false;
 			if (null == type) {
-				isClassName = checkClassName(className);
+				isClassName = checkClassName(classNode.getName());
 				if(!isClassName) type = checkClassType();
 			}
 			
@@ -70,17 +70,17 @@ public class ClassBlockNode extends AstNode {
 			if(tb.match(TokenType.ID)) {
 				if(isClassName) {
 					isClassName = false;
-					type = VarType.fromClassName(className);
+					type = VarType.fromClassName(classNode.getName());
 				}
 				name = consumeToken(tb).getStringValue();
 			}
 
 			if(tb.match(Delimiter.LEFT_PAREN)) { //'(' Это метод
 				if(isClassName) {
-					children.add(new MethodNode(tb, mc, modifiers, null, className));
+					children.add(new MethodNode(tb, mc, modifiers, null, classNode.getName(), classNode));
 				}
 				else {
-					children.add(new MethodNode(tb, mc, modifiers, type, name));
+					children.add(new MethodNode(tb, mc, modifiers, type, name, classNode));
 				}
 				continue;
 			}

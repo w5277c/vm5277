@@ -17,8 +17,12 @@ package ru.vm5277.common.cg.scopes;
 
 import java.util.HashMap;
 import java.util.Map;
+import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGCell;
+import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class CGClassScope extends CGScope {
 	private	final	VarType						type;
@@ -52,6 +56,11 @@ public class CGClassScope extends CGScope {
 		return cells;
 	}
 	
+	public void build(CodeGenerator cg) throws CompileException {
+		if(VERBOSE_LO <= verbose) prepend(new CGIText(";build class " + getPath('.') + ",id:" + resId));
+		if(VERBOSE_LO <= verbose) append(new CGIText(";class end"));
+	}
+	
 	public int getHeapOffset() {
 		return heapOffset;
 	}
@@ -63,5 +72,10 @@ public class CGClassScope extends CGScope {
 	@Override
 	public String getLName() {
 		return "C" + name;
+	}
+	
+	@Override
+	public String toString() {
+		return "class " + name + " '" + getPath('.') + resId;
 	}
 }

@@ -32,6 +32,7 @@ import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.nodes.expressions.MethodCallExpression;
+import ru.vm5277.compiler.nodes.expressions.NewExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.VarSymbol;
@@ -59,14 +60,6 @@ public class VarNode extends AstNode {
         try {consumeToken(tb, Delimiter.SEMICOLON);}catch(CompileException e) {markFirstError(e);}
 	}
 
-	public VarNode(MessageContainer mc, Set<Keyword> modifiers, VarType type, String name) {
-		super(null, mc);
-		
-		this.modifiers = modifiers;
-		this.type = type;
-		this.name = name;
-	}
-	
 	public VarType getType() {
 		return type;
 	}
@@ -79,6 +72,10 @@ public class VarNode extends AstNode {
 		return initializer;
 	}
 	
+	public boolean isStatic() {
+		return modifiers.contains(Keyword.STATIC);
+	}
+
 	public boolean isFinal() {
 		return modifiers.contains(Keyword.FINAL);
 	}
@@ -121,7 +118,7 @@ public class VarNode extends AstNode {
 		
 		if(scope instanceof BlockScope) {
 			BlockScope blockScope = (BlockScope)scope;
-			symbol = new VarSymbol(name, type, modifiers.contains(Keyword.FINAL) || VarType.CSTR == type, modifiers.contains(Keyword.STATIC), scope, this);
+			symbol = new VarSymbol(name, type, isFinal() || VarType.CSTR == type, isStatic(), scope, this);
 			//TODO рудимент
 			/*
 			if(VarType.CSTR == type && null != initializer) {
@@ -150,7 +147,8 @@ public class VarNode extends AstNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		try {
 			symbol.setCGScope(cg.enterLocal(type, (-1 == type.getSize() ? cg.getRefSize() : type.getSize()), VarType.CSTR == type, name));
-// Проверка инициализации final-полей
+			
+			// Проверка инициализации final-полей
 			if (isFinal() && initializer == null) markError("Final variable  '" + name + "' must be initialized");
 
 			// Анализ инициализатора, если есть
@@ -159,10 +157,7 @@ public class VarNode extends AstNode {
 					cg.leaveLocal();
 					return false;
 				}
-			}
-
-			// Проверка совместимости типов
-			if(null != initializer) {
+				// Проверка совместимости типов
 				VarType initType = initializer.getType(scope);
 				if (!isCompatibleWith(scope, type, initType)) {
 					markError("Type mismatch: cannot assign " + initType + " to " + type);
@@ -175,7 +170,7 @@ public class VarNode extends AstNode {
 
 				ExpressionNode optimizedExpr = initializer.optimizeWithScope(scope);
 				if(null != optimizedExpr) {
-					initializer = optimizedExpr;
+					initializer = optimizedExpr; //TODO не передаю созданный Symbol?
 				}
 			}
 		}
@@ -217,6 +212,10 @@ public class VarNode extends AstNode {
 			}
 			else if(initializer instanceof FieldAccessExpression) {
 				cg.constToCells(cg.getScope(), vScope.getStackOffset(), -1, vScope.getCells());
+				accUsed = true;
+			}
+			else if(initializer instanceof NewExpression) {
+				initializer.codeGen(cg);
 				accUsed = true;
 			}
 			else if(initializer instanceof MethodCallExpression) {

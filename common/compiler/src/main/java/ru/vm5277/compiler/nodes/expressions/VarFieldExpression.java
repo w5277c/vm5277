@@ -16,6 +16,7 @@
 package ru.vm5277.compiler.nodes.expressions;
 
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.VarType;
@@ -25,6 +26,7 @@ import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.AliasSymbol;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.ClassSymbol;
+import ru.vm5277.compiler.semantic.FieldSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 import ru.vm5277.compiler.semantic.VarSymbol;
@@ -102,8 +104,27 @@ public class VarFieldExpression extends ExpressionNode {
 	}
 	
 	@Override
+	public Symbol getSymbol() {
+		// Переменная/поле могут быть переданы в вызываемый метод(в котором данное выражение), но на этапе семантики мы получаем Symbol построенный на
+		// параметрах метода(которые по понятным причинам не содержат значение)
+		// Значение появляется позже(на этапе кодогенерации в MethodCallExpression) в виде VarSymbol/FieldSymbol(вероятно также AliasSymbol, если не рудимент)
+		// Здесь мы проверяем на Symbol, и обновляем symbol на актуальное значение.
+
+		if(symbol instanceof VarSymbol || symbol instanceof FieldSymbol || symbol instanceof AliasSymbol) {
+			return symbol;
+		}
+		symbol = scope.resolve(value);
+		return symbol;
+	}
+
+	
+	@Override
 	public Object codeGen(CodeGenerator cg) throws Exception {
 		CGScope oldCGScope = cg.setScope(cgScope);
+		
+		// Актуализируем symbol
+		getSymbol();
+		
 		// Выполняет запись значения в аккумулятор. Но зачастую это не требуется, достаточно вызвать depCodeGen
 		if(null == depCodeGen(cg)) {
 			if(symbol instanceof AliasSymbol) {
@@ -122,8 +143,12 @@ public class VarFieldExpression extends ExpressionNode {
 				}
 			}
 			else {
-				CGVarScope vScope = (CGVarScope)symbol.getCGScope();
-				cg.cellsToAcc(cgScope, vScope);
+				if(symbol.getCGScope() instanceof CGCellsScope) {
+					cg.cellsToAcc(cgScope, (CGCellsScope)symbol.getCGScope());
+				}
+				else {
+					throw new CompileException("Unsupported scope: " + symbol.getCGScope());
+				}
 			}
 		}
 		cg.setScope(oldCGScope);

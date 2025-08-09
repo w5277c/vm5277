@@ -13,21 +13,20 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-.IFNDEF BIT_TO_MASK
-.include "conv/_bit_to_mask_table.asm"
-;-----------------------------------------------------------
-BIT_TO_MASK:
-;-----------------------------------------------------------
-;Номер бита в число(2^n)
-;IN: TEMP_L-номер бита(0-7)
-;OUT: TEMP_L-число(1,2,4,8,16,32,64,128)
-;-----------------------------------------------------------
-	PUSH_Z													;4
-	LDI_Z _BIT_TO_MASK_TABLE*2								;2
-	ADD ZL,TEMP_L											;1
-	ADC ZH,C0x00											;1
-	LPM TEMP_L,Z											;3
-	POP_Z													;4,total:15t
+
+.IFNDEF OS_DIVZ8
+;--------------------------------------------------------
+OS_DIVZ8:
+;--------------------------------------------------------
+;Деление регистра Z(16b) на 8
+;IN: Z
+;OUT: Z
+;--------------------------------------------------------
+	LSR ZH
+	ROR ZL
+	LSR ZH
+	ROR ZL
+	LSR ZH
+	ROR ZL
 	RET
 .ENDIF
-

@@ -239,7 +239,17 @@ public class ClassScope extends Scope {
 		}
 		return null;
 	}
-/*TODO	
+
+	public MethodSymbol resolveConstructor(String methodName, VarType[] argTypes) throws CompileException {
+		// Ищем конструкторы в текущем классе
+		for (MethodSymbol method : constructors) {
+			if (isApplicable(method, argTypes)) {
+				return method;
+			}
+		}
+		return null;
+	}
+	/*TODO	
 	public MethodSymbol resolveStaticImport(String methodName, List<VarType> argTypes) {
 		for (MethodSymbol method : staticImports.values()) {
 			if (method.getName().equals(methodName) && isArgumentsMatch(method, argTypes)) return method;

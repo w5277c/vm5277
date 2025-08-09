@@ -21,5 +21,6 @@ public enum RTOSFeature {
 	OS_FT_WELCOME,
 	OS_FT_DIAG,
 	OS_FT_TIMER1,
-	OS_FT_TIMER2;
+	OS_FT_TIMER2,
+	OS_FT_DRAM;
 }

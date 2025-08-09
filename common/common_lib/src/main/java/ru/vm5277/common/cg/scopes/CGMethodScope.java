@@ -45,16 +45,12 @@ public class CGMethodScope extends CGBlockScope {
 	
 	@Override
 	public void build(CodeGenerator cg) throws CompileException {
-		build(cg, false);
-	}
-	public void build(CodeGenerator cg, boolean launchPoint) throws CompileException {
 		CGIContainer cont = new CGIContainer();
 		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";build " + toString()));
-		if(launchPoint) cont.append(new CGIText("MAIN:"));
 		cont.append(lbScope);
 		prepend(cont);
 		
-		//super.build(cg);
+		if(VERBOSE_LO <= verbose) append(new CGIText(";method end"));
 	}
 
 	//Выделение ячеек для переданных параметров (только стек)
@@ -85,6 +81,11 @@ public class CGMethodScope extends CGBlockScope {
 		return null;
 	}
 
+	public int getSize() {
+		//TODO заглушка
+		return 0x08;
+	}
+	
 	@Override
 	public boolean isFreeReg(byte reg) {
 		RegPair regPair = getReg(reg);

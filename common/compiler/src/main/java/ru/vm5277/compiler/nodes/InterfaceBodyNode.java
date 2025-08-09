@@ -32,7 +32,7 @@ import ru.vm5277.compiler.semantic.Scope;
 public class InterfaceBodyNode extends AstNode {
 	protected List<AstNode> children = new ArrayList<>();
 	
-	public InterfaceBodyNode(TokenBuffer tb, MessageContainer mc, String className) throws CompileException {
+	public InterfaceBodyNode(TokenBuffer tb, MessageContainer mc, String className, ClassNode classNode) throws CompileException {
 		super(tb, mc);
 
 		consumeToken(tb, Delimiter.LEFT_BRACE);
@@ -67,7 +67,7 @@ public class InterfaceBodyNode extends AstNode {
 			}
 
 			if (tb.match(Delimiter.LEFT_PAREN)) { // Это метод
-				children.add(new MethodNode(tb, mc, modifiers, type, name));
+				children.add(new MethodNode(tb, mc, modifiers, type, name, classNode));
 				continue;
 			}
 

@@ -209,7 +209,7 @@ public class Main {
 					timestamp = System.currentTimeMillis();
 					System.out.println("Codegen...");
 
-					launchNode.codeGen(cg, true);
+					launchNode.codeGen(cg);
 					cg.build();
 					//System.out.println("\n" + cg.getAsm());
 					

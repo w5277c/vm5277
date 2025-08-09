@@ -71,6 +71,7 @@ public class CGBlockScope extends CGScope {
 			append(cg.popRegAsm(usedRegs.get(i)));
 		}*/
 		if(0x00 != stackBlockOffset) append(cg.stackFreeAsm());
+		if(VERBOSE_LO <= verbose) append(new CGIText(";block end"));
 	}
 
 	

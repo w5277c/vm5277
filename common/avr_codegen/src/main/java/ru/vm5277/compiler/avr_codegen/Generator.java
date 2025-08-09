@@ -141,6 +141,21 @@ public class Generator extends CodeGenerator {
 	}
 
 	/**
+	 *
+	 * @param scope - область видимости для генерации кода
+	 * @param label - метка объекта
+	 */
+/*	@Override
+	public void pushRef(CGScope scope, String label) {
+		scope.append(new CGIAsm("ldi r30,low(" + label + ")"));
+		scope.append(new CGIAsm("push r30"));
+		if(0x02==getRefSize()) {
+			scope.append(new CGIAsm("ldi r16,high(" + label + ")"));
+			scope.append(new CGIAsm("push r30"));
+		}
+	}
+*/	
+	/**
 	 * pushCells используетя для вызова метода(передачи параметров)
 	 * @param scope - область видимости для генерации кода
 	 * @param size - необходимый размер в стеке
@@ -828,8 +843,12 @@ public class Generator extends CodeGenerator {
 //--------------------	
 	
 	@Override
-	public void eNew(int typeId, long[] parameters, boolean canThrow) {
-		System.out.println("CG:eNew, " + typeId +", params:" + Arrays.toString(parameters));
+	public void eNew(CGScope scope, VarType type, int size, boolean canThrow) {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";eNew " + type + " " + size));
+		RTOSFeatures.add(RTOSFeature.OS_FT_DRAM);
+		scope.append(new CGIAsm("ldi r16," + (size&0xff)));
+		if(0x02==getRefSize()) scope.append(new CGIAsm("ldi r17," + ((size>>0x08)&0xff)));
+		scope.append(new CGIAsm("mcall os_dram_alloc"));
 	}
 
 	@Override

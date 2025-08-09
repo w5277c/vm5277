@@ -412,8 +412,8 @@ public class ASTPrinter {
 		}
 		else if(expr instanceof MethodCallExpression) {
 			MethodCallExpression mce = (MethodCallExpression)expr;
-			if(null != mce.getParent()) {
-				printExpr(mce.getParent());
+			if(null != mce.getClassName()) {
+				printExpr(mce.getClassName());
 				out.put(".");
 			}
 			out.put(mce.getMethodName() + "(");
@@ -450,9 +450,9 @@ public class ASTPrinter {
 		else if(expr instanceof NewExpression) {
 			NewExpression ne = (NewExpression)expr;
 			out.put("new ");
-			out.put(ne.getName());
+			out.put(ne.getMethodName());
 			out.put("(");
-			printArguments(ne.getArgs());
+			printArguments(ne.getArguments());
 			out.put(")");
 		}
 		else if(expr instanceof InstanceOfExpression) {

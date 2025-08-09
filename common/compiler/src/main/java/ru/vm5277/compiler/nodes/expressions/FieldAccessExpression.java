@@ -19,13 +19,18 @@ import java.util.Arrays;
 import java.util.List;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGCellsScope;
+import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
+import ru.vm5277.compiler.semantic.AliasSymbol;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.FieldSymbol;
 import ru.vm5277.compiler.semantic.Scope;
+import ru.vm5277.compiler.semantic.Symbol;
 
 public class FieldAccessExpression extends ExpressionNode {
 	private			ExpressionNode	target;
@@ -145,18 +150,33 @@ public class FieldAccessExpression extends ExpressionNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		if(null == symbol) return false;
+		try {
+			cgScope = cg.enterExpression();
 		
-		// Проверка видимости поля
-		if (((FieldSymbol)symbol).isPrivate() && !(target instanceof ThisExpression)) {
-			markError("Private field '" + fieldName + "' is not accessible");
-			return false;
-		}
+			if(null == symbol) {
+				cg.leaveExpression();
+				return false;
+			}
 
-		if(!target.postAnalyze(scope, cg)) {
+			// Проверка видимости поля
+			if (((FieldSymbol)symbol).isPrivate() && !(target instanceof ThisExpression)) {
+				markError("Private field '" + fieldName + "' is not accessible");
+				cg.leaveExpression();
+				return false;
+			}
+
+			if(!target.postAnalyze(scope, cg)) {
+				cg.leaveExpression();
+				return false;
+			}
+		}
+		catch (CompileException e) {
+			markError(e.getMessage());
+
+			cg.leaveExpression();
 			return false;
 		}
-		
+		cg.leaveExpression();
 		return true;
 	}
 	
@@ -166,7 +186,17 @@ public class FieldAccessExpression extends ExpressionNode {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg) throws Exception {
-		return null;
+		CGScope oldCGScope = cg.setScope(cgScope);
+		if(null == depCodeGen(cg)) {
+			if(symbol.getCGScope() instanceof CGCellsScope) {
+				cg.cellsToAcc(cgScope, (CGCellsScope)symbol.getCGScope());
+			}
+			else {
+				throw new CompileException("Unsupported scope: " + symbol.getCGScope());
+			}
+		}
+		cg.setScope(oldCGScope);
+		return true;
 	}
 	
 	@Override

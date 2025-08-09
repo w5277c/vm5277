@@ -41,7 +41,7 @@ public class InterfaceNode extends ClassNode {
 	@Override
 	public void parse() throws CompileException {
 		// Парсинг тела интерфейса
-		blockIfaceNode = new InterfaceBodyNode(tb, mc, name);
+		blockIfaceNode = new InterfaceBodyNode(tb, mc, name, this);
 		int t=454;
 	}
 	

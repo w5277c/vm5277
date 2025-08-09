@@ -63,18 +63,9 @@ public class CGIContainer implements CGItem {
 		StringBuilder sb = new StringBuilder();
 		
 		for(CGItem item : items) {
-			if(item instanceof CGClassScope) {
-				sb.append(item.getSource());
-			}
+			sb.append(item.getSource());
 		}
-		
-		
-		for(CGItem item : items) {
-			if(!(item instanceof CGClassScope)) {
-				sb.append(item.getSource());
-			}
-		}
-		
+
 		return sb.toString();
 	}
 	

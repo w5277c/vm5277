@@ -40,17 +40,20 @@ public class MethodNode extends AstNode {
 	private	final	Set<Keyword>		modifiers;
 	private	final	VarType				returnType;
 	private	final	String				name;
+	private	final	ClassNode			classNode;
 	private			List<ParameterNode>	parameters;
 	private			BlockNode			blockNode;
 	private			MethodScope			methodScope; // Добавляем поле для хранения области видимости
 	private			boolean				canThrow	= false;
 	
-	public MethodNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType returnType, String name) throws CompileException {
+	public MethodNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType returnType, String name, ClassNode classNode)
+																																	throws CompileException {
 		super(tb, mc);
 		
 		this.modifiers = modifiers;
 		this.returnType = returnType;
 		this.name = name;
+		this.classNode = classNode;
 
         consumeToken(tb); // Потребляем '('
 		this.parameters = parseParameters(mc);
@@ -280,13 +283,10 @@ public class MethodNode extends AstNode {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg) throws Exception {
-		return codeGen(cg, false);
-	}
-	public Object codeGen(CodeGenerator cg, boolean launchPoint) throws Exception {
 		if(cgDone) return null;
 		cgDone = true;
 
-		((CGMethodScope)symbol.getCGScope()).build(cg, launchPoint);
+		((CGMethodScope)symbol.getCGScope()).build(cg);
 		
 		/* не требуется
 		for(ParameterNode node : parameters) {
@@ -295,9 +295,11 @@ public class MethodNode extends AstNode {
 		
 		if(null != blockNode) blockNode.codeGen(cg);		
 		
-		if(VarType.VOID == returnType) {
+		if(null == returnType || VarType.VOID == returnType) {
 			cg.eReturn(symbol.getCGScope(), 0);
 		}
+
+		classNode.codeGen(cg);		
 		
 		return null;
 	}

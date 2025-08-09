@@ -281,19 +281,19 @@ public class BinaryExpression extends ExpressionNode {
 		Operator op = (operator.isAssignment() ? operator.toArithmetic() : operator);
 		// Если expr2 переменная или поле(т.е. содержит cells)
 		if(expr2 instanceof VarFieldExpression) {
-			// Не строим код для expr2(он разместит значение в acc), а нас интересует занчение в cells(только выполняем зависимость)
-			depCodeGen(cg, expr2.getSymbol());
-			// Строим код для expr1(результат в аккумуляторе)
-			if(null == expr1.codeGen(cg)) {
+			// TODO Поменял выражения местами, так как для выражения this.value = value; они явно перепутаны. Проверить остальные
+			// Не строим код для expr1(он разместит значение в acc), а нас интересует знaчение в cells(только выполняем зависимость)
+			depCodeGen(cg, expr1.getSymbol());
+			// Строим код для expr2(результат в аккумуляторе)
+			if(null == expr2.codeGen(cg)) {
 				// Явно не доработанный код, выражение всегда должно помещать результат в аккумулятор
-				throw new CompileException("Accum not used for operand:" + expr1);
+				throw new CompileException("Accum not used for operand:" + expr2);
 			}
-			CGCellsScope cScope = (CGCellsScope)expr2.getSymbol().getCGScope();
+			CGCellsScope cScope = (CGCellsScope)expr1.getSymbol().getCGScope();
 			if(null != op) {
 				cg.cellsAction(cgScope, (cScope instanceof CGVarScope ? ((CGVarScope)cScope).getStackOffset() : 0), cScope.getCells(), op);
 			}
 			if(operator.isAssignment()) {
-				// TODO
 				cg.accToCells(cgScope, cScope);
 			}
 		}

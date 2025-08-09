@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
@@ -41,6 +42,7 @@ public class ClassNode extends AstNode {
 	protected			List<String>	interfaces			= new ArrayList<>();
 	private				ClassBlockNode	blockNode;
 	private				ClassScope		classScope;
+	private				CGClassScope	cgScope;
 	
 	public ClassNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, String parentClassName, List<ClassNode> importedClasses)
 																																	throws CompileException {
@@ -74,7 +76,7 @@ public class ClassNode extends AstNode {
 	
 	public void parse() throws CompileException {
 		// Парсинг тела класса
-		blockNode = new ClassBlockNode(tb, mc, name);
+		blockNode = new ClassBlockNode(tb, mc, this);
 	}
 	
 	public String getName() {
@@ -165,7 +167,7 @@ public class ClassNode extends AstNode {
 			}
 		}
 
-		if(null != cg) cg.enterClass(VarType.fromClassName(name), interfaceIds, name, null == parentClassName);
+		cgScope = cg.enterClass(VarType.fromClassName(name), interfaceIds, name, null == parentClassName);
 
 		for (String interfaceName : interfaces) {
 			// Проверяем существование интерфейса
@@ -183,7 +185,7 @@ public class ClassNode extends AstNode {
 		
 		blockNode.postAnalyze(classScope, cg);
 
-		if(null != cg) cg.leaveClass();
+		cg.leaveClass();
 		return true;
 	}
 	
@@ -225,6 +227,7 @@ public class ClassNode extends AstNode {
 		if(cgDone) return null;
 		cgDone = true;
 
+		cgScope.build(cg);
 /*		if(null != importedClasses) {
 			for (ClassNode imported : importedClasses) {
 				if(isUsed()) imported.codeGen(cg);

@@ -21,8 +21,12 @@
 	.EQU	OS_IR_QNT								= 0x1a	;Количество перырваний(без RESET)
 	.EQU	OS_PCINT_PORTS_QNT						= 0x03	;Количество портов поддерживающих внешние прерывания(PCINT)
 	.EQU	OS_RAM_BORDER_SIZE						= 0x20	;Минимальное допустимое расстояние между вершинами FREE_RAM и STACK
-	.SET	OS_STACK_SIZE							= 0x60	;Стек ядра
-	.SET	OS_IO_BUFFER_SIZE						= 0x80	;Размер буфера ввода (не менее 2)
+	.SET	OS_STACK_SIZE							= 0xc0	;Общий стек(192 байта)
+	.SET	OS_IO_BUFFER_SIZE						= 0x40	;Размер буфера ввода (не менее 2)
+
+	.EQU	OS_DRAM_BMASK_1B_SIZE					= 16	;Размер 128Б(128 яч.)
+	.EQU	OS_DRAM_BMASK_2B_SIZE					= 16	;Размер 256Б(128 яч.)
+	.EQU	OS_DRAM_BMASK_8B_SIZE					= 20	;Размер 1280Б(160 яч.)
 
 	.EQU	SDA										= PC4
 	.EQU	SCL										= PC5
