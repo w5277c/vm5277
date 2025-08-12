@@ -36,6 +36,7 @@ import ru.vm5277.common.compiler.Case;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.Operand;
 import ru.vm5277.common.RTOSFeature;
+import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.SystemParam;
 import ru.vm5277.common.cg.CGActionHandler;
 import ru.vm5277.common.cg.items.CGIAsm;
@@ -48,7 +49,6 @@ import ru.vm5277.common.cg.OperandType;
 import ru.vm5277.common.cg.RegPair;
 import ru.vm5277.common.cg.items.CGItem;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
-import ru.vm5277.common.cg.scopes.CGExpressionScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGMethodScope;
@@ -58,6 +58,10 @@ import ru.vm5277.common.exceptions.CompileException;
 
 // TODO Кодогенератор НЕ ДОЛЖЕН выполнять работу оптимизатора, т.е. не нужно формировать movw вместо двух mov и тому подобное. Так как оптимизатор справится с
 // этой задачей лучше, а кодогенератор может ему помешать.
+
+
+// TODO проверить корректность работы всех режимов в cellsActionAsm
+// TODO привести к общему виду cellsActionAsm, pushCells, popCells, varToRegs, constToCells, regsToVar, т.е все, где выполняется работа с разными типами в cells
 
 public class Generator extends CodeGenerator {
 	private	final	static	String				VERSION		= "0.1";
@@ -134,8 +138,8 @@ public class Generator extends CodeGenerator {
 	@Override
 	public void pushConst(CGScope scope, int size, long value) {
 		for(int i=0; i<size; i++) {
-			scope.append(new CGIAsm("ldi r30," + (value&0xff)));
-			scope.append(new CGIAsm("push r30"));
+			scope.append(new CGIAsm("ldi yl," + (value&0xff)));
+			scope.append(new CGIAsm("push yl"));
 			value >>= 0x08;
 		}
 	}
@@ -165,10 +169,10 @@ public class Generator extends CodeGenerator {
 	public void pushCells(CGScope scope, int size, CGCell[] cells) {
 		if(CGCell.Type.LABEL == cells[0].getType()) {
 			if(VERBOSE_LO <= verbose) scope.append(new CGIText("\t;push ret point"));
-			scope.append(new CGIAsm("ldi r30,low(" + cells[0].getLabel() + ")"));
-			scope.append(new CGIAsm("push r30"));	
-			scope.append(new CGIAsm("ldi r30,high(" + cells[0].getLabel() + ")"));
-			scope.append(new CGIAsm("push r30"));	
+			scope.append(new CGIAsm("ldi yl,low(" + cells[0].getLabel() + ")"));
+			scope.append(new CGIAsm("push yl"));	
+			scope.append(new CGIAsm("ldi yl,high(" + cells[0].getLabel() + ")"));
+			scope.append(new CGIAsm("push yl"));	
 		}
 		else {
 			if(VERBOSE_LO <= verbose) scope.append(new CGIText("\t;push param"));
@@ -321,6 +325,13 @@ public class Generator extends CodeGenerator {
 	}
 
 	@Override
+	public void cellsToRet(CGScope scope, long stackOffset, CGCell[] cells) throws CompileException {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";cellsToRet " + cellsToStr(cells)));
+		cellsActionAsm(scope, stackOffset, cells, (int sn, String rOp) -> new CGIAsm("mov " + (0==sn ? "zl" : "zh") + "," + rOp));
+	}
+
+	
+	@Override
 	public void cellsToAcc(CGScope scope, CGCellsScope cScope) throws CompileException {
 		if(cScope instanceof CGVarScope) {
 			CGVarScope vScope = (CGVarScope)cScope;
@@ -368,7 +379,7 @@ public class Generator extends CodeGenerator {
 					if(srcReg == dstReg) continue; // регистры совпались, ничего не делаем
 					
 					if(!popRegs.contains(dstReg)) {
-						if(	i != (registers.length-1) && isEven(srcReg) && isEven(dstReg) && CGCell.Type.REG == cells[i+1].getType() &&
+/*						if(	i != (registers.length-1) && isEven(srcReg) && isEven(dstReg) && CGCell.Type.REG == cells[i+1].getType() &&
 							(srcReg+1)==cells[i+1].getNum() && (dstReg+1)==registers[i+1]) { // подходит для инструкции movw
 						
 							int pos = getCellsPos(cells, dstReg);
@@ -378,7 +389,7 @@ public class Generator extends CodeGenerator {
 								continue;
 							}
 						}
-						
+*/						
 						int pos = getCellsPos(cells, dstReg);
 						if(pos > i) {
 							scope.append(new CGIAsm("push r" + dstReg));
@@ -508,7 +519,8 @@ public class Generator extends CodeGenerator {
 						}
 
 						// Подходит для инструкции movw
-						if(	i != (regs.length-1)  && i < (usedRegsQnt-1) && isEven(dstReg) && isEven(srcReg) &&
+						// Убираю из CG, это задача оптимизатора
+/*						if(	i != (regs.length-1)  && i < (usedRegsQnt-1) && isEven(dstReg) && isEven(srcReg) &&
 							CGCell.Type.REG == vScope.getCells()[i+1].getType() && dstReg+1==vScope.getCells()[i+1].getNum() && (srcReg+1)==regs[i+1]) {
 
 							pos = getRegPos(regs, i, dstReg);
@@ -517,7 +529,7 @@ public class Generator extends CodeGenerator {
 								i++;
 								continue;
 							}
-						}
+						}*/
 
 						scope.append(new CGIAsm("mov r" + dstReg + ",r" + srcReg));
 						break;
@@ -772,16 +784,16 @@ public class Generator extends CodeGenerator {
 		boolean usedY = false;
 		if(CGCell.Type.HEAP == cells[0].getType()) {
 			int addr = cells[0].getNum();
-			scope.append(new CGIAsm("push r28")); //TODO проверять свободный регистр, если все занято, использовать YL
-			scope.append(new CGIAsm("ldi r30,low(" + addr + ")"));
-			scope.append(new CGIAsm("ldi r31,high(" + addr + ")"));
+			scope.append(new CGIAsm("push yl")); //TODO проверять свободный регистр, если все занято, использовать YL
+			scope.append(new CGIAsm("ldi zl,low(" + addr + ")"));
+			scope.append(new CGIAsm("ldi zh,high(" + addr + ")"));
 			
 			for (int i=0; i<cells.length; i++) {
 				CGCell cell = cells[i];
-				scope.append(new CGIAsm("ldd r28,z+" + (cell.getNum()-addr)));
-				scope.append(handler.action(i, "r28"));
+				scope.append(new CGIAsm("ldd yl,z+" + (cell.getNum()-addr)));
+				scope.append(handler.action(i, "yl"));
 			}
-			scope.append(new CGIAsm("pop r28"));
+			scope.append(new CGIAsm("pop yl"));
 			return;
 		}
 		
@@ -790,8 +802,8 @@ public class Generator extends CodeGenerator {
 			switch(cell.getType()) {
 				case REG:
 					if(usedY) {
-						scope.append(new CGIAsm("pop r29"));
-						scope.append(new CGIAsm("pop r28"));
+						scope.append(new CGIAsm("pop yh"));
+						scope.append(new CGIAsm("pop yl"));
 						usedY = false;
 					}
 					scope.append(handler.action(i, "r" + cell.getNum()));
@@ -800,25 +812,25 @@ public class Generator extends CodeGenerator {
 					//TODO
 					if(stackOffset <= (64-cells.length)) {
 						if(usedY) {
-							scope.append(new CGIAsm("pop r29"));
-							scope.append(new CGIAsm("pop r28"));
+							scope.append(new CGIAsm("pop yh"));
+							scope.append(new CGIAsm("pop yl"));
 							usedY = false;
 						}
 						//TODO cHolder.getBlockScope().putUsedReg((byte)30);
-						scope.append(new CGIAsm("ldd r30,y+" + cell.getNum()));
-						scope.append(handler.action(i, "r30"));
+						scope.append(new CGIAsm("ldd zl,y+" + cell.getNum()));
+						scope.append(handler.action(i, "zl"));
 					}
 					else {
 						//TODO cHolder.getBlockScope().putUsedReg((byte)16);
 						if(!usedY) {
-							scope.append(new CGIAsm("push r28"));
-							scope.append(new CGIAsm("push r29"));
+							scope.append(new CGIAsm("push yl"));
+							scope.append(new CGIAsm("push yh"));
 							usedY = false;
 						}
-						scope.append(new CGIAsm("subi r28,low(0x10000-" + cell.getNum() + ")")); //TODO можно оптимизировать
-						scope.append(new CGIAsm("sbci r29,high(0x10000-" + cell.getNum() + ")"));//Если это условие выполняет более 1 раза, подряд 
-						scope.append(new CGIAsm("ld r30,y"));
-						scope.append(handler.action(i, "r30"));
+						scope.append(new CGIAsm("subi yl,low(0x10000-" + cell.getNum() + ")")); //TODO можно оптимизировать
+						scope.append(new CGIAsm("sbci yh,high(0x10000-" + cell.getNum() + ")"));//Если это условие выполняет более 1 раза, подряд 
+						scope.append(new CGIAsm("ld zl,y"));
+						scope.append(handler.action(i, "zl"));
 					}
 					break;
 				case RET:
@@ -829,8 +841,8 @@ public class Generator extends CodeGenerator {
 			}
 		}
 		if(usedY) {
-			scope.append(new CGIAsm("pop r29"));
-			scope.append(new CGIAsm("pop r28"));
+			scope.append(new CGIAsm("pop yh"));
+			scope.append(new CGIAsm("pop yl"));
 		}
 	};
 	
@@ -843,12 +855,30 @@ public class Generator extends CodeGenerator {
 //--------------------	
 	
 	@Override
-	public void eNew(CGScope scope, VarType type, int size, boolean canThrow) {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";eNew " + type + " " + size));
+	public void eNew(CGScope scope, int size, List<VarType> classTypes, boolean canThrow) throws CompileException {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";eNew [" + StrUtils.toString(classTypes) + "], heap size:" + size));
 		RTOSFeatures.add(RTOSFeature.OS_FT_DRAM);
 		scope.append(new CGIAsm("ldi r16," + (size&0xff)));
 		if(0x02==getRefSize()) scope.append(new CGIAsm("ldi r17," + ((size>>0x08)&0xff)));
 		scope.append(new CGIAsm("mcall os_dram_alloc"));
+		int offset=0;
+		scope.append(new CGIAsm("std z+" + offset++ +",r16"));
+		if(0x02==getRefSize()) {
+			scope.append(new CGIAsm("std z+" + offset++ +",r17"));
+		}
+		//Запись кол-ва ссылок
+		scope.append(new CGIAsm("std z+" + offset++ +",c0x00"));
+		//Запись кол-ва типов классов
+		scope.append(new CGIAsm("ldi r16," + classTypes.size()));
+		scope.append(new CGIAsm("std z+" + offset++ +",r16"));
+		for(VarType type : classTypes) {
+			scope.append(new CGIAsm("ldi r16," + type.getId()));
+			scope.append(new CGIAsm("std z+" + offset++ +",r16"));
+		}
+		//Размер аккумулятора - 2Б
+		accum.setSize(0x02);
+		//New - выражение, возвращает значение в аккумуляторе, Z нужен конструктору
+		scope.append(new CGIAsm("movw r16,zl"));
 	}
 
 	@Override
@@ -861,7 +891,7 @@ public class Generator extends CodeGenerator {
 	public void invokeMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, CGMethodScope mScope) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";invokeMethod " + type + " " + className + "." + methodName));
 
-		if(null == types) {
+		if(null == types || 0 == types.length) {
 			scope.append(new CGIAsm("call " + mScope.getLabel().getName()));
 		}
 		else {
@@ -1005,6 +1035,33 @@ public class Generator extends CodeGenerator {
 		}
 	}
 	
+	@Override
+	public void refCountInc(CGScope scope, long stackOffset, CGCell[] cells) throws CompileException {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";refCount++ for " + cellsToStr(cells)));
+		scope.append(new CGIAsm("push r16"));
+		scope.append(new CGIAsm("push_y"));
+		cellsActionAsm(scope, stackOffset, cells, (int sn, String rOp) -> new CGIAsm("mov " + (0==sn ? "yl" : "yh") + "," + rOp));
+		scope.append(new CGIAsm("ldd r16,y+0x02"));
+		scope.append(new CGIAsm("cpse r16,c0xff"));	//не инкрементируем, если максимальное значение(вынужденная мера - блокировка, объект никогда не будет уничтожен)
+		scope.append(new CGIAsm("inc r16"));
+		scope.append(new CGIAsm("std y+0x02,r16"));
+		scope.append(new CGIAsm("pop_y"));
+		scope.append(new CGIAsm("pop r16"));
+	}
+	@Override
+	public void refCountDec(CGScope scope, long stackOffset, CGCell[] cells) throws CompileException {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";refCount-- for " + cellsToStr(cells)));
+		scope.append(new CGIAsm("push r16"));
+		scope.append(new CGIAsm("push_y"));
+		cellsActionAsm(scope, stackOffset, cells, (int sn, String rOp) -> new CGIAsm("mov " + (0==sn ? "yl" : "yh") + "," + rOp));
+		scope.append(new CGIAsm("ldd r16,y"));
+		scope.append(new CGIAsm("cpse r16,c0xff"));	//не декременируем, если максимальное значение(вынужденная мера - блокировка, объект никогда не будет уничтожен)
+		scope.append(new CGIAsm("dec r16"));
+		scope.append(new CGIAsm("std y,r16"));
+		scope.append(new CGIAsm("pop_y"));
+		scope.append(new CGIAsm("pop r16"));
+	}
+	
 	
 /*	@Override
 	public void setValueByIndex(Operand op, int size, List<Byte> tempRegs) throws Exception {
@@ -1018,13 +1075,13 @@ public class Generator extends CodeGenerator {
 	
 	@Override
 	public boolean emitInstanceof(long resId, int typeId) {
-		System.out.println("CG: emitInstanceOf, op:" + resId + ", typeId:" + typeId);
+		//System.out.println("CG: emitInstanceOf, op:" + resId + ", typeId:" + typeId);
 		return false;//TODO new Operand(VarType.BOOL, OperandType.LITERAL, true);
 	}
 	
 	@Override
 	public void eIf(CGBlockScope condBlockScope, CGBlockScope thenBlockScope, CGBlockScope elseBlockScope) {
-		System.out.println("CG: if, condBlockId:" + condBlockScope + ", thenBlockId:" + thenBlockScope + ", elseBlockId:" + elseBlockScope);
+		//System.out.println("CG: if, condBlockId:" + condBlockScope + ", thenBlockId:" + thenBlockScope + ", elseBlockId:" + elseBlockScope);
 		
 		CGLabelScope beginLbScope = makeLabel(null, "if_begin", true);
 		CGLabelScope thenLbScope = makeLabel(null, "if_then", true);

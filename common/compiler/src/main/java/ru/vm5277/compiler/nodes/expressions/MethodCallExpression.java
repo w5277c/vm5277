@@ -388,6 +388,16 @@ public class MethodCallExpression extends ExpressionNode {
 			int refTypeSize = 1; // TODO Определить значение на базе количества используемых типов класса
 			int stackOffset = 0;
 
+			if(className instanceof VarFieldExpression) {
+				CGCellsScope cScope = (CGCellsScope)((VarFieldExpression)className).getSymbol().getCGScope();
+				if(cScope instanceof CGVarScope) {
+					cg.cellsToRet(cgScope, ((CGVarScope)cScope).getStackOffset(), cScope.getCells());
+				}
+				else {
+					cg.cellsToRet(cgScope, 0, cScope.getCells());
+				}
+			}
+			
 			if(!args.isEmpty()) {
 				CGScope oldCGScope = cg.setScope(symbol.getCGScope());
 				

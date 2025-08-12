@@ -153,9 +153,9 @@ public class ClassNode extends AstNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		int[] interfaceIds = null;
+		VarType[] interfaceTypes = null;
 		if(!interfaces.isEmpty()) {
-			interfaceIds = new int[interfaces.size()];
+			interfaceTypes = new VarType[interfaces.size()];
 			for(int i=0; i<interfaces.size(); i++) {
 				VarType iType = VarType.fromClassName(interfaces.get(i));
 				if(null == iType) {
@@ -163,11 +163,11 @@ public class ClassNode extends AstNode {
 					if(null != cg) cg.leaveClass();
 					return false;
 				}
-				interfaceIds[i] = iType.getId();
+				interfaceTypes[i] = iType;
 			}
 		}
 
-		cgScope = cg.enterClass(VarType.fromClassName(name), interfaceIds, name, null == parentClassName);
+		cgScope = cg.enterClass(VarType.fromClassName(name), interfaceTypes, name, null == parentClassName);
 
 		for (String interfaceName : interfaces) {
 			// Проверяем существование интерфейса

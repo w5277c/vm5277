@@ -26,16 +26,16 @@ import ru.vm5277.common.exceptions.CompileException;
 
 public class CGClassScope extends CGScope {
 	private	final	VarType						type;
-	private	final	int[]						intrerfaceIds;
+	private	final	VarType[]					intrerfaceTypes;
 	private	final	Map<Integer, CGFieldScope>	fields			= new HashMap<>();
 	private			int							heapOffset		= 0;
 	private	final	boolean						isImported;
 	
-	public CGClassScope(CGScope parent, int id, VarType type, int[] intrerfaceIds, String name, boolean isRoot) {
+	public CGClassScope(CGScope parent, int id, VarType type, VarType[] intrerfaceTypes, String name, boolean isRoot) {
 		super(parent, id, name);
 		
 		this.type = type;
-		this.intrerfaceIds = intrerfaceIds;
+		this.intrerfaceTypes = intrerfaceTypes;
 		this.isImported = isRoot;
 	}
 
@@ -72,6 +72,14 @@ public class CGClassScope extends CGScope {
 	@Override
 	public String getLName() {
 		return "C" + name;
+	}
+	
+	public VarType[] getInterfaceTypes() {
+		return intrerfaceTypes;
+	}
+	
+	public VarType getType() {
+		return type;
 	}
 	
 	@Override

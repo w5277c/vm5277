@@ -62,8 +62,8 @@ public abstract class CodeGenerator extends CGScope {
 		this.params = params;
 	}
 	
-	public CGClassScope enterClass(VarType type, int[] intrerfaceIds, String name, boolean isRoot) {
-		scope = new CGClassScope(scope, genId(), type, intrerfaceIds, name, null != scope && isRoot);
+	public CGClassScope enterClass(VarType type, VarType[] intrerfaceTypes, String name, boolean isRoot) {
+		scope = new CGClassScope(scope, genId(), type, intrerfaceTypes, name, null != scope && isRoot);
 		return (CGClassScope)scope;
 	}
 	public void leaveClass() {
@@ -206,6 +206,7 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract void cellsToAcc(CGScope scope, CGCellsScope cScope) throws CompileException;
 	public abstract void accToCells(CGScope scope, CGCellsScope cScope) throws CompileException;
 	public abstract void retToCells(CGScope scope, CGCellsScope cScope) throws CompileException;
+	public abstract void cellsToRet(CGScope scope, long stackOffset, CGCell[] cells) throws CompileException;
 	public abstract void constToAcc(CGScope scope, int size, long value);
 	public abstract void constToCells(CGScope scope, long stackOffset, long value, CGCell[] cells) throws CompileException;
 	public abstract void cellsAction(CGScope scope, long stackOffset, CGCell[] cells, Operator op) throws CompileException;
@@ -216,6 +217,10 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract	void popAcc(CGScope scope, int size);
 	public abstract	void popRet(CGScope scope, int size);
 	//public abstract void pushRef(CGScope scope, String label);
+	public abstract void refCountInc(CGScope scope, long stackOffset, CGCell[] cells) throws CompileException;
+	public abstract void refCountDec(CGScope scope, long stackOffset, CGCell[] cells) throws CompileException;
+
+	
 	public abstract void invokeMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, CGMethodScope mScope)
 																																	throws CompileException;
 	public abstract void invokeNative(CGScope scope, String className, String methodName, String params, VarType type, Operand[] operands)
@@ -224,7 +229,7 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract void emitUnary(Operator op, Integer resId) throws CompileException;
 	
 	//TODO набор методов для реализации команд if, switch, for, loop и .т.д
-	public abstract void eNew(CGScope scope, VarType type, int size, boolean canThrow);
+	public abstract void eNew(CGScope scope, int size, List<VarType> classTypes, boolean canThrow) throws CompileException;
 	public abstract void eFree(Operand op);
 	public abstract void eIf(CGBlockScope conditionBlock, CGBlockScope thenBlock, CGBlockScope elseBlock);
 	public abstract void eTry(CGBlockScope blockScope, List<Case> cases, CGBlockScope defaultBlockScope);

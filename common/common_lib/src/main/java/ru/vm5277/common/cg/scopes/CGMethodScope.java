@@ -81,9 +81,9 @@ public class CGMethodScope extends CGBlockScope {
 		return null;
 	}
 
-	public int getSize() {
-		//TODO заглушка
-		return 0x08;
+	public int getFiledsSize() {
+		//TODO
+		return 0;
 	}
 	
 	@Override

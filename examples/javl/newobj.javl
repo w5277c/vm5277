@@ -34,6 +34,9 @@ class Main {
 		public byte toByte() {
 			return value;
 		}
+
+		public void finalize() {
+		}
 	}
 
 
@@ -46,5 +49,7 @@ class Main {
 		private Byte b = new Byte(0x01);
 
 		System.out(b.toByte());
+		//b = null;
+
     }
 }

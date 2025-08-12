@@ -15,10 +15,11 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
+import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGMethodScope;
-import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -33,15 +34,24 @@ public class NewExpression extends MethodCallExpression {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg) throws Exception {
-		// TODO выделить память для хранения инстанса класса, передать его ссылку аналогично параметру
-		// scope.build
 		CGMethodScope mScope = (CGMethodScope)((MethodSymbol)symbol).getCGScope();
-		cg.eNew(cgScope, type, mScope.getSize(), false); // TODO canThrow
-		super.codeGen(cg);
+		CGClassScope cScope = (CGClassScope)mScope.getParent();
+		ArrayList<VarType> classTypes = new ArrayList<>();
+		classTypes.add(cScope.getType());
+		if(null != cScope.getInterfaceTypes()) {
+			for(VarType classType : cScope.getInterfaceTypes()) {
+				classTypes.add(classType);
+			}
+		}
 		
-
-		// TODO вернуть ссылку на созданный инстанс(поместить в аккумулятор)
+		int size = 0x02 + 0x01 + 0x01 + classTypes.size() + mScope.getFiledsSize(); //size + refCount + classTypesQnt + classTypes + flieldsBlock
+		cg.eNew(cgScope, size, classTypes, false); // TODO canThrow
 		return true;
+	}
+	
+	public Object codeGenPart2(CodeGenerator cg) throws Exception {
+		super.codeGen(cg);
+		return null;
 	}
 	
 	@Override

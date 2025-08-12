@@ -216,14 +216,22 @@ public class VarNode extends AstNode {
 			}
 			else if(initializer instanceof NewExpression) {
 				initializer.codeGen(cg);
-				accUsed = true;
+				cg.accToCells(initializer.getCGScope(), vScope);
+				cg.refCountInc(initializer.getCGScope(), vScope.getStackOffset(), vScope.getCells());
+				((NewExpression)initializer).codeGenPart2(cg);
 			}
 			else if(initializer instanceof MethodCallExpression) {
 				initializer.codeGen(cg);
+				if(VarType.CLASS == vScope.getType()) {
+					cg.refCountInc(cg.getScope(), vScope.getStackOffset(), vScope.getCells());
+				}
 				cg.retToCells(cg.getScope(), vScope);
 			}
 			else {
 				initializer.codeGen(cg);
+				if(VarType.CLASS == vScope.getType()) {
+					cg.refCountInc(cg.getScope(), vScope.getStackOffset(), vScope.getCells());
+				}
 				cg.accToCells(cg.getScope(), vScope);
 				accUsed = true;
 			}
