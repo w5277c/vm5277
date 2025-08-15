@@ -28,9 +28,9 @@
 ;Черновой набросок, выполнена базовая проверка
 ;TODO добавить директивы исключения кода блоков, если блок нулевой длины
 
-.include "math/divz8.asm"
-.include "math/mulz8.asm"
-.include "math/divacc168.asm"
+.include "math/divz16by8.asm"
+.include "math/mulz16by8.asm"
+.include "math/diva16by8.asm"
 .include "conv/bit_to_mask.asm"
 
 .IFNDEF OS_DRAM
@@ -161,7 +161,7 @@ _OS_DRAM_ALLOC_8B:
 	LDI RESULT,OSR_ALLOC_FAIL
 	RET
 	MOV YL,ACCUM_L
-	MCALL OS_ACC168
+	MCALL OS_DIVA16BY8
 	ANDI YL,0b00000111
 	BREQ PC+0x03
 	ADD ACCUM_L,C0x01
@@ -171,7 +171,7 @@ _OS_DRAM_ALLOC_8B:
 	CPI RESULT,OSR_OK
 	BREQ PC+0x02
 	RET
-	MCALL OS_MULZ8
+	MCALL OS_MULZ16BY8
 	LDI TEMP_L,low(OS_DRAM_8B)
 	ADD ZL,TEMP_L
 	LDI TEMP_L,high(OS_DRAM_8B)
@@ -194,22 +194,22 @@ OS_DRAM_FREE:												;TODO
 	PUSH TEMP_H
 
 	CPI ZH,high(OS_DRAM_2B)
-	BRCS OS_DRAM_FREE__1B
-	BRNE OS_DRAM_FREE__CHECK2B
+	BRCS _OS_DRAM_FREE__1B
+	BRNE _OS_DRAM_FREE__CHECK2B
 	CPI ZL,low(OS_DRAM_2B)
-	BRCC OS_DRAM_FREE__CHECK2B
-OS_DRAM_FREE__1B:
+	BRCC _OS_DRAM_FREE__CHECK2B
+_OS_DRAM_FREE__1B:
 	LDI_Y OS_DRAM_BMASK_1B
 	SUBI ZL,low(OS_DRAM_1B)
 	SBCI ZH,high(OS_DRAM_1B)
 	RJMP _OS_DRAM_FREE_CELLS
-OS_DRAM_FREE__CHECK2B:
+_OS_DRAM_FREE__CHECK2B:
 	CPI ZH,high(OS_DRAM_8B)
-	BRCS OS_DRAM_FREE__2B
-	BRNE OS_DRAM_FREE__8B
+	BRCS _OS_DRAM_FREE__2B
+	BRNE _OS_DRAM_FREE__8B
 	CPI ZL,low(OS_DRAM_8B)
-	BRCC OS_DRAM_FREE__8B
-OS_DRAM_FREE__2B:
+	BRCC _OS_DRAM_FREE__8B
+_OS_DRAM_FREE__2B:
 	LDI_Y OS_DRAM_BMASK_2B
 	SUBI ZL,low(OS_DRAM_2B)
 	SBCI ZH,high(OS_DRAM_2B)
@@ -222,17 +222,17 @@ OS_DRAM_FREE__2B:
 	ADC ACCUM_L,C0x00
 	ADC ACCUM_H,C0x00
 	RJMP _OS_DRAM_FREE_CELLS
-OS_DRAM_FREE__8B:
+_OS_DRAM_FREE__8B:
 	LDI_Y OS_DRAM_BMASK_8B
 	SUBI ZL,low(OS_DRAM_8B)
 	SBCI ZH,high(OS_DRAM_8B)
 	MOV RESULT,ZL
-	MCALL OS_DIVZ8
+	MCALL OS_DIVZ16BY8
 	ANDI RESULT,0x07
 	BREQ PC+0x02
 	ADIW Z,0x01
 	MOV RESULT,ACCUM_L
-	MCALL OS_ACC168
+	MCALL OS_DIVA16BY8
 	ANDI RESULT,0x07
 	SUBI RESULT,0x01
 	ADC ACCUM_L,C0x00
@@ -240,7 +240,7 @@ OS_DRAM_FREE__8B:
 _OS_DRAM_FREE_CELLS:
 	MOV ACCUM_EH,ZL
 	ANDI ACCUM_EH,0x07
-	MCALL OS_DIVZ8
+	MCALL OS_DIVZ16BY8
 	ADD YL,ZL
 	ADC YH,ZH
 	LDI ACCUM_EL,0x00
@@ -376,7 +376,7 @@ _OS_DRAM_FILL_CELLS__BITOFFSET_LOOP_DONE:
 
 	;Теперь смещение в битах всегда 0
 	MOV TEMP_H,ACCUM_L										;Сохраняю малдший байт для определения кол-ва бит в последнем байте
-	MCALL OS_ACC168											;Получаю количество полностью заполненных байт
+	MCALL OS_DIVA16BY8										;Получаю количество полностью заполненных байт
 	BREQ _OS_DRAM_FILL_CELLS__FILLBYTES_DONE
 _OS_DRAM_FILL_CELLS__FILLBYTES_LOOP:
 	MCALL _OS_DRAM_BYTE_UPDATE								;Обновляем последующий байт

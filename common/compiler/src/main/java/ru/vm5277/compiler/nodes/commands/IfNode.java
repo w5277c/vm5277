@@ -233,46 +233,46 @@ public class IfNode extends CommandNode {
 		cgDone = true;
 
 		if(alwaysTrue) {
-			cg.enterBlock();
+			cg.enterBlock(cg.getScope());
 			getThenBlock().codeGen(cg);
 			cg.leaveBlock();
 			return null;
 		}
 		if(alwaysFalse()) {
 			if (getElseBlock() != null) {
-				cg.enterBlock();
+				cg.enterBlock(cg.getScope());
 				getElseBlock().codeGen(cg);
 				cg.leaveBlock();
 			}
 			return null;
 		}
 		
-		CGBlockScope condBlockScope = cg.enterBlock();
+		CGBlockScope condBlockScope = cg.enterBlock(cg.getScope());
 		Object obj = condition.codeGen(cg);
 		cg.leaveBlock();
 		
 		//Если результат стал известен без кодогенерации
 		if(obj instanceof Boolean) {
 			if(((Boolean)obj)) {
-				cg.enterBlock();
+				cg.enterBlock(cg.getScope());
 				getThenBlock().codeGen(cg);
 				cg.leaveBlock();
 			}
 			else if(getElseBlock() != null) {
-				cg.enterBlock();
+				cg.enterBlock(cg.getScope());
 				getElseBlock().codeGen(cg);
 				cg.leaveBlock();
 			}
 			return null;
 		}
 		
-		CGBlockScope thenBlockScope = cg.enterBlock();
+		CGBlockScope thenBlockScope = cg.enterBlock(cg.getScope());
 		getThenBlock().codeGen(cg);
 		cg.leaveBlock();
 
 		CGBlockScope elseBlockScope = null;
 		if(null != getElseBlock()) {
-			elseBlockScope = cg.enterBlock();
+			elseBlockScope = cg.enterBlock(cg.getScope());
 			getElseBlock().codeGen(cg);
 			cg.leaveBlock();
 		}

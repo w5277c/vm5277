@@ -17,8 +17,7 @@ package ru.vm5277.common.cg.scopes;
 
 import java.util.HashMap;
 import java.util.Map;
-import ru.vm5277.common.StrUtils;
-import ru.vm5277.common.cg.CGCell;
+import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.compiler.VarType;
@@ -28,31 +27,32 @@ public class CGClassScope extends CGScope {
 	private	final	VarType						type;
 	private	final	VarType[]					intrerfaceTypes;
 	private	final	Map<Integer, CGFieldScope>	fields			= new HashMap<>();
-	private			int							heapOffset		= 0;
+	private			int							filedsOffset	= 0;
 	private	final	boolean						isImported;
+	private			int							heapHeaderSize;
 	
-	public CGClassScope(CGScope parent, int id, VarType type, VarType[] intrerfaceTypes, String name, boolean isRoot) {
+	public CGClassScope(CGScope parent, int id, VarType type, VarType[] interfaceTypes, String name, boolean isRoot) {
 		super(parent, id, name);
 		
 		this.type = type;
-		this.intrerfaceTypes = intrerfaceTypes;
+		this.intrerfaceTypes = interfaceTypes;
 		this.isImported = isRoot;
+		
+		heapHeaderSize = 0x02 + 0x01 + 0x01 + ((null == intrerfaceTypes ? 0x00 : interfaceTypes.length) + 0x01);
 	}
 
 	public void addField(CGFieldScope field) {
 		fields.put(field.getResId(), field);
 	}
 
-	public CGCell[] memAllocate(int size, boolean isStatic) {
-		CGCell[] cells = new CGCell[size];
-		for(int i=0; i<size; i++) {
-			if(isStatic) {
-				cells[i] = new CGCell(CGCell.Type.STAT, statOffset++);
-			}
-			else {
-				cells[i] = new CGCell(CGCell.Type.HEAP, heapOffset++);
-			}
+	public CGCells memAllocate(int size, boolean isStatic) {
+		if(isStatic) {
+			CGCells cells = new CGCells(CGCells.Type.STAT, size, statOffset);
+			statOffset+=size;
+			return cells;
 		}
+		CGCells cells = new CGCells(CGCells.Type.HEAP, size, filedsOffset);
+		filedsOffset+=size;
 		return cells;
 	}
 	
@@ -62,7 +62,7 @@ public class CGClassScope extends CGScope {
 	}
 	
 	public int getHeapOffset() {
-		return heapOffset;
+		return filedsOffset;
 	}
 	
 	public boolean isImported() {
@@ -80,6 +80,11 @@ public class CGClassScope extends CGScope {
 	
 	public VarType getType() {
 		return type;
+	}
+	
+	//TODO предоставлять в CGFieldScope
+	public int getHeapHeaderSize() {
+		return heapHeaderSize;
 	}
 	
 	@Override

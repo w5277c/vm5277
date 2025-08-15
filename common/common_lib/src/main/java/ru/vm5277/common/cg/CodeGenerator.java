@@ -97,7 +97,7 @@ public abstract class CodeGenerator extends CGScope {
 		scope = scope.free();
 	}
 
-	public CGBlockScope enterBlock() {
+	public CGBlockScope enterBlock(CGScope parent) {
 		scope = new CGBlockScope(scope, genId());
 		return (CGBlockScope)scope;
 	}
@@ -202,24 +202,23 @@ public abstract class CodeGenerator extends CGScope {
 	}
 
 	public abstract void accCast(CGScope scope, VarType type) throws CompileException;
-	public abstract void accToRet(CGScope cope);
 	public abstract void cellsToAcc(CGScope scope, CGCellsScope cScope) throws CompileException;
 	public abstract void accToCells(CGScope scope, CGCellsScope cScope) throws CompileException;
 	public abstract void retToCells(CGScope scope, CGCellsScope cScope) throws CompileException;
-	public abstract void cellsToRet(CGScope scope, long stackOffset, CGCell[] cells) throws CompileException;
+	public abstract void setHeapReg(CGScope scope, int offset, CGCells cells) throws CompileException;
 	public abstract void constToAcc(CGScope scope, int size, long value);
-	public abstract void constToCells(CGScope scope, long stackOffset, long value, CGCell[] cells) throws CompileException;
-	public abstract void cellsAction(CGScope scope, long stackOffset, CGCell[] cells, Operator op) throws CompileException;
+	public abstract void constToCells(CGScope scope, int offset, long value, CGCells cells) throws CompileException;
+	public abstract void cellsAction(CGScope scope, int offset, CGCells cells, Operator op) throws CompileException;
 	public abstract void constAction(CGScope scope, Operator op, long k) throws CompileException;
 	public abstract void loadRegsConst(CGScope scope, byte[] regs, long value);
 	public abstract void constLoadRegs(String label, byte[] registers);
 	public abstract	void pushAcc(CGScope scope, int size);
-	public abstract	void popAcc(CGScope scope, int size);
 	public abstract	void popRet(CGScope scope, int size);
+	public abstract	int pushStackReg(CGScope scope);
+	public abstract	void popStackReg(CGScope scope);
+	public abstract void stackToStackReg(CGScope scope);
 	//public abstract void pushRef(CGScope scope, String label);
-	public abstract void refCountInc(CGScope scope, long stackOffset, CGCell[] cells) throws CompileException;
-	public abstract void refCountDec(CGScope scope, long stackOffset, CGCell[] cells) throws CompileException;
-
+	public abstract void updateRefCount(CGScope scope, int offset, CGCells cells, boolean isInc) throws CompileException;
 	
 	public abstract void invokeMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, CGMethodScope mScope)
 																																	throws CompileException;
@@ -238,17 +237,14 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract void eThrow();
 	
 	public abstract int getRefSize();
+	public abstract int getCallSize();
 	public abstract ArrayList<RegPair> buildRegsPool();
-	public abstract CGItem pushRegAsm(int reg);
-	public abstract CGItem popRegAsm(int reg);
-	public abstract CGCell[] getRetCells(int size);
+	public abstract CGCells getRetCells(int size);
 	public abstract void pushConst(CGScope scope, int size, long value);
-	public abstract void pushCells(CGScope scope, int size, CGCell[] cells);
-	public abstract void popCells(CGScope scope, int size, CGCell[] cells);
+	public abstract void pushCells(CGScope scope, int offset, int size, CGCells cells) throws CompileException;
 //	public abstract void setValueByIndex(Operand op, int size, List<Byte> tempRegs) throws CompileException;
-	public abstract CGItem stackAllocAsm(int size);
-	public abstract CGItem stackFreeAsm();
-	public abstract void stackFree(CGScope scope, int size);
+	public abstract CGItem stackAlloc(CGScope scope, int size, boolean modifyIreg);
+	public abstract CGItem stackFree(CGScope scope, int size, boolean modifyIreg);
 	public abstract String getVersion();
 
 	protected long getNum(Operand op) throws CompileException {
@@ -351,18 +347,6 @@ public abstract class CodeGenerator extends CGScope {
 		CGScope old = this.scope;
 		this.scope = scope;
 		return old;
-	}
-	
-	public static String cellsToStr(CGCell[] cells) {
-		StringBuilder sb = new StringBuilder("[");
-		for(int i=0; i<cells.length; i++) {
-			sb.append(cells[i].toString());
-			if(i != cells.length-1) {
-				sb.append(",");
-			}
-		}
-		sb.append("]");
-		return sb.toString();
 	}
 	
 	public void addLabel(CGLabelScope lbScope) {

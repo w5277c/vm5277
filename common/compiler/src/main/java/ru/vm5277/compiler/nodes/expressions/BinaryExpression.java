@@ -22,6 +22,8 @@ import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
+import ru.vm5277.common.cg.scopes.CGClassScope;
+import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.VarType;
@@ -291,7 +293,12 @@ public class BinaryExpression extends ExpressionNode {
 			}
 			CGCellsScope cScope = (CGCellsScope)expr1.getSymbol().getCGScope();
 			if(null != op) {
-				cg.cellsAction(cgScope, (cScope instanceof CGVarScope ? ((CGVarScope)cScope).getStackOffset() : 0), cScope.getCells(), op);
+				if(cScope instanceof CGVarScope) {
+					cg.cellsAction(cgScope, ((CGVarScope)cScope).getStackOffset(), cScope.getCells(), op);
+				}
+				else {
+					cg.cellsAction(cgScope, ((CGClassScope)((CGFieldScope)cScope).getParent()).getHeapHeaderSize(), cScope.getCells(), op);
+				}
 			}
 			if(operator.isAssignment()) {
 				cg.accToCells(cgScope, cScope);
@@ -310,7 +317,15 @@ public class BinaryExpression extends ExpressionNode {
 			if(operator.isAssignment()) {
 				CGCellsScope cScope = (CGCellsScope)expr1.getSymbol().getCGScope();
 				if(Operator.ASSIGN == operator) {
-					cg.constToCells(cgScope, 0, ((LiteralExpression)expr2).getNumValue(), cScope.getCells());
+					if(cScope instanceof CGVarScope) {
+						CGVarScope vScope = (CGVarScope)cScope;
+						cg.constToCells(cgScope, vScope.getStackOffset(), ((LiteralExpression)expr2).getNumValue(), vScope.getCells());
+					}
+					else {
+						CGFieldScope fScope = (CGFieldScope)cScope;
+						cg.constToCells(cgScope, ((CGClassScope)fScope.getParent()).getHeapHeaderSize(), ((LiteralExpression)expr2).getNumValue(),
+										fScope.getCells());
+					}
 				}
 				else {
 					cg.accToCells(cgScope, cScope);

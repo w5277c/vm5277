@@ -15,53 +15,58 @@
  */
 
 .include "stdio/out_char.asm"
-.include "math/diva8by10.asm"
-.include "math/mula8by10.asm"
+.include "math/div32.asm"
 
-.IFNDEF OS_OUT_NUM8
+.IFNDEF OS_OUT_NUM32
 ;-----------------------------------------------------------
-OS_OUT_NUM8:
+OS_OUT_NUM32:
 ;-----------------------------------------------------------
-;Вывод в десятеричной форме числа(8 бит)
-;IN: ACCUM_L-8b число
+;Вывод в десятеричной форме числа(32 бит)
+;IN: ACCUM_L/H/EL/EH-32b число
 ;-----------------------------------------------------------
+	PUSH ACCUM_L
+	PUSH ACCUM_H
+	PUSH ACCUM_EL
+	PUSH ACCUM_EH
 	PUSH TEMP_L
 	PUSH TEMP_H
-	PUSH ACCUM_H
-	PUSH ACCUM_L
+	PUSH TEMP_EL
+	PUSH TEMP_EH
+	PUSH XL
 
 	CLR TEMP_H
-	LDI TEMP_L,0x03
-_OS_OUT_NUM8__LOOP:
-	MOV ACCUM_H,ACCUM_L
-	MCALL OS_DIVA8BY10
+	CLR TEMP_EL
+	CLR TEMP_EH
+	LDI XL,0x09
+_OS_OUT_NUM32__LOOP1:
+	LDI TEMP_L,0x0a
+	MCALL OS_DIV32
+	PUSH TEMP_L
+	DEC XL
+	BRNE _OS_OUT_NUM32__LOOP1
 	PUSH ACCUM_L
-	MCALL OS_MULA8BY10
-	SUB ACCUM_H,ACCUM_L
-	POP ACCUM_L
 
-	BRNE PC+0x02
-	INC TEMP_H
-	CPSE TEMP_H,C0x00
-	PUSH ACCUM_H
-	DEC TEMP_L
-	BRNE _OS_OUT_NUM8__LOOP
-
-	CPI TEMP_H,0x00
-	BRNE _OS_OUT_NUM8__NOT_ZERO
-	LDI TEMP_H,0x01
-	PUSH C0x00
-_OS_OUT_NUM8__NOT_ZERO:
+	CLR TEMP_EL
+	LDI TEMP_EH,0x0a
+_OS_OUT_NUM32__LOOP2:
 	POP ACCUM_L
-	SUBI ACCUM_L,(0x100-0x30)
+	CPI TEMP_EH,0x01
+	BREQ PC+0x03
+	OR TEMP_EL,ACCUM_L
+	BREQ PC+0x02+_MCALL_SIZE
+	SUBI ACCUM_L,low(0x100-0x30)
 	MCALL OS_OUT_CHAR
-	DEC TEMP_H
-	BRNE _OS_OUT_NUM8__NOT_ZERO
+	DEC TEMP_EH
+	BRNE _OS_OUT_NUM32__LOOP2
 
-_OS_OUT_NUM8__END:
-	POP ACCUM_L
-	POP ACCUM_H
-	POP TEMP_L
+	POP XL
+	POP TEMP_EH
+	POP TEMP_EL
 	POP TEMP_H
+	POP TEMP_L
+	POP ACCUM_EH
+	POP ACCUM_EL
+	POP ACCUM_H
+	POP ACCUM_L
 	RET
 .ENDIF

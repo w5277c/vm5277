@@ -17,21 +17,9 @@ package ru.vm5277.common.cg.items;
 
 public class CGIAsm implements CGItem {
 	private	String	text;
-	private	int		wSize;
-	
 	
 	public CGIAsm(String text) {
-		wSize = 0x01;
 		this.text = text;
-	}
-
-	public CGIAsm(String text, int wSize) {
-		this.text = text;
-		this.wSize = wSize;
-	}
-	
-	public int getWSize() {
-		return wSize;
 	}
 
 	public String getText() {

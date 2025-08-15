@@ -217,13 +217,13 @@ public class TryNode extends CommandNode {
 		if(cgDone) return null;
 		cgDone = true;
 
-		CGBlockScope blockScope = cg.enterBlock();
+		CGBlockScope blockScope = cg.enterBlock(cg.getScope());
 		tryBlock.codeGen(cg);
 		cg.leaveBlock();
 		
 		List<Case> cases = new ArrayList<>();
 		for(AstCase astCase : catchCases) {
-			CGBlockScope caseBlockScope = cg.enterBlock();
+			CGBlockScope caseBlockScope = cg.enterBlock(cg.getScope());
 			astCase.getBlock().codeGen(cg);
 			cg.leaveBlock();
 			cases.add(new Case(astCase.getFrom(), astCase.getTo(), caseBlockScope));
@@ -231,7 +231,7 @@ public class TryNode extends CommandNode {
 			
 		CGBlockScope defaultBlockScope = null;
 		if(null != catchDefaultBlock) {
-			defaultBlockScope = cg.enterBlock();
+			defaultBlockScope = cg.enterBlock(cg.getScope());
 			catchDefaultBlock.codeGen(cg);
 			cg.leaveBlock();
 		}

@@ -34,6 +34,14 @@ public class StrUtils {
 		return "";
 	}
 	
+	public static String toString(int[] array) {
+		if(null != array && 0!=array.length) {
+			String result = Arrays.toString(array);
+			return result.substring(1, result.length()-1).replaceAll(",", "");
+		}
+		return "";
+	}
+
 	public static String escapeChar(char c) {
 		switch (c) {
 			case '\n': return "\\n";

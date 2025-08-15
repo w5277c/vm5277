@@ -13,16 +13,44 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-.IFNDEF OS_RAM_FILL_NR
+
+.IFNDEF OS_DIV16
 ;-----------------------------------------------------------
-OS_RAM_FILL_NR:
+OS_DIV16:
 ;-----------------------------------------------------------
-;Заполнение блока памяти значением							;NR-NO_RESTORE - не восстанавливает IN регистры.
-;IN: X-адрес, ACCUM_L-значение, Y-длина
+;Деление 16b числа на 16бит число
+;IN: ACCUM_L/H-16b делимое, TEMP_L/H-16b делитель
+;OUT: ACCUM_L/H-16b результат, TEMP_L/H-16b остаток
 ;-----------------------------------------------------------
-_OS_RAM_FILL_NR__LOOP:
-	ST X+,ACCUM_L
-	SBIW YL,0x01
-	BRNE _OS_RAM_FILL_NR__LOOP
+	PUSH XL
+	PUSH XH
+	PUSH TEMP_EH
+
+	LDI TEMP_EH,0x11
+	SUB XH,XH
+	CLR XL
+
+_OS_DIV16__LOOP:
+	ROL ACCUM_L
+	ROL ACCUM_H
+	DEC TEMP_EH
+	BREQ _OS_DIV16__END
+	ROL XL
+	ROL XH
+	SUB XL,TEMP_L
+	SBC XH,TEMP_H
+	BRCS PC+0x03
+	SEC
+	RJMP _OS_DIV16__LOOP
+	ADD XL,TEMP_L
+	ADC XH,TEMP_H
+	CLC
+	RJMP _OS_DIV16__LOOP
+_OS_DIV16__END:
+	MOVW TEMP_L,XL
+
+	POP TEMP_EH
+	POP XH
+	POP XL
 	RET
 .ENDIF

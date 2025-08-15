@@ -241,7 +241,7 @@ public class BlockNode extends AstNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		cgScope = cg.enterBlock();
+		cgScope = cg.enterBlock(cg.getScope());
 		
 		boolean inTryBlock = false;
 		TryNode currentTryNode = null;
@@ -291,7 +291,6 @@ public class BlockNode extends AstNode {
 		if(cgDone) return null;
 		cgDone = true;
 		
-		cgScope.build(cg);
 		
 		for(AstNode node : children) {
 			//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
@@ -300,6 +299,7 @@ public class BlockNode extends AstNode {
 			}
 		}
 		
+		cgScope.build(cg);
 		cgScope.restoreRegsPool();
 		
 		return null;

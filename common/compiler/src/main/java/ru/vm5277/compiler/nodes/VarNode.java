@@ -217,20 +217,20 @@ public class VarNode extends AstNode {
 			else if(initializer instanceof NewExpression) {
 				initializer.codeGen(cg);
 				cg.accToCells(initializer.getCGScope(), vScope);
-				cg.refCountInc(initializer.getCGScope(), vScope.getStackOffset(), vScope.getCells());
+				cg.updateRefCount(initializer.getCGScope(), vScope.getStackOffset(), vScope.getCells(), true);
 				((NewExpression)initializer).codeGenPart2(cg);
 			}
 			else if(initializer instanceof MethodCallExpression) {
 				initializer.codeGen(cg);
 				if(VarType.CLASS == vScope.getType()) {
-					cg.refCountInc(cg.getScope(), vScope.getStackOffset(), vScope.getCells());
+					cg.updateRefCount(cg.getScope(), vScope.getStackOffset(), vScope.getCells(), true);
 				}
 				cg.retToCells(cg.getScope(), vScope);
 			}
 			else {
 				initializer.codeGen(cg);
 				if(VarType.CLASS == vScope.getType()) {
-					cg.refCountInc(cg.getScope(), vScope.getStackOffset(), vScope.getCells());
+					cg.updateRefCount(cg.getScope(), vScope.getStackOffset(), vScope.getCells(), true);
 				}
 				cg.accToCells(cg.getScope(), vScope);
 				accUsed = true;

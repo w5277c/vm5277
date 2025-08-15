@@ -14,22 +14,19 @@
  * limitations under the License.
  */
 
-.IFNDEF OS_MUL10
-;--------------------------------------------------------;
-OS_MUL10:
+.IFNDEF OS_DIVA16BY8
 ;--------------------------------------------------------
-;Умножение 8бит числа на 8бит число(быстрее чем OS_MUL8X8)
-;IN: ACCUM_L-число
-;OUT: ACCUM_L
+OS_DIVA16BY8:
 ;--------------------------------------------------------
-	PUSH TEMP_L
-
-	LSL ACCUM_L
-	MOV TEMP_L,ACCUM_L
-	LSL ACCUM_L
-	LSL ACCUM_L
-	ADD ACCUM_L,TEMP_L
-
-	POP TEMP_L
+;Деление регистровой пары ACCUMH/L(16b) на 8
+;IN: ACCUM_H/L
+;OUT: ACCUM_H/L
+;--------------------------------------------------------
+	LSR ACCUM_H
+	ROR ACCUM_L
+	LSR ACCUM_H
+	ROR ACCUM_L
+	LSR ACCUM_H
+	ROR ACCUM_L
 	RET
 .ENDIF

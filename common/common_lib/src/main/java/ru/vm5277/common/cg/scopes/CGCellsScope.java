@@ -15,7 +15,7 @@
  */
 package ru.vm5277.common.cg.scopes;
 
-import ru.vm5277.common.cg.CGCell;
+import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.DataSymbol;
 import ru.vm5277.common.compiler.VarType;
 
@@ -31,7 +31,7 @@ public abstract class CGCellsScope extends CGScope {
 		this.size = size;
 	}
 	
-	public abstract CGCell[] getCells();
+	public abstract CGCells getCells();
 	
 	public void setDataSymbol(DataSymbol dataSymbol) {
 		this.dataSymbol = dataSymbol;

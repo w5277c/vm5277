@@ -15,15 +15,14 @@
  */
 package ru.vm5277.common.cg.scopes;
 
-import java.util.Arrays;
-import ru.vm5277.common.cg.CGCell;
+import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class CGFieldScope extends CGCellsScope {
-	private			boolean					isStatic;
-	private			CGCell[]				cells;
+	private			boolean		isStatic;
+	private			CGCells		cells;
 			
 	public CGFieldScope(CGClassScope cScope, int resId, VarType type, int size, boolean isStatic, String name) {
 		super(cScope, resId, type, size, name);
@@ -36,11 +35,11 @@ public class CGFieldScope extends CGCellsScope {
 		
 		cells = ((CGClassScope)parent).memAllocate(size, isStatic);
 		((CGClassScope)parent).addField(this);
-		if(VERBOSE_LO <= verbose) append(new CGIText(";alloc " + getPath('.') + " " + Arrays.toString(cells)));
+		if(VERBOSE_LO <= verbose) append(new CGIText(";alloc " + getPath('.') + " " + cells));
 	}
 	
 	@Override
-	public CGCell[] getCells() {
+	public CGCells getCells() {
 		return cells;
 	}
 	

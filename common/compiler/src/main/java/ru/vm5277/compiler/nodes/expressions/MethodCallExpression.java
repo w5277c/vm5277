@@ -20,11 +20,14 @@ package ru.vm5277.compiler.nodes.expressions;
 import java.util.Arrays;
 import java.util.List;
 import ru.vm5277.common.StrUtils;
-import ru.vm5277.common.cg.CGCell;
+import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.Operand;
 import ru.vm5277.common.cg.OperandType;
+import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
+import ru.vm5277.common.cg.scopes.CGClassScope;
+import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.cg.scopes.CGScope;
@@ -384,67 +387,51 @@ public class MethodCallExpression extends ExpressionNode {
 			cg.invokeNative(cgScope, classNameStr, symbol.getName(), (null == params ? null : Arrays.toString(params)), type, operands);
 		}
 		else {
-			CGLabelScope rpCGScope = null;
+//			CGLabelScope rpCGScope = null;
 			int refTypeSize = 1; // TODO Определить значение на базе количества используемых типов класса
-			int stackOffset = 0;
-
+//			int stackOffset = ((CGMethodScope)symbol.getCGScope()).getStackSize();
+			
 			if(className instanceof VarFieldExpression) {
 				CGCellsScope cScope = (CGCellsScope)((VarFieldExpression)className).getSymbol().getCGScope();
 				if(cScope instanceof CGVarScope) {
-					cg.cellsToRet(cgScope, ((CGVarScope)cScope).getStackOffset(), cScope.getCells());
+					cg.setHeapReg(cgScope, ((CGVarScope)cScope).getStackOffset(), cScope.getCells());
 				}
 				else {
-					cg.cellsToRet(cgScope, 0, cScope.getCells());
+					cg.setHeapReg(cgScope, ((CGClassScope)((CGFieldScope)cScope).getParent()).getHeapHeaderSize(), cScope.getCells());
 				}
 			}
+
+			int stackOffset = 0;
+/*			for(int i=0; i<argTypes.length; i++) {
+				if(-1 == argTypes[i].getSize()) argsSize += cg.getRefSize();
+				else argsSize += argTypes[i].getSize();
+			}
+*/				
+			//Необходимо выделить память в стеке для записи значений аргументов и для локальных переменных вызываемого метода.
+			//Функция возвращает в stackIReg адрес начала выделенного блока в стеке
+			//TODO в текущей реализации нет возможности получить размер блока для локальных переменных. Так как локальные переменные храняться
+			//в CGBlockScope метода, а не в самом методе
 			
+			//TODO много багов, сохранять в стек адрес возврата больше не нужно, запись аргументов через std Y+n, можно использовать zl для констант(с сохранением)
+			
+			//Две модели, либо копируем данные из констант и переменных
+			
+			//cg.stackAlloc(cgScope, argsSize, true);
 			if(!args.isEmpty()) {
+				cg.pushStackReg(cgScope);
+				
 				CGScope oldCGScope = cg.setScope(symbol.getCGScope());
 				
-				// !!! Ввожу четкое разделение примитивов и ссылочных типов.
-/*				// Сначала(для ссылочных параметров) нужно поместить в стек данные всех аргументов, размер которых больше refSize 
-				for(int i=0; i<args.size(); i++) {
-					// Получаем выражение передаваемое этому параметру
-					ExpressionNode argExpr = args.get(i);
-					// Выполняем зависимость
-					argExpr.depCodeGen(cg);
-					
-					Symbol paramSymbol = ((MethodSymbol)symbol).getParameters().get(i);
-					VarType paramVarType = paramSymbol.getType();
-					// Проверка на ссылочный параметр
-
-					if(paramVarType.isObject() || paramVarType.isReferenceType())	{
-						int exprTypeSize = argTypes[i].getSize();
-						if(-1 == exprTypeSize) exprTypeSize = cg.getRefSize();
-						// Проверяем, что размер занчения больше refSize
-						if(cg.getRefSize() < exprTypeSize) {
-							// Необходимо поместить данные в стек
-							if(argExpr instanceof LiteralExpression) {
-								cg.pushConst(cgScope, exprTypeSize, ((LiteralExpression)argExpr).getNumValue());
-							}
-							else if(argExpr instanceof VarFieldExpression) {
-								cg.pushCells(cgScope, exprTypeSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells());
-							}
-							else {
-								throw new CompileException("Unsupported expression:" + argExpr);
-							}
-							stackOffset += exprTypeSize;
-						}
-					}
-				}
-*/
 				// Помещаем в стек адрес возврата
-				rpCGScope = cg.makeLabel(cgScope.getMethodScope(), "RP", true);
-				cg.pushCells(cgScope, 2, new CGCell[]{new CGCell(rpCGScope.getLName())});
+//				rpCGScope = cg.makeLabel(cgScope.getMethodScope(), "RP", true);
+//				cg.pushCells(cgScope, 0, 2, new CGCell[]{new CGCell(rpCGScope.getLName())});
 
-				// Нет необходимости, адрес на this будем передавать в аккумуляторе
-				// Помещаем в стек адрес инстанса класса(this)
-				//if(this instanceof NewExpression) {
-				//	cg.pushAcc(cgScope, cg.getRefSize());
-				//}
-				
-				stackOffset = 0;
-				// Теперь создаем необходимые переменные и формируем стек вызываемого метода
+				// Теперь создаем необходимые переменные и формируем стек вызываемого метода constToCells и cellsToStack
+				// Или сохраняем в стек через push
+				// Проболема в том, чт окогда мы начинаем копировать Y уже находится на новом стеке
+				// Мы можем делать просто push, а затем просто менять Y не выполняя никакого выделения памяти!
+				//Цена этому ручное сохранение точки возврата
+				//Либо учитывать, что между параметрами и локальными переменными лежить адрес возврата!
 				for(int i=0; i<args.size(); i++) {
 					// Получаем параметр вызываемого метода
 					Symbol paramSymbol = ((MethodSymbol)symbol).getParameters().get(i);
@@ -472,43 +459,35 @@ public class MethodCallExpression extends ExpressionNode {
 						cg.leaveLocal();
 						vSymbol.setCGScope(dstVScope);
 
-/*						boolean isRef = paramVarType.isObject() || paramVarType.isReferenceType();
-						if(isRef)	{
-							// Если тип ожидаемого параметра Object(т.е. любой тип) или reference(класс, интерфес, массив),
-							// то сначала передаем ид типа
-							cg.pushConst(cgScope, refTypeSize, argTypes[i].getId());
+						if(argExpr instanceof LiteralExpression) {
+							//TODO этой функции нужен регистр для помещения в стек константы, где взять свободный регистр???
+							cg.pushConst(cgScope, exprTypeSize, ((LiteralExpression)argExpr).getNumValue());
+							//OPTIMIZE Для каждого выполнения будет сохранение и восстановление регистра для временного размещения константы
+							//cg.constToCells(cgScope, 0, ((LiteralExpression)argExpr).getNumValue(), dstVScope.getCells());
 						}
-*/
-//						// Если размер данных типа не более размера данных ссылки, то помещаем данные
-//						if(!isRef || cg.getRefSize() >= exprTypeSize) {
-							if(argExpr instanceof LiteralExpression) {
-								//cg.pushConst(cgScope, isRef ? cg.getRefSize() : exprTypeSize, ((LiteralExpression)argExpr).getNumValue());
-								cg.pushConst(cgScope, exprTypeSize, ((LiteralExpression)argExpr).getNumValue());
-							}
-							else if(argExpr instanceof VarFieldExpression) {
-								//cg.pushCells(cgScope, isRef ? cg.getRefSize() : exprTypeSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells());
-								cg.pushCells(cgScope, exprTypeSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells());
-							}
-							else {
-								throw new CompileException("Unsupported expression:" + argExpr);
-							}
-//						}
-//						else {
-//							// Размер больше. Данные ранее созранены в стек
-//							cg.pushConst(cgScope, cg.getRefSize(), stackOffset);
-//							stackOffset += exprTypeSize;
-//						}
+						else if(argExpr instanceof VarFieldExpression) {
+							cg.pushCells(cgScope, 0, exprTypeSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells());
+							//cg.cellsToStack(cgScope, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells(), stackOffset);
+						}
+						else {
+							throw new CompileException("Unsupported expression:" + argExpr);
+						}
+//						stackOffset+=exprTypeSize;
+						stackOffset+=exprTypeSize;
 					}
 				}
 				cg.setScope(oldCGScope);
 			}
+			cg.stackToStackReg(cgScope);
+			
 			depCodeGen(cg);
 			
 			CGMethodScope mScope = (CGMethodScope)symbol.getCGScope();
 			cg.invokeMethod(cgScope, classNameStr, symbol.getName(), type, argTypes, mScope);
-			if(null != rpCGScope) cgScope.append(rpCGScope);
-			if(0 != stackOffset) {
-				cg.stackFree(cgScope, stackOffset);
+//			if(null != rpCGScope) cgScope.append(rpCGScope);
+			if(0!=stackOffset) {
+				cg.stackFree(cgScope, stackOffset, false);
+				cg.popStackReg(cgScope);
 			}
 		}
 		

@@ -14,19 +14,24 @@
  * limitations under the License.
  */
 
-.IFNDEF OS_ACC168
+.include "math/mul8.asm"
+.IFNDEF OS_DIVA8BY10
 ;--------------------------------------------------------
-OS_ACC168:
+OS_DIVA8BY10:
 ;--------------------------------------------------------
-;Деление регистровой пары ACCUMH/L(16b) на 8
-;IN: ACCUM_H/L
-;OUT: ACCUM_H/L
+;Деление 8b числа на 10
+;IN: ACCUM_L-8b число
+;OUT: ACCUM_L-8b результат
 ;--------------------------------------------------------
-	LSR ACCUM_H
-	ROR ACCUM_L
-	LSR ACCUM_H
-	ROR ACCUM_L
-	LSR ACCUM_H
-	ROR ACCUM_L
+	PUSH ACCUM_H
+
+	LDI ACCUM_L,205													;204.8
+	MCALL OS_MUL8
+	MOV ACCUM_L,ACCUM_H
+	LSR ACCUM_L
+	LSR ACCUM_L
+	LSR ACCUM_L
+
+	POP ACCUM_H
 	RET
 .ENDIF

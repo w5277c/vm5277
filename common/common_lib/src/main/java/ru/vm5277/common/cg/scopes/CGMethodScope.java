@@ -16,8 +16,10 @@
 package ru.vm5277.common.cg.scopes;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 import ru.vm5277.common.StrUtils;
-import ru.vm5277.common.cg.CGCell;
+import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.RegPair;
 import ru.vm5277.common.cg.items.CGIContainer;
@@ -25,25 +27,30 @@ import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
-public class CGMethodScope extends CGBlockScope {
+// STACK(reg Y) - Необходимо выделять память в стеке для значений параметров, так-же сохранять старый Y и устанавливать новый на выделенный блок
+// при завершении необходимо восстанавливать Y
+
+public class CGMethodScope extends CGScope {
 	private	final	CGLabelScope				lbScope;
 	private	final	VarType						type;
 	private	final	VarType[]					types;
+	private	final	Map<Integer, CGVarScope>	args		= new HashMap<>();
+	private			int							stackOffset	= 0;
+	private			int							callSize;
 	private	final	ArrayList<RegPair>			regsPool;	// Свободные регистры, true = cвободен
 	
 	public CGMethodScope(CodeGenerator cg, CGClassScope parent, int resId, VarType type, VarType[] types, String name, ArrayList<RegPair> regsPool) {
-		super(parent, resId);
+		super(parent, resId, name);
 		
 		this.type = type;
 		this.types = types;
-		this.name = name;
 		this.regsPool = regsPool;
+		this.callSize = cg.getCallSize();
 		
 		lbScope = new CGLabelScope(this, null, null, true);
 		cg.addLabel(lbScope);
 	}
 	
-	@Override
 	public void build(CodeGenerator cg) throws CompileException {
 		CGIContainer cont = new CGIContainer();
 		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";build " + toString()));
@@ -54,20 +61,41 @@ public class CGMethodScope extends CGBlockScope {
 	}
 
 	//Выделение ячеек для переданных параметров (только стек)
-	public CGCell[] paramAllocate(int size) throws CompileException {
-		CGCell[] cells = new CGCell[size];
-		for(int i=0; i<size; i++) {
-			cells[i] = new CGCell(CGCell.Type.STACK, stackBlockOffset++);
-		}
+	public CGCells paramAllocate(int size) throws CompileException {
+		CGCells cells = new CGCells(CGCells.Type.STACK, size, stackOffset);
+		stackOffset+=size;
 		return cells;
 	}
+	
+	public void addArg(CGVarScope local) {
+		args.put(local.getResId(), local);
+	}
+	public CGVarScope getArg(int resId) {
+		return args.get(resId);
+	}
 
-	//TODO работает не корректно(не переиспользует регистры в вызванном методе)
-	public RegPair borrowReg() {
+	/**
+	 * borrowReg занимаем регистры запрошенного количества, если регистров не достаточно возвращаем null
+	 * @param size количество ячеек
+	 * @return массив выделенных регистров либо null
+	 */
+	public RegPair[] borrowReg(int size) {
+		if(regsPool.isEmpty()) return null;
+
+		RegPair[] result = new RegPair[size];
+		int index = 0;
 		for(RegPair pair : regsPool) {
 			if(pair.isFree()) {
-				pair.setFree(false);
-				return pair;
+				result[index++] = pair;
+				if(index==size) {
+					for(RegPair rp : result) {
+						rp.setFree(false);
+					}
+					return result;
+				}
+			}
+			else {
+				index=0;
 			}
 		}
 		return null;
@@ -86,7 +114,6 @@ public class CGMethodScope extends CGBlockScope {
 		return 0;
 	}
 	
-	@Override
 	public boolean isFreeReg(byte reg) {
 		RegPair regPair = getReg(reg);
 		return null == regPair || regPair.isFree();
@@ -94,6 +121,14 @@ public class CGMethodScope extends CGBlockScope {
 
 	public CGLabelScope getLabel() {
 		return lbScope;
+	}
+	
+	/**
+	 * Возвращает размер стека для занятого праметрами + длина адреса возврата
+	 * @return размер занятого стека
+	 */
+	public int getStackSize() {
+		return stackOffset + callSize; 
 	}
 	
 	@Override

@@ -15,39 +15,57 @@
  */
 package ru.vm5277.common.cg;
 
-public class CGCell {
+import ru.vm5277.common.StrUtils;
+
+public class CGCells {
 	public static enum Type {
 		REG,	//регистры
 		STACK,	//блок памяти выделенный в стеке
 		STAT,	//глобальный блок памяти выделенный под статические переменные
 		HEAP,	//блок памяти выделенный в инстансе класса
 
-		RET,	//результат возвращенный методом, регистры z и y
-		LABEL,	//метка
 		REF;	//адрес на объект(класс, массив)
 	}
 	
 	private	Type	type;
-	private	int		num;
+	private	int[]	ids;
 	private	String	label;
 	private	boolean	isRef;
 	
-	public CGCell(Type type, int num) {
+	public CGCells(Type type, int size, int offset) {
 		this.type = type;
-		this.num = num;
-	}
-	
-	public CGCell(String label) {
-		this.type = Type.LABEL;
-		this.label = label;
+		ids = new int[size];
+		for(int i=0; i<size; i++) {
+			ids[i] = offset+i;
+		}
 	}
 
+	public CGCells(Type type, byte[] ids) {
+		this.type = type;
+		this.ids = new int[ids.length];
+		for(int i=0; i<ids.length; i++) {
+			this.ids[i] = ids[i];
+		}
+	}
+	
+	public CGCells(RegPair[] regPairs) {
+		this.type = Type.REG;
+		ids = new int[regPairs.length];
+		for(int i=0; i<regPairs.length; i++) {
+			ids[i] = regPairs[i].getReg();
+		}
+	}
+	
 	public Type getType() {
 		return type;
 	}
 	
-	public int getNum() {
-		return num;
+	public int getId(int i) {
+		return ids[i];
+	}
+	
+	public int getSize() {
+		return ids.length;
 	}
 	
 	public String getLabel() {
@@ -56,6 +74,6 @@ public class CGCell {
 	
 	@Override
 	public String toString() {
-		return (Type.LABEL == type ? label + ":" : (type + ":" + num));
+		return type + "[" + StrUtils.toString(ids) + "]";
 	}
 }

@@ -16,15 +16,15 @@
 package ru.vm5277.common.cg.scopes;
 
 import java.util.Arrays;
-import ru.vm5277.common.cg.CGCell;
+import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class CGVarScope extends CGCellsScope {
-	private			boolean					isConstant;
-	private			int						stackOffset;
-	private			CGCell[]				cells;
+	private			boolean		isConstant;
+	private			int			stackOffset;
+	private			CGCells		cells;
 			
 	public CGVarScope(CGScope parent, int resId, VarType type, int size, boolean isConstant, String name) {
 		super(parent, resId, type, size, name);
@@ -37,15 +37,15 @@ public class CGVarScope extends CGCellsScope {
 	
 		if(!isConstant) {
 			if(parent instanceof CGMethodScope) { // Используется при вызове метода(передача параметров)
-				// Выделять память не нужно, будет использована обычная комбинация push
+				// Выделять память не нужно
 				cells = ((CGMethodScope)parent).paramAllocate(size);
-				((CGMethodScope)parent).addLocal(this);
-				if(VERBOSE_LO <= verbose) append(new CGIText(";alloc " + getPath('.') + " " + Arrays.toString(cells)));
+				((CGMethodScope)parent).addArg(this);
+				if(VERBOSE_LO <= verbose) append(new CGIText(";alloc " + getPath('.') + " " + cells));
 			}
 			else if(parent instanceof CGBlockScope) { // Инициализация переменной в блоке
 				cells = ((CGBlockScope)parent).memAllocate(size);
 				((CGBlockScope)parent).addLocal(this);
-				if(VERBOSE_LO <= verbose) append(new CGIText(";alloc " + getPath('.') + " " + Arrays.toString(cells)));
+				if(VERBOSE_LO <= verbose) append(new CGIText(";alloc " + getPath('.') + " " + cells));
 			}
 			else {
 				throw new CompileException("TODO unexpected CGScope:" + parent + " for local init");
@@ -54,7 +54,7 @@ public class CGVarScope extends CGCellsScope {
 	}
 	
 	@Override
-	public CGCell[] getCells() {
+	public CGCells getCells() {
 		return cells;
 	}
 	

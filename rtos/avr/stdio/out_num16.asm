@@ -13,16 +13,50 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-.IFNDEF OS_RAM_FILL_NR
+
+.include "stdio/out_char.asm"
+.include "math/div16.asm"
+
+.IFNDEF OS_OUT_NUM16
 ;-----------------------------------------------------------
-OS_RAM_FILL_NR:
+OS_OUT_NUM16:
 ;-----------------------------------------------------------
-;Заполнение блока памяти значением							;NR-NO_RESTORE - не восстанавливает IN регистры.
-;IN: X-адрес, ACCUM_L-значение, Y-длина
+;Вывод в десятеричной форме числа(16 бит)
+;IN: ACCUM_L/H-16b число
 ;-----------------------------------------------------------
-_OS_RAM_FILL_NR__LOOP:
-	ST X+,ACCUM_L
-	SBIW YL,0x01
-	BRNE _OS_RAM_FILL_NR__LOOP
+	PUSH ACCUM_L
+	PUSH ACCUM_H
+	PUSH TEMP_L
+	PUSH TEMP_H
+	PUSH TEMP_EH
+
+	LDI TEMP_EH,0x04
+_OS_OUT_NUM16__LOOP1:
+	LDI TEMP_H,0x00
+	LDI TEMP_L,0x0a
+	MCALL OS_DIV16
+	PUSH TEMP_L
+	DEC TEMP_EH
+	BRNE _OS_OUT_NUM16__LOOP1
+	PUSH ACCUM_L
+
+	CLR TEMP_L
+	LDI TEMP_EH,0x05
+_OS_OUT_NUM16__LOOP2:
+	POP ACCUM_L
+	CPI TEMP_EH,0x01
+	BREQ PC+0x03
+	OR TEMP_L,ACCUM_L
+	BREQ PC+0x02+_MCALL_SIZE
+	SUBI ACCUM_L,low(0x100-0x30)
+	MCALL OS_OUT_CHAR
+	DEC TEMP_EH
+	BRNE _OS_OUT_NUM16__LOOP2
+
+	POP TEMP_EH
+	POP TEMP_H
+	POP TEMP_L
+	POP ACCUM_H
+	POP ACCUM_L
 	RET
 .ENDIF

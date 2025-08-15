@@ -23,6 +23,7 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.Operator;
+import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.VarType;
@@ -207,14 +208,15 @@ public class FieldNode extends AstNode {
 			else throw new Exception("unexpected expression:" + initializer + " for constant");
 		}
 		else {
+			int heapHeaderSize = ((CGClassScope)fScope.getParent()).getHeapHeaderSize();
 			if(null == initializer) {
-				cg.constToCells(fScope, 0, 0, fScope.getCells());
+				cg.constToCells(fScope, heapHeaderSize, 0, fScope.getCells());
 			}
 			else if(initializer instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
-				cg.constToCells(cg.getScope(), 0, ((LiteralExpression)initializer).getNumValue(), fScope.getCells());
+				cg.constToCells(cg.getScope(), heapHeaderSize, ((LiteralExpression)initializer).getNumValue(), fScope.getCells());
 			}
 			else if(initializer instanceof FieldAccessExpression) {
-				cg.constToCells(cg.getScope(), 0, -1, fScope.getCells());
+				cg.constToCells(cg.getScope(), heapHeaderSize, -1, fScope.getCells());
 				accUsed = true;
 			}
 			else if(initializer instanceof NewExpression) {

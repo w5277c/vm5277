@@ -14,24 +14,22 @@
  * limitations under the License.
  */
 
-.include "math/mul8x8.asm"
-.IFNDEF OS_DIV10
+.IFNDEF OS_MULA8BY10
+;--------------------------------------------------------;
+OS_MULA8BY10:
 ;--------------------------------------------------------
-OS_DIV10:
+;Умножение 8бит числа на 8бит число(быстрее чем OS_MUL8X8)
+;IN: ACCUM_L-число
+;OUT: ACCUM_L
 ;--------------------------------------------------------
-;Деление 8b числа на 10
-;IN: ACCUM_L-8b число
-;OUT: ACCUM_L-8b результат
-;--------------------------------------------------------
-	PUSH ACCUM_H
+	PUSH TEMP_L
 
-	LDI ACCUM_L,205													;204.8
-	MCALL OS_MUL8X8
-	MOV ACCUM_L,ACCUM_H
-	LSR ACCUM_L
-	LSR ACCUM_L
-	LSR ACCUM_L
+	LSL ACCUM_L
+	MOV TEMP_L,ACCUM_L
+	LSL ACCUM_L
+	LSL ACCUM_L
+	ADD ACCUM_L,TEMP_L
 
-	POP ACCUM_H
+	POP TEMP_L
 	RET
 .ENDIF

@@ -20,7 +20,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.StrUtils;
-import ru.vm5277.common.cg.CGCell;
+import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.RegPair;
 import ru.vm5277.common.cg.items.CGIContainer;
@@ -28,49 +28,53 @@ import ru.vm5277.common.cg.items.CGIText;
 import static ru.vm5277.common.cg.scopes.CGScope.verbose;
 import ru.vm5277.common.exceptions.CompileException;
 
-//TODO необходимо перевыделять блок в стеке, также нужно передавать размер выделенного блока как смещение для внутренних переменных
-//TODO а в будущем, учитывать свободные регистры
+// STACK(reg Y) - необходимо выделять блок памяти в стеке для локальных переменных, Y не изменяем. Y изменяется только если выходим за 64 слова, затем
+// его нужно восстановить. Смещения адресов локальных перменных высчитывааются от начала выделенного блока в методе
+
 
 public class CGBlockScope extends CGScope {
-	private		final	Map<Integer, CGVarScope>	locals				= new HashMap<>();
-	protected			int							stackBlockOffset	= 0;
-	private				Set<RegPair>				usedPool			= new HashSet<>(); // Использованные регистры из regsPool метода
+	private		final	Map<Integer, CGVarScope>	locals		= new HashMap<>();
+	protected			int							stackOffset	= 0;
+	private				Set<RegPair>				usedPool	= new HashSet<>(); // Использованные регистры из regsPool метода
 	private				CGMethodScope				mScope;
 	
 	public CGBlockScope(CGScope parent, int id) {
 		super(parent, id, "");
 		
-//		this.usedRegs = new ArrayList<>();
-		
-		CGBlockScope bScope = parent.getBlockScope();
+/*		CGBlockScope bScope = parent.getBlockScope();
 		if(null != bScope) {
-			stackBlockOffset = bScope.getStackBlockSize();
+			this.stackOffset = bScope.getStackBlockSize();
 		}
-		
+*/		
 		mScope = parent.getMethodScope();
 	}
 	
 	public void build(CodeGenerator cg) throws CompileException {
 		CGIContainer cont = new CGIContainer();
 		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";build block " + getPath('.') + ",id:" + resId));
-		
-// Кажется это не нужно, в блоке мы работаем с регистрами взятыми из regsPool, их не нужно сохранять, кроме регистров аккумулятора(но это в другой раз)
-// Регистры(если используются в качестве переменных) используемые в нативных вызовах должны быть сохранены в методе invokeNative
-/*		for(int i=0; i<usedRegs.size(); i++) {
-			cont.append(cg.pushRegAsm(usedRegs.get(i)));
-		}
-*/		
-		if(0x00 != stackBlockOffset) {
-			cg.setDpStackAlloc();
-			cont.append(cg.stackAllocAsm(stackBlockOffset));
+
+	// Кажется это не нужно, в блоке мы работаем с регистрами взятыми из regsPool, их не нужно сохранять, кроме регистров аккумулятора(но это в другой раз)
+	// Регистры(если используются в качестве переменных) используемые в нативных вызовах должны быть сохранены в методе invokeNative
+	/*		for(int i=0; i<usedRegs.size(); i++) {
+				cont.append(cg.pushRegAsm(usedRegs.get(i)));
+			}
+	*/		
+		if(0x00 != stackOffset) {
+//			cg.setDpStackAlloc();
+//			cont.append(cg.stackAllocAsm(stackOffset, !(parent instanceof CGClassScope)));
+			cont.append(cg.stackAlloc(null, stackOffset, false));
+
 		}
 		prepend(cont);
-		
-/*
-		for(int i=usedRegs.size()-1; i>=0; i--) {
-			append(cg.popRegAsm(usedRegs.get(i)));
-		}*/
-		if(0x00 != stackBlockOffset) append(cg.stackFreeAsm());
+
+	/*
+			for(int i=usedRegs.size()-1; i>=0; i--) {
+				append(cg.popRegAsm(usedRegs.get(i)));
+			}*/
+		if(0x00 != stackOffset) {
+			//append(cg.stackFreeAsm());
+			cg.stackFree(this, stackOffset, false);
+		}
 		if(VERBOSE_LO <= verbose) append(new CGIText(";block end"));
 	}
 
@@ -81,14 +85,17 @@ public class CGBlockScope extends CGScope {
 	public CGVarScope getLocal(int resId) {
 		CGVarScope lScope = locals.get(resId);
 		if(null != lScope) return lScope;
-		
+
 		if(null != parent && parent instanceof CGBlockScope) return ((CGBlockScope)parent).getLocal(resId);
 		if(null != parent && parent instanceof CGCommandScope) return parent.getBlockScope().getLocal(resId);
 		return null;
 	}
 
-	public int getStackBlockSize() {
-		return stackBlockOffset;
+	public int getStackSize() {
+		if(parent instanceof CGBlockScope) {
+			return ((CGBlockScope)parent).getStackSize() + stackOffset;
+		}
+		return ((CGMethodScope)parent).getStackSize() + stackOffset;
 	}
 
 	/*public void putUsedReg(byte reg) {
@@ -116,19 +123,18 @@ public class CGBlockScope extends CGScope {
 	}*/
 
 	// Выделение ячеек для переменной в блоке(регистр или стек)
-	public CGCell[] memAllocate(int size) throws CompileException {
-		CGCell[] cells = new CGCell[size];
-		for(int i=0; i<size; i++) {
-			RegPair regPair = null == mScope ? null : mScope.borrowReg();
-			if(null != regPair) {
-				// putUsedReg(reg); не нужно
-				usedPool.add(regPair);
-				cells[i] = new CGCell(CGCell.Type.REG, regPair.getReg());
+	// Изначально ячейки могли содержать регистры и стек одновременно(если регистров не хватило)
+	// Но это очень сильно усложняет логику работы кодогенератора, а также сложно добиться оптимального генерируемого кода
+	public CGCells memAllocate(int size) throws CompileException {
+		RegPair[] regPairs = null == mScope ? null : mScope.borrowReg(size);
+		if(null != regPairs) {
+			for(int i=0; i<size; i++) {
+				usedPool.add(regPairs[i]);
 			}
-			else {
-				cells[i] = new CGCell(CGCell.Type.STACK, stackBlockOffset++);
-			}
+			return new CGCells(regPairs);
 		}
+		CGCells cells = new CGCells(CGCells.Type.STACK, size, getStackSize());
+		stackOffset+=size;
 		return cells;
 	}
 

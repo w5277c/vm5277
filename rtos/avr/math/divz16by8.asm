@@ -14,50 +14,19 @@
  * limitations under the License.
  */
 
-.IFNDEF OS_MUL8X8
+.IFNDEF OS_DIVZ16BY8
 ;--------------------------------------------------------
-OS_MUL8X8:
+OS_DIVZ16BY8:
 ;--------------------------------------------------------
-;Умножение 8бит числа на 8бит число
-;IN: ACCUM_L-число, ACCUM_H-число
-;OUT: ACCUM_L/ACCUM_H-16бит результат
+;Деление регистра Z(16b) на 8
+;IN: Z
+;OUT: Z
 ;--------------------------------------------------------
-.IF MUL_SUPPORT != 0x01
-	PUSH TEMP_L
-	PUSH TEMP_H
-	PUSH TEMP_EL
-
-	MOV TEMP_L,ACCUM_L
-	MOV TEMP_H,ACCUM_H
-	CLR ACCUM_L
-	CLR ACCUM_H
-	CLR FLAGS
-	CLR TEMP_EL
-
-_OS_MUL8X8_LOOP:
-	LSR TEMP_H
-	BRCC PC+0x03
-	ADD ACCUM_L,TEMP_L
-	ADC ACCUM_H,TEMP_EL
-	LSL TEMP_L
-	ROL TEMP_EL
-	CPI TEMP_H,0x00
-	BRNE _OS_MUL8X8_LOOP
-
-	POP TEMP_EL
-	POP TEMP_L
-	POP TEMP_H
-.ELSE
-	PUSH TEMP
-	LDS TEMP,SREG
-	CLI
-
-	MUL ACCUM_L,ACCUM_H
-	MOV ACCUM_L,_RESULT_L											;Не сохраняем, используются только в блоке без прерываний
-	MOV ACCUM_H,_RESULT_H
-
-	STS SREG,TEMP
-	POP TEMP
-.ENDIF
+	LSR ZH
+	ROR ZL
+	LSR ZH
+	ROR ZL
+	LSR ZH
+	ROR ZL
 	RET
 .ENDIF
