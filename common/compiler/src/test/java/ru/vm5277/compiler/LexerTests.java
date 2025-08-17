@@ -1,14 +1,11 @@
 package ru.vm5277.compiler;
 
-import ru.vm5277.compiler.TokenType;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.compiler.Lexer;
-import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.tokens.Token;
 import static ru.vm5277.compiler.tokens.Token.toStringValue;
 

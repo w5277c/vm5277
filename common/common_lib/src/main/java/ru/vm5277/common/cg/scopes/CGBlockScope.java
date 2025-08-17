@@ -133,7 +133,7 @@ public class CGBlockScope extends CGScope {
 			}
 			return new CGCells(regPairs);
 		}
-		CGCells cells = new CGCells(CGCells.Type.STACK, size, getStackSize());
+		CGCells cells = new CGCells(CGCells.Type.STACK_FRAME, size, getStackSize());
 		stackOffset+=size;
 		return cells;
 	}

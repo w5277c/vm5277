@@ -30,7 +30,7 @@ import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.semantic.ClassScope;
-import ru.vm5277.compiler.semantic.InterfaceSymbol;
+import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 
@@ -171,7 +171,7 @@ public class ClassNode extends AstNode {
 
 		for (String interfaceName : interfaces) {
 			// Проверяем существование интерфейса
-			InterfaceSymbol interfaceSymbol = classScope.resolveInterface(interfaceName);
+			InterfaceScope interfaceSymbol = classScope.resolveInterface(interfaceName);
 			if (null == interfaceSymbol) markError("Interface not found: " + interfaceName);
 
 			checkInterfaceImplementation(classScope, interfaceSymbol);
@@ -190,7 +190,7 @@ public class ClassNode extends AstNode {
 	}
 	
 	
-	private boolean checkInterfaceImplementation(ClassScope classScope, InterfaceSymbol interfaceSymbol) {
+	private boolean checkInterfaceImplementation(ClassScope classScope, InterfaceScope interfaceSymbol) {
 		boolean allMethodsImplemented = true;
 		
 		Map<String, List<MethodSymbol>> map = interfaceSymbol.getMethods();

@@ -26,7 +26,7 @@ import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.ClassScope;
-import ru.vm5277.compiler.semantic.InterfaceSymbol;
+import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 
@@ -157,7 +157,7 @@ public class InstanceOfExpression extends ExpressionNode {
 				}
 				else {
 					ClassScope leftClass = scope.getThis().resolveClass(leftType.getClassName());
-					InterfaceSymbol rightInterface = scope.getThis().resolveInterface(rightType.getClassName());
+					InterfaceScope rightInterface = scope.getThis().resolveInterface(rightType.getClassName());
 
 					
 					if (null != leftClass && null != rightInterface) {

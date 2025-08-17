@@ -20,7 +20,7 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
-import ru.vm5277.compiler.semantic.InterfaceSymbol;
+import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class TypeReferenceExpression extends ExpressionNode {
@@ -45,7 +45,7 @@ public class TypeReferenceExpression extends ExpressionNode {
 
 		if(null == type) {
 			// Затем проверяем, является ли это интерфейсом
-			InterfaceSymbol interfaceSymbol = scope.getThis().resolveInterface(className);
+			InterfaceScope interfaceSymbol = scope.getThis().resolveInterface(className);
 			if (null != interfaceSymbol) {
 				type = VarType.addClassName(className);
 			}

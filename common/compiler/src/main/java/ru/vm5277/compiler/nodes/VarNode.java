@@ -96,6 +96,8 @@ public class VarNode extends AstNode {
 
 	@Override
 	public boolean preAnalyze() {
+		try{validateModifiers(modifiers, Keyword.STATIC, Keyword.FINAL);} catch(CompileException e) {addMessage(e);}
+		
 		if(Character.isUpperCase(name.charAt(0))) addMessage(new WarningMessage("Variable name should start with lowercase letter:" + name, sp));
 
 		if(null != initializer) {
@@ -220,13 +222,13 @@ public class VarNode extends AstNode {
 				cg.updateRefCount(initializer.getCGScope(), vScope.getStackOffset(), vScope.getCells(), true);
 				((NewExpression)initializer).codeGenPart2(cg);
 			}
-			else if(initializer instanceof MethodCallExpression) {
+/*			else if(initializer instanceof MethodCallExpression) {
 				initializer.codeGen(cg);
 				if(VarType.CLASS == vScope.getType()) {
 					cg.updateRefCount(cg.getScope(), vScope.getStackOffset(), vScope.getCells(), true);
 				}
-				cg.retToCells(cg.getScope(), vScope);
-			}
+				cg.accToCells(cg.getScope(), vScope);
+			}*/
 			else {
 				initializer.codeGen(cg);
 				if(VarType.CLASS == vScope.getType()) {

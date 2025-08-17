@@ -19,5 +19,6 @@ public enum SystemParam {
 	CORE_FREQ,
 	MCU,
 	STDOUT_PORT,
-	SHOW_WELCOME;	
+	SHOW_WELCOME,
+	MULTITHREADING;
 }

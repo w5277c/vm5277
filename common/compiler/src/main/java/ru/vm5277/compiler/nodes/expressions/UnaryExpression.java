@@ -20,6 +20,7 @@ import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.Operator;
+import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -60,8 +61,11 @@ public class UnaryExpression extends ExpressionNode {
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		try {
+			cgScope = cg.enterExpression();
+			
 			// Проверяем операнд
 			if (!operand.postAnalyze(scope, cg)) {
+				cg.leaveExpression();
 				return false;
 			}
 
@@ -72,6 +76,7 @@ public class UnaryExpression extends ExpressionNode {
 				case PLUS:
 					if (!operandType.isNumeric() && VarType.CSTR != operandType) {
 						markError("Unary " + operator + " requires numeric or string type");
+						cg.leaveExpression();
 						return false;
 					}
 					break;
@@ -79,6 +84,7 @@ public class UnaryExpression extends ExpressionNode {
 				case MINUS:
 					if (!operandType.isNumeric()) {
 						markError("Unary " + operator + " requires numeric type");
+						cg.leaveExpression();
 						return false;
 					}
 					break;
@@ -86,6 +92,7 @@ public class UnaryExpression extends ExpressionNode {
 				case BIT_NOT:
 					if (!operandType.isInteger()) {
 						markError("Bitwise ~ requires integer type");
+						cg.leaveExpression();
 						return false;
 					}
 					break;
@@ -93,6 +100,7 @@ public class UnaryExpression extends ExpressionNode {
 				case NOT:
 					if (operandType != VarType.BOOL) {
 						markError("Logical ! requires boolean type");
+						cg.leaveExpression();
 						return false;
 					}
 					break;
@@ -103,27 +111,34 @@ public class UnaryExpression extends ExpressionNode {
 				case POST_DEC:
 					if (!operandType.isNumeric()) {
 						markError("Increment/decrement requires numeric type");
+						cg.leaveExpression();
 						return false;
 					}
 					if (!(operand instanceof VarFieldExpression)) {
 						markError("Can only increment/decrement variables");
+						cg.leaveExpression();
 						return false;
 					}
 					// Дополнительная проверка на изменяемость переменной
 					if (isFinalVariable((VarFieldExpression)operand, scope)) {
 						markError("Cannot modify final variable");
+						cg.leaveExpression();
 						return false;
 					}
 					break;
 
 				default:
 					markError("Unsupported unary operator: " + operator);
+					cg.leaveExpression();
 					return false;
 			}
-
+			
+			cg.leaveExpression();
 			return true;
-		} catch (CompileException e) {
+		}
+		catch (CompileException e) {
 			markError(e.getMessage());
+			cg.leaveExpression();
 			return false;
 		}
 	}
@@ -151,13 +166,18 @@ public class UnaryExpression extends ExpressionNode {
 	@Override
 	public Object codeGen(CodeGenerator cg) throws Exception {
 		// Генерация кода для операнда (например, переменной или другого выражения)
-		operand.codeGen(cg);
+		if(null != operand.codeGen(cg)) {
+//			cg.emitUnary(cgScope, operator, 0, cg.cScope.getCells()); //TODO смещение!
+		}
 
 		if(operand instanceof VarFieldExpression) {
-			cg.emitUnary(operator, operand.getSymbol().getCGScope().getResId()); //Работаем с переменной
+			CGCellsScope cScope = (CGCellsScope)operand.getSymbol().getCGScope();
+			cg.emitUnary(cgScope, operator, 0, cScope.getCells()); //TODO смещение!
+			//cg.emitUnary(operator, operand.getSymbol().getCGScope().getResId()); //Работаем с переменной
 		}
 		else {
-			cg.emitUnary(operator, null); //TODO Работаем с уже загруженным Accum
+			throw new CompileException("Unsupported operand '" + operand + " in unary expression");
+//			cg.emitUnary(operator, null); //TODO Работаем с уже загруженным Accum
 		}
 		
 		return null;

@@ -14,9 +14,14 @@
  * limitations under the License.
  */
 import rtos.System;
+import rtos.RTOSParam;
+import hal.GPIO;
 
 class Main {
     public static void main() {
+		System.setParam(RTOSParam.CORE_FREQ, 16);
+		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
+
 		int i = 0x04030201;
 		System.outCStr("orig num:");
 		System.out(i);

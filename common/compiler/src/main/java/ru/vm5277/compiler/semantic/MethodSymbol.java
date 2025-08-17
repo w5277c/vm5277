@@ -47,8 +47,10 @@ public class MethodSymbol extends Symbol implements AstHolder {
 	
 	public List<VarType> getParameterTypes() {
 		List<VarType> result = new ArrayList<>();
-		for (Symbol param : parameters) {
-			result.add(param.getType());
+		if(null != parameters) {
+			for (Symbol param : parameters) {
+				result.add(param.getType());
+			}
 		}
 		return result;
 	}
@@ -61,11 +63,13 @@ public class MethodSymbol extends Symbol implements AstHolder {
 		if(null == signature) {
 			StringBuilder sb = new StringBuilder();
 			sb.append(name).append("(");
-			for (Symbol param : parameters) {
-				sb.append(param.getType().getName()).append(",");
-			}
-			if (!parameters.isEmpty()) {
-				sb.setLength(sb.length() - 1); // Удаляем последнюю запятую
+			if(null != parameters) {
+				for (Symbol param : parameters) {
+					sb.append(param.getType().getName()).append(",");
+				}
+				if (!parameters.isEmpty()) {
+					sb.setLength(sb.length() - 1); // Удаляем последнюю запятую
+				}
 			}
 			sb.append(")");
 			signature = sb.toString();

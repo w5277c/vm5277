@@ -27,7 +27,7 @@ import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.semantic.ClassScope;
-import ru.vm5277.compiler.semantic.InterfaceSymbol;
+import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class InterfaceNode extends ClassNode {
@@ -73,11 +73,15 @@ public class InterfaceNode extends ClassNode {
 	@Override
 	public boolean declare(Scope scope) {
 		try {
-			InterfaceSymbol interfaceSymbol = new InterfaceSymbol(name);
+			InterfaceScope iScope = new InterfaceScope(name, scope);
 			if (scope instanceof ClassScope) {
-				((ClassScope)scope).addInterface(interfaceSymbol);
+				((ClassScope)scope).addInterface(iScope);
 			}
-			blockIfaceNode.declare(scope);
+			else if (scope instanceof InterfaceScope) {
+				((InterfaceScope)scope).addInterface(iScope);
+			}
+
+			blockIfaceNode.declare(iScope);
 		} 
 		catch (CompileException e) {
 			markError(e);

@@ -21,6 +21,7 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.common.Operator;
+import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
@@ -333,7 +334,7 @@ public class BinaryExpression extends ExpressionNode {
 			}
 		}
 		else {
-			//CastExprewssion, BinaryExpression и другие
+			//CastExpression, BinaryExpression и другие
 			if(null == expr2.codeGen(cg)) {
 				// Явно не доработанный код, выражение всегда должно помещать результат в аккумулятор
 				throw new CompileException("Accum not used for operand:" + expr2);
@@ -344,7 +345,7 @@ public class BinaryExpression extends ExpressionNode {
 			// Код отстроен и результат может быть только в аккумуляторе, сохраняем его
 			// TODO необходимо проверить!
 			// Если в expr1 не BinaryExpression, то сохранять аккумулятор не нужно?
-			if(expr1 instanceof BinaryExpression) cg.pushAcc(cgScope, size);
+			if(expr1 instanceof BinaryExpression) cg.pushAccBE(cgScope, size);
 
 			// Строим код для expr1(результат в аккумуляторе)
 			if(null == expr1.codeGen(cg)) {
@@ -352,11 +353,10 @@ public class BinaryExpression extends ExpressionNode {
 				throw new CompileException("Accum not used for operand:" + expr1);
 			}
 
-			// Восстанавливаем аккумулятор expr2 во ret cells(как временное хранилище) 
-			if(expr1 instanceof BinaryExpression) cg.popRet(cgScope, size);
-			// Выполняем операцию, левый операнд - аккумулятор, правый операнд - ret
+
+			// Выполняем операцию, левый операнд - аккумулятор, правый операнд - значение на вершине стека
 			if(null != op) {
-				cg.cellsAction(cgScope, 0, cg.getRetCells(size), op);
+				cg.cellsAction(cgScope, 0, new CGCells(CGCells.Type.STACK, size), op);
 			}
 			if(operator.isAssignment()) {
 				// TODO

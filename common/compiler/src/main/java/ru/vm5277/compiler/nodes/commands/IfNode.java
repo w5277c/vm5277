@@ -251,6 +251,7 @@ public class IfNode extends CommandNode {
 		Object obj = condition.codeGen(cg);
 		cg.leaveBlock();
 		
+		/* TODO Рудимент. Сейчас codeGen возвращает true, если результат операции содержится в аккумуляторе. Поломал логику?
 		//Если результат стал известен без кодогенерации
 		if(obj instanceof Boolean) {
 			if(((Boolean)obj)) {
@@ -265,7 +266,7 @@ public class IfNode extends CommandNode {
 			}
 			return null;
 		}
-		
+		*/
 		CGBlockScope thenBlockScope = cg.enterBlock(cg.getScope());
 		getThenBlock().codeGen(cg);
 		cg.leaveBlock();

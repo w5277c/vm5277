@@ -40,6 +40,8 @@ import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.compiler.Case;
 import static ru.vm5277.common.cg.OperandType.LITERAL;
+import ru.vm5277.common.cg.items.CGIAsm;
+import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.scopes.CGCommandScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
@@ -204,31 +206,30 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract void accCast(CGScope scope, VarType type) throws CompileException;
 	public abstract void cellsToAcc(CGScope scope, CGCellsScope cScope) throws CompileException;
 	public abstract void accToCells(CGScope scope, CGCellsScope cScope) throws CompileException;
-	public abstract void retToCells(CGScope scope, CGCellsScope cScope) throws CompileException;
+//	public abstract void retToCells(CGScope scope, CGCellsScope cScope) throws CompileException;
 	public abstract void setHeapReg(CGScope scope, int offset, CGCells cells) throws CompileException;
 	public abstract void constToAcc(CGScope scope, int size, long value);
 	public abstract void constToCells(CGScope scope, int offset, long value, CGCells cells) throws CompileException;
 	public abstract void cellsAction(CGScope scope, int offset, CGCells cells, Operator op) throws CompileException;
 	public abstract void constAction(CGScope scope, Operator op, long k) throws CompileException;
-	public abstract void loadRegsConst(CGScope scope, byte[] regs, long value);
-	public abstract void constLoadRegs(String label, byte[] registers);
-	public abstract	void pushAcc(CGScope scope, int size);
-	public abstract	void popRet(CGScope scope, int size);
+	public abstract	void pushAccBE(CGScope scope, int size);
+	public abstract	void popAccBE(CGScope scope, int size);
+	public abstract	int pushHeapReg(CGScope scope);
+	public abstract	void popHeapReg(CGScope scope);
 	public abstract	int pushStackReg(CGScope scope);
 	public abstract	void popStackReg(CGScope scope);
 	public abstract void stackToStackReg(CGScope scope);
 	//public abstract void pushRef(CGScope scope, String label);
 	public abstract void updateRefCount(CGScope scope, int offset, CGCells cells, boolean isInc) throws CompileException;
 	
-	public abstract void invokeMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, CGMethodScope mScope)
-																																	throws CompileException;
+	public abstract void invokeMethod(CGScope scope, String className,String methodName, VarType type, VarType[] types, CGMethodScope mScope)																		throws CompileException;
 	public abstract void invokeNative(CGScope scope, String className, String methodName, String params, VarType type, Operand[] operands)
 																																	throws CompileException;
 	public abstract boolean emitInstanceof(long op, int typeId);
-	public abstract void emitUnary(Operator op, Integer resId) throws CompileException;
+	public abstract void emitUnary(CGScope scope, Operator op, int offset, CGCells cells) throws CompileException;
 	
 	//TODO набор методов для реализации команд if, switch, for, loop и .т.д
-	public abstract void eNew(CGScope scope, int size, List<VarType> classTypes, boolean canThrow) throws CompileException;
+	public abstract CGIContainer eNew(CGScope scope, int size, List<VarType> classTypes, boolean launchPoint, boolean canThrow) throws CompileException;
 	public abstract void eFree(Operand op);
 	public abstract void eIf(CGBlockScope conditionBlock, CGBlockScope thenBlock, CGBlockScope elseBlock);
 	public abstract void eTry(CGBlockScope blockScope, List<Case> cases, CGBlockScope defaultBlockScope);
@@ -239,7 +240,6 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract int getRefSize();
 	public abstract int getCallSize();
 	public abstract ArrayList<RegPair> buildRegsPool();
-	public abstract CGCells getRetCells(int size);
 	public abstract void pushConst(CGScope scope, int size, long value);
 	public abstract void pushCells(CGScope scope, int offset, int size, CGCells cells) throws CompileException;
 //	public abstract void setValueByIndex(Operand op, int size, List<Byte> tempRegs) throws CompileException;
@@ -268,8 +268,11 @@ public abstract class CodeGenerator extends CGScope {
 		else throw new CompileException("CG: getNum, can't access to method scope, for resId:" + resId);
 	}
 	
-	public void build() throws CompileException {
+	public void build(VarType classType, int fieldsSize) throws CompileException {
 		append(new CGIText("; vm5277." + platform + " v" + getVersion() + " at " + new Date().toString()));
+		
+		// Ниже используется eNew, поэтому всегда необходим RTOSFeature.OS_FT_DRAM
+		RTOSFeatures.add(RTOSFeature.OS_FT_DRAM);
 		
 		if(params.keySet().contains(SystemParam.CORE_FREQ)) {
 			append(new CGIText(".equ core_freq = " + params.get(SystemParam.CORE_FREQ)));
@@ -293,11 +296,13 @@ public abstract class CodeGenerator extends CGScope {
 		if(RTOSFeatures.contains(RTOSFeature.OS_FT_DRAM)) {
 			append(new CGIText(".include \"dmem/dram.asm\""));	
 		}
+		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) {
+			append(new CGIText(".include \"core/dispatcher.asm\""));	
+		}
 		for(String include : includes) {
 			append(new CGIText(".include \"" + include + "\""));
 		}
 		append(new CGIText(""));
-		append(new CGIText("MAIN:"));
 		
 		for(int resId : flashData.keySet()) {
 			DataSymbol ds = flashData.get(resId);
@@ -319,7 +324,14 @@ public abstract class CodeGenerator extends CGScope {
 			else throw new CompileException("CG: build, unsupported value:" + ds.getValue());
 			append(new CGIText(""));
 		}
+		
+		append(new CGIText("Main:"));
 
+		ArrayList<VarType> classTypes = new ArrayList<>();
+		classTypes.add(classType);
+		append(eNew(null, 0x05, classTypes, true, false)); // TODO canThrow
+		//TODO заглушка
+		append(new CGIAsm("jmp JavlCMainMmain"));
 	}
 	
 	public String getAsm() {

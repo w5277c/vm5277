@@ -28,6 +28,7 @@ import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.SourceType;
 import ru.vm5277.common.SystemParam;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.compiler.codegen.PlatformLoader;
 import ru.vm5277.common.messages.MessageContainer;
@@ -36,7 +37,7 @@ import ru.vm5277.compiler.nodes.ClassBlockNode;
 import ru.vm5277.compiler.nodes.ClassNode;
 import ru.vm5277.compiler.nodes.MethodNode;
 import ru.vm5277.compiler.semantic.ClassScope;
-import ru.vm5277.compiler.semantic.InterfaceSymbol;
+import ru.vm5277.compiler.semantic.InterfaceScope;
 
 public class Main {
     public	final	static	String	VERSION				= "0.0.23";
@@ -163,8 +164,6 @@ public class Main {
 		Lexer lexer = new Lexer(sourcePath.toFile(), mc);
 		
 		ClassScope globalScope = new ClassScope();
-		globalScope.addInterface(new InterfaceSymbol("Object"));
-
 		File libDir = toolkitPath.resolve("bin").resolve("libs").normalize().toFile();
 		NativeBindingsReader nbr = new NativeBindingsReader(runtimePath, mc);
 
@@ -210,7 +209,7 @@ public class Main {
 					System.out.println("Codegen...");
 
 					launchNode.codeGen(cg);
-					cg.build();
+					cg.build(VarType.fromClassName(clazz.getName()), 0);
 					//System.out.println("\n" + cg.getAsm());
 					
 					Path targetPath = basePath.resolve("target").normalize();

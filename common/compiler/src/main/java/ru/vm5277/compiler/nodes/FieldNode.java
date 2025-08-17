@@ -102,6 +102,8 @@ public class FieldNode extends AstNode {
 
 	@Override
 	public boolean preAnalyze() {
+		try{validateModifiers(modifiers, Keyword.STATIC, Keyword.FINAL, Keyword.PRIVATE, Keyword.PUBLIC);} catch(CompileException e) {addMessage(e);}
+		
 		if((!isFinal() || !isStatic()) && Character.isUpperCase(name.charAt(0))) {
 			addMessage(new WarningMessage("Field name should start with lowercase letter:" + name, sp));
 		}
@@ -223,10 +225,10 @@ public class FieldNode extends AstNode {
 				initializer.codeGen(cg);
 				accUsed = true;
 			}
-			else if(initializer instanceof MethodCallExpression) {
+/*			else if(initializer instanceof MethodCallExpression) {
 				initializer.codeGen(cg);
-				cg.retToCells(cg.getScope(), fScope);
-			}
+				cg.accToCells(cg.getScope(), fScope);
+			}*/
 			else {
 				initializer.codeGen(cg);
 				cg.accToCells(fScope, fScope);

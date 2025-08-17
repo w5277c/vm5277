@@ -31,14 +31,25 @@ public class ClassScope extends Scope {
 	private final	Map<String, String>				staticImports	= new HashMap<>();
 	private	final	Map<String, Symbol>				fields			= new HashMap<>();
 	private	final	Map<String, ClassScope>			classes			= new HashMap<>();
-	private	final	Map<String, InterfaceSymbol>	interfaces		= new HashMap<>();
+	private	final	Map<String, InterfaceScope>		interfaces		= new HashMap<>();
 	private	final	Map<String, List<MethodSymbol>>	methods			= new HashMap<>();
 	private	final	List<MethodSymbol>				constructors	= new ArrayList<>();
 
-	public ClassScope() {
+	public ClassScope() throws CompileException {
+		addInterface(new InterfaceScope("Object", this));
+		MethodScope mScope = new MethodScope(null, this);
+		MethodSymbol mSymbol = new MethodSymbol("getClassId", VarType.SHORT, null, true, false, false, false, mScope, null);
+		mScope.setSymbol(mSymbol);
+		addMethod(mSymbol);
+		mScope = new MethodScope(null, this);
+		mSymbol = new MethodSymbol("getClassTypeId", VarType.SHORT, null, true, false, false, false, mScope, null);
+		mScope.setSymbol(mSymbol);
+		addMethod(mSymbol);
 	}
 	
 	public ClassScope(String name, Scope parentScope) throws CompileException {
+		this();
+		
 		if (null != parentScope && !(parentScope instanceof ClassScope)) throw new CompileException("Сlass " + name + " can only be declared within a class.");
 		if (name == null || name.isEmpty()) throw new CompileException("Class name cannot be empty");
 
@@ -66,24 +77,24 @@ public class ClassScope extends Scope {
 		if (classes.containsKey(classScope.getName())) throw new CompileException("Duplicate class: " + scopeName);
 		if (interfaces.containsKey(classScope.getName())) throw new CompileException("Class: " + scopeName + " already defined as interface");
 		
-		// Получаем символ Object из родительской области
-		InterfaceSymbol objectInterface = resolveInterface("Object");
+/*		// Получаем символ Object из родительской области
+		InterfaceScope objectInterface = resolveInterface("Object");
 		if (null == objectInterface) throw new CompileException("Base interface 'Object' not found");
 		if (!"Object".equals(scopeName)) {
 			classScope.addInterface(objectInterface); // Добавляем существующий символ
 		}
-		
+*/		
 		classes.put(scopeName, classScope);
 	}
 	
-	public void addInterface(InterfaceSymbol symbol) throws CompileException {
-        String symbolName = symbol.getName();
+	public void addInterface(InterfaceScope iScope) throws CompileException {
+        String symbolName = iScope.getName();
 		
 		if (imports.containsKey(name)) throw new CompileException("Interface '" + symbolName + "' conflicts with import");
         if (staticImports.containsKey(name)) throw new CompileException("Interface '" + symbolName + "' conflicts with static import");
-		if (classes.containsKey(symbol.getName())) throw new CompileException("Interface " + symbolName + " conflicts with class of the same name");
-		if (interfaces.containsKey(symbol.getName())) throw new CompileException("Class " + symbolName + " conflicts with interface of the same name");
-		interfaces.put(symbolName, symbol);
+		if (classes.containsKey(iScope.getName())) throw new CompileException("Interface " + symbolName + " conflicts with class of the same name");
+		if (interfaces.containsKey(iScope.getName())) { throw new CompileException("Interface " + symbolName + " conflicts with interface of the same name");}
+		interfaces.put(symbolName, iScope);
 	}
 	
 	public void addConstructor(MethodSymbol newSymbol) throws CompileException {
@@ -144,7 +155,7 @@ public class ClassScope extends Scope {
 		return this;
 	}
 	
-	public Map<String, InterfaceSymbol> getInterfaces() {
+	public Map<String, InterfaceScope> getInterfaces() {
 		return interfaces;
 	}
 	
@@ -182,11 +193,6 @@ public class ClassScope extends Scope {
 			return methods.get(name).get(0);
 		}
 
-		// Поиск в интерфейсах
-		if (interfaces.containsKey(name)) {
-			return interfaces.get(name);
-		}
-
 		// Поиск в родительской области видимости (если есть)
 		if (parent != null) {
 			return parent.resolve(name);
@@ -212,7 +218,7 @@ public class ClassScope extends Scope {
 		return null;
 	}
 
-	public InterfaceSymbol resolveInterface(String interfaceName) {
+	public InterfaceScope resolveInterface(String interfaceName) {
 		// Поиск в текущем классе
 		if (interfaces.containsKey(interfaceName)) return interfaces.get(interfaceName);
 

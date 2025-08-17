@@ -47,7 +47,12 @@ public class CGMethodScope extends CGScope {
 		this.regsPool = regsPool;
 		this.callSize = cg.getCallSize();
 		
-		lbScope = new CGLabelScope(this, null, null, true);
+		if((null == types || 0==types.length) && "main".equals(name) && "CMain".equals(parent.getLName())) {
+			lbScope = new CGLabelScope(null, null, "JavlCmainMmain", true);
+		}
+		else {
+			lbScope = new CGLabelScope(this, null, null, true);
+		}
 		cg.addLabel(lbScope);
 	}
 	
@@ -62,7 +67,7 @@ public class CGMethodScope extends CGScope {
 
 	//Выделение ячеек для переданных параметров (только стек)
 	public CGCells paramAllocate(int size) throws CompileException {
-		CGCells cells = new CGCells(CGCells.Type.STACK, size, stackOffset);
+		CGCells cells = new CGCells(CGCells.Type.STACK_FRAME, size, stackOffset);
 		stackOffset+=size;
 		return cells;
 	}

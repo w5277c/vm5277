@@ -46,5 +46,7 @@ class Main {
 		Byte b = new Byte(0x01);
 
 		System.out(b.toByte());
+		System.out(b.getClassTypeId());
+		System.out(b.getClassId());
     }
 }

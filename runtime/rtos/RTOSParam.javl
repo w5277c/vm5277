@@ -19,4 +19,5 @@ public class RTOSParam {
 	public	final	static	byte	MCU				= 0x01;
 	public	final	static	byte	STDOUT_PORT		= 0x02;
 	public	final	static	byte	SHOW_WELCOME	= 0x03;
+	public	final	static	byte	MULTITHREADING	= 0x04;
 }

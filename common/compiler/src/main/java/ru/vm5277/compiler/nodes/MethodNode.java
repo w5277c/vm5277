@@ -31,6 +31,7 @@ import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.semantic.ClassScope;
+import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
@@ -173,41 +174,42 @@ public class MethodNode extends AstNode {
 
 	@Override
 	public boolean declare(Scope scope) {
-		ClassScope classScope = (ClassScope)scope;
-		
 		List<Symbol> paramSymbols = new ArrayList<>();
 		for (ParameterNode param : parameters) {
-			//TODO здесь мы не знаем, кто нас вызывает и что передает
-/*			if(!isNative()) {
-				Symbol pSymbol = null;//TODO
-				if(null == pSymbol) {
-					markError(new CompileException("param '" + param.getName() + "' not found"));
-					return false;
-				}
-				paramSymbols.add(new AliasSymbol(param.getName(), param.getType(), pSymbol));
-			}
-			else {*/
-				paramSymbols.add(new Symbol(param.getName(), param.getType(), param.isFinal(), false));
-			//}
+			paramSymbols.add(new Symbol(param.getName(), param.getType(), param.isFinal(), false));
 		}
 
 		// Создаем MethodSymbol
 		try {
-			methodScope = new MethodScope(null, classScope);
+			methodScope = new MethodScope(null, scope);
 			symbol = new MethodSymbol(	name, returnType, paramSymbols, modifiers.contains(Keyword.FINAL),
 										modifiers.contains(Keyword.STATIC),	modifiers.contains(Keyword.NATIVE), canThrow, methodScope, this);
 			// Устанавливаем обратную ссылку
 			methodScope.setSymbol((MethodSymbol)symbol);
 
-			// Добавляем метод или конструктор в область видимости класса
-			if (isConstructor()) {
-				classScope.addConstructor((MethodSymbol)symbol);
+			
+			// Проверяем, является ли scope ClassScope или InterfaceScope
+			if (scope instanceof ClassScope) {
+				ClassScope cScope = (ClassScope) scope;				
+				// Добавляем метод или конструктор в область видимости класса
+				if (isConstructor()) {
+					cScope.addConstructor((MethodSymbol)symbol);
+				}
+				else {
+					// Для обычных методов
+					cScope.addMethod((MethodSymbol)symbol);
+				}
 			}
-			else {
-				// Для обычных методов
-				classScope.addMethod((MethodSymbol)symbol);
+			else if (scope instanceof InterfaceScope) {
+				try{validateModifiers(modifiers, Keyword.PUBLIC);}
+				catch(CompileException e) {
+					addMessage(e);
+					return false;
+				}
+				InterfaceScope iScope = (InterfaceScope) scope;
+				modifiers.add(Keyword.PUBLIC); // Гарантируем, что метод public
+				iScope.addMethod((MethodSymbol)symbol);
 			}
-
 			// Объявляем параметры в области видимости метода
 			for (ParameterNode param : parameters) {
 				param.declare(methodScope);
@@ -216,6 +218,10 @@ public class MethodNode extends AstNode {
 		catch(CompileException e) {markError(e);}
 		
 		if(null != getBody()) {
+			if (scope instanceof InterfaceScope) { //TODO ввести подержу статики
+				markError(new CompileException(	"Method '" + name + "' cannot have body in interface '" + ((InterfaceScope)scope).getName() + "'"));
+				return false;
+			}
 			getBody().declare(methodScope);
 		}
 		

@@ -18,7 +18,7 @@ package ru.vm5277.compiler.semantic;
 public class MethodScope extends BlockScope {
 	private	MethodSymbol	mSymbol;
 	
-	public MethodScope(MethodSymbol mSymbol, ClassScope parent) {
+	public MethodScope(MethodSymbol mSymbol, Scope parent) {
 		super(parent);
 		this.mSymbol = mSymbol;
 	}
