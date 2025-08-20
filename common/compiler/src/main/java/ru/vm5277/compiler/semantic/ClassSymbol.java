@@ -33,6 +33,6 @@ public class ClassSymbol extends Symbol {
 	@Override
 	public String toString() {
 		return	((isNative ? "native " : "") + (isFinal ? "final " : "") + (isStatic ? "static " : "") + " " +
-				((ClassScope)scope.getParent()).getName() + "." + name).trim();
+				(null == ((ClassScope)scope.getParent()).getName() ? name : ((ClassScope)scope.getParent()).getName() + "." + name)).trim();
 	}
 }

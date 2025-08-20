@@ -59,6 +59,6 @@
 			</plugin>
 		</plugins>
 
-		<finalName>javlc</finalName>
+		<finalName>j8bc</finalName>
 	</build>
 </project>

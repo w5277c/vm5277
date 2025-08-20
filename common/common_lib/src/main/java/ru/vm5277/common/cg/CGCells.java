@@ -84,6 +84,6 @@ public class CGCells {
 	
 	@Override
 	public String toString() {
-		return type + (Type.STACK == type ? "[x" + size + "]" : StrUtils.toString(ids));
+		return type + "[" + (Type.STACK == type ? "x" + size : StrUtils.toString(ids)) + "]";
 	}
 }

@@ -61,11 +61,11 @@ public class Generator extends CodeGenerator {
 	@Override public void updateRefCount(CGScope scope, int offset, CGCells cells, boolean isInc) throws CompileException {}
 	@Override public void invokeMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, CGMethodScope mScope) throws CompileException {}
 	@Override public void invokeNative(CGScope scope, String className, String methodName, String params, VarType type, Operand[] operands) throws CompileException {}
-	@Override public boolean emitInstanceof(long op, int typeId) {return false;}
+	@Override public void eInstanceof(CGScope scope, VarType type) throws CompileException {}
 	@Override public void emitUnary(CGScope scope, Operator op, int offset, CGCells cells) throws CompileException {}
 	@Override public CGIContainer eNew(CGScope scope, int size, List<VarType> classTypes, boolean launcPoint, boolean canThrow) throws CompileException {return null;}
 	@Override public void eFree(Operand op) {}
-	@Override public void eIf(CGBlockScope conditionBlock, CGBlockScope thenBlock, CGBlockScope elseBlock) {}
+	@Override public void eIf(CGScope scope, CGBlockScope thenBlock, CGBlockScope elseBlock) {}
 	@Override public void eTry(CGBlockScope blockScope, List<Case> cases, CGBlockScope defaultBlockScope) {}
 	@Override public void eWhile(CGScope scope, CGScope condScope, CGBlockScope bodyScope) throws CompileException {}
 	@Override public void eReturn(CGScope scope, int size) {}

@@ -57,6 +57,8 @@ public abstract class CodeGenerator extends CGScope {
 	protected					CGScope						scope				= null;
 	protected	final			CGAccum						accum				= new CGAccum();
 	protected					boolean						dpStackAlloc		= false; // зависимость от процедур выделения и освобождения памяти в стеке
+	protected					boolean						dpClassModel		= false;
+	protected					boolean						dpInstanceOf		= false;
 	
 	public CodeGenerator(String platform, Map<String, NativeBinding> nbMap, Map<SystemParam, Object> params) {
 		this.platform = platform;
@@ -66,6 +68,7 @@ public abstract class CodeGenerator extends CGScope {
 	
 	public CGClassScope enterClass(VarType type, VarType[] intrerfaceTypes, String name, boolean isRoot) {
 		scope = new CGClassScope(scope, genId(), type, intrerfaceTypes, name, null != scope && isRoot);
+		dpClassModel = true;
 		return (CGClassScope)scope;
 	}
 	public void leaveClass() {
@@ -187,12 +190,12 @@ public abstract class CodeGenerator extends CGScope {
 	}
 
 	public void defineStr(CGCellsScope cScope, String text) {
-		DataSymbol ds = new DataSymbol("JavlD" + cScope.getResId(), -1, text);
+		DataSymbol ds = new DataSymbol("j8bD" + cScope.getResId(), -1, text);
 		flashData.put(cScope.getResId(), ds);
 		cScope.setDataSymbol(ds);
 	}
 	public void defineData(CGCellsScope cScope, int size, long value) {
-		DataSymbol ds = new DataSymbol("JavlD" + cScope.getResId(), size, value);
+		DataSymbol ds = new DataSymbol("j8bD" + cScope.getResId(), size, value);
 		flashData.put(cScope.getResId(), ds);
 		cScope.setDataSymbol(ds);
 	}
@@ -225,13 +228,13 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract void invokeMethod(CGScope scope, String className,String methodName, VarType type, VarType[] types, CGMethodScope mScope)																		throws CompileException;
 	public abstract void invokeNative(CGScope scope, String className, String methodName, String params, VarType type, Operand[] operands)
 																																	throws CompileException;
-	public abstract boolean emitInstanceof(long op, int typeId);
+	public abstract void eInstanceof(CGScope scope, VarType type) throws CompileException;
 	public abstract void emitUnary(CGScope scope, Operator op, int offset, CGCells cells) throws CompileException;
 	
 	//TODO набор методов для реализации команд if, switch, for, loop и .т.д
 	public abstract CGIContainer eNew(CGScope scope, int size, List<VarType> classTypes, boolean launchPoint, boolean canThrow) throws CompileException;
 	public abstract void eFree(Operand op);
-	public abstract void eIf(CGBlockScope conditionBlock, CGBlockScope thenBlock, CGBlockScope elseBlock);
+	public abstract void eIf(CGScope scope, CGBlockScope thenBlock, CGBlockScope elseBlock);
 	public abstract void eTry(CGBlockScope blockScope, List<Case> cases, CGBlockScope defaultBlockScope);
 	public abstract void eWhile(CGScope scope, CGScope condScope, CGBlockScope bodyScope) throws CompileException;
 	public abstract void eReturn(CGScope scope, int size);
@@ -296,6 +299,13 @@ public abstract class CodeGenerator extends CGScope {
 		if(RTOSFeatures.contains(RTOSFeature.OS_FT_DRAM)) {
 			append(new CGIText(".include \"dmem/dram.asm\""));	
 		}
+		if(dpClassModel) {
+			append(new CGIText(".include \"j8b/inc_refcount.asm\""));
+			append(new CGIText(".include \"j8b/dec_refcount.asm\""));	
+		}
+		if(dpInstanceOf) {
+			append(new CGIText(".include \"j8b/instanceof.asm\""));
+		}
 		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) {
 			append(new CGIText(".include \"core/dispatcher.asm\""));	
 		}
@@ -331,7 +341,7 @@ public abstract class CodeGenerator extends CGScope {
 		classTypes.add(classType);
 		append(eNew(null, 0x05, classTypes, true, false)); // TODO canThrow
 		//TODO заглушка
-		append(new CGIAsm("jmp JavlCMainMmain"));
+		append(new CGIAsm("jmp j8bCMainMmain"));
 	}
 	
 	public String getAsm() {

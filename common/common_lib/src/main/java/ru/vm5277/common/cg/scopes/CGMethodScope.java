@@ -48,7 +48,7 @@ public class CGMethodScope extends CGScope {
 		this.callSize = cg.getCallSize();
 		
 		if((null == types || 0==types.length) && "main".equals(name) && "CMain".equals(parent.getLName())) {
-			lbScope = new CGLabelScope(null, null, "JavlCmainMmain", true);
+			lbScope = new CGLabelScope(null, -1, "j8bCmainMmain", true);
 		}
 		else {
 			lbScope = new CGLabelScope(this, null, null, true);

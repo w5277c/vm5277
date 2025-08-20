@@ -257,8 +257,8 @@ public class Generator extends CodeGenerator {
 				int addr = cells.getId(0);
 				boolean needRestoreIReg = moveIReg(scope, 'y', offset+addr, cells.getSize());
 				for(int i=0; i<cells.getSize(); i++) {
-					scope.append(new CGIAsm("ldd javl_atom,y+" + (cells.getId(i) + (needRestoreIReg ? -addr : offset))));
-					scope.append(new CGIAsm("push javl_atom"));
+					scope.append(new CGIAsm("ldd j8b_atom,y+" + (cells.getId(i) + (needRestoreIReg ? -addr : offset))));
+					scope.append(new CGIAsm("push j8b_atom"));
 				}
 				if(needRestoreIReg) restoreIReg(scope, 'y', offset+addr);
 				if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) {
@@ -272,8 +272,8 @@ public class Generator extends CodeGenerator {
 				addr = cells.getId(0);
 				needRestoreIReg = moveIReg(scope, 'z', offset+addr, cells.getSize());
 				for(int i=0; i<cells.getSize(); i++) {
-					scope.append(new CGIAsm("ldd javl_atom,z+" + (cells.getId(i) + (needRestoreIReg ? -addr : offset))));
-					scope.append(new CGIAsm("push javl_atom"));
+					scope.append(new CGIAsm("ldd j8b_atom,z+" + (cells.getId(i) + (needRestoreIReg ? -addr : offset))));
+					scope.append(new CGIAsm("push j8b_atom"));
 				}
 				if(needRestoreIReg) restoreIReg(scope, 'z', offset+addr);
 				if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) {
@@ -595,7 +595,7 @@ public class Generator extends CodeGenerator {
 			case MINUS:
 				constActionAsm(scope, k, (int sn, String rOp) -> new CGIAsm((0 == sn ? "subi " : "sbci ") + getRightOp(sn, null) + "," + rOp));
 			case LT:
-				CGLabelScope lbScope = makeLabel(null, "end", true);
+				CGLabelScope lbScope = makeLabel(null, "end", true);//TODO не корректный label, состоит только из имени 'end'
 				for(int i=accum.getSize()-1; i>=0; i--) {
 					cont.append(new CGIAsm("cpi " + getRightOp(i, null) + "," + ((k>>(i*8))&0xff)));
 					if(i!=0) {
@@ -725,8 +725,8 @@ public class Generator extends CodeGenerator {
 				}
 				//Значение лежит на вершине стека(BigEndian)
 				for(int i=0; i<cells.getSize(); i++) {
-					scope.append(new CGIAsm("pop javl_atom"));
-					scope.append(handler.action(i, "javl_atom"));
+					scope.append(new CGIAsm("pop j8b_atom"));
+					scope.append(handler.action(i, "j8b_atom"));
 				}
 				if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) {
 					scope.append(new CGIAsm("mcall os_dispatcher_unlock"));
@@ -909,69 +909,72 @@ public class Generator extends CodeGenerator {
 	
 	@Override
 	public void updateRefCount(CGScope scope, int offset, CGCells cells, boolean isInc) throws CompileException {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";refCount++ for " + cells));
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";refCount" + (isInc ? "++" : "--") + " for " + cells));
+	
+		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("mcall os_dispatcher_lock"));
+		scope.append(new CGIAsm("push_z"));
 
-		scope.append(new CGIAsm("push r16"));
 		switch(cells.getType()) {
 			case REG:
-				scope.append(new CGIAsm("push yl"));
-				if(0x02 == getRefSize()) scope.append(new CGIAsm("push yh"));
-				scope.append(new CGIAsm("mov yl,r" + cells.getId(0x00)));
-				if(0x02 == getRefSize()) scope.append(new CGIAsm("mov yh,r" + cells.getId(0x01)));
+				scope.append(new CGIAsm("mov zl,r" + cells.getId(0x00)));
+				if(0x01 == getRefSize()) {
+					scope.append(new CGIAsm("ldi zh,0x00"));
+				}
+				else {
+					scope.append(new CGIAsm("mov zh,r" + cells.getId(0x01)));
+				}
 				break;
 			case STACK_FRAME:
-				scope.append(new CGIAsm("push zl"));
-				if(0x02 == getRefSize()) scope.append(new CGIAsm("push zh"));
 				int addr = cells.getId(0);
 				boolean needRestoreIReg = moveIReg(scope, 'y', offset+addr, cells.getSize());
 				scope.append(new CGIAsm("ldd zl,y+" + (cells.getId(0) + (needRestoreIReg ? -addr : offset))));
-				if(0x02 == getRefSize()) scope.append(new CGIAsm("ldd zh,y+" + (cells.getId(1) + (needRestoreIReg ? -addr : offset))));
+				if(0x01 == getRefSize()) {
+					scope.append(new CGIAsm("ldi zh,0x00"));
+				}
+				else {
+					scope.append(new CGIAsm("ldd zh,y+" + (cells.getId(1) + (needRestoreIReg ? -addr : offset))));					
+				}
 				if(needRestoreIReg) restoreIReg(scope, 'y', offset+addr);
 				break;
 			case HEAP:
-				scope.append(new CGIAsm("push yl"));
-				if(0x02 == getRefSize()) scope.append(new CGIAsm("push yh"));
 				addr = cells.getId(0);
 				needRestoreIReg = moveIReg(scope, 'z', offset+addr, cells.getSize());
-				scope.append(new CGIAsm("ldd yl,z+" + (cells.getId(0) + (needRestoreIReg ? -addr : offset))));
-				if(0x02 == getRefSize()) scope.append(new CGIAsm("ldd yh,z+" + (cells.getId(0) + (needRestoreIReg ? -addr : offset))));
-				if(needRestoreIReg) restoreIReg(scope, 'z', offset+addr);
+				if(0x01 == getRefSize()) {
+					scope.append(new CGIAsm("ldd zl,z+" + (cells.getId(0) + (needRestoreIReg ? -addr : offset))));
+					scope.append(new CGIAsm("ldi zh,0x00"));
+				}
+				else {
+					scope.append(new CGIAsm("ldd j8b_atom,z+" + (cells.getId(0) + (needRestoreIReg ? -addr : offset))));
+					scope.append(new CGIAsm("ldd zh,z+" + (cells.getId(1) + (needRestoreIReg ? -addr : offset))));
+					scope.append(new CGIAsm("mov zl,j8b_atom"));
+				}
 				break;
 			default:
 				throw new CompileException("Unsupported cell type:" + cells.getType());
 		}
 
-		if(CGCells.Type.HEAP == cells.getType()) {
-			scope.append(new CGIAsm("ldd r16,y+0x02"));
-			scope.append(new CGIAsm("cpse r16,c0xff"));	//не инкрементируем, если максимальное значение(вынужденная мера - блокировка, объект никогда не будет уничтожен)
-			scope.append(new CGIAsm("inc r16"));
-			scope.append(new CGIAsm("std y+0x02,r16"));
-			if(0x02 == getRefSize()) scope.append(new CGIAsm("pop yh"));
-			scope.append(new CGIAsm("pop yl"));
-		}
-		else {
-			scope.append(new CGIAsm("ldd r16,z+0x02"));
-			scope.append(new CGIAsm("cpse r16,c0xff"));	//не инкрементируем, если максимальное значение(вынужденная мера - блокировка, объект никогда не будет уничтожен)
-			scope.append(new CGIAsm(isInc ? "inc r16" : "dec r16"));
-			scope.append(new CGIAsm("std z+0x02,r16"));
-			if(0x02 == getRefSize()) scope.append(new CGIAsm("pop zh"));
-			scope.append(new CGIAsm("pop zl"));
-		}
-		scope.append(new CGIAsm("pop r16"));
+		scope.append(new CGIAsm("mcall j8bproc_" + (isInc ? "inc" : "dec") + "_refcount"));
+		scope.append(new CGIAsm("pop_z"));
+		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("mcall os_dispatcher_unlock"));
 	}
 	
 	@Override
-	public boolean emitInstanceof(long resId, int typeId) {
-		//System.out.println("CG: emitInstanceOf, op:" + resId + ", typeId:" + typeId);
-		return false;//TODO new Operand(VarType.BOOL, OperandType.LITERAL, true);
+	public void eInstanceof(CGScope scope, VarType type) throws CompileException {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";eInstanceOf " + type));
+		dpInstanceOf=true;
+		// TODO не сохраняем Z, так как обращение к полю/переменной уже изменило Z, но нужно учитывать работу с this
+		scope.append(new CGIAsm("push r17"));
+		scope.append(new CGIAsm("ldi r17,"+type.getId()));
+		scope.append(new CGIAsm("mcall j8bproc_instanceof"));
+		scope.append(new CGIAsm("pop r17"));
 	}
 	
 	@Override
-	public void eIf(CGBlockScope condBlockScope, CGBlockScope thenBlockScope, CGBlockScope elseBlockScope) {
+	public void eIf(CGScope scope, CGBlockScope thenScope, CGBlockScope elseScope) {
 		//TODO код устарел
 		
 		if(VERBOSE_LO <= verbose) {
-			scope.append(new CGIText(";eIf, condBlock:" + condBlockScope + ", thenBlock:" + thenBlockScope + ", elseBlock:" + elseBlockScope));
+			scope.prepend(new CGIText(";eIf"));
 		}
 		
 		CGLabelScope beginLbScope = makeLabel(null, "if_begin", true);
@@ -979,8 +982,8 @@ public class Generator extends CodeGenerator {
 		CGLabelScope elseLbScope = makeLabel(null, "if_else", true);
 		CGLabelScope endLbScope = makeLabel(null, "if_end", true);
 		
-		condBlockScope.prepend(beginLbScope);
-		thenBlockScope.prepend(thenLbScope);
+		scope.prepend(beginLbScope);
+		thenScope.prepend(thenLbScope);
 		
 
 //		String optimizedBrInst = Optimizator.localWithConstantComparingCondition((CGExpressionScope)condBlockScope.getItems().get(1));
@@ -988,16 +991,17 @@ public class Generator extends CodeGenerator {
 		String brInstr = "brne";//null == optimizedBrInst ? "brne" : optimizedBrInst;
 		
 
-		//if(null == optimizedBrInst) condBlockScope.append(new CGIAsm("cpi r16,0x01"));
-		if(null != elseBlockScope) {
-			condBlockScope.append(new CGIAsm(brInstr + " " + elseLbScope.getName())); //TODO необходима проверка длины прыжка
-			thenBlockScope.append(new CGIAsm("rjmp " + endLbScope.getName())); //TODO необходима проверка длины прыжка
-			elseBlockScope.prepend(elseLbScope);
-			elseBlockScope.append(endLbScope);
+		//if(null == optimizedBrInst) 
+		scope.append(new CGIAsm("cpi r16,0x01"));
+		if(null != elseScope) {
+			scope.append(new CGIAsm(brInstr + " " + elseLbScope.getName())); //TODO необходима проверка длины прыжка
+			thenScope.append(new CGIAsm("rjmp " + endLbScope.getName())); //TODO необходима проверка длины прыжка
+			elseScope.prepend(elseLbScope);
+			elseScope.append(endLbScope);
 		}
 		else {
-			condBlockScope.append(new CGIAsm(brInstr + " " + endLbScope.getName())); //TODO необходима проверка длины прыжка
-			thenBlockScope.append(endLbScope);
+			scope.append(new CGIAsm(brInstr + " " + endLbScope.getName())); //TODO необходима проверка длины прыжка
+			thenScope.append(endLbScope);
 		}
 	}
 
@@ -1030,7 +1034,6 @@ public class Generator extends CodeGenerator {
 	
 	@Override
 	public void eReturn(CGScope scope, int size) {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";eReturn"));
 		scope.append(new CGIAsm("ret"));
 	}
 	

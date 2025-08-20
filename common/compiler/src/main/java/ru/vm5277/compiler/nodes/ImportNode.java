@@ -81,7 +81,7 @@ public class ImportNode extends AstNode {
     }
 
 	public String getImportFilePath() {
-		return (importStr.replace(".", File.separator) + ".javl");
+		return (importStr.replace(".", File.separator) + ".j8b");
 	}
 	
     // Геттеры

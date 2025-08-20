@@ -205,10 +205,12 @@ public class ClassNode extends AstNode {
 			for (MethodSymbol interfaceMethod : entry) {
 
 				// Проверяем каждый метод класса
-				for (MethodSymbol classMethod : classMethods) {
-					if (interfaceMethod.getSignature().equals(classMethod.getSignature())) {
-						found = true;
-						break;
+				if(null != classMethods) {
+					for (MethodSymbol classMethod : classMethods) {
+						if (interfaceMethod.getSignature().equals(classMethod.getSignature())) {
+							found = true;
+							break;
+						}
 					}
 				}
 

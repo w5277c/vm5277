@@ -1,0 +1,33 @@
+import rtos.System;
+import rtos.RTOSParam;
+import hal.GPIO;
+
+class Main {
+	public static void main() {
+		System.setParam(RTOSParam.CORE_FREQ, 16);
+		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
+		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
+
+		byte a = 100;
+		{
+			byte b = 10;
+			byte c = 20;
+			System.out(b + c + a);
+		}
+
+		{
+			byte d = 30;
+			byte e = 40;
+			System.out(d + e);
+
+			{
+				byte f = 50;
+				System.out(f);
+			}
+		}
+
+		byte g = 60;
+		byte h = 70;
+		System.out(a + g + h);
+	}
+}

@@ -19,6 +19,7 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
+import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -113,7 +114,9 @@ public class VarFieldExpression extends ExpressionNode {
 		if(symbol instanceof VarSymbol || symbol instanceof FieldSymbol || symbol instanceof AliasSymbol) {
 			return symbol;
 		}
-		symbol = scope.resolve(value);
+		if(null != scope) { //TODO вероятно всегда null
+			symbol = scope.resolve(value);
+		}
 		return symbol;
 	}
 
@@ -152,7 +155,7 @@ public class VarFieldExpression extends ExpressionNode {
 			}
 		}
 		cg.setScope(oldCGScope);
-		return true;
+		return CodegenResult.RESULT_IN_ACCUM;
 		
 		// Это странный код, боюсь поломать
 /*		if(null == depCodeGen(cg)) {

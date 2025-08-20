@@ -20,6 +20,7 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.ClassScope;
+import ru.vm5277.compiler.semantic.ClassSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class ThisExpression extends ExpressionNode {
@@ -42,6 +43,7 @@ public class ThisExpression extends ExpressionNode {
 	@Override
 	public boolean declare(Scope scope) {
 		this.scope = scope.getThis();
+		symbol = new ClassSymbol(this.scope.getName(), VarType.fromClassName(this.scope.getName()), true, false, this.scope);
 		return true;
 	}
 	

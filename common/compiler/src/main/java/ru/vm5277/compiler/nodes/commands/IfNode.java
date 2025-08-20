@@ -19,6 +19,7 @@ import java.util.Arrays;
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
@@ -38,7 +39,7 @@ import ru.vm5277.compiler.semantic.Symbol;
 
 public class IfNode extends CommandNode {
     private	ExpressionNode	condition;
-	private	BlockNode		blockNode;
+	private	BlockNode		thenBlockNode;
 	private	BlockNode		elseBlockNode;
 	
 	private	BlockScope		thenScope;
@@ -59,7 +60,7 @@ public class IfNode extends CommandNode {
 		// Then блок
 		tb.getLoopStack().add(this);
 		try {
-			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
+			thenBlockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
 		}
 		catch(CompileException e) {markFirstError(e);}
 		tb.getLoopStack().remove(this);
@@ -91,7 +92,7 @@ public class IfNode extends CommandNode {
     }
 
     public BlockNode getThenBlock() {
-        return blockNode;
+        return thenBlockNode;
     }
 
     public BlockNode getElseBlock() {
@@ -233,52 +234,37 @@ public class IfNode extends CommandNode {
 		cgDone = true;
 
 		if(alwaysTrue) {
-			cg.enterBlock(cg.getScope());
-			getThenBlock().codeGen(cg);
-			cg.leaveBlock();
+			thenBlockNode.codeGen(cg);
 			return null;
 		}
-		if(alwaysFalse()) {
-			if (getElseBlock() != null) {
-				cg.enterBlock(cg.getScope());
-				getElseBlock().codeGen(cg);
-				cg.leaveBlock();
+		if(alwaysFalse) {
+			if(getElseBlock() != null) {
+				elseBlockNode.codeGen(cg);
 			}
 			return null;
 		}
 		
-		CGBlockScope condBlockScope = cg.enterBlock(cg.getScope());
 		Object obj = condition.codeGen(cg);
-		cg.leaveBlock();
 		
-		/* TODO Рудимент. Сейчас codeGen возвращает true, если результат операции содержится в аккумуляторе. Поломал логику?
-		//Если результат стал известен без кодогенерации
-		if(obj instanceof Boolean) {
-			if(((Boolean)obj)) {
-				cg.enterBlock(cg.getScope());
-				getThenBlock().codeGen(cg);
-				cg.leaveBlock();
-			}
-			else if(getElseBlock() != null) {
-				cg.enterBlock(cg.getScope());
-				getElseBlock().codeGen(cg);
-				cg.leaveBlock();
+		//Если результат стал известен без runtime
+		if(obj == CodegenResult.TRUE) {
+			thenBlockNode.codeGen(cg);
+			return null;
+		}
+		if(obj == CodegenResult.FALSE) {
+			if(elseBlockNode != null) {
+				elseBlockNode.codeGen(cg);
 			}
 			return null;
 		}
-		*/
-		CGBlockScope thenBlockScope = cg.enterBlock(cg.getScope());
-		getThenBlock().codeGen(cg);
-		cg.leaveBlock();
 
-		CGBlockScope elseBlockScope = null;
-		if(null != getElseBlock()) {
-			elseBlockScope = cg.enterBlock(cg.getScope());
-			getElseBlock().codeGen(cg);
-			cg.leaveBlock();
+		thenBlockNode.codeGen(cg);
+
+		if(null != elseBlockNode) {
+			elseBlockNode.codeGen(cg);
 		}
 		
-		cg.eIf(condBlockScope, thenBlockScope, elseBlockScope);
+		cg.eIf(condition.getCGScope(), thenBlockNode.getCGScope(), null == elseBlockNode ? null : elseBlockNode.getCGScope());
 		
 		return null;
 	}
@@ -286,8 +272,8 @@ public class IfNode extends CommandNode {
 	@Override
 	public List<AstNode> getChildren() {
 		if(null == elseBlockNode) {
-			return Arrays.asList(blockNode);
+			return Arrays.asList(thenBlockNode);
 		}
-		return Arrays.asList(blockNode, elseBlockNode);
+		return Arrays.asList(thenBlockNode, elseBlockNode);
 	}
 }

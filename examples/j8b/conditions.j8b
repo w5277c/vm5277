@@ -13,40 +13,42 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 import rtos.System;
 import rtos.RTOSParam;
 import hal.GPIO;
 
 class Main {
-	public interface Number {
-		byte toByte();
-	}
-
-	public class Byte implements Number {
-		private	byte	value;
-
-		public Byte(byte value) {
-			this.value = value;
-		}
-
-		public byte toByte() {
-			return value;
-		}
-
-		public void finalize() {
-		}
-	}
-
-    public static void main() {
+	public static void main() {
 		System.setParam(RTOSParam.CORE_FREQ, 16);
 		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
 		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
 
-		Byte b = new Byte(0x01);
+		if(true) {
+			System.outChar('A'); //65
+		}
 
-		System.out(b.toByte());
-		System.out(b.getClassTypeId());
-		System.out(b.getClassId());
-    }
+		if(false) {
+			System.outChar('B'); //66
+		}
+
+		if(3==1+2) {
+			System.outChar('C'); //67
+		}
+
+		if(1!=2) {
+			System.outChar('D'); //68
+		}
+		else {
+			System.outChar('E'); //69
+		}
+
+		byte i=1;
+		byte j=2;
+		if(i+j<2) {
+			System.outChar('F'); //71
+		}
+		else {
+			System.outChar('G'); //72
+		}
+	}
 }

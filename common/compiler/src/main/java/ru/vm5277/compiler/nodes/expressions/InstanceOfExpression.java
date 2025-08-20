@@ -18,6 +18,11 @@ package ru.vm5277.compiler.nodes.expressions;
 import java.util.Arrays;
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGCellsScope;
+import ru.vm5277.common.cg.scopes.CGClassScope;
+import ru.vm5277.common.cg.scopes.CGFieldScope;
+import ru.vm5277.common.cg.scopes.CGVarScope;
+import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -31,14 +36,13 @@ import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 
 public class InstanceOfExpression extends ExpressionNode {
-	private	final	ExpressionNode	leftExpr;		// Проверяемое выражение
+	private	final	ExpressionNode	leftExpr;	// Проверяемое выражение
 	private	final	ExpressionNode	rightExpr;	// Выражение, возвращающее тип
 	private			VarType			leftType;
 	private			VarType			rightType;
 	private			String			varName;
 	private			Scope			scope;
 	private			boolean			fulfillsContract;	//Флаг реализации интерфейса
-	private			boolean			isUsed				= false;	
 	
 	public InstanceOfExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode leftExpr, ExpressionNode rightExpr, String varName) {
 		super(tb, mc);
@@ -78,6 +82,10 @@ public class InstanceOfExpression extends ExpressionNode {
 	@Override
 	public boolean declare(Scope scope) {
 		try {
+			if(!leftExpr.declare(scope) || !rightExpr.declare(scope)) {
+				return false;
+			}
+			
 			if(rightExpr instanceof LiteralExpression && ((LiteralExpression)rightExpr).getValue() instanceof VarType) {
 				rightType = (VarType)((LiteralExpression)rightExpr).getValue();
 			}
@@ -195,18 +203,36 @@ public class InstanceOfExpression extends ExpressionNode {
 	@Override
 	public Object codeGen(CodeGenerator cg) throws Exception {
 		//Обходимся без рантайма, пока в левой части примитив или это константа
-		//Но нужно вызывать рантайм, если в встречаем объект, так как только в рантайм данных есть информация о типе переменной
+		//Но нужно вызывать рантайм, если встречаем объект, так как только в рантайм данных есть информация о типе переменной
 		
-		Symbol  varSymbol = ((VarFieldExpression)leftExpr).getSymbol();
-		if(varSymbol.isFinal()) {
-			return isCompatibleWith(scope, varSymbol.getType(), rightType);
+		Symbol varSymbol = leftExpr.getSymbol();
+		if(varSymbol.isFinal()) return (isCompatibleWith(scope, varSymbol.getType(), rightType) ? CodegenResult.TRUE : CodegenResult.FALSE);
+
+		if(CodegenResult.RESULT_IN_ACCUM != leftExpr.codeGen(cg)) {		
+			// Явно не доработанный код, выражение всегда должно помещать результат в аккумулятор
+			throw new CompileException("Accum not used for operand:" + leftExpr);
 		}
 
-		leftExpr.codeGen(cg);
-		//TODO long objectOp = cg.getAcc(); //???
-		//cg.setAcc(cgScope, 0x01, cg.emitInstanceof(objectOp, (int)rightType.getId()) ? 0x01 : 0x00);
-		//cg.loadConstToAcc(cgScope, 0x01, cg.emitInstanceof(objectOp, (int)rightType.getId()) ? 0x01 : 0x00);
-		return null;
+		// TODO весь код можно вынести в RTOS j8b утилиты и просто вызывать как функцию
+		int heapSaved=0;
+		if(leftExpr instanceof VarFieldExpression) {
+			CGCellsScope cScope = (CGCellsScope)((VarFieldExpression)leftExpr).getSymbol().getCGScope();
+			heapSaved = cg.pushHeapReg(cgScope);
+			if(cScope instanceof CGVarScope) {
+				cg.setHeapReg(cgScope, ((CGVarScope)cScope).getStackOffset(), cScope.getCells());
+			}
+			else {
+				cg.setHeapReg(cgScope, ((CGClassScope)((CGFieldScope)cScope).getParent()).getHeapHeaderSize(), cScope.getCells());
+			}
+		}
+
+		cg.eInstanceof(cgScope, rightType);
+
+		if(0 != heapSaved) {
+			cg.popHeapReg(cgScope);
+		}
+
+		return CodegenResult.RESULT_IN_ACCUM;
 	}
 
 	@Override

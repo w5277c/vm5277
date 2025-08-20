@@ -15,43 +15,42 @@
  */
 package ru.vm5277.common;
 
-import java.util.Arrays;
 import java.util.Collection;
 
 public class StrUtils {
 	public static String toString(Collection collection) {
 		if(null != collection && !collection.isEmpty()) {
-			StringBuilder sb = new StringBuilder("[");
+			StringBuilder sb = new StringBuilder();
 			for(Object obj : collection) {
 				if(!obj.toString().isEmpty()) sb.append(obj).append(",");
 			}
-			if(1!=sb.length()) sb.deleteCharAt(sb.length()-1);
-			return sb.toString() + "]";
+			if(0!=sb.length()) sb.deleteCharAt(sb.length()-1);
+			return sb.toString();
 		}
-		return "[]";
+		return "";
 	}
 	public static String toString(Object[] array) {
 		if(null != array && 0!=array.length) {
-			StringBuilder sb = new StringBuilder("[");
+			StringBuilder sb = new StringBuilder();
 			for(Object obj : array) {
 				if(!obj.toString().isEmpty()) sb.append(obj).append(",");
 			}
-			if(1!=sb.length()) sb.deleteCharAt(sb.length()-1);
-			return sb.toString() + "]";
+			if(0!=sb.length()) sb.deleteCharAt(sb.length()-1);
+			return sb.toString();
 		}
-		return "[]";
+		return "";
 	}
 	
 	public static String toString(int[] array) {
 		if(null != array && 0!=array.length) {
-			StringBuilder sb = new StringBuilder("[");
+			StringBuilder sb = new StringBuilder("");
 			for(Object obj : array) {
 				if(!obj.toString().isEmpty()) sb.append(obj).append(",");
 			}
-			if(1!=sb.length()) sb.deleteCharAt(sb.length()-1);
-			return sb.toString() + "]";
+			if(0!=sb.length()) sb.deleteCharAt(sb.length()-1);
+			return sb.toString();
 		}
-		return "[]";
+		return "";
 	}
 
 	public static String escapeChar(char c) {

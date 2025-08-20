@@ -23,38 +23,19 @@ class Main {
 		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
 		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
 
+		byte num = 0x20;
 
-		if(true) {
-			System.outChar('A'); //65
-		}
+		byte ch = 'A';
+		System.outChar(ch);
+		ch++;
+		System.outChar(ch);
+		ch++;
+		System.outChar(ch);
+		ch++;
+		ch = ch + num;
+		System.outChar(ch);
 
-		if(false) {
-			System.outChar('B'); //66
-		}
 
-		if(3==1+2) {
-			System.outChar('C'); //67
-		}
-
-		if(1!=2) {
-			System.outChar('D'); //68
-		}
-		else {
-			System.outChar('E'); //69
-		}
-
-		byte ch = 'F';
-		if(ch is byte) { //TODO убрать поддержку примитивов, нет необходимости
-			System.outChar(ch); //70
-		}
-
-		byte i=1;
-		byte j=2;
-		if(i+j<2) { //TODO поломана кодогенерация условия
-			System.outChar('G'); //71
-		}
-		else {
-			System.outChar('H'); //72
-		}
+		System.stop();
     }
 }

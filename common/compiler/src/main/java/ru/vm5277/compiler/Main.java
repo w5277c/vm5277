@@ -47,7 +47,7 @@ public class Main {
 	
 	public static void main(String[] args) throws IOException, Exception {
 		long startTimestamp = System.currentTimeMillis();
-		System.out.println("Javl Compiler v" + VERSION + " started");
+		System.out.println("j8b compiler v" + VERSION + " started");
 		
 		isWindows = (null != System.getProperty("os.name") && System.getProperty("os.name").toLowerCase().contains("windows"));
 
@@ -59,7 +59,7 @@ public class Main {
 		}
 		if(0x01 == args.length) {
 			if(args[0x00].equalsIgnoreCase("--version")) {
-				System.out.println("Javl compiler version: " + VERSION);
+				System.out.println("j8b compiler version: " + VERSION);
 			}
 			else {
 				showHelp();
@@ -262,7 +262,7 @@ public class Main {
     }
 	
 	private static void showHelp() {
-		System.out.println("Javl Compiler: Java-like source code compiler for vm5277 Embedded Toolkit");
+		System.out.println("j8b compiler: Java-like source code compiler for vm5277 Embedded Toolkit");
 		System.out.println("Version: " + VERSION + " | License: Apache-2.0");
 		System.out.println("-------------------------------------------");
 		System.out.println();
@@ -272,7 +272,7 @@ public class Main {
 		System.out.println("Project home: https://github.com/w5277c/vm5277");
 		System.out.println("Contact: w5277c@gmail.com | konstantin@5277.ru");
 		System.out.println();
-		System.out.println("Usage: javlc" + (isWindows ? ".exe" : "") + " <platform>:<mcu> <input.javl> [options]");
+		System.out.println("Usage: j8bc" + (isWindows ? ".exe" : "") + " <platform>:<mcu> <input.j8b> [options]");
 		System.out.println();
 		System.out.println("Options:");
 		System.out.println("  -o, --output <file>\tOutput HEX file (default: <input>.hex)");
@@ -294,7 +294,7 @@ public class Main {
 		System.out.println("  -h, --help\t\tShow this help");
 		System.out.println();
 		System.out.println("Example:");
-		System.out.println("  javlc avr:atmega328p main.javl -f 8 -o firmware.hex -I ./libs");
+		System.out.println("  j8bc avr:atmega328p main.j8b -f 8 -o firmware.hex -I ./libs");
 	}
 	
 	private static void showInvalidDeviceFormat(String invalidParam) {

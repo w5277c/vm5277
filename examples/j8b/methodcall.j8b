@@ -14,34 +14,24 @@
  * limitations under the License.
  */
 import rtos.System;
+import rtos.RTOSParam;
+import hal.GPIO;
 
 class Main {
-    public static void main() {
-/*		final Object obj = 0x01;
-		if(obj is byte as b) {
-//			System.out(b);
-			System.outCStr(" is byte\n");
-		}
-*/
-		Object obj2 = 0x04030201;
-		if(obj2 is int as i) {
-//			System.out(i);
-			System.outCStr(" is int\n");
-		}
+	public static void main() {
+		System.setParam(RTOSParam.CORE_FREQ, 16);
+		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
+		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
 
-/*		obj2 = 0x0201;
-		if(obj2 is short as s) {
-//			System.out(s);
-			System.outCStr(" is short\n");
-		}
-*/
+		byte src1 = 1;
+		short src2 = 2;
+		byte result = inc(src1, src2);
+		System.out(result);
+		System.stop();
+	}
 
-/*		if((0xffff+0x01) is int as i) {
-			System.out(i);
-			System.outCStr(" is int\n");
-		}
-		else {
-			System.outCStr("Expr is not int type\n");
-		}*/
-    }
+	private byte inc(byte val1, short val2) {
+		byte tmp = 3;
+		return (byte)(val1+val2+tmp);
+	}
 }

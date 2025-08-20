@@ -199,6 +199,9 @@ public abstract class AstNode extends SemanticAnalyzer {
 				return new MethodCallExpression(tb, mc, new ThisExpression(tb, mc), id, parseArguments(tb));
 			}
 			else {
+				if(Keyword.THIS.getName().equals(id)) {
+					return new ThisExpression(tb, mc);
+				}
 				//Это имя переменной или поля
 				return new VarFieldExpression(tb, mc, id);
 			}
@@ -364,7 +367,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		if (left.isClassType() && right.isClassType()) {
 			if(null == left.getClassName()) return false;
 			if(left.getClassName().equals(right.getClassName())) return true;
-			return null != scope.getThis().resolveInterface(left.getName());
+			return null != scope.getThis().resolveInterface(right.getName());
 		}
 		
 		// Проверка массивов

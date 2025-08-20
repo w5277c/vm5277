@@ -31,7 +31,9 @@ public class BlockScope extends Scope {
 
 	public void addVariable(Symbol symbol) throws CompileException {
 		String name = symbol.getName();
-		if (variables.containsKey(name)) throw new CompileException("Duplicate variable: " + name);
+		if (variables.containsKey(name)) {
+			throw new CompileException("Duplicate variable: " + name);
+		}
 		variables.put(name, symbol);
 	}
 

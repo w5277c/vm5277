@@ -157,6 +157,11 @@ public class MethodNode extends AstNode {
 	public boolean preAnalyze() {
 		try{validateModifiers(modifiers, Keyword.PUBLIC, Keyword.PRIVATE, Keyword.STATIC, Keyword.NATIVE);} catch(CompileException e) {addMessage(e);}
 		
+		if(null == name) {
+			markError("Constructor or method declaration is invalid: name cannot be null");
+			return false;
+		}
+		
 		if(!isConstructor() && Character.isUpperCase(name.charAt(0))) {
 			addMessage(new WarningMessage("Method name should start with uppercase letter:" + name, sp));
 		}

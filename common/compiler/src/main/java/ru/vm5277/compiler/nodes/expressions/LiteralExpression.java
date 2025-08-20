@@ -67,6 +67,10 @@ public class LiteralExpression extends ExpressionNode {
 		return value instanceof Integer || value instanceof Long;
 	}
 	
+	public boolean isNull() {
+		return null == value;
+	}
+	
 	public long getNumValue() {
 		if(value instanceof Character) {
 			return (int)(Character)value;
@@ -82,10 +86,6 @@ public class LiteralExpression extends ExpressionNode {
 	
 	@Override
 	public boolean preAnalyze() {
-		if (value == null) {
-			markError("Literal value cannot be null");
-			return false;
-		}
 		return true;
 	}
 	

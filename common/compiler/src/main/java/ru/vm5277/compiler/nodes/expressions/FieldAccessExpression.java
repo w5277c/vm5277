@@ -21,16 +21,14 @@ import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.cg.scopes.CGVarScope;
+import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
-import ru.vm5277.compiler.semantic.AliasSymbol;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.FieldSymbol;
 import ru.vm5277.compiler.semantic.Scope;
-import ru.vm5277.compiler.semantic.Symbol;
 
 public class FieldAccessExpression extends ExpressionNode {
 	private			ExpressionNode	target;
@@ -103,6 +101,10 @@ public class FieldAccessExpression extends ExpressionNode {
 				}
 			}
 
+			if(!target.declare(scope)) {
+				return false;
+			}
+			
 			if (target instanceof TypeReferenceExpression) {
 				TypeReferenceExpression tre = (TypeReferenceExpression) target;
 				className = tre.getClassName();
@@ -196,7 +198,7 @@ public class FieldAccessExpression extends ExpressionNode {
 			}
 		}
 		cg.setScope(oldCGScope);
-		return true;
+		return CodegenResult.RESULT_IN_ACCUM;
 	}
 	
 	@Override

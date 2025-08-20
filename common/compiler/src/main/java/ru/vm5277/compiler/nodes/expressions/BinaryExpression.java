@@ -27,6 +27,7 @@ import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
+import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -282,17 +283,44 @@ public class BinaryExpression extends ExpressionNode {
 		}
 
 		Operator op = (operator.isAssignment() ? operator.toArithmetic() : operator);
-		// Если expr2 переменная или поле(т.е. содержит cells)
-		if(expr2 instanceof VarFieldExpression) {
-			// TODO Поменял выражения местами, так как для выражения this.value = value; они явно перепутаны. Проверить остальные
-			// Не строим код для expr1(он разместит значение в acc), а нас интересует знaчение в cells(только выполняем зависимость)
-			depCodeGen(cg, expr1.getSymbol());
-			// Строим код для expr2(результат в аккумуляторе)
-			if(null == expr2.codeGen(cg)) {
-				// Явно не доработанный код, выражение всегда должно помещать результат в аккумулятор
-				throw new CompileException("Accum not used for operand:" + expr2);
+		// Для присваивания всегда вычисляем правое выражение первым
+		if (operator.isAssignment()) {
+			// Не строим код для leftExpr(он разместит значение в acc), а нас интересует знaчение в cells(только выполняем зависимость)
+			depCodeGen(cg, leftExpr.getSymbol());
+			// Затем обрабатываем левое выражение (куда записываем результат)
+			if (leftExpr instanceof VarFieldExpression || leftExpr instanceof FieldAccessExpression) {
+				CGCellsScope cScope = (CGCellsScope)leftExpr.getSymbol().getCGScope();
+				if(VarType.NULL == rightType) {
+					if(null == op) {
+						int offset = (cScope instanceof CGVarScope ?	((CGVarScope)cScope).getStackOffset() :
+																		((CGClassScope)((CGFieldScope)cScope).getParent()).getHeapHeaderSize());
+						cg.constToCells(cgScope, offset, 0x00, cScope.getCells());
+						cg.updateRefCount(cgScope, offset, cScope.getCells(), false);
+					}
+					else {
+						throw new CompileException("Invalid assignment: cannot use '" + operator.getSymbol() + "' with null value");
+					}
+				}
+				else {
+					if (CodegenResult.RESULT_IN_ACCUM != rightExpr.codeGen(cg)) {
+						throw new CompileException("Accum not used for operand:" + rightExpr);
+					}
+					cg.accToCells(cgScope, cScope);
+				}
 			}
-			CGCellsScope cScope = (CGCellsScope)expr1.getSymbol().getCGScope();
+			else {
+				throw new CompileException("Invalid left operand for assignment: " + leftExpr);
+			}
+		} // Если expr2 переменная или поле(т.е. содержит cells)
+		else if(expr2 instanceof VarFieldExpression) {
+			// Не строим код для expr2(он разместит значение в acc), а нас интересует знaчение в cells(только выполняем зависимость)
+			depCodeGen(cg, expr2.getSymbol());
+			// Строим код для expr1(результат в аккумуляторе)
+			if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg)) {
+				// Явно не доработанный код, выражение всегда должно помещать результат в аккумулятор
+				throw new CompileException("Accum not used for operand:" + expr1);
+			}
+			CGCellsScope cScope = (CGCellsScope)expr2.getSymbol().getCGScope();
 			if(null != op) {
 				if(cScope instanceof CGVarScope) {
 					cg.cellsAction(cgScope, ((CGVarScope)cScope).getStackOffset(), cScope.getCells(), op);
@@ -308,7 +336,7 @@ public class BinaryExpression extends ExpressionNode {
 		else if(expr2 instanceof LiteralExpression) {
 			// Это константа, код не стоим, заивисимости нет
 			// Строим код для expr1(результат в аккумуляторе)
-			if(null == expr1.codeGen(cg)) {
+			if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg)) {
 				// Явно не доработанный код, выражение всегда должно помещать результат в аккумулятор
 				throw new CompileException("Accum not used for operand:" + expr1);
 			}
@@ -335,7 +363,7 @@ public class BinaryExpression extends ExpressionNode {
 		}
 		else {
 			//CastExpression, BinaryExpression и другие
-			if(null == expr2.codeGen(cg)) {
+			if(CodegenResult.RESULT_IN_ACCUM != expr2.codeGen(cg)) {
 				// Явно не доработанный код, выражение всегда должно помещать результат в аккумулятор
 				throw new CompileException("Accum not used for operand:" + expr2);
 			}					
@@ -348,7 +376,7 @@ public class BinaryExpression extends ExpressionNode {
 			if(expr1 instanceof BinaryExpression) cg.pushAccBE(cgScope, size);
 
 			// Строим код для expr1(результат в аккумуляторе)
-			if(null == expr1.codeGen(cg)) {
+			if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg)) {
 				// Явно не доработанный код, выражение всегда должно помещать результат в аккумулятор
 				throw new CompileException("Accum not used for operand:" + expr1);
 			}
@@ -364,7 +392,7 @@ public class BinaryExpression extends ExpressionNode {
 			}
 		}
 		cg.setScope(oldCGScope);
-		return true;
+		return CodegenResult.RESULT_IN_ACCUM;
 	}
 
 	@Override

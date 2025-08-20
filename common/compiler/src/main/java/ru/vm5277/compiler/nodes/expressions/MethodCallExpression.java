@@ -323,7 +323,10 @@ public class MethodCallExpression extends ExpressionNode {
 					//Создаем алиасы на переменные(из аргументов), которые содержат final переменные или переменные типа ссылки, массива и cstr
 					//Для остальных аргументов создаем новые переменные, которые должны быть проинициализирвоаны в кодогенерации
 					//и им должны быть присвоены значения переменных
-					MethodScope mScope = ((MethodSymbol)symbol).getScope();
+
+
+					//TODO не верно. Незачем задавать новые переменные, достаточно поместить значения в params метода
+/*					MethodScope mScope = ((MethodSymbol)symbol).getScope();
 					for(int i=0; i< args.size(); i++) {
 						Symbol pSymbol = ((MethodSymbol)symbol).getParameters().get(i);
 						ExpressionNode expr = args.get(i);
@@ -346,7 +349,7 @@ public class MethodCallExpression extends ExpressionNode {
 							cg.leaveExpression();
 							return false;
 						}
-					}
+					}*/
 				}
 			}
 		}
@@ -514,9 +517,9 @@ public class MethodCallExpression extends ExpressionNode {
 						cg.popStackReg(cgScope);
 //					}
 				}
-//				if(0 != heapSaved) {
+				if(0 != heapSaved) {
 					cg.popHeapReg(cgScope);
-//				}
+				}
 			}
 		}
 		
