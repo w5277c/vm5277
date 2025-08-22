@@ -18,11 +18,11 @@
 OS_RAM_FILL_NR:
 ;-----------------------------------------------------------
 ;Заполнение блока памяти значением							;NR-NO_RESTORE - не восстанавливает IN регистры.
-;IN: X-адрес, ACCUM_L-значение, Y-длина
+;IN: Y-адрес, ACCUM_L-значение, TEMP_L/H-длина
 ;-----------------------------------------------------------
 _OS_RAM_FILL_NR__LOOP:
-	ST X+,ACCUM_L
-	SBIW YL,0x01
+	ST Y+,ACCUM_L
+	SBIW TEMP_L,0x01
 	BRNE _OS_RAM_FILL_NR__LOOP
 	RET
 .ENDIF

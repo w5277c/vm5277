@@ -122,7 +122,7 @@ public class VarFieldExpression extends ExpressionNode {
 
 	
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
 		CGScope oldCGScope = cg.setScope(cgScope);
 		
 		// Актуализируем symbol
@@ -137,9 +137,11 @@ public class VarFieldExpression extends ExpressionNode {
 					vSymbol = scope.resolve(symbol.getName());
 					if(null != vSymbol && null != vSymbol.getCGScope()) {
 						depCodeGen(cg);
-						CGVarScope vScope = (CGVarScope)vSymbol.getCGScope();
-						cg.cellsToAcc(cgScope, vScope);
-						//Назначаем алиас ссылающийся на реальную переменную
+						if(accumStore) {
+							CGVarScope vScope = (CGVarScope)vSymbol.getCGScope();
+							cg.cellsToAcc(cgScope, vScope);
+							//Назначаем алиас ссылающийся на реальную переменную
+						}
 						symbol = vSymbol;
 						break;
 					}
@@ -147,7 +149,7 @@ public class VarFieldExpression extends ExpressionNode {
 			}
 			else {
 				if(symbol.getCGScope() instanceof CGCellsScope) {
-					cg.cellsToAcc(cgScope, (CGCellsScope)symbol.getCGScope());
+					if(accumStore) cg.cellsToAcc(cgScope, (CGCellsScope)symbol.getCGScope());
 				}
 				else {
 					throw new CompileException("Unsupported scope: " + symbol.getCGScope());
@@ -155,7 +157,7 @@ public class VarFieldExpression extends ExpressionNode {
 			}
 		}
 		cg.setScope(oldCGScope);
-		return CodegenResult.RESULT_IN_ACCUM;
+		return (accumStore ? CodegenResult.RESULT_IN_ACCUM : null);
 		
 		// Это странный код, боюсь поломать
 /*		if(null == depCodeGen(cg)) {

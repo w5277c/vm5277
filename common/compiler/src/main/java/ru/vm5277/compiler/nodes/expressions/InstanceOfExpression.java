@@ -201,7 +201,7 @@ public class InstanceOfExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
 		//Обходимся без рантайма, пока в левой части примитив или это константа
 		//Но нужно вызывать рантайм, если встречаем объект, так как только в рантайм данных есть информация о типе переменной
 		
@@ -214,10 +214,11 @@ public class InstanceOfExpression extends ExpressionNode {
 		}
 
 		// TODO весь код можно вынести в RTOS j8b утилиты и просто вызывать как функцию
-		int heapSaved=0;
+		boolean heapSaved=false;
 		if(leftExpr instanceof VarFieldExpression) {
 			CGCellsScope cScope = (CGCellsScope)((VarFieldExpression)leftExpr).getSymbol().getCGScope();
-			heapSaved = cg.pushHeapReg(cgScope);
+			cg.pushHeapReg(cgScope);
+			heapSaved = true;
 			if(cScope instanceof CGVarScope) {
 				cg.setHeapReg(cgScope, ((CGVarScope)cScope).getStackOffset(), cScope.getCells());
 			}
@@ -228,9 +229,7 @@ public class InstanceOfExpression extends ExpressionNode {
 
 		cg.eInstanceof(cgScope, rightType);
 
-		if(0 != heapSaved) {
-			cg.popHeapReg(cgScope);
-		}
+		if(heapSaved) cg.popHeapReg(cgScope);
 
 		return CodegenResult.RESULT_IN_ACCUM;
 	}

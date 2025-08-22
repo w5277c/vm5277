@@ -126,6 +126,10 @@ public class CGScope extends CGIContainer {
 		return null;
 	}
 
+	public int getVerbose() {
+		return verbose;
+	}
+	
 	@Override
 	public String toString() {
 		return getClass().getSimpleName() + ":" + name;

@@ -21,7 +21,11 @@ import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.items.CGIText;
+import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGMethodScope;
+import static ru.vm5277.common.cg.scopes.CGScope.VERBOSE_LO;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
@@ -297,21 +301,33 @@ public class MethodNode extends AstNode {
 		if(cgDone) return null;
 		cgDone = true;
 
-		((CGMethodScope)symbol.getCGScope()).build(cg);
+//		CGMethodScope mScope = (CGMethodScope)symbol.getCGScope();
+//		if(VERBOSE_LO <= cg.getVerbose()) mScope.append(new CGIText(";build " + mScope.toString()));
+//		mScope.append(mScope.getLabel());
 		
-		/* не требуется
-		for(ParameterNode node : parameters) {
-			node.codeGen(cg);
-		}*/
+//		if(isConstructor()) {
+//			CGClassScope cScope = (CGClassScope)mScope.getParent();
+//			cg.eNewInstance(mScope, cScope.getHeapHeaderSize()+cScope.getHeapOffset(),	cScope.getType(), Arrays.asList(mScope.getTypes()), false, false);
+//			mScope.append(mScope.getInitLabel());
+//		}
 		
-		if(null != blockNode) blockNode.codeGen(cg);		
+//		if(!blockNode.getChildren().isEmpty()) {
+//			cg.pushStackReg(mScope);
+//			cg.stackToStackReg(mScope);
+
+			if(null != blockNode) blockNode.codeGen(cg);
 		
-		if(null == returnType || VarType.VOID == returnType) {
+//			cg.popStackReg(mScope);
+//		}
+		
+/*		if(null == returnType || VarType.VOID == returnType) {
 			cg.eReturn(symbol.getCGScope(), 0);
 		}
-
+*/
 		classNode.codeGen(cg);		
-		
+
+		((CGMethodScope)symbol.getCGScope()).build(cg);
+//		if(VERBOSE_LO <= cg.getVerbose()) mScope.append(new CGIText(";method end"));		
 		return null;
 	}
 /*

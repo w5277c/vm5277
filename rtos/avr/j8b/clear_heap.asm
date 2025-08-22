@@ -14,30 +14,24 @@
  * limitations under the License.
  */
 
-.IFNDEF J8BPROC_INSTANCEOF_NR
+.IFNDEF J8BPROC_CLEAR_HEAP_NR
 ;-----------------------------------------------------------
-J8BPROC_INSTANCEOF_NR:										;NR-NO_RESTORE - не восстанавливает Z
+J8BPROC_CLEAR_HEAP_NR:										;NR-NO_RESTORE - не восстанавливает ACCUM_L/H
 ;-----------------------------------------------------------
-;Проверяем реализацию интерфейса(перебор VarType ids)
-;IN: Z-адрес HEAP,ACCUM_H-VarType id
+;Заполнение нулями HEAP(часть переменных)
+;IN: Z-адрес начала HEAP,ACCUM_L/H-размер HEAP
 ;-----------------------------------------------------------
-	PUSH TEMP_L
-	ADIW ZL,0x03
-	LD ACCUM_L,Z+
-	LD ZH,Z
-	MOV ZL,ACCUM_L
-	LPM ACCUM_L,Z+
-_J8BPROC_INSTANCEOF_NR__LOOP:
-	LPM TEMP_L,Z+
-	CP TEMP_L,ACCUM_H
-	BREQ _J8BPROC_INSTANCEOF_NR__OK
-	DEC ACCUM_L
-	BRNE _J8BPROC_INSTANCEOF_NR__LOOP
-	RJMP _J8BPROC_INSTANCEOF_NR__END
-_J8BPROC_INSTANCEOF_NR__OK:
-	LDI ACCUM_L,0x01
-_J8BPROC_INSTANCEOF_NR__END:
-	POP TEMP_L
+	PUSH_Z
+	ADIW ZL,0x05
+	SUBI ACCUM_L,0x05
+	SBCI ACCUM_H,0x00
+_J8BPROC_CLEAR_HEAP__LOOP:
+	ST Z+,C0x00
+	SUBI ACCUM_L,0x01
+	BRNE _J8BPROC_CLEAR_HEAP__LOOP
+	SBCI ACCUM_H,0x00
+	BRNE _J8BPROC_CLEAR_HEAP__LOOP
+	POP_Z
 	RET
 .ENDIF
 

@@ -17,6 +17,7 @@ package ru.vm5277.compiler.nodes.commands;
 
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
@@ -143,8 +144,10 @@ public class ReturnNode extends CommandNode {
 				cg.constToAcc(cgScope, returnType.getSize(), ((LiteralExpression)expr).getNumValue());
 			}
 		}
-		cg.eReturn(cgScope, returnType.getSize());
-		
+		// Можно было бы вызвать cg.eReturn(cgScope, returnType.getSize());, но в блоке мог быть выделен STACK_FRAME и возможно что-то еще, поэтому переходим
+		// на завершение блока. Оптимизатор в будущем почистит лишние JMP(например если после JMP сразу следует метка.
+		CGBlockScope bScope = (CGBlockScope)cgScope.getParent();
+		cg.jump(cgScope, bScope.getELabel());
 		return null;
 	}
 

@@ -285,7 +285,8 @@ _OS_DRAM_FIND_FREE_CELLS__BITLOOP:
 	MOV TEMP_H,TEMP_L
 	MOVW TEMP_EL,ACCUM_L
 	;Общая логика для первого и последующего нулевых бит
-	SBIW TEMP_EL,0x01										;Вычитаем 1 ячейку из необходимого размера
+	SUBI TEMP_EL,0x01										;Вычитаем 1 ячейку из необходимого размера
+	SBCI TEMP_EH,0x00
 	BREQ _OS_DRAM_FIND_FREE_CELLS__OK						;Если рвзмер стал нулевым, то блок найден
 	RJMP _OS_DRAM_FIND_FREE_CELLS__BITLOOP_IS_NEXT
 _OS_DRAM_FIND_FREE_CELLS__BITLOOP_IS_HI:

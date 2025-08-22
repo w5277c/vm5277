@@ -116,7 +116,7 @@ public class LiteralExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
 		//TODO перенести код в VarNode и FieldNode
 		//TODO отключен
 //		if(cgScope.getParent() instanceof CGCellsScope) {

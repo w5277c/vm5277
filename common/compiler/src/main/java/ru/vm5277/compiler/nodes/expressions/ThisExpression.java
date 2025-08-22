@@ -53,7 +53,7 @@ public class ThisExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
 		return null;
 	}
 	

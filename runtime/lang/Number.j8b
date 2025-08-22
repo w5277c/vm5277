@@ -1,7 +1,7 @@
 public interface Number {
-  bool toBool();
+//  bool toBool();
   byte toByte();
-  short toShort();
-  int toInt();
-  fixed toFixed();
+//  short toShort();
+//  int toInt();
+//  fixed toFixed();
 }

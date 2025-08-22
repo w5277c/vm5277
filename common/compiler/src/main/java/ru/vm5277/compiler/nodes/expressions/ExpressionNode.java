@@ -816,6 +816,14 @@ public class ExpressionNode extends AstNode {
 	}
 
 	@Override
+	public Object codeGen(CodeGenerator cg) throws Exception {
+		return codeGen(cg, true);
+	}
+	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
+		throw new CompileException("Not supported here.");
+	}
+
+	@Override
 	public List<AstNode> getChildren() {
 		return null;
 	}

@@ -1,7 +1,7 @@
 # vm5277 Embedded Java like toolkit
 **Java-like embedded toolkit for Atmel, Microchip, STM8, and other MCUs**
 
-Универсальная платформа для embedded-разработки( Java-подобный язык Javl + RTOS + кросс-платформенные драйверы для 8-битных МК)
+Универсальная платформа для embedded-разработки( Java-подобный язык j8b + RTOS + кросс-платформенные драйверы для 8-битных МК)
 
 ## Лицензия
 Проект распространяется под **Apache License 2.0**.
@@ -17,13 +17,13 @@
 Локальные переменные распределяются из следующих ресурсов:
 1. **Регистры**:
    - `r20-r27`: полностью выделены под переменные и больше нигде не используются.
-   - `r19-r17`: используются как переменными, так и аккумулятором. Аккумулятор временно задействуется в выражениях, сохраняя регистры, если они используются переменными.
+   - `r19-r17`: используются как переменными, так и аккумулятором. Аккумулятор временно задействуется в выражениях, сохраняя регистры, если они используются переменными. Также используется для возврата значения из метода.
    - `r16`: выделен под аккумулятор и используется как базовый регистр для алгоритмов.
    - `Y (r28, r29)`: хранит адрес начала блока памяти в стеке. Может использоваться для алгоритмов (с сохранением старого значения).
-   - `Z (r30, r31)`: хранит адрес начала блока HEAP в динамической памяти. Также может использоваться для алгоритмов (с сохранением старого значения). Регистры `Z` и `Y` также используются для возврата значения из метода.
+   - `Z (r30, r31)`: хранит адрес начала блока HEAP в динамической памяти. Также может использоваться для алгоритмов (с сохранением старого значения).
    - Реализован механизм переиспользования регистров.
 
-2. **Фиксированный блок памяти в стеке**:
+2. **Фиксированный блок памяти в стеке(STACK FRAME)**:
    - Используется регистр `Y`.
    - Память под переменные в стеке выделяется для каждого кодового блока отдельно и освобождается по его завершении.
 
@@ -31,87 +31,59 @@
 
 ## Процедура создания экземпляра класса
 
-### 1. Создание HEAP
-- Вызывается функция RTOS `os_dram_alloc` для выделения памяти под HEAP. Размер передается как константа (известен на этапе компиляции).
-- Адрес блока возвращается в регистре `Z`.
-- Формируется заголовок класса:
-  - Размер HEAP (2 байта).
-  - Количество ссылок на экземпляр класса (1 байт, изначально = 0).
-  - Количество типов реализуемых интерфейсов, включая сам класс (1 байт).
-  - Идентификаторы типов класса и интерфейсов (x байт).
-  - Остальная память отведена под поля класса.
+### 1. Вызов конструктора
+- Сохраняем старый адрес HEAP(регистр `Z`)
+- Поочередно помещаем в стек все аргументы
+- Вызываем конструктор
+- Восстанавливаем адрес HEAP
 
 **Пример ASM-кода:**
 ```asm
-ldi r16,6
-ldi r17,0
-mcall os_dram_alloc
-std z+0,r16
-std z+1,r17
-std z+2,c0x00
-ldi r16,2
-std z+3,r16
-ldi r16,15
-std z+4,r16
-ldi r16,14
-std z+5,r16
-movw r16,zl
+push_z
+ldi zl,8
+push zl
+mcall j8bC11CByteMByte
+pop_z
 ```
 
-### 2. Передача THIS
+### 2. Конструктор(инициализация HEAP)
+- Выделяем память для HEAP
+- Заполняем заголовок класса
+  - Размер HEAP (2 байта).
+  - Количество ссылок на экземпляр класса (1 байт, изначально = 0, не освобождаем HEAP = 0ff).
+  - Aдрес ранее созданной FLASH-таблицы с ид типов класса и интерфейсов, которые он реализует
+    - Количество типов реализуемых интерфейсов, включая сам класс (1 байт).
+    - Идентификатор типа класса (1 байт)
+    - Идентификаторы интерфейсов (n байт).
+  - Остальная память отведена под поля класса.
+- Вызываем очистку нулями блока локальных переменных в HEAP
+- Конструктор разделен на две части: 1 - инициализация HEAP, 2 - функционал верхнего уровня
+
+**Пример ASM-кода:**
+```asm
+	ldi r16,6
+	ldi r17,0
+	mcall os_dram_alloc
+	std z+0,r16
+	std z+1,r17
+	std z+2,c0x00
+	ldi r16,low(j8bI10CByte*2)
+	std z+3,r16
+	ldi r16,high(j8bI10CByte*2)
+	std z+4,r16
+	mcall j8bproc_clear_heap_nr
+```
+### 3. Конструктор(реализация кода верхнего уровня)
+- Z содержит адрес HEAP
+- При необходимости создается STACK FRAME(для каждого кодового блока)
+- На выходе STACK FRAME освобождается и восстанавливается Y
+- Z восстанавливает вызывающий
+- результат(адрес HEAP = this) возвращаем в аккумуляторе, аналогично возвращаем в аккумуляторе результат методов
+
+
+### Передача THIS
 - Если выражение-инициализатор (`NEW`) используется в присваивании, значение аккумулятора записывается в переменную/поле.
 - Счетчик ссылок инкрементируется (в будущем будет проверка, чтобы увеличивать счетчик только для переменных с ссылками вне класса, а также решение проблемы циклических ссылок).
-
-**Пример ASM-кода:**
-```asm
-push r16
-push_y
-mov yl,r20
-mov yh,r21
-ldd r16,y+0x02 ; смещение на счетчик ссылок
-cpse r16,c0xff ; не инкрементируем, если максимальное значение
-inc r16
-std y+0x02,r16
-pop_y
-pop r16
-; accum->var 'b'
-mov r20,r16
-mov r21,r17
-```
-
-### 3. Вызов конструктора
-- Если есть аргументы, сохраняется адрес возврата в стек.
-- Аргументы помещаются в стек (копируются их значения, кроме объектов, которые передаются как ссылки).
-- Переход на адрес метода: `JMP` (если есть аргументы) или `CALL` (если аргументов нет).
-
-**Пример ASM-кода:**
-```asm
-; push ret point
-ldi yl,low(JavlCMainMmainRP16)
-push yl
-ldi yl,high(JavlCMainMmainRP16)
-push yl
-ldi yl,1   ; Аргумент - константа = 1
-push yl
-jmp JavlCByteMconstr12
-```
-
-### 4. Работа метода
-- Конструктор не возвращает значений, в отличие от метода.
-- Адрес HEAP (`THIS`) передается через регистр `Z`.
-- В начале работы выделяется память в стеке (если есть локальные переменные) через вызов `stk_alloc`. Размер передается в `Y`, адрес начала блока также возвращается в `Y`.
-- Процедура выполняется для каждого кодового блока `{...}`.
-
-**Пример ASM-кода:**
-```asm
-TODO
-```
-
-### 5. Завершение работы метода
-- Возвращаемое значение записывается в `zl`, `zh`, `yl`, `yh` (в зависимости от размера).
-- Выполняется `ret`.
-
----
 
 ## Планы на будущее
 
@@ -156,17 +128,13 @@ TODO
 ---
 
 
-**Javl сурс**
+**j8b сурс**
 ```Java
 import rtos.System;
 import rtos.RTOSParam;
-import hal.GPIO;
+import lang.Number;
 
 class Main {
-	public interface Number {
-		byte toByte();
-	}
-
 	public class Byte implements Number {
 		private	byte	value;
 
@@ -175,98 +143,80 @@ class Main {
 		}
 
 		public byte toByte() {
-			return value;
-		}
-
-		public void finalize() {
+			byte t=0;
+			return value+t;
 		}
 	}
 
     public static void main() {
-		System.setParam(RTOSParam.CORE_FREQ, 16);
-		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
-		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
+		System.setParam(RTOSParam.STDOUT_PORT, 0x12);
 
-		Byte b = new Byte(0x01);
-
-		System.out(b.toByte());
+		Byte b1 = new Byte(0x08);
+		System.out(b1.toByte());
     }
 }
 ```
 **Результат**
 ```asm
-.equ core_freq = 16
 .equ stdout_port = 18
 
-.set OS_FT_STDOUT = 1
-.set OS_FT_WELCOME = 1
 .set OS_FT_DRAM = 1
+.set OS_FT_STDOUT = 1
 
 .include "devices/atmega328p.def"
 .include "core/core.asm"
 .include "dmem/dram.asm"
+.include "j8b/inc_refcount.asm"
+.include "j8b/dec_refcount.asm"
+.include "j8b/clear_heap.asm"
 .include "stdio/out_num8.asm"
 
-MAIN:
-	push yl
-	ldi yl,0
-	std z+6,yl
-	pop yl
-JavlCByteMconstr12:
-	ldd r16,y+0
-	std z+6,r16
-	ret
-JavlCByteMtoByte13:
-	ldd r16,z+6
-	mov r30,r16
-	ret
-JavlCMainMmain15:
+Main:
+	jmp j8bCMainMmain
+j8bI0CMain: .db 1,13
+j8bI10CByte: .db 2,14,12,0
+j8bC11CByteMByte:
 	ldi r16,6
 	ldi r17,0
 	mcall os_dram_alloc
 	std z+0,r16
 	std z+1,r17
 	std z+2,c0x00
-	ldi r16,2
+	ldi r16,low(j8bI10CByte*2)
 	std z+3,r16
-	ldi r16,15
+	ldi r16,high(j8bI10CByte*2)
 	std z+4,r16
-	ldi r16,14
+	mcall j8bproc_clear_heap_nr
+j8bCI12CByteMByte:
+	ldd r16,y+0
 	std z+5,r16
-	movw r16,zl
+j8bE13CByteMByteB19:
+	ret
+j8bC14CByteMtoByte:
+	ldi r20,0
+	mov r16,r20
+	push yl
+	ldd yl,z+5
+	add r16,yl
+	pop yl
+	jmp j8bE15CByteMtoByteB21
+j8bE15CByteMtoByteB21:
+	ret
+j8bCmainMmain:
+	push_z
+	ldi zl,8
+	push zl
+	mcall j8bC11CByteMByte
+	pop_z
 	mov r20,r16
 	mov r21,r17
-	push r16
-	push yl
-	push yh
-	mov yl,r20
-	mov yh,r21
-	ldd r16,z+0x02
-	cpse r16,c0xff
-	inc r16
-	std z+0x02,r16
-	pop zh
-	pop zl
-	pop r16
-	push yl
-	push yh
-	ldi yl,1
-	push yl
-	lds yl,SPL
-	lds yh,SPH
-	mcall JavlCByteMconstr12
-	pop yl
-	pop yh
-	pop yl
-	mov r16,r20
-	mov r17,r21
+	push_z
 	mov r30,r20
 	mov r31,r21
-	lds yl,SPL
-	lds yh,SPH
-	mcall JavlCByteMtoByte13
-	mov r16,zl
+	mcall j8bC14CByteMtoByte
+	pop_z
 	mcall os_out_num8
+j8bE16CMainMmainB24:
 	ret
 ```
 

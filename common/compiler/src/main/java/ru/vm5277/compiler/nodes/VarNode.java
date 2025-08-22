@@ -22,6 +22,7 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.Operator;
+import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.VarType;
@@ -197,7 +198,7 @@ public class VarNode extends AstNode {
 			if(initializer instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)initializer;
 				if(VarType.CSTR == le.getType(null)) {
-					cg.defineStr(vScope, (String)le.getValue());
+					vScope.setDataSymbol(cg.defineData(vScope.getResId(), (String)le.getValue()));
 					//TODO рудимент?
 					//symbol.getConstantOperand().setValue(cgScope.getResId());
 				}
@@ -205,8 +206,9 @@ public class VarNode extends AstNode {
 			else throw new Exception("unexpected expression:" + initializer + " for constant");
 		}
 		else {
+			// Инициализация(заполнение нулями необходима только регистрам, остальные проинициализированы вместе с HEAP/STACK)
 			if(null == initializer) {
-				cg.constToCells(cg.getScope(), vScope.getStackOffset(), 0, vScope.getCells());
+				if(CGCells.Type.REG==vScope.getCells().getType()) cg.constToCells(cg.getScope(), vScope.getStackOffset(), 0, vScope.getCells());
 			}
 			else if(initializer instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
 				cg.constToCells(cg.getScope(), vScope.getStackOffset(), ((LiteralExpression)initializer).getNumValue(), vScope.getCells());
@@ -218,8 +220,6 @@ public class VarNode extends AstNode {
 			else if(initializer instanceof NewExpression) {
 				initializer.codeGen(cg);
 				cg.accToCells(initializer.getCGScope(), vScope);
-				cg.updateRefCount(initializer.getCGScope(), vScope.getStackOffset(), vScope.getCells(), true);
-				((NewExpression)initializer).codeGenPart2(cg);
 			}
 /*			else if(initializer instanceof MethodCallExpression) {
 				initializer.codeGen(cg);

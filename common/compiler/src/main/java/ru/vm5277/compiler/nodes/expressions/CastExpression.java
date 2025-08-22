@@ -88,11 +88,11 @@ public class CastExpression extends ExpressionNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
 		Object result = operand.codeGen(cg);
 		if (sourceType != targetType) {
 			if (sourceType.isNumeric() && targetType.isNumeric()) {
-				cg.accCast(cgScope, targetType);
+				cg.accCast(cgScope, targetType.getSize());
 			}
 		}
 		return result;

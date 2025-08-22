@@ -187,7 +187,7 @@ public class FieldAccessExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
 		CGScope oldCGScope = cg.setScope(cgScope);
 		if(null == depCodeGen(cg)) {
 			if(symbol.getCGScope() instanceof CGCellsScope) {

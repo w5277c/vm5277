@@ -266,7 +266,7 @@ public class BinaryExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
 		// TODO костыль. Похоже нужно управлять областью видимости универсально, а не точечно
 		// Необходимо, чтобы код зависимостей формировался не там, где он находится в древе AST, а там, где он необходим, что оптимально для выделения регистров
 		CGScope oldCGScope = cg.setScope(cgScope); //В таком виде верный порядок использования регистров
@@ -286,7 +286,7 @@ public class BinaryExpression extends ExpressionNode {
 		// Для присваивания всегда вычисляем правое выражение первым
 		if (operator.isAssignment()) {
 			// Не строим код для leftExpr(он разместит значение в acc), а нас интересует знaчение в cells(только выполняем зависимость)
-			depCodeGen(cg, leftExpr.getSymbol());
+			depCodeGen(cg, leftExpr.getSymbol()); //TODO использовать метод leftExpr.codeGen(cg, false);
 			// Затем обрабатываем левое выражение (куда записываем результат)
 			if (leftExpr instanceof VarFieldExpression || leftExpr instanceof FieldAccessExpression) {
 				CGCellsScope cScope = (CGCellsScope)leftExpr.getSymbol().getCGScope();

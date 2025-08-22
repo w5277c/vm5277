@@ -20,11 +20,9 @@ package ru.vm5277.compiler.nodes.expressions;
 import java.util.Arrays;
 import java.util.List;
 import ru.vm5277.common.StrUtils;
-import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.Operand;
 import ru.vm5277.common.cg.OperandType;
-import ru.vm5277.common.cg.items.CGIAsm;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
@@ -39,11 +37,9 @@ import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.AliasSymbol;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.InterfaceScope;
-import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
-import ru.vm5277.compiler.semantic.VarSymbol;
 
 public class MethodCallExpression extends ExpressionNode {
 	private			ExpressionNode			className;
@@ -364,8 +360,8 @@ public class MethodCallExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
-		className.codeGen(cg);
+	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
+		className.codeGen(cg, false);
 		
 		String classNameStr = ((ClassScope)((MethodSymbol)symbol).getScope().getParent()).getName();
 
@@ -408,118 +404,28 @@ public class MethodCallExpression extends ExpressionNode {
 				cg.constToAcc(cgScope, cg.getRefSize(), classType.getId());
 			}
 			else {
-	//			CGLabelScope rpCGScope = null;
 				int refTypeSize = 1; // TODO Определить значение на базе количества используемых типов класса
-	//			int stackOffset = ((CGMethodScope)symbol.getCGScope()).getStackSize();
-				int heapSaved=0;
-				if(className instanceof VarFieldExpression) {
-					CGCellsScope cScope = (CGCellsScope)((VarFieldExpression)className).getSymbol().getCGScope();
-					heapSaved = cg.pushHeapReg(cgScope);
-					if(cScope instanceof CGVarScope) {
-						cg.setHeapReg(cgScope, ((CGVarScope)cScope).getStackOffset(), cScope.getCells());
-					}
-					else {
-						cg.setHeapReg(cgScope, ((CGClassScope)((CGFieldScope)cScope).getParent()).getHeapHeaderSize(), cScope.getCells());
-					}
+				cg.pushHeapReg(cgScope);
+				if(this instanceof NewExpression) {
+					putArgsToStack(cg, refTypeSize);
 				}
-
-				int stackOffset = 0;
-	/*			for(int i=0; i<argTypes.length; i++) {
-					if(-1 == argTypes[i].getSize()) argsSize += cg.getRefSize();
-					else argsSize += argTypes[i].getSize();
-				}
-	*/				
-				//Необходимо выделить память в стеке для записи значений аргументов и для локальных переменных вызываемого метода.
-				//Функция возвращает в stackIReg адрес начала выделенного блока в стеке
-				//TODO в текущей реализации нет возможности получить размер блока для локальных переменных. Так как локальные переменные храняться
-				//в CGBlockScope метода, а не в самом методе
-
-				//TODO много багов, сохранять в стек адрес возврата больше не нужно, запись аргументов через std Y+n, можно использовать zl для констант(с сохранением)
-
-				//Две модели, либо копируем данные из констант и переменных
-
-				//cg.stackAlloc(cgScope, argsSize, true);
-				if(!args.isEmpty()) {
-					cg.pushStackReg(cgScope);
-
-					CGScope oldCGScope = cg.setScope(symbol.getCGScope());
-
-					// Помещаем в стек адрес возврата
-	//				rpCGScope = cg.makeLabel(cgScope.getMethodScope(), "RP", true);
-	//				cg.pushCells(cgScope, 0, 2, new CGCell[]{new CGCell(rpCGScope.getLName())});
-
-					// Теперь создаем необходимые переменные и формируем стек вызываемого метода constToCells и cellsToStack
-					// Или сохраняем в стек через push
-					// Проболема в том, чт окогда мы начинаем копировать Y уже находится на новом стеке
-					// Мы можем делать просто push, а затем просто менять Y не выполняя никакого выделения памяти!
-					//Цена этому ручное сохранение точки возврата
-					//Либо учитывать, что между параметрами и локальными переменными лежить адрес возврата!
-					for(int i=0; i<args.size(); i++) {
-						// Получаем параметр вызываемого метода
-						Symbol paramSymbol = ((MethodSymbol)symbol).getParameters().get(i);
-						VarType paramVarType = paramSymbol.getType();
-
-						// Получаем выражение передаваемое этому параметру
-						ExpressionNode argExpr = args.get(i);
-						// Выполняем зависимость
-						argExpr.depCodeGen(cg);
-						// Получаю из scope вызываемого метода переменую с именем параметра(пустая переменная уже создана, или создан Alias)
-						Symbol vSymbol = ((MethodSymbol)symbol).getScope().resolve(paramSymbol.getName());
-						if(vSymbol instanceof AliasSymbol) {
-							// Это алиас, который нужно что???
-							throw new CompileException("Unsupported alias:" + vSymbol.toString());
+				else {
+					if(className instanceof VarFieldExpression) {
+						CGCellsScope cScope = (CGCellsScope)((VarFieldExpression)className).getSymbol().getCGScope();
+						if(cScope instanceof CGVarScope) {
+							cg.setHeapReg(cgScope, ((CGVarScope)cScope).getStackOffset(), cScope.getCells());
 						}
 						else {
-							int exprTypeSize = argTypes[i].getSize();
-							if(-1 == exprTypeSize) exprTypeSize = cg.getRefSize();
-							// Создаем новую область видимости переменной в вызываемом методе
-							int varSize = paramVarType.isObject() ? refTypeSize + cg.getRefSize() : exprTypeSize;
-							CGVarScope dstVScope = cg.enterLocal(vSymbol.getType(), varSize, false, vSymbol.getName());
-
-							// Выделяем память в стеке
-							dstVScope.build();
-							cg.leaveLocal();
-							vSymbol.setCGScope(dstVScope);
-
-							if(argExpr instanceof LiteralExpression) {
-								//TODO этой функции нужен регистр для помещения в стек константы, где взять свободный регистр???
-								cg.pushConst(cgScope, exprTypeSize, ((LiteralExpression)argExpr).getNumValue());
-								//OPTIMIZE Для каждого выполнения будет сохранение и восстановление регистра для временного размещения константы
-								//cg.constToCells(cgScope, 0, ((LiteralExpression)argExpr).getNumValue(), dstVScope.getCells());
-							}
-							else if(argExpr instanceof VarFieldExpression) {
-								cg.pushCells(cgScope, 0, exprTypeSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells());
-								//cg.cellsToStack(cgScope, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells(), stackOffset);
-							}
-							else {
-								throw new CompileException("Unsupported expression:" + argExpr);
-							}
-	//						stackOffset+=exprTypeSize;
-							stackOffset+=exprTypeSize;
+							cg.setHeapReg(cgScope, ((CGClassScope)((CGFieldScope)cScope).getParent()).getHeapHeaderSize(), cScope.getCells());
 						}
 					}
-					cg.setScope(oldCGScope);
+					putArgsToStack(cg, refTypeSize);
 				}
-	//else if(null == mScope && 0 == types.length && VarType.SHORT == type && "getClassId".equals(methodName)) {			
-				//Заглушка, метод Object.getClassId ничего не делает, так как адрес HEAP = ид экземпляру класса и уже хранится в индексном регистре HEAP
-//				if(0 != argTypes.length || !"getClassId".equals(symbol.getName())) {
-					cg.stackToStackReg(cgScope);
-//				}
-
 				depCodeGen(cg);
 
 				CGMethodScope mScope = (CGMethodScope)symbol.getCGScope();
 				cg.invokeMethod(cgScope, classNameStr, symbol.getName(), type, argTypes, mScope);
-	//			if(null != rpCGScope) cgScope.append(rpCGScope);
-				if(0!=stackOffset) {
-					cg.stackFree(cgScope, stackOffset, false);
-//					if(0 != argTypes.length || !"getClassId".equals(symbol.getName())) {
-						cg.popStackReg(cgScope);
-//					}
-				}
-				if(0 != heapSaved) {
-					cg.popHeapReg(cgScope);
-				}
+				cg.popHeapReg(cgScope);
 			}
 		}
 		
@@ -543,7 +449,7 @@ public class MethodCallExpression extends ExpressionNode {
 			if(VarType.CSTR == le.getType(null)) {
 				CGVarScope vScope = cg.enterLocal(VarType.CSTR, -1, true, null);
 				cg.leaveLocal();
-				cg.defineStr(vScope, (String)le.getValue());
+				vScope.setDataSymbol(cg.defineData(vScope.getResId(), (String)le.getValue()));
 				return new Operand(OperandType.FLASH_RES, vScope.getResId());
 			}
 			else {
@@ -566,6 +472,51 @@ public class MethodCallExpression extends ExpressionNode {
 			return new Operand(OperandType.ACCUM, null);
 		}
 		else throw new Exception("Unexpected expression:" + expr);
+	}
+	
+	private void putArgsToStack(CodeGenerator cg, int refTypeSize) throws Exception {
+		if(!args.isEmpty()) {
+			CGScope oldCGScope = cg.setScope(symbol.getCGScope());
+			for(int i=0; i<args.size(); i++) {
+				// Получаем параметр вызываемого метода
+				Symbol paramSymbol = ((MethodSymbol)symbol).getParameters().get(i);
+				VarType paramVarType = paramSymbol.getType();
+
+				// Получаем выражение передаваемое этому параметру
+				ExpressionNode argExpr = args.get(i);
+				// Выполняем зависимость
+				argExpr.depCodeGen(cg);
+				// Получаю из scope вызываемого метода переменую с именем параметра(пустая переменная уже создана, или создан Alias)
+				Symbol vSymbol = ((MethodSymbol)symbol).getScope().resolve(paramSymbol.getName());
+				if(vSymbol instanceof AliasSymbol) {
+					// Это алиас, который нужно что???
+					throw new CompileException("Unsupported alias:" + vSymbol.toString());
+				}
+				else {
+					int exprTypeSize = argTypes[i].getSize();
+					if(-1 == exprTypeSize) exprTypeSize = cg.getRefSize();
+					// Создаем новую область видимости переменной в вызываемом методе
+					int varSize = paramVarType.isObject() ? refTypeSize + cg.getRefSize() : exprTypeSize;
+					CGVarScope dstVScope = cg.enterLocal(vSymbol.getType(), varSize, false, vSymbol.getName());
+
+					// Выделяем память в стеке
+					dstVScope.build();
+					cg.leaveLocal();
+					vSymbol.setCGScope(dstVScope);
+
+					if(argExpr instanceof LiteralExpression) {
+						cg.pushConst(cgScope, exprTypeSize, ((LiteralExpression)argExpr).getNumValue());
+					}
+					else if(argExpr instanceof VarFieldExpression) {
+						cg.pushCells(cgScope, 0, exprTypeSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells());
+					}
+					else {
+						throw new CompileException("Unsupported expression:" + argExpr);
+					}
+				}
+			}
+			cg.setScope(oldCGScope);
+		}
 	}
 	
 	@Override

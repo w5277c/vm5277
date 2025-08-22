@@ -23,6 +23,7 @@ import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.RegPair;
+import ru.vm5277.common.cg.items.CGIAsm;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGIText;
 import static ru.vm5277.common.cg.scopes.CGScope.verbose;
@@ -33,12 +34,13 @@ import ru.vm5277.common.exceptions.CompileException;
 
 
 public class CGBlockScope extends CGScope {
+	private				CGLabelScope				lbEScope;
 	private		final	Map<Integer, CGVarScope>	locals		= new HashMap<>();
 	protected			int							stackOffset	= 0;
 	private				Set<RegPair>				usedPool	= new HashSet<>(); // Использованные регистры из regsPool метода
 	private				CGMethodScope				mScope;
 	
-	public CGBlockScope(CGScope parent, int id) {
+	public CGBlockScope(CodeGenerator cg, CGScope parent, int id) {
 		super(parent, id, "");
 		
 /*		CGBlockScope bScope = parent.getBlockScope();
@@ -47,34 +49,35 @@ public class CGBlockScope extends CGScope {
 		}
 */		
 		mScope = parent.getMethodScope();
+
+		lbEScope = new CGLabelScope(this, null, "E", true);
+		cg.addLabel(lbEScope);
 	}
 	
 	public void build(CodeGenerator cg) throws CompileException {
 		CGIContainer cont = new CGIContainer();
-		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";build block " + getPath('.') + ",id:" + resId));
+		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";build block"));
 
+		if(0x00 != stackOffset) {
+			cont.append(cg.stackAlloc(null, stackOffset));
+		}
+
+		
 	// Кажется это не нужно, в блоке мы работаем с регистрами взятыми из regsPool, их не нужно сохранять, кроме регистров аккумулятора(но это в другой раз)
 	// Регистры(если используются в качестве переменных) используемые в нативных вызовах должны быть сохранены в методе invokeNative
 	/*		for(int i=0; i<usedRegs.size(); i++) {
 				cont.append(cg.pushRegAsm(usedRegs.get(i)));
 			}
 	*/		
-		if(0x00 != stackOffset) {
-//			cg.setDpStackAlloc();
-//			cont.append(cg.stackAllocAsm(stackOffset, !(parent instanceof CGClassScope)));
-			cont.append(cg.stackAlloc(null, stackOffset, false));
-
-		}
 		prepend(cont);
 
 	/*
 			for(int i=usedRegs.size()-1; i>=0; i--) {
 				append(cg.popRegAsm(usedRegs.get(i)));
 			}*/
-		if(0x00 != stackOffset) {
-			//append(cg.stackFreeAsm());
-			cg.stackFree(this, stackOffset, false);
-		}
+	
+		append(lbEScope);
+		if(0x00 != stackOffset) append(cg.stackFree(null, stackOffset));
 		if(VERBOSE_LO <= verbose) append(new CGIText(";block end"));
 	}
 
@@ -168,6 +171,10 @@ public class CGBlockScope extends CGScope {
 		return null == regPair || regPair.isFree();
 	}
 	
+	public CGLabelScope getELabel() {
+		return lbEScope;
+	}
+
 	@Override
 	public String getLName() {
 		return "B" + resId;

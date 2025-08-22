@@ -73,42 +73,25 @@ public class Generator extends CodeGenerator {
 	}
 	
 	@Override
-	public CGIContainer stackAlloc(CGScope scope, int size, boolean modifyIreg) {
+	public CGIContainer stackAlloc(CGScope scope, int size) {
 		CGIContainer result = new CGIContainer();
 		
 		if(VERBOSE_LO <= verbose) result.append(new CGIText(";alloc stack, size:" + size));
-		if(modifyIreg) result.append(new CGIAsm("push yl"));
-		if(modifyIreg && def_sph) result.append(new CGIAsm("push yh"));
+		result.append(new CGIAsm("push yl"));
+		if(def_sph) result.append(new CGIAsm("push yh"));
 		
-		if(size < (def_sph ? 9 : 6)) {
+		if(size<5) {
 			for(int i=0; i<size; i++) {
-				result.append(new CGIAsm("push yl"));
+				result.append(new CGIAsm("push c0x00"));
 			}
+			result.append(new CGIAsm("sbiw yl," + size));
 		}
 		else {
-			if(def_sph) {
-				if(modifyIreg) {
-					result.append(new CGIAsm("lds yl,SREG"));
-					result.append(new CGIAsm("cli"));
-				}
-				else {
-					result.append(new CGIAsm("push r16"));
-					result.append(new CGIAsm("lds r16,SREG"));
-					result.append(new CGIAsm("cli"));
-					result.append(new CGIAsm("pop atom_l"));
-				}
-				result.append(new CGIAsm("lds _SPH,SPH"));
-				result.append(new CGIAsm("sbci _SPH,high(" + size + ")"));
-				result.append(new CGIAsm("sts SPH,_SPH"));
-			}
-
-			result.append(new CGIAsm("lds _SPL,SPL"));
-			result.append(new CGIAsm("subi _SPL,low(" + size + ")"));
-			result.append(new CGIAsm("sts SPL,_SPL"));
-
-			if(def_sph) result.append(new CGIAsm("sts SREG," + (modifyIreg ? "yl" : "atom_l")));
-		}
-		if(modifyIreg) {
+			result.append(new CGIAsm("ldi yl,low(" + size + ")"));
+			result.append(new CGIAsm("ldi yh,high(" + size + ")"));
+			result.append(new CGIAsm("push c0x00"));
+			result.append(new CGIAsm("sbiw yl,0x01"));
+			result.append(new CGIAsm("brne pc-0x02"));//TODO проверить
 			result.append(new CGIAsm("lds yl,SPL")); //TODO проверить адрес ячейки
 			result.append(new CGIAsm(def_sph ? "lds yh,SPH" : "ldi yh,0x00"));
 		}
@@ -117,42 +100,28 @@ public class Generator extends CodeGenerator {
 		return result;
 	}
 	@Override
-	public CGIContainer stackFree(CGScope scope, int size, boolean modifyIreg) {
+	public CGIContainer stackFree(CGScope scope, int size) {
 		CGIContainer result = new CGIContainer();
 		
 		if(VERBOSE_LO <= verbose) result.append(new CGIText(";free stack, size:" + size));
-		if(size < (def_sph ? 9 : 6)) {
+		if(size<9) {
 			for(int i=0; i<size; i++) {
 				result.append(new CGIAsm("pop yl"));
 			}
 		}
 		else {
-			if(def_sph) {
-				if(modifyIreg) {
-					result.append(new CGIAsm("lds yl,SREG"));
-					result.append(new CGIAsm("cli"));
-				}
-				else {
-					result.append(new CGIAsm("push r16"));
-					result.append(new CGIAsm("lds r16,SREG"));
-					result.append(new CGIAsm("cli"));
-					result.append(new CGIAsm("pop atom_l"));
-				}
-				result.append(new CGIAsm("lds _SPH,SPH"));
-				result.append(new CGIAsm("sbci _SPH,high(-" + size + ")"));
-				result.append(new CGIAsm("sts SPH,_SPH"));
-			}
-			
+			if(def_sph) result.append(new CGIAsm("lds yl,SREG"));
+			if(def_sph) result.append(new CGIAsm("cli"));
 			result.append(new CGIAsm("lds _SPL,SPL"));
+			if(def_sph) result.append(new CGIAsm("lds _SPH,SPH"));
 			result.append(new CGIAsm("subi _SPL,low(-" + size + ")"));
+			if(def_sph) result.append(new CGIAsm("sbci _SPH,high(-" + size + ")"));
 			result.append(new CGIAsm("sts SPL,_SPL"));
-
-			if(def_sph) result.append(new CGIAsm("sts SREG," + (modifyIreg ? "yl" : "atom_l")));
+			if(def_sph) result.append(new CGIAsm("sts SPH,_SPH"));
+			if(def_sph) result.append(new CGIAsm("sts SREG,yl"));
 		}
-		if(modifyIreg) {
-			if(def_sph) result.append(new CGIAsm("pop yh"));
-			result.append(new CGIAsm("pop yl"));
-		}
+		if(def_sph) result.append(new CGIAsm("pop yh"));
+		result.append(new CGIAsm("pop yl"));
 
 		if(null != scope) scope.append(result);
 		return result;
@@ -162,43 +131,41 @@ public class Generator extends CodeGenerator {
 //	public CGIAsm popRegAsm(int reg) {return new CGIAsm("pop r"+reg+"");}
 
 	@Override
-	public int pushHeapReg(CGScope scope) {
+	public void pushHeapReg(CGScope scope) {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";push heap iReg"));
-		scope.append(new CGIAsm("push zl"));
-		if(def_sph) {
-			scope.append(new CGIAsm("push zh"));
-			return 0x02;
-		}
-		return 0x01;
+		scope.append(new CGIAsm("push_z"));
 	}
 	@Override
 	public void popHeapReg(CGScope scope) {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";pop heap iReg"));
-		if(def_sph) scope.append(new CGIAsm("pop zh"));
-		scope.append(new CGIAsm("pop zl"));
+		scope.append(new CGIAsm("pop_z"));
 	}
 
 	@Override
-	public int pushStackReg(CGScope scope) {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";push stack iReg"));
-		scope.append(new CGIAsm("push yl"));
-		if(def_sph) {
-			scope.append(new CGIAsm("push yh"));
-			return 0x02;
-		}
-		return 0x01;
+	public CGIContainer pushStackReg(CGScope scope) {
+		CGIContainer result = new CGIContainer();
+		if(VERBOSE_LO <= verbose) result.append(new CGIText(";push stack iReg"));
+		result.append(new CGIAsm("push_y"));
+		if(null != scope) scope.append(result);
+		return result;
 	}
 	@Override
-	public void popStackReg(CGScope scope) {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";pop stack iReg"));
-		if(def_sph) scope.append(new CGIAsm("pop yh"));
-		scope.append(new CGIAsm("pop yl"));
+	public CGIContainer popStackReg(CGScope scope) {
+		CGIContainer result = new CGIContainer();
+		if(VERBOSE_LO <= verbose) result.append(new CGIText(";pop stack iReg"));
+		result.append(new CGIAsm("pop_y"));
+		if(null != scope) scope.append(result);
+		return result;
 	}
+	
 	@Override
-	public void stackToStackReg(CGScope scope) {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";stack addr to stack iReg"));
-		scope.append(new CGIAsm("lds yl,SPL")); //TODO проверить адрес ячейки
-		scope.append(new CGIAsm(def_sph ? "lds yh,SPH" : "ldi yh,0x00"));
+	public CGIContainer stackToStackReg(CGScope scope) {
+		CGIContainer result = new CGIContainer();
+		if(VERBOSE_LO <= verbose) result.append(new CGIText(";stack addr to stack iReg"));
+		result.append(new CGIAsm("lds yl,SPL")); //TODO проверить адрес ячейки
+		result.append(new CGIAsm(def_sph ? "lds yh,SPH" : "ldi yh,0x00"));
+		if(null != scope) scope.append(result);
+		return result;
 	}
 
 	
@@ -212,8 +179,8 @@ public class Generator extends CodeGenerator {
 	public void pushConst(CGScope scope, int size, long value) {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";push const '" + value + "'"));
 		for(int i=0; i<size; i++) {
-			scope.append(new CGIAsm("ldi yl," + (value&0xff)));
-			scope.append(new CGIAsm("push yl"));
+			scope.append(new CGIAsm("ldi zl," + (value&0xff)));
+			scope.append(new CGIAsm("push zl"));
 			value >>= 0x08;
 		}
 	}
@@ -359,14 +326,25 @@ public class Generator extends CodeGenerator {
 	}
 	
 	@Override
-	public void accCast(CGScope scope, VarType type) throws CompileException {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";acc cast " + accum.getSize() + "->" + type.getSize()));
-		if(accum.getSize() < type.getSize()) {
-			for(int i=accum.getSize(); i<type.getSize(); i++) {
-				scope.append(new CGIAsm("ldi r" + getAccRegs(4)[i] + ",0x00"));
+	public void jump(CGScope scope, CGLabelScope lScope) throws CompileException {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";jump"));
+		scope.append(new CGIAsm("jmp " + lScope.getName())); //TODO сделать проверки на варианты rjmp и jmp
+	}
+	
+	@Override
+	public CGIContainer accCast(CGScope scope, int size) throws CompileException {
+		CGIContainer result = new CGIContainer();
+		if(accum.getSize() != size) {
+			if(VERBOSE_LO <= verbose) result.append(new CGIText(";acc cast " + accum.getSize() + "->" + size));
+			if(accum.getSize() < size) {
+				for(int i=accum.getSize(); i<size; i++) {
+					result.append(new CGIAsm("ldi r" + getAccRegs(4)[i] + ",0x00"));
+				}
 			}
+			accum.setSize(size);
 		}
-		accum.setSize(type.getSize());
+		if(null != scope) scope.append(result);
+		return result;
 	}
 
 	public void cellsToRegs(CGScope scope, int offset, CGCells cells, byte[] registers) throws CompileException {
@@ -744,12 +722,12 @@ public class Generator extends CodeGenerator {
 		}
 	};
 
-//--------------------	
-	
+
+	// TODO Лучше вынести данный код в виде RTOS функции. Перед этим нужно сохранять блок VarTypeIds интерфейсов во FLASH, а здесь указывать адрес размещения
 	@Override
-	public CGIContainer eNew(CGScope scope, int size, List<VarType> classTypes, boolean launchPoint, boolean canThrow) throws CompileException {
+	public CGIContainer eNewInstance(int size, CGLabelScope iidLabel, VarType type, boolean launchPoint, boolean canThrow) throws CompileException {
 		CGIContainer result = new CGIContainer();
-		if(VERBOSE_LO <= verbose) result.append(new CGIText(launchPoint ? ";Launch " : (";eNew [" + StrUtils.toString(classTypes) + "], heap size:" + size)));
+		if(VERBOSE_LO <= verbose) result.append(new CGIText(launchPoint ? ";Launch " : (";eNewInstance '" + type + "', heap size:" + size)));
 		RTOSFeatures.add(RTOSFeature.OS_FT_DRAM); //TODO сейчас реализуется классвовая модель, но что если нужно собрать просто функцию?
 		result.append(new CGIAsm("ldi r16," + (size&0xff)));
 		if(0x02==getRefSize()) result.append(new CGIAsm("ldi r17," + ((size>>0x08)&0xff)));
@@ -761,18 +739,17 @@ public class Generator extends CodeGenerator {
 		}
 		//Запись кол-ва ссылок
 		result.append(new CGIAsm("std z+" + offset++ + (launchPoint ? ",c0xff" : ",c0x00")));
-		//Запись кол-ва типов классов
-		result.append(new CGIAsm("ldi r16," + classTypes.size()));
+		//Запись блока ид типов класса и интерфейсов
+		result.append(new CGIAsm("ldi r16,low(" + iidLabel.getName() + "*2)"));
 		result.append(new CGIAsm("std z+" + offset++ +",r16"));
-		for(VarType type : classTypes) {
-			result.append(new CGIAsm("ldi r16," + type.getId()));
-			result.append(new CGIAsm("std z+" + offset++ +",r16"));
+		result.append(new CGIAsm("ldi r16,high(" + iidLabel.getName() + "*2)"));
+		result.append(new CGIAsm("std z+" + offset++ +",r16"));
+
+		int stackFrameSize = size-offset;
+		if(0x00!=stackFrameSize) {
+			dpClearHeap = true;
+			result.append(new CGIAsm("mcall j8bproc_clear_heap_nr"));
 		}
-		//Размер аккумулятора - 2Б
-		accum.setSize(0x02);
-		//New - выражение, возвращает значение в аккумуляторе, Z нужен конструктору
-		result.append(new CGIAsm("movw r16,zl"));
-		if(null != scope) scope.append(result);
 		return result;
 	}
 
@@ -960,7 +937,7 @@ public class Generator extends CodeGenerator {
 	
 	@Override
 	public void eInstanceof(CGScope scope, VarType type) throws CompileException {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";eInstanceOf " + type));
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";eInstanceOf '" + type + "'"));
 		dpInstanceOf=true;
 		// TODO не сохраняем Z, так как обращение к полю/переменной уже изменило Z, но нужно учитывать работу с this
 		scope.append(new CGIAsm("push r17"));
@@ -1033,8 +1010,12 @@ public class Generator extends CodeGenerator {
 	}
 	
 	@Override
-	public void eReturn(CGScope scope, int size) {
-		scope.append(new CGIAsm("ret"));
+	public CGIContainer eReturn(CGScope scope, int size) throws CompileException {
+		CGIContainer result = new CGIContainer();
+		if(0 != size) result.append(accCast(null, size));
+		result.append(new CGIAsm("ret"));
+		if(null != scope) scope.append(result);
+		return result;
 	}
 	
 	@Override

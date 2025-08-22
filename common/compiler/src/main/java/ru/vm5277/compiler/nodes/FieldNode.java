@@ -202,7 +202,7 @@ public class FieldNode extends AstNode {
 			if(initializer instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)initializer;
 				if(VarType.CSTR == le.getType(null)) {
-					cg.defineStr(fScope, (String)le.getValue());
+					fScope.setDataSymbol(cg.defineData(fScope.getResId(), (String)le.getValue()));
 					//TODO рудимент?
 					//symbol.getConstantOperand().setValue(cgScope.getResId());
 				}
@@ -212,7 +212,7 @@ public class FieldNode extends AstNode {
 		else {
 			int heapHeaderSize = ((CGClassScope)fScope.getParent()).getHeapHeaderSize();
 			if(null == initializer) {
-				cg.constToCells(fScope, heapHeaderSize, 0, fScope.getCells());
+				// Ничего не делаем, инициализация(заполнение нулями необходима только регистрам, остальные проинициализированы вместе с HEAP/STACK)
 			}
 			else if(initializer instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
 				cg.constToCells(cg.getScope(), heapHeaderSize, ((LiteralExpression)initializer).getNumValue(), fScope.getCells());

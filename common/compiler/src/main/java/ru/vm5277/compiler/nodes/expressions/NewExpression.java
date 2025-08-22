@@ -44,14 +44,8 @@ public class NewExpression extends MethodCallExpression {
 			}
 		}
 		
-		int size = 0x02 + 0x01 + 0x01 + classTypes.size() + mScope.getFiledsSize(); //size + refCount + classTypesQnt + classTypes + flieldsBlock
-		cg.eNew(cgScope, size, classTypes, false, false); // TODO canThrow
-		return true;
-	}
-	
-	public Object codeGenPart2(CodeGenerator cg) throws Exception {
 		super.codeGen(cg);
-		return null;
+		return true;
 	}
 	
 	@Override

@@ -16,6 +16,7 @@
 package ru.vm5277.common.cg.scopes;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import ru.vm5277.common.StrUtils;
@@ -32,6 +33,7 @@ import ru.vm5277.common.exceptions.CompileException;
 
 public class CGMethodScope extends CGScope {
 	private	final	CGLabelScope				lbScope;
+	private			CGLabelScope				lbCIScope;
 	private	final	VarType						type;
 	private	final	VarType[]					types;
 	private	final	Map<Integer, CGVarScope>	args		= new HashMap<>();
@@ -51,20 +53,33 @@ public class CGMethodScope extends CGScope {
 			lbScope = new CGLabelScope(null, -1, "j8bCmainMmain", true);
 		}
 		else {
-			lbScope = new CGLabelScope(this, null, null, true);
+			lbScope = new CGLabelScope(this, null, "C", true);
 		}
 		cg.addLabel(lbScope);
+		
+		if(null == type) {
+			lbCIScope = new CGLabelScope(this, null, "CI", true);
+			cg.addLabel(lbCIScope);
+		}
 	}
 	
 	public void build(CodeGenerator cg) throws CompileException {
 		CGIContainer cont = new CGIContainer();
 		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";build " + toString()));
 		cont.append(lbScope);
+
+		
+		CGClassScope cScope = (CGClassScope)parent;
+		if(null == type) {
+			cont.append(cg.eNewInstance(cScope.getHeapHeaderSize()+cScope.getHeapOffset(), cScope.getIIDLabel(), cScope.getType(), false, false));
+			cont.append(lbCIScope);
+		}
 		prepend(cont);
 		
+		append(cg.eReturn(null, null == type ? 0x00 : type.getSize()));
 		if(VERBOSE_LO <= verbose) append(new CGIText(";method end"));
 	}
-
+	
 	//Выделение ячеек для переданных параметров (только стек)
 	public CGCells paramAllocate(int size) throws CompileException {
 		CGCells cells = new CGCells(CGCells.Type.STACK_FRAME, size, stackOffset);
@@ -127,6 +142,9 @@ public class CGMethodScope extends CGScope {
 	public CGLabelScope getLabel() {
 		return lbScope;
 	}
+	public CGLabelScope getCILabel() {
+		return lbCIScope;
+	}
 	
 	/**
 	 * Возвращает размер стека для занятого праметрами + длина адреса возврата
@@ -136,9 +154,13 @@ public class CGMethodScope extends CGScope {
 		return stackOffset + callSize; 
 	}
 	
+	public VarType[] getTypes() {
+		return types;
+	}
+	
 	@Override
 	public String toString() {
-		return "method " + type + " '" + getPath('.') +  "(" + StrUtils.toString(types) + "), id:" + resId;
+		return (null==type ? "constructor" : "method " + type) + " '" + getPath('.') +  "(" + StrUtils.toString(types) + ")";
 	}
 	
 	@Override

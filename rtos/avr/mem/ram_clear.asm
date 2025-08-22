@@ -13,31 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-.IFNDEF J8BPROC_INSTANCEOF_NR
+.IFNDEF OS_RAM_CLEAR_NR
 ;-----------------------------------------------------------
-J8BPROC_INSTANCEOF_NR:										;NR-NO_RESTORE - не восстанавливает Z
+OS_RAM_CLEAR_NR:
 ;-----------------------------------------------------------
-;Проверяем реализацию интерфейса(перебор VarType ids)
-;IN: Z-адрес HEAP,ACCUM_H-VarType id
+;Заполнение блока памяти значением							;NR-NO_RESTORE - не восстанавливает IN регистры.
+;IN: Y-адрес, TEMP_L/H-длина
 ;-----------------------------------------------------------
-	PUSH TEMP_L
-	ADIW ZL,0x03
-	LD ACCUM_L,Z+
-	LD ZH,Z
-	MOV ZL,ACCUM_L
-	LPM ACCUM_L,Z+
-_J8BPROC_INSTANCEOF_NR__LOOP:
-	LPM TEMP_L,Z+
-	CP TEMP_L,ACCUM_H
-	BREQ _J8BPROC_INSTANCEOF_NR__OK
-	DEC ACCUM_L
-	BRNE _J8BPROC_INSTANCEOF_NR__LOOP
-	RJMP _J8BPROC_INSTANCEOF_NR__END
-_J8BPROC_INSTANCEOF_NR__OK:
-	LDI ACCUM_L,0x01
-_J8BPROC_INSTANCEOF_NR__END:
-	POP TEMP_L
+_OS_RAM_CLEAR_NR__LOOP:
+	ST Y+,C0x00
+	SBIW TEMP_L,0x01
+	BRNE _OS_RAM_FILL_NR__LOOP
 	RET
 .ENDIF
-

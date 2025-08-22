@@ -153,10 +153,10 @@
 	.DEF	ACCUM_EH								= r19
 	.DEF	RESULT									= r20	;Регистр результата операции или кода исключения
 	.DEF	FLAGS									= r21	;Регистр флагов
-	.DEF	TEMP_L									= r22
-	.DEF	TEMP_H									= r23
-	.DEF	TEMP_EL									= r24
-	.DEF	TEMP_EH									= r25
+	.DEF	TEMP_EL									= r22
+	.DEF	TEMP_EH									= r23
+	.DEF	TEMP_L									= r24	;Заданы после TEMP_EL/EH, специально для ADIW/SBIW инструкций
+	.DEF	TEMP_H									= r25
 
 
 .MACRO PUSH_X

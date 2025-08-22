@@ -80,7 +80,7 @@ public class TypeReferenceExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
 		//cg.setAcc(new Operand(VarType.CLASS, OperandType.TYPE, varType.getId()));
 		return null;
 	}

@@ -17,6 +17,7 @@
 /*
  * TODO:
  * Добавить директивы .REPT и .ENDR, повторяет блок N раз
+ * Проверить ADIW/SBIW rXX,const, rXX может быть только >=24
  */
 
 package ru.vm5277.avr_asm;

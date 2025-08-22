@@ -164,7 +164,7 @@ public class UnaryExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
 		// Генерация кода для операнда (например, переменной или другого выражения)
 		if(null != operand.codeGen(cg)) {
 //			cg.emitUnary(cgScope, operator, 0, cg.cScope.getCells()); //TODO смещение!
