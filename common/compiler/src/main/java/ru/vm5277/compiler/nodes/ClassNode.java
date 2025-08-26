@@ -17,9 +17,11 @@ package ru.vm5277.compiler.nodes;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
+import ru.vm5277.common.ImplementInfo;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.compiler.Delimiter;
@@ -39,7 +41,7 @@ public class ClassNode extends AstNode {
 	protected	final	Set<Keyword>	modifiers;
 	protected			String			name;
 	private				String			parentClassName;
-	protected			List<String>	interfaces			= new ArrayList<>();
+	protected			List<String>	impl			= new ArrayList<>();
 	private				ClassBlockNode	blockNode;
 	private				ClassScope		classScope;
 	private				CGClassScope	cgScope;
@@ -65,7 +67,7 @@ public class ClassNode extends AstNode {
 			consumeToken(tb);
 			while(true) {
 				try {
-					interfaces.add((String)consumeToken(tb, TokenType.ID).getValue());
+					impl.add((String)consumeToken(tb, TokenType.ID).getValue());
 				}
 				catch(CompileException e) {markFirstError(e);} // встретили не ID интерфейса, пропускаем
 				if (!tb.match(Delimiter.COMMA)) break;
@@ -105,7 +107,7 @@ public class ClassNode extends AstNode {
 	
 	@Override
 	public String toString() {
-		return getClass().getSimpleName() + ": " + modifiers + ", " + name + ", " + interfaces;
+		return getClass().getSimpleName() + ": " + modifiers + ", " + name + ", " + impl;
 	}
 
 	@Override
@@ -140,7 +142,11 @@ public class ClassNode extends AstNode {
 		}
 		
 		try {
-			classScope = new ClassScope(name, parentScope);
+			List<VarType> implTypes = new ArrayList<>();
+			for(String ifaceName : impl) {
+				implTypes.add(VarType.fromClassName(ifaceName));
+			}
+			classScope = new ClassScope(name, parentScope, implTypes);
 			if(null != parentScope) ((ClassScope)parentScope).addClass(classScope);
 			
 			blockNode.declare(classScope);
@@ -153,72 +159,82 @@ public class ClassNode extends AstNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		VarType[] interfaceTypes = null;
-		if(!interfaces.isEmpty()) {
-			interfaceTypes = new VarType[interfaces.size()];
-			for(int i=0; i<interfaces.size(); i++) {
-				VarType iType = VarType.fromClassName(interfaces.get(i));
-				if(null == iType) {
-					markError("Interface not found: " + interfaces.get(i));
-					if(null != cg) cg.leaveClass();
-					return false;
-				}
-				interfaceTypes[i] = iType;
-			}
-		}
-
-		cgScope = cg.enterClass(VarType.fromClassName(name), interfaceTypes, name, null == parentClassName);
-
-		for (String interfaceName : interfaces) {
-			// Проверяем существование интерфейса
-			InterfaceScope interfaceSymbol = classScope.resolveInterface(interfaceName);
-			if (null == interfaceSymbol) markError("Interface not found: " + interfaceName);
-
-			checkInterfaceImplementation(classScope, interfaceSymbol);
-		}
-		
 		if(null != importedClasses) {
 			for (ClassNode imported : importedClasses) {
 				imported.postAnalyze(scope, cg);
 			}
 		}
-		
+
+		List<ImplementInfo> implInfos = new ArrayList<>();
+		if(!impl.isEmpty()) {
+			List<InterfaceScope> iScopes = new ArrayList<>();
+			for(String ifaceName : impl) {
+				fillInterfaces(iScopes, ifaceName);
+			}	
+			for(InterfaceScope iScope : iScopes) {
+				VarType iType = VarType.fromClassName(iScope.getName());
+				List<String> signatures = new ArrayList<>();
+				for(MethodSymbol mSymbol : iScope.getMethods()) {
+// TODO					if(mSymbol.getNode().isCGDone()) { Не работает, на текущем этапе еще не решены зависимости
+						signatures.add(mSymbol.getSignature());
+//					}
+				}
+				implInfos.add(new ImplementInfo(iType, signatures));
+			}
+			
+			Collections.sort(implInfos, new Comparator<ImplementInfo>() {
+				@Override
+				public int compare(ImplementInfo ii1, ImplementInfo ii2) {
+					return Integer.compare(ii1.getType().getId(), ii2.getType().getId());
+				}
+			});
+		}
+
+		cgScope = cg.enterClass(VarType.fromClassName(name), name, implInfos, null == parentClassName);
+
 		blockNode.postAnalyze(classScope, cg);
 
 		cg.leaveClass();
 		return true;
 	}
 	
+	private void fillInterfaces(List<InterfaceScope> iScopes, String ifaceName) {
+		InterfaceScope iScope = classScope.resolveInterface(ifaceName);
+		if(null == iScope) {
+			markError("Interface not found: " + ifaceName);
+		}
+		else if(!iScopes.contains(iScope)) {
+			checkInterfaceImplementation(classScope, iScope);
+			iScopes.add(iScope);
+			for(VarType type : iScope.getImpl()) {
+				fillInterfaces(iScopes, type.getClassName());
+			}
+		}
+	}
 	
 	private boolean checkInterfaceImplementation(ClassScope classScope, InterfaceScope interfaceSymbol) {
 		boolean allMethodsImplemented = true;
 		
-		Map<String, List<MethodSymbol>> map = interfaceSymbol.getMethods();
-		for(String methodName : map.keySet()) { 
-			List<MethodSymbol> entry = map.get(methodName);
+		// Для каждого метода в интерфейсе
+		for (MethodSymbol interfaceMethod : interfaceSymbol.getMethods()) {
 			boolean found = false;
-
 			// Получаем методы класса с таким же именем
-			List<MethodSymbol> classMethods = classScope.getMethods(methodName);
-
-			// Для каждого метода в интерфейсе
-			for (MethodSymbol interfaceMethod : entry) {
-
-				// Проверяем каждый метод класса
-				if(null != classMethods) {
-					for (MethodSymbol classMethod : classMethods) {
-						if (interfaceMethod.getSignature().equals(classMethod.getSignature())) {
-							found = true;
-							break;
-						}
+			List<MethodSymbol> classMethods = classScope.getMethods(interfaceMethod.getName());
+			
+			// Проверяем каждый метод класса
+			if(null != classMethods) {
+				for (MethodSymbol classMethod : classMethods) {
+					if (interfaceMethod.getSignature().equals(classMethod.getSignature())) {
+						found = true;
+						break;
 					}
 				}
+			}
 
-				if (!found) {
-					markError(	"Class '" + classScope.getName() + "' must implement method: " + interfaceMethod.getSignature() + 
-								" from interface '" + interfaceSymbol.getName() + "'");
-					allMethodsImplemented = false;
-				}
+			if (!found) {
+				markError(	"Class '" + classScope.getName() + "' must implement method: " + interfaceMethod.getSignature() + 
+							" from interface '" + interfaceSymbol.getName() + "'");
+				allMethodsImplemented = false;
 			}
 		}
 		return allMethodsImplemented;

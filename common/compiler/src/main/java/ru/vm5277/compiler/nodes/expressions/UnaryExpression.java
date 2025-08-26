@@ -26,6 +26,7 @@ import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.ClassScope;
+import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 
@@ -144,10 +145,10 @@ public class UnaryExpression extends ExpressionNode {
 	}
 	
 	private boolean isFinalVariable(VarFieldExpression var, Scope scope) {
-		Symbol symbol = scope.resolve(var.getValue());
+		Symbol symbol = scope.resolveSymbol(var.getValue());
 		if(null == symbol) {
-			ClassScope classScope = scope.getThis().resolveClass(var.getValue());
-			if(null != classScope) {
+			InterfaceScope iScope = scope.getThis().resolveScope(var.getValue());
+			if(null != iScope) {
 				symbol = new Symbol(var.getValue(), VarType.CLASS, false, false);
 			}
 		}

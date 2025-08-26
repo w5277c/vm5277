@@ -501,6 +501,10 @@ public abstract class AstNode extends SemanticAnalyzer {
 		return null;
 	}
 	
+	public boolean isCGDone() {
+		return cgDone;
+	}
+	
 	// TODO костыль
 	public void setDepCGScope(CGScope cgScope) {
 		this.depCGScope = cgScope;

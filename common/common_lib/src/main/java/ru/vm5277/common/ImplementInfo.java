@@ -13,12 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ru.vm5277.compiler.semantic;
+package ru.vm5277.common;
 
-public abstract class Scope {
-	private	boolean	isUsed	= false;
+import java.util.List;
+import ru.vm5277.common.compiler.VarType;
+
+public class ImplementInfo implements Comparable<ImplementInfo> {
+	private	VarType			type;
+	private	List<String>	signatures;
 	
-	public abstract Symbol resolveSymbol(String name);
-	public abstract Scope getParent();
-	public abstract ClassScope getThis();
+	public ImplementInfo(VarType type, List<String> signatures) {
+		this.type = type;
+		this.signatures = signatures;
+	}
+	
+	public VarType getType() {
+		return type;
+	}
+	
+	public List<String> getSignatures() {
+		return signatures;
+	}
+	
+	@Override
+	public int compareTo(ImplementInfo pair) {
+		return Integer.compare(type.getId(), pair.getType().getId());
+	}
 }

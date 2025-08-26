@@ -32,6 +32,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import ru.vm5277.avr_asm.nodes.DataNode;
 import ru.vm5277.avr_asm.nodes.MacroNode;
 import ru.vm5277.avr_asm.nodes.MnemNode;
 import ru.vm5277.avr_asm.nodes.Node;
@@ -47,7 +48,7 @@ import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class Assembler implements AssemblerInterface {
-	public	final	static	String	VERSION		= "0.3";
+	public	final	static	String	VERSION		= "0.4";
 	public			static	int		tabSize		= 4;
 	public			static	boolean	isWindows;
 	public			static	Path	toolkitPath;
@@ -214,6 +215,9 @@ public class Assembler implements AssemblerInterface {
 				scope.beginMacroSecondPass(callSymbol);
 				secondPass(scope, mc, callSymbol.getSecondPartNodes());
 				scope.endMacroSecondPass();
+			}
+			else if(node instanceof DataNode) {
+				((DataNode)node).secondPass();
 			}
 			else {
 				mc.add(new ErrorMessage("Unexpected node type, expected MnemNode or MacroNode, got: " + node, null));

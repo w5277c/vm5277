@@ -36,6 +36,7 @@ import ru.vm5277.common.compiler.Case;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.Operand;
 import ru.vm5277.common.RTOSFeature;
+import ru.vm5277.common.RTOSLibs;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.SystemParam;
 import ru.vm5277.common.cg.CGActionHandler;
@@ -190,16 +191,16 @@ public class Generator extends CodeGenerator {
 	 * @param scope - область видимости для генерации кода
 	 * @param label - метка объекта
 	 */
-/*	@Override
-	public void pushRef(CGScope scope, String label) {
-		scope.append(new CGIAsm("ldi r30,low(" + label + ")"));
-		scope.append(new CGIAsm("push r30"));
+	@Override
+	public void pushLabel(CGScope scope, String label) {
+		scope.append(new CGIAsm("ldi zl,low(" + label + ")"));
+		scope.append(new CGIAsm("push zl"));
 		if(0x02==getRefSize()) {
-			scope.append(new CGIAsm("ldi r16,high(" + label + ")"));
-			scope.append(new CGIAsm("push r30"));
+			scope.append(new CGIAsm("ldi zl,high(" + label + ")"));
+			scope.append(new CGIAsm("push zl"));
 		}
 	}
-*/	
+	
 	
 	/**
 	 * pushCells используетя для вызова метода(передачи параметров)
@@ -747,8 +748,8 @@ public class Generator extends CodeGenerator {
 
 		int stackFrameSize = size-offset;
 		if(0x00!=stackFrameSize) {
-			dpClearHeap = true;
-			result.append(new CGIAsm("mcall j8bproc_clear_heap_nr"));
+			RTOSLibs.CLEAR_FIELDS.setRequired();
+			result.append(new CGIAsm("mcall j8bproc_clear_fields_nr"));
 		}
 		return result;
 	}
@@ -760,13 +761,22 @@ public class Generator extends CodeGenerator {
 
 
 	@Override
-	public void invokeMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, CGMethodScope mScope) throws CompileException {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";invokeMethod " + type + " " + className + "." + methodName));
+	public void invokeClassMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, CGLabelScope lbScope)
+																																	throws CompileException {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";invokeClassMethod " + type + " " + className + "." + methodName));
 		if(0 != types.length || !("getClassTypeId".equals(methodName) || "getClassId".equals(methodName))) {
-			scope.append(new CGIAsm("mcall " + mScope.getLabel().getName()));
+			scope.append(new CGIAsm("jmp " + lbScope.getName())); //TODO добавить точку возврата
 		}
 	}
-	
+	@Override
+	public void invokeInterfaceMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, VarType ifaceType, int methodSN)
+																																	throws CompileException {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";invokeInterfaceMethod " + type + " " + className + "." + methodName));
+		RTOSLibs.INVOKE_METHOD.setRequired();
+		scope.append(new CGIAsm("ldi r16," + ifaceType.getId()));
+		scope.append(new CGIAsm("ldi r17," + methodSN));
+		scope.append(new CGIAsm("jmp j8bproc_invoke_method_nr"));
+	}
 	@Override
 	public void invokeNative(CGScope scope, String className, String methodName, String paramTypes, VarType type, Operand[] ops) throws CompileException {
 		String methodQName = className + "." + methodName + (null != paramTypes ? " " + paramTypes : "");
@@ -938,12 +948,12 @@ public class Generator extends CodeGenerator {
 	@Override
 	public void eInstanceof(CGScope scope, VarType type) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";eInstanceOf '" + type + "'"));
-		dpInstanceOf=true;
+		RTOSLibs.INCTANCEOF.setRequired();
 		// TODO не сохраняем Z, так как обращение к полю/переменной уже изменило Z, но нужно учитывать работу с this
-		scope.append(new CGIAsm("push r17"));
+//		scope.append(new CGIAsm("push r17")); В теории не нужно, если и используется аккумулятор, то только в выражениях с булевой логикой, т.е. только r16
 		scope.append(new CGIAsm("ldi r17,"+type.getId()));
-		scope.append(new CGIAsm("mcall j8bproc_instanceof"));
-		scope.append(new CGIAsm("pop r17"));
+		scope.append(new CGIAsm("mcall j8bproc_instanceof_nr"));
+//		scope.append(new CGIAsm("pop r17"));
 	}
 	
 	@Override
@@ -954,10 +964,10 @@ public class Generator extends CodeGenerator {
 			scope.prepend(new CGIText(";eIf"));
 		}
 		
-		CGLabelScope beginLbScope = makeLabel(null, "if_begin", true);
-		CGLabelScope thenLbScope = makeLabel(null, "if_then", true);
-		CGLabelScope elseLbScope = makeLabel(null, "if_else", true);
-		CGLabelScope endLbScope = makeLabel(null, "if_end", true);
+		CGLabelScope beginLbScope = makeLabel(null, "_j8b_ifbegin", true);
+		CGLabelScope thenLbScope = makeLabel(null, "_j8b_ifthen", true);
+		CGLabelScope elseLbScope = makeLabel(null, "_j8b_ifelse", true);
+		CGLabelScope endLbScope = makeLabel(null, "_j8b_ifend", true);
 		
 		scope.prepend(beginLbScope);
 		thenScope.prepend(thenLbScope);
@@ -969,7 +979,7 @@ public class Generator extends CodeGenerator {
 		
 
 		//if(null == optimizedBrInst) 
-		scope.append(new CGIAsm("cpi r16,0x01"));
+//		scope.append(new CGIAsm("cpi r16,0x01"));
 		if(null != elseScope) {
 			scope.append(new CGIAsm(brInstr + " " + elseLbScope.getName())); //TODO необходима проверка длины прыжка
 			thenScope.append(new CGIAsm("rjmp " + endLbScope.getName())); //TODO необходима проверка длины прыжка
@@ -994,11 +1004,11 @@ public class Generator extends CodeGenerator {
 	public void eWhile(CGScope scope, CGScope condScope, CGBlockScope bodyScope) throws CompileException {
 		if(VERBOSE_HI == verbose) scope.append(new CGIText(";CG: while, cond:" + condScope + ", body:" + bodyScope));
 		
-		CGLabelScope cgBeginLbScope = new CGLabelScope(scope, null, "lWHILEBEGIN:", true);
+		CGLabelScope cgBeginLbScope = new CGLabelScope(scope, null, "_j8b_whilebegin", true);
 		labels.put(cgBeginLbScope.getResId(), cgBeginLbScope);
-		CGLabelScope cgBodyLbScope = new CGLabelScope(scope, null, "lWHILEBODY", true);
+		CGLabelScope cgBodyLbScope = new CGLabelScope(scope, null, "_j8b_whilebody", true);
 		labels.put(cgBodyLbScope.getResId(), cgBodyLbScope);
-		CGLabelScope cgEndLbScope = new CGLabelScope(scope, null, "lWHILEEND", true);
+		CGLabelScope cgEndLbScope = new CGLabelScope(scope, null, "_j8b_whileend", true);
 		labels.put(cgEndLbScope.getResId(), cgEndLbScope);
 		
 		if(null != condScope) {

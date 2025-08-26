@@ -15,11 +15,13 @@
  */
 package ru.vm5277.common.cg.scopes;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import ru.vm5277.common.ImplementInfo;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.cg.DataSymbol;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.compiler.VarType;
@@ -27,23 +29,27 @@ import ru.vm5277.common.exceptions.CompileException;
 
 public class CGClassScope extends CGScope {
 	private	final	VarType						type;
-	private	final	VarType[]					interfaceTypes;
+	private	final	List<ImplementInfo>			impl;
 	private	final	Map<Integer, CGFieldScope>	fields			= new HashMap<>();
+	private	final	Map<String, CGMethodScope>	methods			= new HashMap<>();
 	private			int							filedsOffset	= 0;
 	private	final	boolean						isImported;
 	private			int							heapHeaderSize;
 	private			CGLabelScope				lbIIDSScope;
+	private			CGIContainer				cont			= new CGIContainer();
 	
-	public CGClassScope(CodeGenerator cg, CGScope parent, int id, VarType type, VarType[] interfaceTypes, String name, boolean isRoot) {
+	public CGClassScope(CodeGenerator cg, CGScope parent, int id, VarType type, String name, List<ImplementInfo> impl, boolean isRoot) {
 		super(parent, id, name);
 		
 		this.type = type;
-		this.interfaceTypes = interfaceTypes;
+		this.impl = impl;
 		this.isImported = isRoot;
 		
+		lbIIDSScope = new CGLabelScope(null, null, "_j8b_meta", true);
+		
+		Collections.sort(impl);
 		// адрес HEAP, счетчик ссылок, адрес блока реализаций класса и интерфейсов
 		heapHeaderSize = 0x02 + 0x01 + 0x02;
-		lbIIDSScope = new CGLabelScope(this, null, "I", true);
 	}
 
 	public void addField(CGFieldScope field) {
@@ -62,30 +68,9 @@ public class CGClassScope extends CGScope {
 	}
 	
 	public void build(CodeGenerator cg) throws CompileException {
-		CGIContainer cont = new CGIContainer();
-		if(VERBOSE_LO <= verbose) {
-			cont.append(new CGIText(";build class " + getPath('.')));
-		}
-
-		// Формируем FLASH блок с ид типов класса и реализованных интерфейсов
-		StringBuilder sb = new StringBuilder(lbIIDSScope.getName());
-		sb.append(": .db ").append(0x01 + (null == interfaceTypes ? 0x00 : interfaceTypes.length)).append(",");
-		sb.append(type.getId()).append(",");
-		if(null != interfaceTypes) {
-			for(VarType vt : interfaceTypes) {
-				sb.append(vt.getId()).append(",");
-			}
-		}
-		if(null != interfaceTypes && 0!=interfaceTypes.length%0x02) {
-			sb.append("0");
-		}
-		else {
-			sb.deleteCharAt(sb.length()-1);
-		}
-		cont.append(new CGIText(sb.toString()));
+		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";======== enter CLASS " + getPath('.') + " ========================"));
 		prepend(cont);
-
-		if(VERBOSE_LO <= verbose) append(new CGIText(";class end"));
+		if(VERBOSE_LO <= verbose) append(new CGIText(";======== leave CLASS " + getPath('.') + " ========================"));
 	}
 	
 	public int getHeapOffset() {
@@ -99,10 +84,6 @@ public class CGClassScope extends CGScope {
 	@Override
 	public String getLName() {
 		return "C" + name;
-	}
-	
-	public VarType[] getInterfaceTypes() {
-		return interfaceTypes;
 	}
 	
 	public VarType getType() {
@@ -121,5 +102,56 @@ public class CGClassScope extends CGScope {
 	@Override
 	public String toString() {
 		return "class " + name + " '" + getPath('.') + resId;
+	}
+
+	public void addMethod(CGMethodScope mScope) {
+		methods.put(mScope.getSignature(), mScope);
+	}
+	
+	@Override
+	public String getSource() {
+		// Поздний этап сборки, так как использование методов класса известно только на этапе кодогенерации
+		
+		// Формируем FLASH блок с ид типов класса и реализованных интерфейсов
+		// - ид номер типа класса(1 байт)
+		// - количество интерфейсов реализованных интерфейсов(1 байт)
+		// Формируем запись из двух байт для каждого интерфейса
+		// - ид номер типа интерфейса(1 байт)
+		// - количество методов в интерфейсе
+		// Формируем адреса методов
+		// - адрес метода(2 байта)
+
+		// Обязательные условия
+		// - все интерфейсы упорядочены(например по VarType ID) и не зависят от порядка и наличия в implements
+		// - методы отсутствующие в интерфейсах идут после остальных методов
+		// - методы повторяющиеся в интерфейсах участвуют в подсчете количества методов, а также дублируются в таблице адресов методов
+
+		if(!impl.isEmpty()) {
+			StringBuilder implSB = new StringBuilder(lbIIDSScope.getName());
+			StringBuilder methodsAddrSB = new StringBuilder("\n\t.dw ");
+			implSB.append(":\n\t.db ").append(type.getId()).append(",").append(impl.size()).append(",");
+			
+			for(ImplementInfo pair : impl) {
+				implSB.append(pair.getType().getId()).append(",").append(pair.getSignatures().size()).append(",");
+				
+				for(String mehodId : pair.getSignatures()) {
+					CGMethodScope mScope = methods.get(mehodId);
+					// Метод может не использоваться в кодогенерации
+					if(mScope.isUsed()) {
+						methodsAddrSB.append(mScope.getLabel().getName()).append(",");
+					}
+					else {
+						methodsAddrSB.append(0).append(",");
+					}
+				}
+			}
+			methodsAddrSB.deleteCharAt(methodsAddrSB.length()-1);
+
+			implSB.deleteCharAt(implSB.length()-1);
+			implSB.append(methodsAddrSB);
+			cont.append(new CGIText(implSB.toString()));
+		}
+		
+		return super.getSource();
 	}
 }

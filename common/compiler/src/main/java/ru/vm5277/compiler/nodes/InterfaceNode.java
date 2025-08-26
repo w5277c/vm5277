@@ -15,13 +15,12 @@
  */
 package ru.vm5277.compiler.nodes;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
-import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -32,7 +31,8 @@ import ru.vm5277.compiler.semantic.Scope;
 
 public class InterfaceNode extends ClassNode {
 	private			InterfaceBodyNode	blockIfaceNode;
-
+	private			InterfaceScope		interfaceScope;
+	
 	public InterfaceNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, String parentClassName, List<ClassNode> importedClasses)
 																																	throws CompileException {
 		super(tb, mc, modifiers, parentClassName, importedClasses);
@@ -73,15 +73,19 @@ public class InterfaceNode extends ClassNode {
 	@Override
 	public boolean declare(Scope scope) {
 		try {
-			InterfaceScope iScope = new InterfaceScope(name, scope);
+			List<VarType> implTypes = new ArrayList<>();
+			for(String ifaceName : impl) {
+				implTypes.add(VarType.fromClassName(ifaceName));
+			}
+			interfaceScope = new InterfaceScope(name, scope, implTypes);
 			if (scope instanceof ClassScope) {
-				((ClassScope)scope).addInterface(iScope);
+				((ClassScope)scope).addInterface(interfaceScope);
 			}
 			else if (scope instanceof InterfaceScope) {
-				((InterfaceScope)scope).addInterface(iScope);
+				((InterfaceScope)scope).addInterface(interfaceScope);
 			}
 
-			blockIfaceNode.declare(iScope);
+			blockIfaceNode.declare(interfaceScope);
 		} 
 		catch (CompileException e) {
 			markError(e);
@@ -92,14 +96,7 @@ public class InterfaceNode extends ClassNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		int[] interfaceIds = null;
-		if(!interfaces.isEmpty()) {
-			interfaceIds = new int[interfaces.size()];
-			for(int i=0; i<interfaces.size(); i++) {
-				interfaceIds[i] = VarType.fromClassName(interfaces.get(i)).getId();
-			}
-		}
-		cg.enterInterface(VarType.fromClassName(name), interfaceIds, name);
+		cg.enterInterface(VarType.fromClassName(name), name);
 
 		// Проверка что интерфейс не содержит конструкторов
 		for (AstNode decl : blockIfaceNode.getDeclarations()) {
@@ -147,22 +144,23 @@ public class InterfaceNode extends ClassNode {
 		if(cgDone) return null;
 		cgDone = true;
 
-		int[] interfaceIds = null;
-		if(!interfaces.isEmpty()) {
-			interfaceIds = new int[interfaces.size()];
-			for(int i=0; i<interfaces.size(); i++) {
-				interfaceIds[i] = VarType.fromClassName(interfaces.get(i)).getId();
+/* Уже есть в postAnalyze
+int[] interfaceIds = null;
+		if(!impl.isEmpty()) {
+			interfaceIds = new int[impl.size()];
+			for(int i=0; i<impl.size(); i++) {
+				interfaceIds[i] = VarType.fromClassName(impl.get(i)).getId();
 			}
 		}
 			
 		cg.enterInterface(VarType.fromClassName(name), interfaceIds, name);
-		try {
-			blockIfaceNode.codeGen(cg);
-		}
-		finally {
+*/
+		blockIfaceNode.codeGen(cg);
+		
+/*		finally {
 			cg.leaveInterface();
 		}
-		
+*/		
 		return null;
 	}
 	

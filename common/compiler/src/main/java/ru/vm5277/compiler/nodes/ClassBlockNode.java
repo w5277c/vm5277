@@ -168,10 +168,8 @@ public class ClassBlockNode extends AstNode {
 		}
 
 		// Проверка методов
-		for (List<MethodSymbol> methodGroup : classScope.getMethods().values()) {
-			for (MethodSymbol method : methodGroup) {
-				if (!method.isStatic()) return true;
-			}
+		for (MethodSymbol method : classScope.getMethods()) {
+			if (!method.isStatic()) return true;
 		}
 
 		return false;

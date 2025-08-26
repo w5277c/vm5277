@@ -119,10 +119,10 @@ public class Parser {
 						if(Keyword.MESSAGE.getName().equals(kd)) {MessageNode.parse(tb, scope, mc); continue;}
 						if(Keyword.WARNING.getName().equals(kd)) {WarningNode.parse(tb, scope, mc); continue;}
 						if(Keyword.ERROR.getName().equals(kd)) {ErrorNode.parse(tb, scope, mc); continue;}
-						if(Keyword.DB.getName().equals(kd)) {DataNode.parse(tb, scope, mc, 1); continue;}
-						if(Keyword.DW.getName().equals(kd)) {DataNode.parse(tb, scope, mc, 2); continue;}
-						if(Keyword.DD.getName().equals(kd)) {DataNode.parse(tb, scope, mc, 4); continue;}
-						if(Keyword.DQ.getName().equals(kd)) {DataNode.parse(tb, scope, mc, 8); continue;}
+						if(Keyword.DB.getName().equals(kd)) {secondPassNodes.add(new DataNode(tb, scope, mc, 1)); continue;}
+						if(Keyword.DW.getName().equals(kd)) {secondPassNodes.add(new DataNode(tb, scope, mc, 2)); continue;}
+						if(Keyword.DD.getName().equals(kd)) {secondPassNodes.add(new DataNode(tb, scope, mc, 4)); continue;}
+						if(Keyword.DQ.getName().equals(kd)) {secondPassNodes.add(new DataNode(tb, scope, mc, 8)); continue;}
 						if(Keyword.LIST.getName().equals(kd)) {scope.setListEnabled(true); continue;}
 						if(Keyword.NOLIST.getName().equals(kd)) {scope.setListEnabled(false); continue;}
 						if(Keyword.OVERLAP.getName().equals(kd)) {scope.setOverlapAllowed(true); continue;}

@@ -15,15 +15,11 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
-import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.cg.scopes.CGClassScope;
-import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
-import ru.vm5277.compiler.semantic.MethodSymbol;
 
 public class NewExpression extends MethodCallExpression {
 	private	VarType					type;
@@ -34,7 +30,7 @@ public class NewExpression extends MethodCallExpression {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg) throws Exception {
-		CGMethodScope mScope = (CGMethodScope)((MethodSymbol)symbol).getCGScope();
+/*		CGMethodScope mScope = (CGMethodScope)((MethodSymbol)symbol).getCGScope();
 		CGClassScope cScope = (CGClassScope)mScope.getParent();
 		ArrayList<VarType> classTypes = new ArrayList<>();
 		classTypes.add(cScope.getType());
@@ -43,7 +39,7 @@ public class NewExpression extends MethodCallExpression {
 				classTypes.add(classType);
 			}
 		}
-		
+*/		
 		super.codeGen(cg);
 		return true;
 	}

@@ -31,9 +31,11 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import ru.vm5277.common.ImplementInfo;
 import ru.vm5277.common.NativeBinding;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.RTOSFeature;
+import ru.vm5277.common.RTOSLibs;
 import ru.vm5277.common.SystemParam;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
@@ -56,10 +58,6 @@ public abstract class CodeGenerator extends CGScope {
 	protected	static	final	Map<Integer, DataSymbol>	flashData			= new HashMap<>();
 	protected					CGScope						scope				= null;
 	protected	final			CGAccum						accum				= new CGAccum();
-	protected					boolean						dpStackAlloc		= false; // зависимость от процедур выделения и освобождения памяти в стеке
-	protected					boolean						dpClassModel		= false;
-	protected					boolean						dpInstanceOf		= false;
-	protected					boolean						dpClearHeap			= false;
 	
 	public CodeGenerator(String platform, Map<String, NativeBinding> nbMap, Map<SystemParam, Object> params) {
 		this.platform = platform;
@@ -67,9 +65,10 @@ public abstract class CodeGenerator extends CGScope {
 		this.params = params;
 	}
 	
-	public CGClassScope enterClass(VarType type, VarType[] intrerfaceTypes, String name, boolean isRoot) {
-		scope = new CGClassScope(this, scope, genId(), type, intrerfaceTypes, name, null != scope && isRoot);
-		dpClassModel = true;
+	public CGClassScope enterClass(VarType type, String name, List<ImplementInfo> impl, boolean isRoot) {
+		scope = new CGClassScope(this, scope, genId(), type, name, impl, null != scope && isRoot);
+		RTOSLibs.INC_REFCOUNT.setRequired();
+		RTOSLibs.DEC_REFCOUNT.setRequired();
 		return (CGClassScope)scope;
 	}
 	public void leaveClass() {
@@ -78,8 +77,8 @@ public abstract class CodeGenerator extends CGScope {
 		//TODO
 	}
 
-	public CGInterfaceScope enterInterface(VarType type, int[] intrerfaceIds, String name) {
-		scope = new CGInterfaceScope(scope, genId(), type, intrerfaceIds, name);
+	public CGInterfaceScope enterInterface(VarType type, String name) {
+		scope = new CGInterfaceScope(scope, genId(), type, name);
 		return (CGInterfaceScope)scope;
 	}
 	public void leaveInterface() {
@@ -88,16 +87,20 @@ public abstract class CodeGenerator extends CGScope {
 	}
 
 	public CGMethodScope enterConstructor(VarType[] types) {
-		scope = new CGMethodScope(this, (CGClassScope)scope, genId(), null, types, ((CGClassScope)scope).getName(), buildRegsPool());
-		return (CGMethodScope)scope;
+		CGMethodScope mScope = new CGMethodScope(this, (CGClassScope)scope, genId(), null, types, ((CGClassScope)scope).getName(), buildRegsPool());
+		((CGClassScope)scope).addMethod(mScope);
+		scope = mScope;
+		return mScope;
 	}
 	public void leaveConstructor() {
 		scope = scope.free();
 	}
 
 	public CGMethodScope enterMethod(VarType type, VarType[] types, String name) {
-		scope = new CGMethodScope(this, (CGClassScope)scope, genId(), type, types, name, buildRegsPool());
-		return (CGMethodScope)scope;
+		CGMethodScope mScope = new CGMethodScope(this, (CGClassScope)scope, genId(), type, types, name, buildRegsPool());
+		((CGClassScope)scope).addMethod(mScope);
+		scope = mScope;
+		return mScope;
 	}
 	public void leaveMethod() {
 		scope = scope.free();
@@ -219,10 +222,11 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract	CGIContainer pushStackReg(CGScope scope);
 	public abstract	CGIContainer popStackReg(CGScope scope);
 	public abstract CGIContainer stackToStackReg(CGScope scope);
-	//public abstract void pushRef(CGScope scope, String label);
+	public abstract void pushLabel(CGScope scope, String label);
 	public abstract void updateRefCount(CGScope scope, int offset, CGCells cells, boolean isInc) throws CompileException;
 	
-	public abstract void invokeMethod(CGScope scope, String className,String methodName, VarType type, VarType[] types, CGMethodScope mScope)																		throws CompileException;
+	public abstract void invokeClassMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, CGLabelScope lbScope) throws CompileException;
+	public abstract void invokeInterfaceMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, VarType ifaceType, int methodSN) throws CompileException;
 	public abstract void invokeNative(CGScope scope, String className, String methodName, String params, VarType type, Operand[] operands)
 																																	throws CompileException;
 	public abstract void eInstanceof(CGScope scope, VarType type) throws CompileException;
@@ -289,26 +293,20 @@ public abstract class CodeGenerator extends CGScope {
 
 		append(new CGIText(".include \"devices/" + params.get(SystemParam.MCU) + ".def\""));
 		append(new CGIText(".include \"core/core.asm\""));
-		if(dpStackAlloc) {
-			append(new CGIText(".include \"sys/stack_alloc.asm\""));
-			append(new CGIText(".include \"sys/stack_free.asm\""));	
-		}
+
 		if(RTOSFeatures.contains(RTOSFeature.OS_FT_DRAM)) {
-			append(new CGIText(".include \"dmem/dram.asm\""));	
-		}
-		if(dpClassModel) {
-			append(new CGIText(".include \"j8b/inc_refcount.asm\""));
-			append(new CGIText(".include \"j8b/dec_refcount.asm\""));	
-		}
-		if(dpInstanceOf) {
-			append(new CGIText(".include \"j8b/instanceof.asm\""));
-		}
-		if(dpClearHeap) {
-			append(new CGIText(".include \"j8b/clear_heap.asm\""));
+			RTOSLibs.DRAM.setRequired();
 		}
 		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) {
-			append(new CGIText(".include \"core/dispatcher.asm\""));	
+			RTOSLibs.DISPATCHER.setRequired();
 		}
+		
+		for(RTOSLibs lib : RTOSLibs.values()) {
+			if(lib.isRequired()) {
+				append(new CGIText(".include \"" + lib.getPath() + "\""));
+			}
+		}
+		
 		for(String include : includes) {
 			append(new CGIText(".include \"" + include + "\""));
 		}

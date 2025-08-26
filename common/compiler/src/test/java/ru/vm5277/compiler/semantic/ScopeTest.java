@@ -21,14 +21,14 @@ public class ScopeTest {
 
     @BeforeEach
     void setup() throws CompileException {
-        globalScope = new ClassScope("Global", null);
-        childScope = new ClassScope("Child", globalScope);
+        globalScope = new ClassScope("Global", null, null);
+        childScope = new ClassScope("Child", globalScope, null);
     }
 
     @Test
     void resolveFieldFromParentScope() throws CompileException {
         globalScope.addField(new Symbol("x", VarType.INT, false, false));
-        Symbol resolved = childScope.resolve("x");
+        Symbol resolved = childScope.resolveSymbol("x");
         assertNotNull(resolved);
         assertEquals(VarType.INT, resolved.getType());
     }

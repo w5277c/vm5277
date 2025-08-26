@@ -50,7 +50,7 @@ public class CGBlockScope extends CGScope {
 */		
 		mScope = parent.getMethodScope();
 
-		lbEScope = new CGLabelScope(this, null, "E", true);
+		lbEScope = new CGLabelScope(null, null, "_j8b_methodend", true);
 		cg.addLabel(lbEScope);
 	}
 	

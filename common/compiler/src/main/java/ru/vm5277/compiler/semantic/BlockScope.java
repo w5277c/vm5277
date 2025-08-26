@@ -38,13 +38,13 @@ public class BlockScope extends Scope {
 	}
 
 	@Override
-	public Symbol resolve(String name) {
+	public Symbol resolveSymbol(String name) {
 		// 1. Ищем в локальных переменных
 		Symbol symbol = variables.get(name);
 		if (symbol != null) return symbol;
 
 		// 2. Делегируем в родительскую область
-		return parent != null ? parent.resolve(name) : null;
+		return parent != null ? parent.resolveSymbol(name) : null;
 	}
 	
 	public void addLabel(LabelSymbol label) throws CompileException {

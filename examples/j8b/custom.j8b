@@ -16,10 +16,19 @@
 
 import rtos.System;
 import rtos.RTOSParam;
-import lang.Number;
+//import lang.Number;
 
 class Main {
-	public class Byte implements Number {
+	interface Number {
+		byte toByte();
+	}
+
+	interface Test implements Number {
+		byte toByte();
+		void test();
+	}
+
+	public class Byte implements Test {
 		private	byte	value;
 
 		public Byte(byte value) {
@@ -27,15 +36,19 @@ class Main {
 		}
 
 		public byte toByte() {
-			byte t=0;
-			return value+t;
+			return value;
+		}
+
+		public void test() {
 		}
 	}
 
     public static void main() {
 		System.setParam(RTOSParam.STDOUT_PORT, 0x12);
 
-		Byte b1 = new Byte(0x08);
-		System.out(b1.toByte());
-    }
+		Number b1 = new Byte(0x08);
+		if(b1 is Byte) {
+			System.out(b1.toByte());
+		}
+	}
 }

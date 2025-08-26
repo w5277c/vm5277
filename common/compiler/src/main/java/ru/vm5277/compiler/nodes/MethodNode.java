@@ -227,7 +227,7 @@ public class MethodNode extends AstNode {
 		catch(CompileException e) {markError(e);}
 		
 		if(null != getBody()) {
-			if (scope instanceof InterfaceScope) { //TODO ввести подержу статики
+			if (!(scope instanceof ClassScope)) { //TODO ввести подержу статики
 				markError(new CompileException(	"Method '" + name + "' cannot have body in interface '" + ((InterfaceScope)scope).getName() + "'"));
 				return false;
 			}
@@ -325,8 +325,10 @@ public class MethodNode extends AstNode {
 		}
 */
 		classNode.codeGen(cg);		
-
-		((CGMethodScope)symbol.getCGScope()).build(cg);
+		// У интерфейса нет тела метода
+		if(!(classNode instanceof InterfaceNode)) {
+			((CGMethodScope)symbol.getCGScope()).build(cg);
+		}
 //		if(VERBOSE_LO <= cg.getVerbose()) mScope.append(new CGIText(";method end"));		
 		return null;
 	}

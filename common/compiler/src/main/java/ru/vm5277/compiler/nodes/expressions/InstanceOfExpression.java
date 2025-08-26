@@ -99,7 +99,7 @@ public class InstanceOfExpression extends ExpressionNode {
 					
 					if(leftExpr instanceof VarFieldExpression) {
 						VarFieldExpression ve = (VarFieldExpression)leftExpr;
-						Symbol vSymbol = scope.resolve(ve.getValue());
+						Symbol vSymbol = scope.resolveSymbol(ve.getValue());
 						if(null == vSymbol) {
 							markError(new CompileException("var '" + ve.getValue() + "' not found"));
 							return false;
@@ -164,12 +164,12 @@ public class InstanceOfExpression extends ExpressionNode {
 					fulfillsContract = true;
 				}
 				else {
-					ClassScope leftClass = scope.getThis().resolveClass(leftType.getClassName());
-					InterfaceScope rightInterface = scope.getThis().resolveInterface(rightType.getClassName());
+					InterfaceScope leftIScope = scope.getThis().resolveScope(leftType.getClassName());
+					InterfaceScope rightIScope = scope.getThis().resolveInterface(rightType.getClassName());
 
 					
-					if (null != leftClass && null != rightInterface) {
-						fulfillsContract = leftClass.getInterfaces().containsKey(rightInterface.getName());
+					if (null != leftIScope && null != rightIScope) {
+						fulfillsContract = leftIScope.getInterfaces().containsKey(rightIScope.getName());
 					}
 				}
 			}
@@ -208,10 +208,7 @@ public class InstanceOfExpression extends ExpressionNode {
 		Symbol varSymbol = leftExpr.getSymbol();
 		if(varSymbol.isFinal()) return (isCompatibleWith(scope, varSymbol.getType(), rightType) ? CodegenResult.TRUE : CodegenResult.FALSE);
 
-		if(CodegenResult.RESULT_IN_ACCUM != leftExpr.codeGen(cg)) {		
-			// Явно не доработанный код, выражение всегда должно помещать результат в аккумулятор
-			throw new CompileException("Accum not used for operand:" + leftExpr);
-		}
+		leftExpr.codeGen(cg, false);
 
 		// TODO весь код можно вынести в RTOS j8b утилиты и просто вызывать как функцию
 		boolean heapSaved=false;

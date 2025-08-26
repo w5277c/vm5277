@@ -152,7 +152,7 @@ public class ImportNode extends AstNode {
 				}
 			} else {
 				// Проверяем существование класса
-				if (classScope.resolveClass(importStr) == null) {
+				if (classScope.resolveScope(importStr) == null) {
 					markError("Imported class not found: " + importStr);
 				}
 			}

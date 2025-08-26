@@ -20,22 +20,25 @@ J8BPROC_INSTANCEOF_NR:										;NR-NO_RESTORE - не восстанавлива
 ;-----------------------------------------------------------
 ;Проверяем реализацию интерфейса(перебор VarType ids)
 ;IN: Z-адрес HEAP,ACCUM_H-VarType id
+;OUT: flag Z-true(реализует)
 ;-----------------------------------------------------------
 	PUSH TEMP_L
 	ADIW ZL,0x03
 	LD ACCUM_L,Z+
 	LD ZH,Z
 	MOV ZL,ACCUM_L
-	LPM ACCUM_L,Z+
+	LPM ACCUM_L,Z+											;Проверяем на ид типа класса
+	CP ACCUM_L,ACCUM_H
+	BREQ _J8BPROC_INSTANCEOF_NR__END
+	LPM ACCUM_L,Z+											;Получаем количество интерфейсов
 _J8BPROC_INSTANCEOF_NR__LOOP:
-	LPM TEMP_L,Z+
+	LPM TEMP_L,Z+											;Получаем ид типа интерфейса
 	CP TEMP_L,ACCUM_H
-	BREQ _J8BPROC_INSTANCEOF_NR__OK
+	BREQ _J8BPROC_INSTANCEOF_NR__END
+	ADIW ZL,0x01											;Пропускаем количество методов интерфейса
 	DEC ACCUM_L
 	BRNE _J8BPROC_INSTANCEOF_NR__LOOP
-	RJMP _J8BPROC_INSTANCEOF_NR__END
-_J8BPROC_INSTANCEOF_NR__OK:
-	LDI ACCUM_L,0x01
+	CLZ
 _J8BPROC_INSTANCEOF_NR__END:
 	POP TEMP_L
 	RET

@@ -17,6 +17,10 @@ package ru.vm5277.avr_asm.nodes;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import javax.xml.bind.DatatypeConverter;
 import ru.vm5277.avr_asm.Assembler;
 import ru.vm5277.avr_asm.TokenBuffer;
@@ -25,29 +29,76 @@ import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.avr_asm.semantic.LiteralExpression;
 import ru.vm5277.avr_asm.Delimiter;
 import ru.vm5277.avr_asm.TokenType;
+import ru.vm5277.avr_asm.semantic.IdExpression;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 
-public class DataNode {
-	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc, int valueSize) throws CompileException {
-		SourcePosition sp = tb.getSP();
+public class DataNode extends Node {
+	private int						valueSize;
+	private	Map<Integer, String>	unresolvedLabels	= new HashMap<>();
+	
+	public DataNode(TokenBuffer tb, Scope scope, MessageContainer mc, int valueSize) throws CompileException {
+		super(tb, scope, mc);
+		
+		this.valueSize = valueSize;
+		this.scope = scope;
+		this.mc = mc;
+		this.sp = tb.getSP();
+
+		StringBuilder listSB = null;
+		if(scope.isListEnabled()) {
+			listSB = new StringBuilder();
+			switch(valueSize) {
+				case 1: listSB.append(".DB "); break;
+				case 2: listSB.append(".DW "); break;
+				case 4: listSB.append(".DD "); break;
+				case 8: listSB.append(".DQ "); break;
+			}
+		}
 		
 		try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
-
 			while(true) {
 				SourcePosition _sp = tb.getSP();
 				byte[] tmp = null;
 				Expression expr = Expression.parse(tb, scope, mc);
 				if(expr instanceof LiteralExpression && ((LiteralExpression)expr).getValue() instanceof String) {
 					tmp = ((String)((LiteralExpression)expr).getValue()).getBytes(StandardCharsets.US_ASCII);
+					if(scope.isListEnabled()) {
+						for(int offset=0; offset<tmp.length;) {
+							for(int i=0; i<valueSize && offset+i<tmp.length; i++) {
+								listSB.append(tmp[offset+i]&0xff);
+							}
+							offset += valueSize;
+							listSB.append(",");
+						}
+					}
 				}
 				else {
 					Long value = Expression.getLong(expr, tb.getSP());
-					if(null == value) {
-						tb.skipLine();
-						throw new CompileException("Cannot resolve expression: '" + expr + "'", _sp);
+					if(null != value) {
+						if(scope.isListEnabled()) listSB.append(value).append(",");
+					}
+					else {
+						// Похоже в выражении метка
+						if(expr instanceof IdExpression) {
+							if(scope.isListEnabled()) listSB.append(((IdExpression)expr).getId()).append(",");
+							
+							Integer _value = scope.resolveLabel(((IdExpression)expr).getId());
+							if(null != _value) {
+								value = _value.longValue();
+							}
+							else {
+								value = 0x00l;
+								// Адрес метки еще не известен, оставляем для second pass
+								unresolvedLabels.put(scope.getCSeg().getPC()+(baos.size()/2), ((IdExpression)expr).getId());
+							}
+						}
+						else {
+							tb.skipLine();
+							throw new CompileException("Cannot resolve expression: '" + expr + "'", _sp);
+						}
 					}
 					if(value >= (1<<(valueSize*8))) {
 						tb.skipLine();
@@ -81,15 +132,40 @@ public class DataNode {
 				scope.getCSeg().movePC(wSize);
 			
 				if(scope.isListEnabled()) {
-					String text = "";
-					try {text = " #" + new String(baos.toByteArray(), "ASCII").replaceAll("\\r", "\\\\r").replaceAll("\\n", "\\\\n");}catch(Exception e) {}
-					scope.list(".DB 0x" + DatatypeConverter.printHexBinary(baos.toByteArray()) + text);
+					listSB.deleteCharAt(listSB.length()-1);
+					scope.list(listSB.toString());
 				}
 			}
 			Node.consumeToken(tb, TokenType.NEWLINE);
 		}
 		catch(Exception e) {
 			throw new CompileException(e.getMessage(), sp);
+		}
+	}
+
+	public void secondPass()  {
+		if(!unresolvedLabels.isEmpty()) {
+			for(Integer wAddr : unresolvedLabels.keySet()) {
+				String labelName = unresolvedLabels.get(wAddr);
+				Integer value = scope.resolveLabel(labelName);
+				if(null == value) {
+					markError(new CompileException("Cannot resolve label: '" + labelName + "'", sp));
+				}
+				else {
+					byte[] tmp = new byte[valueSize];
+					for(int i=0; i<valueSize; i++) {
+						tmp[i] = (byte)(value & 0xff);
+						value >>>= 8;
+					}
+					try {
+						scope.getCSeg().setPC(wAddr);
+						scope.getCSeg().getCurrentBlock().write(tmp, valueSize/2);
+					}
+					catch(Exception e) {
+						markError(new CompileException(e.getMessage(), sp));
+					}
+				}
+			}
 		}
 	}
 }

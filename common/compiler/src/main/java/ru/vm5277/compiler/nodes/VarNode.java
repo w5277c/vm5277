@@ -34,6 +34,8 @@ import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.nodes.expressions.NewExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
+import ru.vm5277.compiler.semantic.ClassScope;
+import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.VarSymbol;
 
@@ -161,13 +163,27 @@ public class VarNode extends AstNode {
 				}
 				// Проверка совместимости типов
 				VarType initType = initializer.getType(scope);
-				if (!isCompatibleWith(scope, type, initType)) {
+				if(initType.isClassType() && type.isClassType()) {
+					if(initType != type) {
+						InterfaceScope iScope = scope.getThis().resolveScope(initType.getClassName());
+						if(!iScope.isImplements(type)) {
+							markError("Type mismatch: cannot assign " + initType + " to " + type);
+							cg.leaveLocal();
+							return false;
+						}
+					}
+				}
+				else if (!isCompatibleWith(scope, type, initType)) {
 					markError("Type mismatch: cannot assign " + initType + " to " + type);
+					cg.leaveLocal();
+					return false;
 				}
 
 				// Дополнительная проверка на сужающее преобразование
 				if (type.isNumeric() && initType.isNumeric() && type.getSize() < initType.getSize()) { //TODO верятно нужно и в других местах
 					markError("Narrowing conversion from " + initType + " to " + type + " requires explicit cast"); 
+					cg.leaveLocal();
+					return false;
 				}
 
 				ExpressionNode optimizedExpr = initializer.optimizeWithScope(scope);
@@ -176,7 +192,11 @@ public class VarNode extends AstNode {
 				}
 			}
 		}
-		catch (CompileException e) {markError(e);}
+		catch (CompileException e) {
+			markError(e);
+			cg.leaveLocal();
+			return false;
+		}
 		
 		cg.leaveLocal();
 		return true;

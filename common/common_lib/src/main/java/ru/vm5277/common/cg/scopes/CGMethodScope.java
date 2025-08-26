@@ -16,9 +16,6 @@
 package ru.vm5277.common.cg.scopes;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.Map;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
@@ -36,10 +33,11 @@ public class CGMethodScope extends CGScope {
 	private			CGLabelScope				lbCIScope;
 	private	final	VarType						type;
 	private	final	VarType[]					types;
-	private	final	Map<Integer, CGVarScope>	args		= new HashMap<>();
+	private	final	String						signature;
 	private			int							stackOffset	= 0;
 	private			int							callSize;
 	private	final	ArrayList<RegPair>			regsPool;	// Свободные регистры, true = cвободен
+	private			boolean						isUsed;
 	
 	public CGMethodScope(CodeGenerator cg, CGClassScope parent, int resId, VarType type, VarType[] types, String name, ArrayList<RegPair> regsPool) {
 		super(parent, resId, name);
@@ -48,6 +46,19 @@ public class CGMethodScope extends CGScope {
 		this.types = types;
 		this.regsPool = regsPool;
 		this.callSize = cg.getCallSize();
+		
+		StringBuilder sb = new StringBuilder();
+		sb.append(name).append("(");
+		if(null != types) {
+			for (VarType _type : types) {
+				sb.append(_type.getName()).append(",");
+			}
+			if (0!=types.length) {
+				sb.setLength(sb.length() - 1); // Удаляем последнюю запятую
+			}
+		}
+		sb.append(")");
+		signature = sb.toString();
 		
 		if((null == types || 0==types.length) && "main".equals(name) && "CMain".equals(parent.getLName())) {
 			lbScope = new CGLabelScope(null, -1, "j8bCmainMmain", true);
@@ -58,13 +69,16 @@ public class CGMethodScope extends CGScope {
 		cg.addLabel(lbScope);
 		
 		if(null == type) {
-			lbCIScope = new CGLabelScope(this, null, "CI", true);
+			lbCIScope = new CGLabelScope(null, null, "_j8b_cinit", true);
 			cg.addLabel(lbCIScope);
 		}
 	}
 	
 	public void build(CodeGenerator cg) throws CompileException {
+		isUsed = true;
+		
 		CGIContainer cont = new CGIContainer();
+		cont.append(new CGIText(""));
 		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";build " + toString()));
 		cont.append(lbScope);
 
@@ -87,13 +101,6 @@ public class CGMethodScope extends CGScope {
 		return cells;
 	}
 	
-	public void addArg(CGVarScope local) {
-		args.put(local.getResId(), local);
-	}
-	public CGVarScope getArg(int resId) {
-		return args.get(resId);
-	}
-
 	/**
 	 * borrowReg занимаем регистры запрошенного количества, если регистров не достаточно возвращаем null
 	 * @param size количество ячеек
@@ -146,6 +153,10 @@ public class CGMethodScope extends CGScope {
 		return lbCIScope;
 	}
 	
+	public String getSignature() {
+		return signature;
+	}
+	
 	/**
 	 * Возвращает размер стека для занятого праметрами + длина адреса возврата
 	 * @return размер занятого стека
@@ -156,6 +167,10 @@ public class CGMethodScope extends CGScope {
 	
 	public VarType[] getTypes() {
 		return types;
+	}
+	
+	public boolean isUsed() {
+		return isUsed;
 	}
 	
 	@Override

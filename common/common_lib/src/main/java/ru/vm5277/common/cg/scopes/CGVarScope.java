@@ -15,7 +15,6 @@
  */
 package ru.vm5277.common.cg.scopes;
 
-import java.util.Arrays;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.compiler.VarType;
@@ -38,7 +37,7 @@ public class CGVarScope extends CGCellsScope {
 				// Выделять память не нужно
 				cells = ((CGMethodScope)parent).paramAllocate(size);
 //				if(VERBOSE_LO <= verbose) ((CGMethodScope)parent).append(new CGIText(";build " + toString() + ", allocated " + cells));
-				((CGMethodScope)parent).addArg(this);
+//				((CGMethodScope)parent).addArg(this); Нигде не используется
 			}
 			else if(parent instanceof CGBlockScope) { // Инициализация переменной в блоке
 				cells = ((CGBlockScope)parent).memAllocate(size);

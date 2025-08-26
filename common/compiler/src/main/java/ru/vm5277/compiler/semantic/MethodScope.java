@@ -32,7 +32,7 @@ public class MethodScope extends BlockScope {
 
 //	Убрал, так как отличается от BlockScope только поиском в параметрах, что не верно, параметры не имеют прямого отношения к переданным переменным
 	@Override
-	public Symbol resolve(String name) {
+	public Symbol resolveSymbol(String name) {
 		// 1. Проверяем локальные переменные
 		Symbol symbol = variables.get(name);
 		if (symbol != null) return symbol;
@@ -45,9 +45,8 @@ public class MethodScope extends BlockScope {
 		}
 
 		// 3. Делегируем в родительскую область видимости
-		return parent != null ? parent.resolve(name) : null;
+		return parent != null ? parent.resolveSymbol(name) : null;
 	}
-	
 	
 	@Override
 	public String toString() {

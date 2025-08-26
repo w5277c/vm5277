@@ -28,6 +28,7 @@ import ru.vm5277.compiler.semantic.AliasSymbol;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.ClassSymbol;
 import ru.vm5277.compiler.semantic.FieldSymbol;
+import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 import ru.vm5277.compiler.semantic.VarSymbol;
@@ -49,15 +50,15 @@ public class VarFieldExpression extends ExpressionNode {
 	@Override
 	public VarType getType(Scope scope) throws CompileException {
 		if (symbol == null) {
-			symbol = scope.resolve(value);
+			symbol = scope.resolveSymbol(value);
 			if(null != symbol) {
 				return symbol.getType();
 			}
 			else {
-				ClassScope classScope = scope.getThis().resolveClass(value);
-				if(null != classScope) {
+				InterfaceScope iScope = scope.getThis().resolveScope(value);
+				if(null != iScope) {
 					//symbol = new Symbol(value, VarType.fromClassName(value), false, false);
-					symbol = new ClassSymbol(value, VarType.fromClassName(value), false, false, classScope);
+					symbol = new ClassSymbol(value, VarType.fromClassName(value), false, false, iScope);
 				}
 			}
         }
@@ -82,12 +83,12 @@ public class VarFieldExpression extends ExpressionNode {
 			
 			cgScope = cg.enterExpression();
 			if (symbol == null) {
-				symbol = scope.resolve(value);
+				symbol = scope.resolveSymbol(value);
 				if(null == symbol) {
-					ClassScope classScope = scope.getThis().resolveClass(value);
-					if(null != classScope) {
+					InterfaceScope iScope = scope.getThis().resolveScope(value);
+					if(null != iScope) {
 						// TODO что здесь делает ClassSymbol? 
-						symbol = new ClassSymbol(value, VarType.fromClassName(value), false, false, classScope);
+						symbol = new ClassSymbol(value, VarType.fromClassName(value), false, false, iScope);
 					}
 				}
 			}
@@ -115,7 +116,7 @@ public class VarFieldExpression extends ExpressionNode {
 			return symbol;
 		}
 		if(null != scope) { //TODO вероятно всегда null
-			symbol = scope.resolve(value);
+			symbol = scope.resolveSymbol(value);
 		}
 		return symbol;
 	}
@@ -131,10 +132,10 @@ public class VarFieldExpression extends ExpressionNode {
 		// Выполняет запись значения в аккумулятор. Но зачастую это не требуется, достаточно вызвать depCodeGen
 		if(null == depCodeGen(cg)) {
 			if(symbol instanceof AliasSymbol) {
-				Symbol  vSymbol = scope.resolve(value);
+				Symbol  vSymbol = scope.resolveSymbol(value);
 				while(vSymbol instanceof AliasSymbol) {
 					symbol = ((AliasSymbol)vSymbol).getSymbol();
-					vSymbol = scope.resolve(symbol.getName());
+					vSymbol = scope.resolveSymbol(symbol.getName());
 					if(null != vSymbol && null != vSymbol.getCGScope()) {
 						depCodeGen(cg);
 						if(accumStore) {
@@ -158,40 +159,6 @@ public class VarFieldExpression extends ExpressionNode {
 		}
 		cg.setScope(oldCGScope);
 		return (accumStore ? CodegenResult.RESULT_IN_ACCUM : null);
-		
-		// Это странный код, боюсь поломать
-/*		if(null == depCodeGen(cg)) {
-			//Зависимость уже обработана, используем переменную
-			if(symbol instanceof AliasSymbol) {
-				Symbol  vSymbol = scope.resolve(value);
-				while(vSymbol instanceof AliasSymbol) {
-					symbol = ((AliasSymbol)vSymbol).getSymbol();
-					if(symbol instanceof AstHolder) {
-						depCodeGen(cg);
-						CGVarScope vScope = (CGVarScope)symbol.getCGScope();
-						cg.cellsToAcc(cgScope.getParent(), vScope);
-						//Назначаем алиас ссылающийся на реальную переменную
-						symbol = vSymbol;
-						break;
-					}
-					vSymbol = scope.resolve(symbol.getName());
-				}
-			}
-			else {
-				CGVarScope vScope = (CGVarScope)symbol.getCGScope();
-				//Двойное добавление инструкции при вызове нативного метода
-				
-//					byte port = GPIO.PB1;
-//					GPIO.modeOut(port);
-//					GPIO.invert(port);
-				
-
-				cg.cellsToAcc(cgScope.getParent(), vScope);
-			}
-
-//cg.cellsToAcc(cgScope.getParent(), (CGVarScope)cgScope.getParent());
-		}
-		return null;*/
 	}
 	
 	@Override

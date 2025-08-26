@@ -28,6 +28,7 @@ import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.FieldSymbol;
+import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class FieldAccessExpression extends ExpressionNode {
@@ -108,9 +109,9 @@ public class FieldAccessExpression extends ExpressionNode {
 			if (target instanceof TypeReferenceExpression) {
 				TypeReferenceExpression tre = (TypeReferenceExpression) target;
 				className = tre.getClassName();
-				ClassScope classScope = scope.getThis().resolveClass(tre.getType(scope).getClassName());
-				if(null != classScope) {
-					symbol = classScope.resolve(fieldName);
+				InterfaceScope iScope = scope.getThis().resolveScope(tre.getType(scope).getClassName());
+				if(null != iScope) {
+					symbol = iScope.resolveSymbol(fieldName);
 				}
 				else {
 					markError("Can't resolve class scope:" + tre.toString());
@@ -118,7 +119,7 @@ public class FieldAccessExpression extends ExpressionNode {
 				}
 			}
 			else if(target instanceof ThisExpression) {
-				symbol = scope.getThis().resolve(fieldName);
+				symbol = scope.getThis().resolveSymbol(fieldName);
 			}
 			else {
 				// Нестатическое поле (this.field или obj.field)
@@ -128,9 +129,9 @@ public class FieldAccessExpression extends ExpressionNode {
 					markError("Cannot access field of primitive type: " + targetType);
 					return false;
 				}
-				ClassScope classScope = scope.getThis().resolveClass(target.getType(scope).getClassName());
-				if(null != classScope) {
-					symbol = classScope.resolve(fieldName);
+				InterfaceScope iScope = scope.getThis().resolveScope(target.getType(scope).getClassName());
+				if(null != iScope) {
+					symbol = iScope.resolveSymbol(fieldName);
 				}
 				else {
 					markError("Can't resolve class scope:" + target.toString());

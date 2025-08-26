@@ -32,6 +32,7 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.semantic.ClassScope;
+import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 
@@ -141,7 +142,7 @@ public class BinaryExpression extends ExpressionNode {
 			if(operator.isAssignment()) {
 				if(leftExpr instanceof VarFieldExpression) {
 					VarFieldExpression varExpr = (VarFieldExpression) leftExpr;
-					Symbol symbol = scope.resolve(varExpr.getValue());
+					Symbol symbol = scope.resolveSymbol(varExpr.getValue());
 					if(null != symbol && symbol.isFinal()) {
 						markError("Cannot assign to final variable: " + varExpr.getValue());
 						cg.leaveExpression();
@@ -159,9 +160,9 @@ public class BinaryExpression extends ExpressionNode {
 
 					if (targetType.isClassType()) {
 						// Ищем класс в scope
-						ClassScope classScope = scope.getThis().resolveClass(targetType.getClassName());
-						if (null != classScope) {
-							Symbol field = classScope.getFields().get(fieldName);
+						InterfaceScope iScope = scope.getThis().resolveScope(targetType.getClassName());
+						if (null != iScope && iScope instanceof ClassScope) {
+							Symbol field = ((ClassScope)iScope).getFields().get(fieldName);
 							if (null != field && field.isFinal()) {
 								markError("Cannot assign to final field: " + targetType.getClassName() + "." + fieldName);
 								cg.leaveExpression();

@@ -19,18 +19,27 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.compiler.nodes.AstNode;
 
 public class InterfaceScope extends Scope {
-	private			String							name;
-	private			Scope							parent;
-	private	final	Map<String, List<MethodSymbol>>	methods		= new HashMap<>();
-	private	final	Map<String, InterfaceScope>		interfaces	= new HashMap<>();
+	protected			String							name;
+	protected			Scope							parent;
+	protected	final	Map<String, String>				imports		= new HashMap<>();
+	protected			List<VarType>					impl		= null;
+	protected	final	List<MethodSymbol>				methods		= new ArrayList<>();
+	protected	final	Map<String, InterfaceScope>		interfaces	= new HashMap<>();
 	
-	public InterfaceScope(String name, Scope parentScope) throws CompileException {
+	protected InterfaceScope() {
+	}
+			
+	public InterfaceScope(String name, Scope parentScope, List<VarType> impl) throws CompileException {
 		if (name == null || name.isEmpty()) throw new CompileException("Class name cannot be empty");
 		this.name = name;
 		this.parent = parentScope;
+
+		this.impl = impl;
 	}
 
 	public void addInterface(InterfaceScope iScope) throws CompileException {
@@ -44,20 +53,14 @@ public class InterfaceScope extends Scope {
 		String symbolName = method.getName();
 		if (interfaces.containsKey(symbolName)) throw new CompileException("Method name '" + symbolName + "' conflicts with interface name");
 		
-		List<MethodSymbol> symbols = methods.get(symbolName);
-		if(null == symbols) {
-			symbols = new ArrayList<>();
-			methods.put(symbolName, symbols);
-		}
-		
 		String methodSignature = method.getSignature();
-		for(MethodSymbol symbol : symbols) {
-			if(methodSignature.equals(symbol.getSignature())) {
+		for(MethodSymbol symbol : methods) {
+			if(symbol.getName().equals(method.getName()) && methodSignature.equals(symbol.getSignature())) {
 				throw new CompileException("Method '" + methodSignature + "' is already defined in interface '" + symbolName + "'");
 			}
 		}
 		
-		symbols.add(method);
+		methods.add(method);
 	}
 
 	public Map<String, InterfaceScope> getInterfaces() {
@@ -65,29 +68,50 @@ public class InterfaceScope extends Scope {
 	}
 
 	public List<MethodSymbol> getMethods(String name) {
-		return methods.get(name);
+		List<MethodSymbol> result = new ArrayList<>();
+		for(MethodSymbol mSymbol : methods) {
+			if(mSymbol.getName().equals(name)) {
+				result.add(mSymbol);
+			}
+		}
+		return result;
 	}
 	
-	public Map<String, List<MethodSymbol>> getMethods() {
+	public List<MethodSymbol> getMethods() {
 		return methods;
 	}
 
 	@Override
-	public Symbol resolve(String name) {
-		// Поиск методов (без параметров - для простых случаев)
+	public Symbol resolveSymbol(String name) {
+/*		// Поиск методов (без параметров - для простых случаев)
 		if (methods.containsKey(name) && !methods.get(name).isEmpty()) {
 			// Возвращаем первый метод с таким именем (для точного поиска нужно использовать resolveMethod)
 			return methods.get(name).get(0);
 		}
-
+*/
 		// Поиск в родительской области видимости (если есть)
 		if (parent != null) {
-			return parent.resolve(name);
+			return parent.resolveSymbol(name);
 		}
 		
 		// Символ не найден
 		return null;
 	}
+	
+	public InterfaceScope resolveScope(String name) {
+		// Поиск в импортах (если интерфейс объявлен в другом пакете)
+		// Поиск в импортах (если интерфейс объявлен в другом пакете)
+		String importedName = imports.get(name);
+		if(null != importedName) {
+			if(interfaces.containsKey(importedName)) return interfaces.get(importedName);
+		}
+		// Поиск в родительской области видимости (если есть)
+		if(parent != null && parent instanceof InterfaceScope) {
+			return ((InterfaceScope)parent).resolveScope(name);
+		}
+		return null;
+	}
+
 
 	public InterfaceScope resolveInterface(String interfaceName) {
 		// Поиск в текущем классе
@@ -108,6 +132,44 @@ public class InterfaceScope extends Scope {
 		return null;
 	}
 
+	public MethodSymbol resolveMethod(String methodName, VarType[] argTypes) throws CompileException {
+		// Ищем методы в текущем классе
+		for (MethodSymbol method : methods) {
+			if (method.getName().equals(methodName) && isApplicable(method, argTypes)) {
+				return method;
+			}
+		}
+		return null;
+	}
+
+	protected boolean isApplicable(MethodSymbol method, VarType[] argTypes) throws CompileException {
+		List<VarType> paramTypes = method.getParameterTypes();
+		if (paramTypes.size() != argTypes.length) {
+			return false;
+		}
+
+		for (int i=0; i<paramTypes.size(); i++) {
+			if (!AstNode.isCompatibleWith(this, paramTypes.get(i), argTypes[i])) {
+				return false;
+			}
+		}
+		return true;
+	}
+	
+	public boolean isImplements(VarType ifaceType) {
+		if(null == impl) return false;
+		for(VarType type : impl) {
+			if(ifaceType == type) return true;
+			InterfaceScope iScope = resolveInterface(type.getClassName());
+			if(iScope.isImplements(ifaceType)) return true;
+		}
+		return false;
+	}
+	
+	public List<VarType> getImpl() {
+		return impl;
+	}
+
 	public String getName() {
 		return name;
 	}
@@ -120,5 +182,40 @@ public class InterfaceScope extends Scope {
 	@Override
 	public ClassScope getThis() {
 		return parent.getThis();
+	}
+	
+	public int getMethodSN(String methodName, String signature) {
+		for(int i=0; i<methods.size(); i++) {
+			MethodSymbol mSymbol = methods.get(i);
+			if(mSymbol.getName().equals(methodName) && mSymbol.getSignature().equals(signature))  return i;
+		}
+		return -1;
+	}
+
+	public List<AstNode> fillDepends(String signature) {
+		List<AstNode> result = new ArrayList<>();
+		
+		Scope parentScope = parent;
+		while(!(parentScope instanceof ClassScope)) {
+			parentScope = parentScope.getParent();
+		}
+		ClassScope cScope = (ClassScope)parentScope;
+
+		while(null != cScope) {
+			for(ClassScope intcScope : cScope.getClasses()) {
+				if(intcScope.isImplements(VarType.fromClassName(name))) {
+					for(MethodSymbol mSymbol : intcScope.getMethods()) {
+						if(mSymbol.getSignature().equals(signature)) {
+							if(null != mSymbol.getNode()) {
+								result.add(mSymbol.getNode());
+							}
+						}
+					}
+				}
+			}
+
+			cScope = (ClassScope)cScope.getParent();
+		}
+		return result;
 	}
 }

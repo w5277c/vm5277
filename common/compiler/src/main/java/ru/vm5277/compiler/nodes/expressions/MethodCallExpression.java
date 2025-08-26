@@ -26,6 +26,7 @@ import ru.vm5277.common.cg.OperandType;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
+import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
@@ -91,30 +92,28 @@ public class MethodCallExpression extends ExpressionNode {
 			argTypes[i] = args.get(i).getType(scope);
 		}
 
-		// Если есть parent (вызов через объект или класс)
-		if (null != classType) {
+		InterfaceScope iScope = scope.getThis().resolveScope(classType.getName());
+		if (null != iScope) {
 			// Если parent - класс и это не вызов конструктора, то вызов статического метода
 			if (!(this instanceof NewExpression) && classType.isClassType()) {
-				ClassScope classScope = scope.getThis().resolveClass(classType.getName());
-				if (null == classScope) throw new CompileException("Class '" + classType.getName() + "' not found");
+				if (null == iScope) throw new CompileException("Class '" + classType.getName() + "' not found");
 
-				symbol = classScope.resolveMethod(methodName, argTypes);
+				symbol = iScope.resolveMethod(methodName, argTypes);
 				if (symbol != null) return symbol.getType();
 			}
 
 			// Если parent - объект (вызов метода экземпляра)
 			else {
 				// Получаем класс объекта
-				ClassScope classScope = scope.getThis().resolveClass(classType.getName());
-				if (null == classScope) throw new CompileException("Class '" + classType.getName() + "' not found");
+				if (null == iScope) throw new CompileException("Class '" + classType.getName() + "' not found");
 
-				if(this instanceof NewExpression) {
-					symbol = classScope.resolveConstructor(methodName, argTypes);
+				if(this instanceof NewExpression && iScope instanceof ClassScope) {
+					symbol = ((ClassScope)iScope).resolveConstructor(methodName, argTypes);
 					if (null == symbol) return null;
 					return classType;
 				}
 				else {
-					symbol = classScope.resolveMethod(methodName, argTypes);
+					symbol = iScope.resolveMethod(methodName, argTypes);
 					if (null != symbol && !symbol.isStatic()) return symbol.getType();
 				}
 			}
@@ -290,23 +289,30 @@ public class MethodCallExpression extends ExpressionNode {
 					return false;
 				}
 
-				ClassScope classScope = scope.getThis().resolveClass(className);
-				if(null == classScope) {
+				InterfaceScope iScope = scope.getThis().resolveScope(className);
+				if(null == iScope) {
 					markError(new CompileException("Class '" + className + "' not found"));
 					cg.leaveExpression();
 					return false;
 				}
 				
 				if(this instanceof NewExpression) {
-					symbol = classScope.resolveConstructor(methodName, argTypes);
-					if (symbol == null) {
-						markError("Constructor '" + methodName + "(" + StrUtils.toString(argTypes) + ")' not found");
+					if(iScope instanceof ClassScope) {
+						symbol = ((ClassScope)iScope).resolveConstructor(methodName, argTypes);
+						if (symbol == null) {
+							markError("Constructor '" + methodName + "(" + StrUtils.toString(argTypes) + ")' not found");
+							cg.leaveExpression();
+							return false;
+						}
+					}
+					else {
+						markError(new CompileException("Class '" + className + "' not found"));
 						cg.leaveExpression();
 						return false;
 					}
 				}
 				else {
-					symbol = classScope.resolveMethod(methodName, argTypes);
+					symbol = iScope.resolveMethod(methodName, argTypes);
 					if (symbol == null) {
 						markError("Method '" + methodName + "(" + StrUtils.toString(argTypes) + ")' not found");
 						cg.leaveExpression();
@@ -363,7 +369,8 @@ public class MethodCallExpression extends ExpressionNode {
 	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
 		className.codeGen(cg, false);
 		
-		String classNameStr = ((ClassScope)((MethodSymbol)symbol).getScope().getParent()).getName();
+		InterfaceScope iScope = (InterfaceScope)((MethodSymbol)symbol).getScope().getParent();
+		String classNameStr = iScope.getName();
 
 		if(symbol.isNative()) {
 			Operand[] operands = null;
@@ -390,22 +397,27 @@ public class MethodCallExpression extends ExpressionNode {
 			cg.invokeNative(cgScope, classNameStr, symbol.getName(), (null == params ? null : Arrays.toString(params)), type, operands);
 		}
 		else {
+			CGLabelScope rpCGScope = null;
 			if(0 == argTypes.length && "getClassId".equals(symbol.getName())) {
 				if(className instanceof VarFieldExpression) {
 					CGCellsScope cScope = (CGCellsScope)((VarFieldExpression)className).getSymbol().getCGScope();
 					// Только для информирования
-					cg.invokeMethod(cgScope, classNameStr, symbol.getName(), type, argTypes, null);
+					cg.invokeClassMethod(cgScope, classNameStr, symbol.getName(), type, argTypes, null);
 					cg.cellsToAcc(cgScope, cScope);
 				}
 			}
 			else if(0 == argTypes.length && "getClassTypeId".equals(symbol.getName())) {
 				// Только для информирования
-				cg.invokeMethod(cgScope, classNameStr, symbol.getName(), type, argTypes, null);
+				cg.invokeClassMethod(cgScope, classNameStr, symbol.getName(), type, argTypes, null);
 				cg.constToAcc(cgScope, cg.getRefSize(), classType.getId());
 			}
 			else {
 				int refTypeSize = 1; // TODO Определить значение на базе количества используемых типов класса
 				cg.pushHeapReg(cgScope);
+				// Помещаем в стек адрес возврата
+				rpCGScope = cg.makeLabel(null, "_j8b_retpoint", true);
+				cg.pushLabel(cgScope, rpCGScope.getLName());
+
 				if(this instanceof NewExpression) {
 					putArgsToStack(cg, refTypeSize);
 				}
@@ -423,8 +435,26 @@ public class MethodCallExpression extends ExpressionNode {
 				}
 				depCodeGen(cg);
 
+/*				int methodSN = -1;
+				if(null != symbol.getCGScope()) {
+					methodSN = ((CGClassScope)symbol.getCGScope().getParent()).getMethodSN((CGMethodScope)symbol.getCGScope());
+				}
+*/				
 				CGMethodScope mScope = (CGMethodScope)symbol.getCGScope();
-				cg.invokeMethod(cgScope, classNameStr, symbol.getName(), type, argTypes, mScope);
+				if(null != mScope) {
+					cg.invokeClassMethod(cgScope, classNameStr, symbol.getName(), type, argTypes, mScope.getLabel());
+				}
+				else {
+					List<AstNode> depends = iScope.fillDepends(((MethodSymbol)symbol).getSignature());
+					if(null != depends) {
+						for(AstNode node : depends) {
+							node.codeGen(cg);
+						}
+					}
+					int methodSN = iScope.getMethodSN(symbol.getName(), ((MethodSymbol)symbol).getSignature());
+					cg.invokeInterfaceMethod(cgScope, classNameStr, symbol.getName(), type, argTypes, VarType.fromClassName(iScope.getName()), methodSN);
+				}
+				cgScope.append(rpCGScope);
 				cg.popHeapReg(cgScope);
 			}
 		}
@@ -487,7 +517,7 @@ public class MethodCallExpression extends ExpressionNode {
 				// Выполняем зависимость
 				argExpr.depCodeGen(cg);
 				// Получаю из scope вызываемого метода переменую с именем параметра(пустая переменная уже создана, или создан Alias)
-				Symbol vSymbol = ((MethodSymbol)symbol).getScope().resolve(paramSymbol.getName());
+				Symbol vSymbol = ((MethodSymbol)symbol).getScope().resolveSymbol(paramSymbol.getName());
 				if(vSymbol instanceof AliasSymbol) {
 					// Это алиас, который нужно что???
 					throw new CompileException("Unsupported alias:" + vSymbol.toString());
