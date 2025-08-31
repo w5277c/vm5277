@@ -22,6 +22,15 @@ public class CGExpressionScope extends CGScope {
 		super(parent, -1, "");
 	}
 	
+	public CGConditionScope getConditionScope() {
+		CGScope scope = parent;
+		while(null != scope) {
+			if(scope instanceof CGConditionScope) return (CGConditionScope)scope;
+			scope = scope.getParent();
+		}
+		return null;
+	}
+	
 	public void enter() {
 		nestCntr++;
 	}

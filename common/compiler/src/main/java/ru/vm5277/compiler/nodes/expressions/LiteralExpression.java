@@ -67,6 +67,10 @@ public class LiteralExpression extends ExpressionNode {
 		return value instanceof Integer || value instanceof Long;
 	}
 	
+	public boolean isBoolean() {
+		return value instanceof Boolean;
+	}
+	
 	public boolean isNull() {
 		return null == value;
 	}

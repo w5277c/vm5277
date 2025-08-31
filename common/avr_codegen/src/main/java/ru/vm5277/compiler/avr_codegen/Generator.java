@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0
+ *     http://www.apache.org/licenses/LICENSE-2.0eunary
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -16,7 +16,6 @@
 package ru.vm5277.compiler.avr_codegen;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +25,8 @@ import static ru.vm5277.common.Operator.BIT_AND;
 import static ru.vm5277.common.Operator.BIT_NOT;
 import static ru.vm5277.common.Operator.BIT_OR;
 import static ru.vm5277.common.Operator.BIT_XOR;
+import static ru.vm5277.common.Operator.EQ;
+import static ru.vm5277.common.Operator.LT;
 import static ru.vm5277.common.Operator.MINUS;
 import static ru.vm5277.common.Operator.PLUS;
 import static ru.vm5277.common.Operator.POST_DEC;
@@ -50,10 +51,9 @@ import ru.vm5277.common.cg.OperandType;
 import ru.vm5277.common.cg.RegPair;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGClassScope;
-import ru.vm5277.common.cg.scopes.CGExpressionScope;
+import ru.vm5277.common.cg.scopes.CGConditionScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
-import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
@@ -65,6 +65,7 @@ public class Generator extends CodeGenerator {
 	private	final	static	String				VERSION		= "0.1";
 	private	final	static	byte[]				usableRegs	= new byte[]{20,21,22,23,24,25,26,27,   19,18,17}; //Используем регистры
 	//private	final	static	byte[]				usableRegs	= new byte[]{}; 	//Без регистров для локальных переменных
+	//private	final	static	byte[]				usableRegs	= new byte[]{20}; 	//С одним регистром
 	private	final	static	boolean				def_sph		= true; // TODO генератор avr должен знать характеристики МК(чтобы не писать асм код с .ifdef)
 	private	final	static	boolean				def_call	= true; // TODO генератор avr должен знать характеристики МК(чтобы не писать асм код с .ifdef)
 	
@@ -128,8 +129,8 @@ public class Generator extends CodeGenerator {
 		return result;
 	}
 	
-//	public CGIAsm pushRegAsm(int reg) {return new CGIAsm("push r"+reg+"");}
-//	public CGIAsm popRegAsm(int reg) {return new CGIAsm("pop r"+reg+"");}
+	public CGIAsm pushRegAsm(byte reg) {return new CGIAsm("push r"+reg+"");}
+	public CGIAsm popRegAsm(byte reg) {return new CGIAsm("pop r"+reg+"");}
 
 	@Override
 	public void pushHeapReg(CGScope scope) {
@@ -328,10 +329,9 @@ public class Generator extends CodeGenerator {
 	
 	@Override
 	public void jump(CGScope scope, CGLabelScope lScope) throws CompileException {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";jump"));
 		scope.append(new CGIAsm("jmp " + lScope.getName())); //TODO сделать проверки на варианты rjmp и jmp
 	}
-	
+
 	@Override
 	public CGIContainer accCast(CGScope scope, int size) throws CompileException {
 		CGIContainer result = new CGIContainer();
@@ -573,90 +573,170 @@ public class Generator extends CodeGenerator {
 				break;
 			case MINUS:
 				constActionAsm(scope, k, (int sn, String rOp) -> new CGIAsm((0 == sn ? "subi " : "sbci ") + getRightOp(sn, null) + "," + rOp));
-			case LT:
-				CGLabelScope lbScope = makeLabel(null, "end", true);//TODO не корректный label, состоит только из имени 'end'
-				for(int i=accum.getSize()-1; i>=0; i--) {
-					cont.append(new CGIAsm("cpi " + getRightOp(i, null) + "," + ((k>>(i*8))&0xff)));
-					if(i!=0) {
-						cont.append(new CGIAsm("brcs " + lbScope.getName()));
-						cont.append(new CGIAsm("brne " + lbScope.getName()));
-					}
-				}
-				if(1!=accum.getSize()) {
-					cont.append(lbScope);
-				}
-				cont.append(new CGIAsm("rol r16"));
-				scope.append(cont);
+			case BIT_AND:
+				constActionAsm(scope, k,  (int sn, String reg) -> new CGIAsm("andi " + getRightOp(sn, null) + "," + reg));
 				break;
-			case LTE:
-				lbScope = makeLabel(null, "end", true);
-				for(int i=accum.getSize()-1; i>=0; i--) {
-					cont.append(new CGIAsm("cpi " + getRightOp(i, null) + "," + ((k>>(i*8))&0xff)));
-					if(i!=0) {
-						cont.append(new CGIAsm("brcs " + lbScope.getName()));
-						cont.append(new CGIAsm("brne " + lbScope.getName()));
-					}
-					else {
-						cont.append(new CGIAsm("brne " + lbScope.getName())); //TODO не нужно?
-					}
-				}
-				cont.append(lbScope);
-				cont.append(new CGIAsm("rol r16"));
-				scope.append(cont);
+			case BIT_OR:
+				constActionAsm(scope, k, (int sn, String reg) -> new CGIAsm("ori " + getRightOp(sn, null) + "," + reg));
 				break;
-			case GTE:
-				lbScope = makeLabel(null, "end", true);
+			case BIT_XOR:
+				cont.append(new CGIAsm("push yl"));
 				for(int i=accum.getSize()-1; i>=0; i--) {
-					cont.append(new CGIAsm("cpi " + getRightOp(i, null) + "," + ((k>>(i*8))&0xff)));
-					if(i!=0) {
-						cont.append(new CGIAsm("brcs " + lbScope.getName()));
-						cont.append(new CGIAsm("brne " + lbScope.getName()));
-					}
-					if(1!=accum.getSize()) {
-						cont.append(lbScope);
-					}
-					cont.append(new CGIAsm("rol r16"));
-					cont.append(new CGIAsm("com r16"));
+					cont.append(new CGIAsm("ldi yl," + ((k>>(i*8))&0xff)));
+					cont.append(new CGIAsm("eor " + getRightOp(i, null) + ",r16"));
 				}
-				scope.append(cont);
-				break;
-			case GT:
-				lbScope = makeLabel(null, "end", true);
-				for(int i=accum.getSize()-1; i>=0; i--) {
-					cont.append(new CGIAsm("cpi " + getRightOp(i, null) + "," + ((k>>(i*8))&0xff)));
-					if(i!=0) {
-						cont.append(new CGIAsm("brcs " + lbScope.getName()));
-						cont.append(new CGIAsm("brne " + lbScope.getName()));
-					}
-					else {
-						cont.append(new CGIAsm("brne " + lbScope.getName()));
-					}
-				}
-				cont.append(lbScope);
-				cont.append(new CGIAsm("rol r16"));
-				cont.append(new CGIAsm("com r16"));
-				scope.append(cont);
-				break;
-			case EQ:
-			case NEQ:
-				lbScope = makeLabel(null, "end", true);
-				for(int i=accum.getSize()-1; i>=0; i--) {
-					cont.append(new CGIAsm("cpi " + getRightOp(i, null) + "," + ((k>>(i*8))&0xff)));
-					if(i!=0) {
-						cont.append(new CGIAsm("brne " + lbScope.getName()));
-					}
-					else {
-						cont.append(lbScope);
-						cont.append(new CGIAsm("ldi r16," + (Operator.EQ == op ? "0x00" : "0x01")));
-						cont.append(new CGIAsm("brne pc+0x02"));
-						cont.append(new CGIAsm("ldi r16," + (Operator.EQ == op ? "0x01" : "0x00")));
-					}
-				}
-				scope.append(cont);
+				cont.append(new CGIAsm("pop yl"));
 				break;
 			default:
 				throw new CompileException("CG:constAction: unsupported operator: " + op);
 		}
+	}
+
+	@Override
+	public void constCond(CGScope scope, Operator op, long k, boolean isNot, boolean isOr, CGConditionScope condScope) throws CompileException {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";accum " + op + " " + k + " -> accum (isOr:" + isOr + ", isNot:" + isNot));
+		CGIContainer cont = new CGIContainer("constCondition:" + op);
+		
+		if(isNot) { // Инвертируем выражение заменя AND<->OR и инвертируем операторы сравнения
+			isOr = !isOr;
+			switch(op) {
+				case LT: op = Operator.GTE; break;
+				case LTE: op = Operator.GT; break;
+				case GT: op = Operator.LTE; break;
+				case GTE: op = Operator.LT; break;
+				case EQ: op = Operator.NEQ; break;
+				case NEQ: op = Operator.EQ; break;
+				default: throw new CompileException("CG:constAction: unsupported operator: " + op);
+			}
+		}
+		
+		CGLabelScope lbScope = (0x01 == accum.getSize() ? null : makeLabel(null, "_j8b_cppoint", false));
+		
+		for(int i=accum.getSize()-1; i>=0; i--) {
+			cont.append(new CGIAsm("cpi " + getRightOp(i, null) + "," + ((k>>(i*8))&0xff)));
+
+			switch(op) {
+				case LT:
+					if(isOr) { // В связке с OR
+						if(0!=i) {  // Старшие байты
+							cont.append(new CGIAsm("brcs " + condScope.getLbThenScope().getName()));
+							cont.append(new CGIAsm("brne " + lbScope.getName()));
+							lbScope.setUsed();
+							// Если == - продолжаем без перехода
+						}
+						else { // Младший байт
+							cont.append(new CGIAsm("brcs " + condScope.getLbThenScope().getName())); // Если <
+						}
+					}
+					else { // В связке с AND 
+						if(0!=i) {  // Старшие байты
+							cont.append(new CGIAsm("breq pc+0x02"));
+							cont.append(new CGIAsm("brcc " + condScope.getLbElseScope().getName())); // Если >
+						}
+						else { // Младший байт
+							cont.append(new CGIAsm("brcc " + condScope.getLbElseScope().getName())); // Если >=
+						}
+					}
+					break;
+				case GTE:
+					if(isOr) { // В связке с OR
+						if(0!=i) {  // Старшие байты
+							cont.append(new CGIAsm("brcc " + condScope.getLbThenScope().getName())); // Если >=
+							cont.append(new CGIAsm("brne " + lbScope.getName())); // Если < - продолжить
+							lbScope.setUsed();
+						}
+						else { // Младший байт
+							cont.append(new CGIAsm("brcc " + condScope.getLbThenScope().getName())); // Если >=
+						}
+					}
+					else { // В связке с AND 
+						cont.append(new CGIAsm("brcs " + condScope.getLbElseScope().getName())); // Если <
+					}
+					break;
+				case GT:
+					if(isOr) { // В связке с OR
+						if(0!=i) {  // Старшие байты
+							cont.append(new CGIAsm("breq pc+0x03")); // Если =, пропустить байт
+							cont.append(new CGIAsm("brcc " + condScope.getLbThenScope().getName())); // Если >
+							cont.append(new CGIAsm("brne " + lbScope.getName())); // Если < - продолжить
+							lbScope.setUsed();
+						}
+						else { // Младший байт
+							cont.append(new CGIAsm("breq pc+0x02")); // Если =, пропустить brcc
+							cont.append(new CGIAsm("brcc " + condScope.getLbThenScope().getName())); // Если >
+						}
+					}
+					else { // В связке с AND 
+						if(0!=i) {  // Старшие байты
+							cont.append(new CGIAsm("brcs " + condScope.getLbElseScope().getName())); // Если <
+							cont.append(new CGIAsm("brne " + lbScope.getName())); // Если > - продолжить
+							lbScope.setUsed();
+						}
+						else { // Младший байт
+							cont.append(new CGIAsm("brcs " + condScope.getLbElseScope().getName())); // Если <
+							cont.append(new CGIAsm("breq " + condScope.getLbElseScope().getName())); // Если =
+						}
+					}
+					break;
+				case LTE:
+					if(isOr) { // В связке с OR
+						if(0!=i) {  // Старшие байты
+							cont.append(new CGIAsm("brcs " + condScope.getLbThenScope().getName())); // Если <
+							cont.append(new CGIAsm("brne " + lbScope.getName())); // Если > - продолжить
+							lbScope.setUsed();
+						}
+						else { // Младший байт
+							cont.append(new CGIAsm("brcs " + condScope.getLbThenScope().getName())); // Если <
+							cont.append(new CGIAsm("breq " + condScope.getLbThenScope().getName())); // Если =
+						}
+					}
+					else { // В связке с AND 
+						if(0!=i) {  // Старшие байты
+							cont.append(new CGIAsm("breq pc+0x03")); // Если =, пропустить brcc
+							cont.append(new CGIAsm("brcc " + condScope.getLbElseScope().getName())); // Если >
+							cont.append(new CGIAsm("brne " + lbScope.getName())); // Если < - продолжить
+							lbScope.setUsed();
+						}
+						else { // Младший байт
+							cont.append(new CGIAsm("breq pc+0x02")); // Если =, пропустить brcc
+							cont.append(new CGIAsm("brcc " + condScope.getLbElseScope().getName())); // Если >
+						}
+					}
+					break;
+				case NEQ:
+					if(isOr) { // В связке с OR
+						cont.append(new CGIAsm("brne " + condScope.getLbThenScope().getName()));
+					}
+					else { // В связке с AND 
+						if(0!=i) {  //Старшие байты
+							cont.append(new CGIAsm("brne " + lbScope.getName()));
+							lbScope.setUsed();
+						}
+						else { // Младший байт
+							cont.append(new CGIAsm("breq " + condScope.getLbElseScope().getName()));
+						}
+					}
+					break;
+				case EQ:
+					if(isOr) { // В связке с OR
+						if(0!=i) {  //Старшие байты
+							cont.append(new CGIAsm("brne " + lbScope.getName()));
+							lbScope.setUsed();
+						}
+						else { // Младший байт
+							cont.append(new CGIAsm("breq " + condScope.getLbThenScope().getName()));
+						}
+					}
+					else { // В связке с AND 
+						cont.append(new CGIAsm("brne " + condScope.getLbElseScope().getName()));
+					}
+					break;
+				default:
+					throw new CompileException("CG:constAction: unsupported operator: " + op);
+			}
+		}
+		if(0x01 != accum.getSize()) cont.append(lbScope);
+		scope.append(cont);
 	}
 
 	String getRightOp(int sn, Long constant) { //возвращает либо байт константы, либо регистр аккумуляора, если constant is null
@@ -761,16 +841,14 @@ public class Generator extends CodeGenerator {
 
 
 	@Override
-	public void invokeClassMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, CGLabelScope lbScope)
-																																	throws CompileException {
+	public void invokeClassMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, CGLabelScope lbScope)																														throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";invokeClassMethod " + type + " " + className + "." + methodName));
 		if(0 != types.length || !("getClassTypeId".equals(methodName) || "getClassId".equals(methodName))) {
 			scope.append(new CGIAsm("jmp " + lbScope.getName())); //TODO добавить точку возврата
 		}
 	}
 	@Override
-	public void invokeInterfaceMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, VarType ifaceType, int methodSN)
-																																	throws CompileException {
+	public void invokeInterfaceMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, VarType ifaceType, int methodSN)																										throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";invokeInterfaceMethod " + type + " " + className + "." + methodName));
 		RTOSLibs.INVOKE_METHOD.setRequired();
 		scope.append(new CGIAsm("ldi r16," + ifaceType.getId()));
@@ -957,38 +1035,33 @@ public class Generator extends CodeGenerator {
 	}
 	
 	@Override
-	public void eIf(CGScope scope, CGBlockScope thenScope, CGBlockScope elseScope) {
+	public void eIf(CGConditionScope labelsScope, CGScope condScope, CGBlockScope thenScope, CGBlockScope elseScope) throws CompileException {
 		//TODO код устарел
 		
 		if(VERBOSE_LO <= verbose) {
-			scope.prepend(new CGIText(";eIf"));
+			condScope.prepend(new CGIText(";eIf"));
 		}
 		
-		CGLabelScope beginLbScope = makeLabel(null, "_j8b_ifbegin", true);
-		CGLabelScope thenLbScope = makeLabel(null, "_j8b_ifthen", true);
-		CGLabelScope elseLbScope = makeLabel(null, "_j8b_ifelse", true);
-		CGLabelScope endLbScope = makeLabel(null, "_j8b_ifend", true);
-		
-		scope.prepend(beginLbScope);
-		thenScope.prepend(thenLbScope);
-		
+		condScope.prepend(labelsScope.getLbBeginScope());
+		labelsScope.getLbBeginScope().setUsed();
+		thenScope.prepend(labelsScope.getLbThenScope());
+		labelsScope.getLbThenScope().setUsed();
+		labelsScope.getLbElseScope().setUsed();
+		labelsScope.getLbEndScope().setUsed();
+		// Проверяем на выражение возвращающие флаги
 
-//		String optimizedBrInst = Optimizator.localWithConstantComparingCondition((CGExpressionScope)condBlockScope.getItems().get(1));
-//		boolean optimized = false;
-		String brInstr = "brne";//null == optimizedBrInst ? "brne" : optimizedBrInst;
+		if (labelsScope.mustElseJump()) {
+			jump(condScope, labelsScope.getLbElseScope());
+		}
 		
-
-		//if(null == optimizedBrInst) 
-//		scope.append(new CGIAsm("cpi r16,0x01"));
-		if(null != elseScope) {
-			scope.append(new CGIAsm(brInstr + " " + elseLbScope.getName())); //TODO необходима проверка длины прыжка
-			thenScope.append(new CGIAsm("rjmp " + endLbScope.getName())); //TODO необходима проверка длины прыжка
-			elseScope.prepend(elseLbScope);
-			elseScope.append(endLbScope);
+		if(null == elseScope) {
+			thenScope.append(labelsScope.getLbElseScope());
+			thenScope.append(labelsScope.getLbEndScope());
 		}
 		else {
-			scope.append(new CGIAsm(brInstr + " " + endLbScope.getName())); //TODO необходима проверка длины прыжка
-			thenScope.append(endLbScope);
+			elseScope.prepend(labelsScope.getLbElseScope());
+			thenScope.append(new CGIAsm("rjmp " + labelsScope.getLbEndScope()));
+			elseScope.append(labelsScope.getLbEndScope());
 		}
 	}
 
@@ -1004,11 +1077,11 @@ public class Generator extends CodeGenerator {
 	public void eWhile(CGScope scope, CGScope condScope, CGBlockScope bodyScope) throws CompileException {
 		if(VERBOSE_HI == verbose) scope.append(new CGIText(";CG: while, cond:" + condScope + ", body:" + bodyScope));
 		
-		CGLabelScope cgBeginLbScope = new CGLabelScope(scope, null, "_j8b_whilebegin", true);
+		CGLabelScope cgBeginLbScope = new CGLabelScope(scope, null, "lWHILEBEGIN:", true);
 		labels.put(cgBeginLbScope.getResId(), cgBeginLbScope);
-		CGLabelScope cgBodyLbScope = new CGLabelScope(scope, null, "_j8b_whilebody", true);
+		CGLabelScope cgBodyLbScope = new CGLabelScope(scope, null, "lWHILEBODY", true);
 		labels.put(cgBodyLbScope.getResId(), cgBodyLbScope);
-		CGLabelScope cgEndLbScope = new CGLabelScope(scope, null, "_j8b_whileend", true);
+		CGLabelScope cgEndLbScope = new CGLabelScope(scope, null, "lWHILEEND", true);
 		labels.put(cgEndLbScope.getResId(), cgEndLbScope);
 		
 		if(null != condScope) {

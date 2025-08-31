@@ -24,7 +24,10 @@ import ru.vm5277.common.Operator;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGClassScope;
+import ru.vm5277.common.cg.scopes.CGConditionScope;
+import ru.vm5277.common.cg.scopes.CGExpressionScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
+import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.CodegenResult;
@@ -268,6 +271,9 @@ public class BinaryExpression extends ExpressionNode {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
+		return codeGen(cg, false, false, accumStore);
+	}
+	public Object codeGen(CodeGenerator cg, boolean isInvert, boolean opOr, boolean accumStore) throws Exception {
 		// TODO костыль. Похоже нужно управлять областью видимости универсально, а не точечно
 		// Необходимо, чтобы код зависимостей формировался не там, где он находится в древе AST, а там, где он необходим, что оптимально для выделения регистров
 		CGScope oldCGScope = cg.setScope(cgScope); //В таком виде верный порядок использования регистров
@@ -275,6 +281,7 @@ public class BinaryExpression extends ExpressionNode {
 		// Изначально сохраняем порядок left/right
 		ExpressionNode expr1 = leftExpr;
 		ExpressionNode expr2 = rightExpr;
+
 		// Оптимизация порядка для коммутативных операций
 		if(operator.isCommutative()) {
 			if(leftExpr instanceof VarFieldExpression || leftExpr instanceof LiteralExpression) {
@@ -282,10 +289,48 @@ public class BinaryExpression extends ExpressionNode {
 				expr2 = leftExpr;
 			}
 		}
+		CGConditionScope condScope = ((CGExpressionScope)cgScope).getConditionScope();
+		if(null != condScope) {
+			condScope.mustElseJump(opOr ^ isInvert);
+		}
 
 		Operator op = (operator.isAssignment() ? operator.toArithmetic() : operator);
+		if(operator.isLogical()) {
+			if(expr1 instanceof LiteralExpression) {
+				LiteralExpression le = (LiteralExpression)expr1;
+				if(le.isBoolean()) {
+					boolean value = isInvert ? !(Boolean)le.getValue() : (Boolean)le.getValue();
+					if((Operator.OR == operator && value) || (Operator.AND == operator && !value)) {
+						cg.setScope(oldCGScope);
+						return value ? CodegenResult.TRUE : CodegenResult.FALSE;
+					}
+				}
+			}
+			if(expr2 instanceof LiteralExpression) {
+				LiteralExpression le = (LiteralExpression)expr2;
+				if(le.isBoolean()) {
+					boolean value = isInvert ? !(Boolean)le.getValue() : (Boolean)le.getValue();
+					if((Operator.OR == operator && value) || (Operator.AND == operator && !value)) {
+						cg.setScope(oldCGScope);
+						return value ? CodegenResult.TRUE : CodegenResult.FALSE;
+					}
+				}
+			}
+			
+			if(expr1 instanceof BinaryExpression) ((BinaryExpression)expr1).codeGen(cg, isInvert, Operator.OR == operator, false);
+			else if(expr1 instanceof UnaryExpression) {
+				((UnaryExpression)expr1).codeGen(cg, isInvert, false);
+			}
+			else expr1.codeGen(cg, false);
+			
+			if(expr2 instanceof BinaryExpression) ((BinaryExpression)expr2).codeGen(cg, isInvert, Operator.OR == operator, false);
+			else if(expr2 instanceof UnaryExpression) {
+				((UnaryExpression)expr2).codeGen(cg, isInvert, false);
+			}
+			else expr2.codeGen(cg, false);
+		}
 		// Для присваивания всегда вычисляем правое выражение первым
-		if (operator.isAssignment()) {
+		else if (operator.isAssignment()) {
 			// Не строим код для leftExpr(он разместит значение в acc), а нас интересует знaчение в cells(только выполняем зависимость)
 			depCodeGen(cg, leftExpr.getSymbol()); //TODO использовать метод leftExpr.codeGen(cg, false);
 			// Затем обрабатываем левое выражение (куда записываем результат)
@@ -314,20 +359,29 @@ public class BinaryExpression extends ExpressionNode {
 			}
 		} // Если expr2 переменная или поле(т.е. содержит cells)
 		else if(expr2 instanceof VarFieldExpression) {
-			// Не строим код для expr2(он разместит значение в acc), а нас интересует знaчение в cells(только выполняем зависимость)
-			depCodeGen(cg, expr2.getSymbol());
-			// Строим код для expr1(результат в аккумуляторе)
-			if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg)) {
-				// Явно не доработанный код, выражение всегда должно помещать результат в аккумулятор
-				throw new CompileException("Accum not used for operand:" + expr1);
-			}
 			CGCellsScope cScope = (CGCellsScope)expr2.getSymbol().getCGScope();
-			if(null != op) {
-				if(cScope instanceof CGVarScope) {
-					cg.cellsAction(cgScope, ((CGVarScope)cScope).getStackOffset(), cScope.getCells(), op);
+			//TODO Вероятно не совсем корректная модель. Условие ниже 'expr2 instanceof LiteralExpression' вообще возможно?
+			if(expr1 instanceof LiteralExpression) {
+				if(CodegenResult.RESULT_IN_ACCUM != expr2.codeGen(cg)) {
+					cg.cellsToAcc(cgScope, cScope);
 				}
-				else {
-					cg.cellsAction(cgScope, ((CGClassScope)((CGFieldScope)cScope).getParent()).getHeapHeaderSize(), cScope.getCells(), op);
+				cg.constCond(cgScope, op, ((LiteralExpression)expr1).getNumValue(), isInvert, opOr, condScope);
+			}
+			else {
+				// Не строим код для expr2(он разместит значение в acc), а нас интересует знaчение в cells(только выполняем зависимость)
+				depCodeGen(cg, expr2.getSymbol());
+				// Строим код для expr1(результат в аккумуляторе)
+				if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg)) {
+					// Явно не доработанный код, выражение всегда должно помещать результат в аккумулятор
+					throw new CompileException("Accum not used for operand:" + expr1);
+				}
+				if(null != op) {
+					if(cScope instanceof CGVarScope) {
+						cg.cellsAction(cgScope, ((CGVarScope)cScope).getStackOffset(), cScope.getCells(), op);
+					}
+					else {
+						cg.cellsAction(cgScope, ((CGClassScope)((CGFieldScope)cScope).getParent()).getHeapHeaderSize(), cScope.getCells(), op);
+					}
 				}
 			}
 			if(operator.isAssignment()) {
@@ -342,7 +396,12 @@ public class BinaryExpression extends ExpressionNode {
 				throw new CompileException("Accum not used for operand:" + expr1);
 			}
 			if(null != op) {
-				cg.constAction(cgScope, op, ((LiteralExpression)expr2).getNumValue());
+				if(op.isComparison()) {
+					cg.constCond(cgScope, op, ((LiteralExpression)expr2).getNumValue(), isInvert, opOr, condScope);
+				}
+				else {
+					cg.constAction(cgScope, op, ((LiteralExpression)expr2).getNumValue());
+				}
 			}
 			if(operator.isAssignment()) {
 				CGCellsScope cScope = (CGCellsScope)expr1.getSymbol().getCGScope();

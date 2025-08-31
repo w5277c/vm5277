@@ -45,6 +45,7 @@ import static ru.vm5277.common.cg.OperandType.LITERAL;
 import ru.vm5277.common.cg.items.CGIAsm;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.scopes.CGCommandScope;
+import ru.vm5277.common.cg.scopes.CGConditionScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
@@ -188,8 +189,15 @@ public abstract class CodeGenerator extends CGScope {
 		scope = new CGCommandScope(scope);
 		return (CGCommandScope)scope;
 	}
-	
 	public void leaveCommand() {
+		scope = scope.free();
+	}
+
+	public CGConditionScope enterCondition() {
+		scope = new CGConditionScope(this, scope);
+		return (CGConditionScope)scope;
+	}
+	public void leaveCondition() {
 		scope = scope.free();
 	}
 
@@ -215,6 +223,7 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract void constToCells(CGScope scope, int offset, long value, CGCells cells) throws CompileException;
 	public abstract void cellsAction(CGScope scope, int offset, CGCells cells, Operator op) throws CompileException;
 	public abstract void constAction(CGScope scope, Operator op, long k) throws CompileException;
+	public abstract void constCond(CGScope scope, Operator op, long k, boolean isNot, boolean isOr, CGConditionScope condScope) throws CompileException;
 	public abstract	void pushAccBE(CGScope scope, int size);
 	public abstract	void popAccBE(CGScope scope, int size);
 	public abstract	void pushHeapReg(CGScope scope);
@@ -222,6 +231,8 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract	CGIContainer pushStackReg(CGScope scope);
 	public abstract	CGIContainer popStackReg(CGScope scope);
 	public abstract CGIContainer stackToStackReg(CGScope scope);
+	public abstract CGIAsm pushRegAsm(byte reg);
+	public abstract CGIAsm popRegAsm(byte reg);
 	public abstract void pushLabel(CGScope scope, String label);
 	public abstract void updateRefCount(CGScope scope, int offset, CGCells cells, boolean isInc) throws CompileException;
 	
@@ -235,7 +246,7 @@ public abstract class CodeGenerator extends CGScope {
 	//TODO набор методов для реализации команд if, switch, for, loop и .т.д
 	public abstract CGIContainer eNewInstance(int size, CGLabelScope iidLabel, VarType type, boolean launchPoint, boolean canThrow) throws CompileException;
 	public abstract void eFree(Operand op);
-	public abstract void eIf(CGScope scope, CGBlockScope thenBlock, CGBlockScope elseBlock);
+	public abstract void eIf(CGConditionScope labelsScope, CGScope condScope, CGBlockScope thenBlock, CGBlockScope elseBlock) throws CompileException;
 	public abstract void eTry(CGBlockScope blockScope, List<Case> cases, CGBlockScope defaultBlockScope);
 	public abstract void eWhile(CGScope scope, CGScope condScope, CGBlockScope bodyScope) throws CompileException;
 	public abstract CGIContainer eReturn(CGScope scope, int size) throws CompileException;

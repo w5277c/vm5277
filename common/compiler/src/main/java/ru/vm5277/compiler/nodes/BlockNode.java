@@ -285,6 +285,20 @@ public class BlockNode extends AstNode {
 		return true;
 	}
 
+	
+	public void firstCodeGen(CodeGenerator cg) throws Exception {
+		cgDone = true;
+		
+		for(AstNode node : children) {
+			//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
+			if(!(node instanceof VarNode)) {
+				node.codeGen(cg);
+			}
+		}
+		
+		cgScope.build(cg, true);
+	}
+
 	@Override
 	public Object codeGen(CodeGenerator cg) throws Exception {
 		if(cgDone) return null;
@@ -298,7 +312,7 @@ public class BlockNode extends AstNode {
 			}
 		}
 		
-		cgScope.build(cg);
+		cgScope.build(cg, false);
 		cgScope.restoreRegsPool();
 		
 		return null;

@@ -17,7 +17,11 @@ package ru.vm5277.compiler.nodes.commands;
 
 import java.util.Arrays;
 import java.util.List;
+import ru.vm5277.common.Operator;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.Operand;
+import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.cg.scopes.CGConditionScope;
 import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -27,8 +31,10 @@ import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
+import ru.vm5277.compiler.nodes.expressions.BinaryExpression;
 import ru.vm5277.compiler.nodes.expressions.InstanceOfExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
@@ -180,6 +186,7 @@ public class IfNode extends CommandNode {
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		cgScope = cg.enterCondition();
 		// Проверка типа условия
 		if (null != condition) {
 			if (condition.postAnalyze(scope, cg)) {
@@ -222,7 +229,7 @@ public class IfNode extends CommandNode {
 		catch (CompileException e) {
 			markFirstError(e);
 		}
-		
+		cg.leaveCondition();
 		return true;
 	}
 	
@@ -262,11 +269,25 @@ public class IfNode extends CommandNode {
 			elseBlockNode.codeGen(cg);
 		}
 		
-		cg.eIf(condition.getCGScope(), thenBlockNode.getCGScope(), null == elseBlockNode ? null : elseBlockNode.getCGScope());
+		cg.eIf(((CGConditionScope)cgScope), condition.getCGScope(), thenBlockNode.getCGScope(), null == elseBlockNode ? null : elseBlockNode.getCGScope());
 		
 		return null;
 	}
 
+/*	private Operator getLastLogicalOperator(ExpressionNode expr) {
+		if (expr instanceof BinaryExpression) {
+			BinaryExpression binExpr = (BinaryExpression) expr;
+			if (binExpr.getOperator().isLogical()) {
+				// Рекурсивно проверяем правый операнд
+				Operator rightOp = getLastLogicalOperator(binExpr.getRight());
+				// Если правый операнд тоже логический - возвращаем его оператор
+				// Иначе возвращаем текущий оператор
+				return (rightOp != null) ? rightOp : binExpr.getOperator();
+			}
+		}
+		// Для не-логических выражений возвращаем null
+		return null;
+	}	*/
 	@Override
 	public List<AstNode> getChildren() {
 		if(null == elseBlockNode) {

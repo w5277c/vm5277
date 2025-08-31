@@ -1,5 +1,0 @@
-ExpressionNode.parseQualifiedName
-AstNode.parseTypeReference
-AstNode.parseFullQualifiedExpression
-BlockNode блок нач. со строки 99
-По сути одно и тоже???

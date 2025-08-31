@@ -15,15 +15,16 @@
  */
 package ru.vm5277.common.cg.scopes;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.RegPair;
-import ru.vm5277.common.cg.items.CGIAsm;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGIText;
 import static ru.vm5277.common.cg.scopes.CGScope.verbose;
@@ -39,6 +40,7 @@ public class CGBlockScope extends CGScope {
 	protected			int							stackOffset	= 0;
 	private				Set<RegPair>				usedPool	= new HashSet<>(); // Использованные регистры из regsPool метода
 	private				CGMethodScope				mScope;
+	private				List<Byte>					usedRegs	= new ArrayList<>();
 	
 	public CGBlockScope(CodeGenerator cg, CGScope parent, int id) {
 		super(parent, id, "");
@@ -54,7 +56,7 @@ public class CGBlockScope extends CGScope {
 		cg.addLabel(lbEScope);
 	}
 	
-	public void build(CodeGenerator cg) throws CompileException {
+	public void build(CodeGenerator cg, boolean isFirst) throws CompileException {
 		CGIContainer cont = new CGIContainer();
 		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";build block"));
 
@@ -62,26 +64,25 @@ public class CGBlockScope extends CGScope {
 			cont.append(cg.stackAlloc(null, stackOffset));
 		}
 
-		
-	// Кажется это не нужно, в блоке мы работаем с регистрами взятыми из regsPool, их не нужно сохранять, кроме регистров аккумулятора(но это в другой раз)
-	// Регистры(если используются в качестве переменных) используемые в нативных вызовах должны быть сохранены в методе invokeNative
-	/*		for(int i=0; i<usedRegs.size(); i++) {
+		// Регистры(если используются в качестве переменных) используемые в нативных вызовах должны быть сохранены в методе invokeNative
+		if(!isFirst) {
+			for(int i=0; i<usedRegs.size(); i++) {
 				cont.append(cg.pushRegAsm(usedRegs.get(i)));
 			}
-	*/		
+		}
+			
 		prepend(cont);
 
-	/*
+		append(lbEScope);
+		if(!isFirst) {
 			for(int i=usedRegs.size()-1; i>=0; i--) {
 				append(cg.popRegAsm(usedRegs.get(i)));
-			}*/
-	
-		append(lbEScope);
+			}
+		}
 		if(0x00 != stackOffset) append(cg.stackFree(null, stackOffset));
 		if(VERBOSE_LO <= verbose) append(new CGIText(";block end"));
 	}
 
-	
 	public void addLocal(CGVarScope local) {
 		locals.put(local.getResId(), local);
 	}
@@ -101,10 +102,12 @@ public class CGBlockScope extends CGScope {
 		return ((CGMethodScope)parent).getStackSize() + stackOffset;
 	}
 
-	/*public void putUsedReg(byte reg) {
+	public void putUsedReg(byte reg) {
 		if(16==reg) return; //r16 всегда свободен и используется для аккумулятора(который используется только временно(для выражений))
 		if(!usedRegs.contains(reg)) {
-			if(parent instanceof CGBlockScope) { // Если родитель тоже блок, и он не использует этот регистр, то выгодней сохранение регистра вынести в родитель
+
+			//Этот код не всегда работает, так как регистр может быть занят ранее по сурсу но позже по выполнению кодогенерации. Эта задача оптимизатора
+/*			if(parent instanceof CGBlockScope) { // Если родитель тоже блок, и он не использует этот регистр, то выгодней сохранение регистра вынести в родитель
 				CGBlockScope bScope =((CGBlockScope)parent);
 				if(bScope.getUsedRegs().contains(reg)) {
 					usedRegs.add(reg);
@@ -114,6 +117,8 @@ public class CGBlockScope extends CGScope {
 				}
 			}
 			else usedRegs.add(reg);
+*/
+			usedRegs.add(reg);
 		}
 	}
 	public void putUsedRegs(byte[] regs) {
@@ -123,7 +128,7 @@ public class CGBlockScope extends CGScope {
 	}
 	public List<Byte> getUsedRegs() { // только для чтения!
 		return usedRegs;
-	}*/
+	}
 
 	// Выделение ячеек для переменной в блоке(регистр или стек)
 	// Изначально ячейки могли содержать регистры и стек одновременно(если регистров не хватило)
@@ -133,7 +138,9 @@ public class CGBlockScope extends CGScope {
 		if(null != regPairs) {
 			for(int i=0; i<size; i++) {
 				usedPool.add(regPairs[i]);
+				putUsedReg(regPairs[i].getReg());
 			}
+			
 			return new CGCells(regPairs);
 		}
 		CGCells cells = new CGCells(CGCells.Type.STACK_FRAME, size, getStackSize());

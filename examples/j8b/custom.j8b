@@ -16,39 +16,15 @@
 
 import rtos.System;
 import rtos.RTOSParam;
-//import lang.Number;
 
 class Main {
-	interface Number {
-		byte toByte();
-	}
-
-	interface Test implements Number {
-		byte toByte();
-		void test();
-	}
-
-	public class Byte implements Test {
-		private	byte	value;
-
-		public Byte(byte value) {
-			this.value = value;
-		}
-
-		public byte toByte() {
-			return value;
-		}
-
-		public void test() {
-		}
-	}
-
     public static void main() {
 		System.setParam(RTOSParam.STDOUT_PORT, 0x12);
 
-		Number b1 = new Byte(0x08);
-		if(b1 is Byte) {
-			System.out(b1.toByte());
+		short s2 = 2;
+		short s3 = 3;
+		if (s2 == 2 && s3 != 3 || s2 < 1 || s3 > 5) {
+			System.out(s2);
 		}
 	}
 }

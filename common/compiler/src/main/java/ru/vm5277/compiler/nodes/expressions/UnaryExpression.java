@@ -21,6 +21,8 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
+import ru.vm5277.common.cg.scopes.CGConditionScope;
+import ru.vm5277.common.cg.scopes.CGExpressionScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -166,21 +168,37 @@ public class UnaryExpression extends ExpressionNode {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
-		// Генерация кода для операнда (например, переменной или другого выражения)
-		if(null != operand.codeGen(cg)) {
-//			cg.emitUnary(cgScope, operator, 0, cg.cScope.getCells()); //TODO смещение!
-		}
+		return codeGen(cg, false, accumStore);
+	}
+	public Object codeGen(CodeGenerator cg, boolean isInvert, boolean accumStore) throws Exception {
 
-		if(operand instanceof VarFieldExpression) {
-			CGCellsScope cScope = (CGCellsScope)operand.getSymbol().getCGScope();
-			cg.emitUnary(cgScope, operator, 0, cScope.getCells()); //TODO смещение!
-			//cg.emitUnary(operator, operand.getSymbol().getCGScope().getResId()); //Работаем с переменной
+		// Генерация кода для операнда (например, переменной или другого выражения)
+
+		if(Operator.NOT == operator) {
+			if(operand instanceof BinaryExpression) {
+				((BinaryExpression)operand).codeGen(cg, !isInvert, true, false);
+			}
+			else if(operand instanceof UnaryExpression) {
+				((UnaryExpression)operand).codeGen(cg, !isInvert, false);
+			}
+			else {
+				throw new CompileException("Unsupported expression: '" + operand + " for operator:" + operator);
+			}
 		}
 		else {
-			throw new CompileException("Unsupported operand '" + operand + " in unary expression");
-//			cg.emitUnary(operator, null); //TODO Работаем с уже загруженным Accum
+			if(operand instanceof VarFieldExpression) {
+				CGCellsScope cScope = (CGCellsScope)operand.getSymbol().getCGScope();
+				cg.emitUnary(cgScope, operator, 0, cScope.getCells()); //TODO смещение!
+				//cg.emitUnary(operator, operand.getSymbol().getCGScope().getResId()); //Работаем с переменной
+			}
+			else if(operand instanceof UnaryExpression) {
+				((UnaryExpression)operand).codeGen(cg, isInvert, false);
+			}
+			else {
+				throw new CompileException("Unsupported operand '" + operand + " in unary expression");
+	//			cg.emitUnary(operator, null); //TODO Работаем с уже загруженным Accum
+			}
 		}
-		
 		return null;
 	}
 	

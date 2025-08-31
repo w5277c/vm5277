@@ -175,9 +175,7 @@ public class ClassNode extends AstNode {
 				VarType iType = VarType.fromClassName(iScope.getName());
 				List<String> signatures = new ArrayList<>();
 				for(MethodSymbol mSymbol : iScope.getMethods()) {
-// TODO					if(mSymbol.getNode().isCGDone()) { Не работает, на текущем этапе еще не решены зависимости
-						signatures.add(mSymbol.getSignature());
-//					}
+					signatures.add(mSymbol.getSignature());
 				}
 				implInfos.add(new ImplementInfo(iType, signatures));
 			}

@@ -296,6 +296,18 @@ public class MethodNode extends AstNode {
 		return true;
 	}
 	
+	public void firstCodeGen(CodeGenerator cg) throws Exception {
+		cgDone = true;
+		
+		if(null != blockNode) blockNode.firstCodeGen(cg);
+		
+		classNode.codeGen(cg);		
+
+		if(!(classNode instanceof InterfaceNode)) {
+			((CGMethodScope)symbol.getCGScope()).build(cg);
+		}
+	}
+	
 	@Override
 	public Object codeGen(CodeGenerator cg) throws Exception {
 		if(cgDone) return null;
@@ -325,11 +337,10 @@ public class MethodNode extends AstNode {
 		}
 */
 		classNode.codeGen(cg);		
-		// У интерфейса нет тела метода
+
 		if(!(classNode instanceof InterfaceNode)) {
 			((CGMethodScope)symbol.getCGScope()).build(cg);
 		}
-//		if(VERBOSE_LO <= cg.getVerbose()) mScope.append(new CGIText(";method end"));		
 		return null;
 	}
 /*

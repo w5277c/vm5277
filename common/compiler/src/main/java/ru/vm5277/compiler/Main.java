@@ -37,7 +37,6 @@ import ru.vm5277.compiler.nodes.ClassBlockNode;
 import ru.vm5277.compiler.nodes.ClassNode;
 import ru.vm5277.compiler.nodes.MethodNode;
 import ru.vm5277.compiler.semantic.ClassScope;
-import ru.vm5277.compiler.semantic.InterfaceScope;
 
 public class Main {
     public	final	static	String	VERSION				= "0.0.23";
@@ -208,7 +207,7 @@ public class Main {
 					timestamp = System.currentTimeMillis();
 					System.out.println("Codegen...");
 
-					launchNode.codeGen(cg);
+					launchNode.firstCodeGen(cg);
 					cg.build(VarType.fromClassName(clazz.getName()), 0);
 					//System.out.println("\n" + cg.getAsm());
 					
