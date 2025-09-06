@@ -13,11 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ru.vm5277.common.cg;
+package ru.vm5277.common;
 
-import ru.vm5277.common.cg.items.CGItem;
-import ru.vm5277.common.exceptions.CompileException;
-
-public interface CGActionHandler {
-	public CGItem action(int sn, String rOp) throws CompileException;
+public class Pair<K,V> {
+	private	K k;
+	private	V v;
+	
+	public Pair(K k, V v) {
+		this.k = k;
+		this.v = v;
+	}
+	
+	public K getK() {
+		return k;
+	}
+	
+	public V getV() {
+		return v;
+	}
+	
 }

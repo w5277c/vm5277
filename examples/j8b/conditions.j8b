@@ -45,10 +45,10 @@ class Main {
 		byte i=1;
 		byte j=2;
 		if(i+j<2) {
-			System.outChar('F'); //71
+			System.outChar('F'); //70
 		}
 		else {
-			System.outChar('G'); //72
+			System.outChar('G'); //71
 		}
 	}
 }

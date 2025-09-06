@@ -214,7 +214,7 @@ public class InstanceOfExpression extends ExpressionNode {
 		boolean heapSaved=false;
 		if(leftExpr instanceof VarFieldExpression) {
 			CGCellsScope cScope = (CGCellsScope)((VarFieldExpression)leftExpr).getSymbol().getCGScope();
-			cg.pushHeapReg(cgScope);
+			cg.pushHeapReg(cgScope, false);
 			heapSaved = true;
 			if(cScope instanceof CGVarScope) {
 				cg.setHeapReg(cgScope, ((CGVarScope)cScope).getStackOffset(), cScope.getCells());
@@ -226,7 +226,7 @@ public class InstanceOfExpression extends ExpressionNode {
 
 		cg.eInstanceof(cgScope, rightType);
 
-		if(heapSaved) cg.popHeapReg(cgScope);
+		if(heapSaved) cg.popHeapReg(cgScope, false);
 
 		return CodegenResult.RESULT_IN_ACCUM;
 	}

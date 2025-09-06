@@ -186,7 +186,7 @@ public class VarNode extends AstNode {
 					return false;
 				}
 
-				ExpressionNode optimizedExpr = initializer.optimizeWithScope(scope);
+				ExpressionNode optimizedExpr = initializer.optimizeWithScope(scope, cg);
 				if(null != optimizedExpr) {
 					initializer = optimizedExpr; //TODO не передаю созданный Symbol?
 				}

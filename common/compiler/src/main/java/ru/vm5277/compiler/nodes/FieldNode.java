@@ -175,7 +175,7 @@ public class FieldNode extends AstNode {
 					markError("Narrowing conversion from " + initType + " to " + type + " requires explicit cast");
 				}
 
-				ExpressionNode optimizedExpr = initializer.optimizeWithScope(scope);
+				ExpressionNode optimizedExpr = initializer.optimizeWithScope(scope, cg);
 				if(null != optimizedExpr) {
 					initializer = optimizedExpr; //TODO не передаю сохданный Symbol?
 				}

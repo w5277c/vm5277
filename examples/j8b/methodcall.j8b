@@ -18,20 +18,31 @@ import rtos.RTOSParam;
 import hal.GPIO;
 
 class Main {
+	class Test {
+		public void test() {
+			System.out('!');
+		}
+	}
+
 	public static void main() {
 		System.setParam(RTOSParam.CORE_FREQ, 16);
 		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
 		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
 
-		byte src1 = 1;
-		short src2 = 2;
-		byte result = inc(src1, src2);
-		System.out(result);
+		byte a = 1;
+		byte b = 2;
+		System.out(inc(b, 2));
+		System.out(inc(b, b));
+		System.out(inc(2, 2));
+		System.out(inc(a+b, inc(1, inc(2, 3))));
+
+		Test test = new Test();
+		test.test();
+
 		System.stop();
 	}
 
-	private byte inc(byte val1, short val2) {
-		byte tmp = 3;
-		return (byte)(val1+val2+tmp);
+	private byte inc(byte b1, byte b2) {
+		return b1+b2;
 	}
 }

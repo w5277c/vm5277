@@ -20,14 +20,16 @@ import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.Operator;
+import ru.vm5277.common.cg.scopes.CGBranchScope;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
-import ru.vm5277.common.cg.scopes.CGConditionScope;
-import ru.vm5277.common.cg.scopes.CGExpressionScope;
+import ru.vm5277.common.cg.scopes.CGClassScope;
+import ru.vm5277.common.cg.scopes.CGFieldScope;
+import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
-import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
@@ -168,37 +170,43 @@ public class UnaryExpression extends ExpressionNode {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
-		return codeGen(cg, false, accumStore);
+		return codeGen(cg, false, false, accumStore);
 	}
-	public Object codeGen(CodeGenerator cg, boolean isInvert, boolean accumStore) throws Exception {
+	public Object codeGen(CodeGenerator cg, boolean isInvert, boolean opOr, boolean accumStore) throws Exception {
+		CGScope brScope = cg.getScope();
+		while(null != brScope && !(brScope instanceof CGBranchScope)) {
+			brScope = brScope.getParent();
+		}
 
-		// Генерация кода для операнда (например, переменной или другого выражения)
-
-		if(Operator.NOT == operator) {
-			if(operand instanceof BinaryExpression) {
-				((BinaryExpression)operand).codeGen(cg, !isInvert, true, false);
-			}
-			else if(operand instanceof UnaryExpression) {
-				((UnaryExpression)operand).codeGen(cg, !isInvert, false);
+		CGScope oldCGScope = cg.setScope(cgScope);
+		if(operand instanceof BinaryExpression) {
+			((BinaryExpression)operand).codeGen(cg, !isInvert, true, false);
+		}
+		else if(operand instanceof VarFieldExpression) {
+			if(Operator.NOT == operator) {
+				((VarFieldExpression)operand).codeGen(cg, !isInvert, opOr, (CGBranchScope)brScope);
 			}
 			else {
-				throw new CompileException("Unsupported expression: '" + operand + " for operator:" + operator);
+				((VarFieldExpression)operand).codeGen(cg, false);
+				CGCellsScope cScope = (CGCellsScope)operand.getSymbol().getCGScope();
+				int offset;
+				if(cScope instanceof CGVarScope) {
+					offset = ((CGVarScope)cScope).getStackOffset();
+				}
+				else {
+					offset = ((CGClassScope)((CGFieldScope)cScope).getParent()).getHeapHeaderSize();
+				}
+				cg.emitUnary(cgScope, operator, offset, cScope.getCells());
 			}
+		}
+		else if(operand instanceof UnaryExpression) {
+			((UnaryExpression)operand).codeGen(cg, isInvert, opOr, false);
 		}
 		else {
-			if(operand instanceof VarFieldExpression) {
-				CGCellsScope cScope = (CGCellsScope)operand.getSymbol().getCGScope();
-				cg.emitUnary(cgScope, operator, 0, cScope.getCells()); //TODO смещение!
-				//cg.emitUnary(operator, operand.getSymbol().getCGScope().getResId()); //Работаем с переменной
-			}
-			else if(operand instanceof UnaryExpression) {
-				((UnaryExpression)operand).codeGen(cg, isInvert, false);
-			}
-			else {
-				throw new CompileException("Unsupported operand '" + operand + " in unary expression");
-	//			cg.emitUnary(operator, null); //TODO Работаем с уже загруженным Accum
-			}
+			cg.setScope(oldCGScope);
+			throw new CompileException("Unsupported operand '" + operand + " in unary expression");
 		}
+		cg.setScope(oldCGScope);
 		return null;
 	}
 	

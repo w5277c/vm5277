@@ -16,6 +16,9 @@
 package ru.vm5277.common.cg.scopes;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
@@ -31,6 +34,7 @@ import ru.vm5277.common.exceptions.CompileException;
 public class CGMethodScope extends CGScope {
 	private	final	CGLabelScope				lbScope;
 	private			CGLabelScope				lbCIScope;
+	private	final	Map<Integer, CGVarScope>	args		= new HashMap<>();
 	private	final	VarType						type;
 	private	final	VarType[]					types;
 	private	final	String						signature;
@@ -61,16 +65,16 @@ public class CGMethodScope extends CGScope {
 		signature = sb.toString();
 		
 		if((null == types || 0==types.length) && "main".equals(name) && "CMain".equals(parent.getLName())) {
-			lbScope = new CGLabelScope(null, -1, "j8bCmainMmain", true);
+			lbScope = new CGLabelScope(null, -1, LabelNames.MAIN, true);
 		}
 		else {
 			lbScope = new CGLabelScope(this, null, "C", true);
 		}
-		cg.addLabel(lbScope);
+	//	cg.addLabel(lbScope);
 		
 		if(null == type) {
-			lbCIScope = new CGLabelScope(null, null, "_j8b_cinit", true);
-			cg.addLabel(lbCIScope);
+			lbCIScope = new CGLabelScope(null, null, LabelNames.CONSTR_INIT, true);
+	//		cg.addLabel(lbCIScope);
 		}
 	}
 	
@@ -90,17 +94,39 @@ public class CGMethodScope extends CGScope {
 		}
 		prepend(cont);
 		
-		append(cg.eReturn(null, null == type ? 0x00 : type.getSize()));
+//		append(cg.eReturn(null, null == type ? 0x00 : type.getSize(), stackOffset));
 		if(VERBOSE_LO <= verbose) append(new CGIText(";method end"));
 	}
 	
 	//Выделение ячеек для переданных параметров (только стек)
-	public CGCells paramAllocate(int size) throws CompileException {
-		CGCells cells = new CGCells(CGCells.Type.STACK_FRAME, size, stackOffset);
+	public CGCells argAllocate(int size) throws CompileException {
 		stackOffset+=size;
+		CGCells cells = new CGCells(CGCells.Type.STACK_FRAME, size, types.length-stackOffset);
 		return cells;
 	}
 	
+	public void clearArgs() {
+		args.clear();
+		stackOffset=0;
+	}
+	public void addArg(CGVarScope local) {
+		args.put(local.getResId(), local);
+	}
+	public CGVarScope getArg(int resId) {
+		CGVarScope lScope = args.get(resId);
+		if(null != lScope) return lScope;
+
+		if(null != parent) {
+			CGScope scope = parent;
+			while(scope instanceof CGBranchScope) scope = scope.getParent();
+		
+			if(scope instanceof CGMethodScope) return ((CGMethodScope)scope).getArg(resId);
+			if(scope instanceof CGBlockScope) return ((CGBlockScope)scope).getVar(resId);
+			if(scope instanceof CGCommandScope) return scope.getBlockScope().getVar(resId);
+		}
+		return null;
+	}
+
 	/**
 	 * borrowReg занимаем регистры запрошенного количества, если регистров не достаточно возвращаем null
 	 * @param size количество ячеек
@@ -157,16 +183,16 @@ public class CGMethodScope extends CGScope {
 		return signature;
 	}
 	
-	/**
-	 * Возвращает размер стека для занятого праметрами + длина адреса возврата
-	 * @return размер занятого стека
-	 */
 	public int getStackSize() {
-		return stackOffset + callSize; 
+		return stackOffset;
 	}
 	
 	public VarType[] getTypes() {
 		return types;
+	}
+	
+	public VarType getType() {
+		return type;
 	}
 	
 	public boolean isUsed() {

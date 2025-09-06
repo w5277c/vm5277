@@ -26,7 +26,6 @@ import ru.vm5277.common.cg.OperandType;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
-import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
@@ -43,7 +42,7 @@ import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 
 public class MethodCallExpression extends ExpressionNode {
-	private			ExpressionNode			className;
+	private			ExpressionNode			classNameExpr;
 	private	final	String					methodName;
 	private	final	List<ExpressionNode>	args;
 	private			VarType					type;
@@ -53,7 +52,7 @@ public class MethodCallExpression extends ExpressionNode {
 	public MethodCallExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode className, String methodName, List<ExpressionNode> arguments) {
         super(tb, mc);
         
-		this.className = className;
+		this.classNameExpr = className;
 		this.methodName = methodName;
         this.args = arguments;
     }
@@ -63,7 +62,7 @@ public class MethodCallExpression extends ExpressionNode {
 	}
 	
 	public ExpressionNode getClassName() {
-		return className;
+		return classNameExpr;
 	}
 
 	public List<ExpressionNode> getArguments() {
@@ -73,7 +72,7 @@ public class MethodCallExpression extends ExpressionNode {
 	@Override
 	public VarType getType(Scope scope) throws CompileException {
 		//поиск метода в текущем классе
-		if(null == className) {
+		if(null == classNameExpr) {
 			ClassScope classScope = scope.getThis();
 			if(null != classScope) {
 				classType = VarType.fromClassName(classScope.getName());
@@ -81,10 +80,10 @@ public class MethodCallExpression extends ExpressionNode {
 		}
 
 		// Проверка существования parent (если есть)
-		if (null == classType && null != className) {
-			classType = className.getType(scope);
+		if (null == classType && null != classNameExpr) {
+			classType = classNameExpr.getType(scope);
 		}
-		if (null == classType) throw new CompileException("Cannot resolve:" + className.toString());
+		if (null == classType) throw new CompileException("Cannot resolve:" + classNameExpr.toString());
 		
 		// Получаем типы аргументов
 		argTypes = new VarType[args.size()];
@@ -175,21 +174,21 @@ public class MethodCallExpression extends ExpressionNode {
 			return false;
 		}
 
-		if(null != className) {
-			if(className instanceof UnresolvedReferenceExpression) {
-				UnresolvedReferenceExpression ure = (UnresolvedReferenceExpression)className;
+		if(null != classNameExpr) {
+			if(classNameExpr instanceof UnresolvedReferenceExpression) {
+				UnresolvedReferenceExpression ure = (UnresolvedReferenceExpression)classNameExpr;
 				if("this".equals(ure.getId())) {
-					className = new ThisExpression(tb, mc);
+					classNameExpr = new ThisExpression(tb, mc);
 				}
 				else if(null != VarType.fromClassName(ure.getId())) {
-					className = new TypeReferenceExpression(tb, mc, ure.getId());
+					classNameExpr = new TypeReferenceExpression(tb, mc, ure.getId());
 				}
 				else {
-					className =  new VarFieldExpression(tb, mc, ure.getId());
+					classNameExpr =  new VarFieldExpression(tb, mc, ure.getId());
 				}
 			}
 
-			if(!className.preAnalyze()) {
+			if(!classNameExpr.preAnalyze()) {
 				return false;
 			}
 		}
@@ -208,8 +207,8 @@ public class MethodCallExpression extends ExpressionNode {
 
 	@Override
 	public boolean declare(Scope scope) {
-		if(null != className) {
-			if(!className.declare(scope)) {
+		if(null != classNameExpr) {
+			if(!classNameExpr.declare(scope)) {
 				return false;
 			}
 		}
@@ -220,9 +219,9 @@ public class MethodCallExpression extends ExpressionNode {
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		try {
-			ExpressionNode optimizedParentScope = className.optimizeWithScope(scope);
+			ExpressionNode optimizedParentScope = classNameExpr.optimizeWithScope(scope, cg);
 			if(null != optimizedParentScope) {
-				className = optimizedParentScope;
+				classNameExpr = optimizedParentScope;
 			}
 		
 			try {type = getType(scope);} catch(CompileException e) {markError(e); return false;}; //TODO костыль, нужен для присваивания symbol
@@ -230,11 +229,11 @@ public class MethodCallExpression extends ExpressionNode {
 			cgScope = cg.enterExpression();		
 
 			// Проверка parent (если есть)
-			if (null != className) {
-				if (!className.postAnalyze(scope, cg)) return false;
+			if (null != classNameExpr) {
+				if (!classNameExpr.postAnalyze(scope, cg)) return false;
 
 				try {
-					VarType parentType = className.getType(scope);
+					VarType parentType = classNameExpr.getType(scope);
 					if (null == parentType) {
 						markError("Cannot determine type of parent expression");
 						cg.leaveExpression();
@@ -254,7 +253,7 @@ public class MethodCallExpression extends ExpressionNode {
 				if (!arg.postAnalyze(scope, cg)) return false;
 
 				try {
-					ExpressionNode optimizedExpr = arg.optimizeWithScope(scope);
+					ExpressionNode optimizedExpr = arg.optimizeWithScope(scope, cg);
 					if(null != optimizedExpr) {
 						args.set(i, optimizedExpr);
 					}
@@ -272,19 +271,19 @@ public class MethodCallExpression extends ExpressionNode {
 
 			// Поиск метода в ClassScope
 			String className = null;
-			if(null != this.className) {
-				if(this.className instanceof TypeReferenceExpression) {
-					TypeReferenceExpression tre = (TypeReferenceExpression)this.className;
+			if(null != this.classNameExpr) {
+				if(this.classNameExpr instanceof TypeReferenceExpression) {
+					TypeReferenceExpression tre = (TypeReferenceExpression)this.classNameExpr;
 					className = tre.getClassName();
 				}
-				else if(this.className instanceof VarFieldExpression) {
-					className = ((VarFieldExpression)this.className).getType(scope).getClassName();
+				else if(this.classNameExpr instanceof VarFieldExpression) {
+					className = ((VarFieldExpression)this.classNameExpr).getType(scope).getClassName();
 				}
-				else if(this.className instanceof ThisExpression) {
+				else if(this.classNameExpr instanceof ThisExpression) {
 					className = scope.getThis().getName();
 				}
 				else {
-					markError(new CompileException("Unsupported parent type: " + this.className.toString()));
+					markError(new CompileException("Unsupported parent type: " + this.classNameExpr.toString()));
 					cg.leaveExpression();
 					return false;
 				}
@@ -319,7 +318,7 @@ public class MethodCallExpression extends ExpressionNode {
 						return false;
 					}
 				}
-				
+
 				//Ничего не делаем с аргументами, если это нативный метод
 				if(!symbol.isNative()) {
 					//Создаем алиасы на переменные(из аргументов), которые содержат final переменные или переменные типа ссылки, массива и cstr
@@ -367,7 +366,7 @@ public class MethodCallExpression extends ExpressionNode {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
-		className.codeGen(cg, false);
+		classNameExpr.codeGen(cg, false);
 		
 		InterfaceScope iScope = (InterfaceScope)((MethodSymbol)symbol).getScope().getParent();
 		String classNameStr = iScope.getName();
@@ -397,33 +396,30 @@ public class MethodCallExpression extends ExpressionNode {
 			cg.invokeNative(cgScope, classNameStr, symbol.getName(), (null == params ? null : Arrays.toString(params)), type, operands);
 		}
 		else {
-			CGLabelScope rpCGScope = null;
+		//	CGLabelScope rpCGScope = null;
 			if(0 == argTypes.length && "getClassId".equals(symbol.getName())) {
-				if(className instanceof VarFieldExpression) {
-					CGCellsScope cScope = (CGCellsScope)((VarFieldExpression)className).getSymbol().getCGScope();
+				if(classNameExpr instanceof VarFieldExpression) {
+					CGCellsScope cScope = (CGCellsScope)((VarFieldExpression)classNameExpr).getSymbol().getCGScope();
 					// Только для информирования
-					cg.invokeClassMethod(cgScope, classNameStr, symbol.getName(), type, argTypes, null);
+					cg.invokeClassMethod(cgScope, classNameStr, symbol.getName(), type, argTypes, null, false);
 					cg.cellsToAcc(cgScope, cScope);
 				}
 			}
 			else if(0 == argTypes.length && "getClassTypeId".equals(symbol.getName())) {
 				// Только для информирования
-				cg.invokeClassMethod(cgScope, classNameStr, symbol.getName(), type, argTypes, null);
+				cg.invokeClassMethod(cgScope, classNameStr, symbol.getName(), type, argTypes, null, false);
 				cg.constToAcc(cgScope, cg.getRefSize(), classType.getId());
 			}
 			else {
 				int refTypeSize = 1; // TODO Определить значение на базе количества используемых типов класса
-				cg.pushHeapReg(cgScope);
-				// Помещаем в стек адрес возврата
-				rpCGScope = cg.makeLabel(null, "_j8b_retpoint", true);
-				cg.pushLabel(cgScope, rpCGScope.getLName());
+//				cg.pushHeapReg(cgScope);
 
 				if(this instanceof NewExpression) {
 					putArgsToStack(cg, refTypeSize);
 				}
 				else {
-					if(className instanceof VarFieldExpression) {
-						CGCellsScope cScope = (CGCellsScope)((VarFieldExpression)className).getSymbol().getCGScope();
+					if(classNameExpr instanceof VarFieldExpression) {
+						CGCellsScope cScope = (CGCellsScope)((VarFieldExpression)classNameExpr).getSymbol().getCGScope();
 						if(cScope instanceof CGVarScope) {
 							cg.setHeapReg(cgScope, ((CGVarScope)cScope).getStackOffset(), cScope.getCells());
 						}
@@ -442,7 +438,7 @@ public class MethodCallExpression extends ExpressionNode {
 */				
 				CGMethodScope mScope = (CGMethodScope)symbol.getCGScope();
 				if(null != mScope) {
-					cg.invokeClassMethod(cgScope, classNameStr, symbol.getName(), type, argTypes, mScope.getLabel());
+					cg.invokeClassMethod(cgScope, classNameStr, symbol.getName(), type, argTypes, mScope.getLabel(), classNameExpr instanceof ThisExpression);
 				}
 				else {
 					List<AstNode> depends = iScope.fillDepends(((MethodSymbol)symbol).getSignature());
@@ -454,8 +450,7 @@ public class MethodCallExpression extends ExpressionNode {
 					int methodSN = iScope.getMethodSN(symbol.getName(), ((MethodSymbol)symbol).getSignature());
 					cg.invokeInterfaceMethod(cgScope, classNameStr, symbol.getName(), type, argTypes, VarType.fromClassName(iScope.getName()), methodSN);
 				}
-				cgScope.append(rpCGScope);
-				cg.popHeapReg(cgScope);
+//				cg.popHeapReg(cgScope);
 			}
 		}
 		
@@ -465,7 +460,7 @@ public class MethodCallExpression extends ExpressionNode {
 	private Operand makeNativeOperand(CodeGenerator cg, ExpressionNode expr) throws Exception {
 		if(expr instanceof VarFieldExpression) {
 			VarFieldExpression ve = (VarFieldExpression)expr;
-			// Кодогенерация VarFieldExpression выполняет запись значения в аккумулятор, но нам этого не нужно, выполняет только зависимость
+			// Кодогенерация VarFieldExpression выполняет запись значения в аккумулятор, но нам этого не нужно, выполняем только зависимость
 			ve.depCodeGen(cg);
 			return new Operand(VarType.CSTR == ve.getType(null) ? OperandType.FLASH_RES : OperandType.LOCAL_RES, ve.getSymbol().getCGScope().getResId());
 		}
@@ -507,6 +502,8 @@ public class MethodCallExpression extends ExpressionNode {
 	private void putArgsToStack(CodeGenerator cg, int refTypeSize) throws Exception {
 		if(!args.isEmpty()) {
 			CGScope oldCGScope = cg.setScope(symbol.getCGScope());
+			
+			((CGMethodScope)symbol.getCGScope()).clearArgs(); //скорее всего не зайдет, нам нужно удалять только те, которые мы даобавили
 			for(int i=0; i<args.size(); i++) {
 				// Получаем параметр вызываемого метода
 				Symbol paramSymbol = ((MethodSymbol)symbol).getParameters().get(i);
@@ -514,8 +511,6 @@ public class MethodCallExpression extends ExpressionNode {
 
 				// Получаем выражение передаваемое этому параметру
 				ExpressionNode argExpr = args.get(i);
-				// Выполняем зависимость
-				argExpr.depCodeGen(cg);
 				// Получаю из scope вызываемого метода переменую с именем параметра(пустая переменная уже создана, или создан Alias)
 				Symbol vSymbol = ((MethodSymbol)symbol).getScope().resolveSymbol(paramSymbol.getName());
 				if(vSymbol instanceof AliasSymbol) {
@@ -535,10 +530,23 @@ public class MethodCallExpression extends ExpressionNode {
 					vSymbol.setCGScope(dstVScope);
 
 					if(argExpr instanceof LiteralExpression) {
-						cg.pushConst(cgScope, exprTypeSize, ((LiteralExpression)argExpr).getNumValue());
+						// Выполняем зависимость
+						argExpr.depCodeGen(cg);
+						cg.pushConst(argExpr.getCGScope(), exprTypeSize, ((LiteralExpression)argExpr).getNumValue());
 					}
 					else if(argExpr instanceof VarFieldExpression) {
-						cg.pushCells(cgScope, 0, exprTypeSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells());
+						// Выполняем зависимость
+						argExpr.depCodeGen(cg);
+						cg.pushCells(argExpr.getCGScope(), 0, exprTypeSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells());
+					}
+					else if(argExpr instanceof MethodCallExpression) {
+						// Выполняем зависимость
+						argExpr.codeGen(cg, true);
+						cg.pushAccBE(argExpr.getCGScope(), paramVarType.getSize());
+					}
+					else if (argExpr instanceof BinaryExpression) {
+						argExpr.codeGen(cg, true);
+						cg.pushAccBE(argExpr.getCGScope(), paramVarType.getSize());
 					}
 					else {
 						throw new CompileException("Unsupported expression:" + argExpr);
@@ -551,11 +559,11 @@ public class MethodCallExpression extends ExpressionNode {
 	
 	@Override
 	public List<AstNode> getChildren() {
-		return Arrays.asList(className); //TODO проверить
+		return Arrays.asList(classNameExpr); //TODO проверить
 	}
 	
 	@Override
 	public String toString() {
-		return getClass().getSimpleName() + " " + type + " " + className.toString() + "." + methodName + "(" + StrUtils.toString(argTypes) + ")";
+		return getClass().getSimpleName() + " " + type + " " + classNameExpr.toString() + "." + methodName + "(" + StrUtils.toString(argTypes) + ")";
 	}
 }

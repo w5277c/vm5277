@@ -20,6 +20,7 @@ import ru.vm5277.common.StrUtils;
 public class CGCells {
 	public static enum Type {
 		REG,			//регистры
+		ACC,			//как и регистры, но ids и size не заполнены
 		STACK_FRAME,	//блок памяти выделенный в стеке
 		STAT,			//глобальный блок памяти выделенный под статические переменные
 		HEAP,			//блок памяти выделенный в инстансе класса
@@ -34,6 +35,10 @@ public class CGCells {
 	private	String	label;
 	private	boolean	isRef;
 	
+	public CGCells(Type type) {
+		this.type = type;
+	}
+
 	public CGCells(Type type, int size) {
 		this.type = type;
 		this.size = size;

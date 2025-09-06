@@ -20,6 +20,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import ru.vm5277.common.ImplementInfo;
+import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.items.CGIContainer;
@@ -45,7 +46,7 @@ public class CGClassScope extends CGScope {
 		this.impl = impl;
 		this.isImported = isRoot;
 		
-		lbIIDSScope = new CGLabelScope(null, null, "_j8b_meta", true);
+		lbIIDSScope = new CGLabelScope(null, null, LabelNames.META, true);
 		
 		Collections.sort(impl);
 		// адрес HEAP, счетчик ссылок, адрес блока реализаций класса и интерфейсов
@@ -126,14 +127,15 @@ public class CGClassScope extends CGScope {
 		// - методы отсутствующие в интерфейсах идут после остальных методов
 		// - методы повторяющиеся в интерфейсах участвуют в подсчете количества методов, а также дублируются в таблице адресов методов
 
-		if(!impl.isEmpty()) {
-			StringBuilder implSB = new StringBuilder(lbIIDSScope.getName());
-			StringBuilder methodsAddrSB = new StringBuilder("\n\t.dw ");
-			implSB.append(":\n\t.db ").append(type.getId()).append(",").append(impl.size()).append(",");
+		StringBuilder implSB = new StringBuilder(lbIIDSScope.getName());
+		implSB.append(":\n\t.db ").append(type.getId()).append(",").append(impl.size());
 			
+		if(!impl.isEmpty()) {
+			implSB.append(",");
+			StringBuilder methodsAddrSB = new StringBuilder("\n\t.dw ");
 			for(ImplementInfo pair : impl) {
 				implSB.append(pair.getType().getId()).append(",").append(pair.getSignatures().size()).append(",");
-				
+
 				for(String mehodId : pair.getSignatures()) {
 					CGMethodScope mScope = methods.get(mehodId);
 					// Метод может не использоваться в кодогенерации
@@ -145,12 +147,11 @@ public class CGClassScope extends CGScope {
 					}
 				}
 			}
-			methodsAddrSB.deleteCharAt(methodsAddrSB.length()-1);
-
 			implSB.deleteCharAt(implSB.length()-1);
+			methodsAddrSB.deleteCharAt(methodsAddrSB.length()-1);
 			implSB.append(methodsAddrSB);
-			cont.append(new CGIText(implSB.toString()));
 		}
+		cont.append(new CGIText(implSB.toString()));
 		
 		return super.getSource();
 	}

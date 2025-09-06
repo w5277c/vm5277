@@ -19,7 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.cg.scopes.CGClassScope;
 
-public class CGIContainer implements CGItem {
+public class CGIContainer extends CGItem {
 	private	final	List<CGItem>	items	= new ArrayList<>();
 	private			int				pos		= 0;
 	private			String			tag;
@@ -63,7 +63,9 @@ public class CGIContainer implements CGItem {
 		StringBuilder sb = new StringBuilder();
 		
 		for(CGItem item : items) {
-			sb.append(item.getSource());
+			if(!item.isDisabled()) {
+				sb.append(item.getSource());
+			}
 		}
 
 		return sb.toString();

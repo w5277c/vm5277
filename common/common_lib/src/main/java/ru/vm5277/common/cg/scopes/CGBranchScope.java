@@ -15,17 +15,27 @@
  */
 package ru.vm5277.common.cg.scopes;
 
-public class CGExpressionScope extends CGScope {
-	private	int	nestCntr = 0;
+import java.util.Stack;
+import ru.vm5277.common.LabelNames;
+import ru.vm5277.common.cg.CodeGenerator;
+
+public class CGBranchScope extends CGScope {
+	private Stack<CGLabelScope>	lbEndScopes	= new Stack<>();	// Выход из текущего подвыражения
 	
-	public CGExpressionScope(CGScope parent) {
-		super(parent, -1, "");
+	public CGBranchScope(CodeGenerator cg, CGScope parent) {
+		super(parent, -1, null);
+		
+		lbEndScopes.add(new CGLabelScope(null, null, LabelNames.COMPARE_END, true));
 	}
 	
-	public void enter() {
-		nestCntr++;
+	public void pushEnd(CGLabelScope lbScope) {
+		lbEndScopes.add(lbScope);
 	}
-	public int leave() {
-		return nestCntr--;
+	public CGLabelScope popEnd() {
+		return lbEndScopes.pop();
+	}
+	
+	public CGLabelScope getEnd() {
+		return lbEndScopes.lastElement();
 	}
 }

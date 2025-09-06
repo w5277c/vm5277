@@ -15,7 +15,7 @@
  */
 package ru.vm5277.common.cg.items;
 
-public class CGIText implements CGItem {
+public class CGIText extends CGItem {
 	private	final	String	text;
 	
 	public CGIText(String text) {

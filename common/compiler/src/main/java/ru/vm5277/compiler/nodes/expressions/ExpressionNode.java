@@ -359,11 +359,16 @@ public class ExpressionNode extends AstNode {
 	
 	// Оптимизация выражения с использованием Scope (поздний этап).
 	// Осторожно с новыми инстансами выражений, теряем проинициализированные при семантическом анализе поля.
-	public ExpressionNode optimizeWithScope(Scope scope) throws CompileException {
+	public ExpressionNode optimizeWithScope(Scope scope, CodeGenerator cg) throws CompileException {
 		if (this instanceof CastExpression) {
 			CastExpression cast = (CastExpression)this;
-			ExpressionNode operand = cast.getOperand().optimizeWithScope(scope);
-			if(null == operand) operand = cast.getOperand();
+			ExpressionNode operand = cast.getOperand().optimizeWithScope(scope, cg);
+			if(null == operand) {
+				operand = cast.getOperand();
+			}
+			else {
+				operand.postAnalyze(scope, cg);
+			}
 
 			VarType operandType = operand.getType(scope);
 			
@@ -398,12 +403,18 @@ public class ExpressionNode extends AstNode {
 			InstanceOfExpression ioe = (InstanceOfExpression)this;
 
 			// Оптимизация через флаг из postAnalyze
-			if (ioe.isFulfillsContract()) return new LiteralExpression(tb, mc, true, cgScope);
+			if (ioe.isFulfillsContract()) {
+				ExpressionNode result = new LiteralExpression(tb, mc, true, cgScope);
+				result.postAnalyze(scope, cg);
+				return result;
+			}
 
 			// Оптимизация для final объектов
 			if (ioe.getLeft() instanceof VarFieldExpression) {
 				if(ioe.getLeftType().isPrimitive() && ioe.getLeftType() == ioe.getRightType()) {
-					return new LiteralExpression(tb, mc, true, cgScope);
+					ExpressionNode result = new LiteralExpression(tb, mc, true, cgScope);
+					result.postAnalyze(scope, cg);
+					return result;
 				}
 
 				VarFieldExpression varExpr = (VarFieldExpression)ioe.getLeft();
@@ -424,21 +435,39 @@ public class ExpressionNode extends AstNode {
 					}
 
 					// Точное совпадение типов
-					if (leftType == ioe.getRightType()) return new LiteralExpression(tb, mc, true, cgScope);
+					if (leftType == ioe.getRightType()) {
+						ExpressionNode result = new LiteralExpression(tb, mc, true, cgScope);
+						result.postAnalyze(scope, cg);
+						return result;
+					}
 
 					// Массивы одинаковой размерности
 					if (leftType.isArray() && ioe.getRightType().isArray()) {
 						// Совпадает размерность?
-						if (leftType.getArrayDepth() != ioe.getRightType().getArrayDepth())  return new LiteralExpression(tb, mc, false, cgScope);
+						if (leftType.getArrayDepth() != ioe.getRightType().getArrayDepth()) {
+							ExpressionNode result = new LiteralExpression(tb, mc, false, cgScope);
+							result.postAnalyze(scope, cg);
+							return result;
+						}
 
 						// Object[] совместим с любым массивом
-						if (ioe.getRightType().isObject()) return new LiteralExpression(tb, mc, true, cgScope);
+						if (ioe.getRightType().isObject()) {
+							ExpressionNode result = new LiteralExpression(tb, mc, true, cgScope);
+							result.postAnalyze(scope, cg);
+							return result;
+						}
 
 						// Проверка типа элементов
-						if (leftType.getClassName().equals(ioe.getRightType().getClassName())) return new LiteralExpression(tb, mc, true, cgScope);
+						if (leftType.getClassName().equals(ioe.getRightType().getClassName())) {
+							ExpressionNode result = new LiteralExpression(tb, mc, true, cgScope);
+							result.postAnalyze(scope, cg);
+							return result;
+						}
 						
 						// Все остальные случаи -> false
-						return new LiteralExpression(tb, mc, false, cgScope);
+						ExpressionNode result = new LiteralExpression(tb, mc, false, cgScope);
+						result.postAnalyze(scope, cg);
+						return result;
 					}
 				}
 			}
@@ -455,11 +484,11 @@ public class ExpressionNode extends AstNode {
 		
 		if (this instanceof BinaryExpression) {
 			BinaryExpression bin = (BinaryExpression) this;
-			ExpressionNode _left = bin.getLeft().optimizeWithScope(scope);
-			ExpressionNode _right = bin.getRight().optimizeWithScope(scope);
+			ExpressionNode _left = bin.getLeft().optimizeWithScope(scope, cg);
+			ExpressionNode _right = bin.getRight().optimizeWithScope(scope, cg);
 			ExpressionNode result = optimizeOperationChain(	null == _left ? bin.getLeft() : _left, bin.getOperator(),
 															null == _right ? bin.getRight(): _right, 0);
-			result.setCGScope(cgScope);
+			result.postAnalyze(scope, cg);
 			return result;
 		}
 		return null;
@@ -830,18 +859,5 @@ public class ExpressionNode extends AstNode {
 	
 	public CGScope getCGScope() {
 		return cgScope;
-	}
-	
-	protected void setCGScope(CGScope scope) {
-		this.cgScope = scope;
-		// TODO Костыль?
-		// Рекурсивно устанавливаем scope для всех дочерних узлов
-		if(null != getChildren()) {
-			for (AstNode child : getChildren()) {
-				if (child instanceof ExpressionNode) {
-					((ExpressionNode)child).setCGScope(scope);
-				}
-			}
-		}
 	}
 }

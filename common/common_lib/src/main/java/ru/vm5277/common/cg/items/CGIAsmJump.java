@@ -15,22 +15,35 @@
  */
 package ru.vm5277.common.cg.items;
 
-public class CGIAsm extends CGItem {
-	protected	String	text;
+import ru.vm5277.common.cg.scopes.CGLabelScope;
+
+public class CGIAsmJump extends CGIAsm {
+	private	String	labelName;
 	
-	public CGIAsm(String text) {
-		this.text = text;
+	public CGIAsmJump(String instr, CGLabelScope lbScope) {
+		super(instr);
+		this.labelName = lbScope.getName();
 	}
 
-	public String getText() {
-		return text;
+	public CGIAsmJump(String instr, String labelName) {
+		super(instr);
+		this.labelName = labelName;
 	}
-	public void setText(String text) {
-		this.text = text;
+
+	public String getLabelName() {
+		return labelName;
+	}
+	public void setLabelName(String labelName) {
+		this.labelName = labelName;
 	}
 	
 	@Override
 	public String getSource() {
-		return "\t" + text + "\n";
+		return "\t" + text + " " + labelName + "\n";
+	}
+	
+	@Override
+	public String toString() {
+		return text + " " + labelName;
 	}
 }

@@ -15,10 +15,52 @@
  */
 package ru.vm5277.compiler.avr_codegen;
 
+import java.util.ArrayList;
+import ru.vm5277.common.cg.CodeOptimizer;
+import ru.vm5277.common.cg.items.CGIAsmJump;
 import ru.vm5277.common.cg.items.CGIContainer;
+import ru.vm5277.common.cg.items.CGItem;
 import ru.vm5277.common.cg.scopes.CGExpressionScope;
+import ru.vm5277.common.cg.scopes.CGLabelScope;
+import ru.vm5277.common.cg.scopes.CGScope;
 
-public class Optimizator {
+public class Optimizer extends CodeOptimizer {
+	
+	
+	@Override
+	public void optimizeBranchChains(CGScope scope) {
+		ArrayList<CGItem> list = new ArrayList();
+
+		boolean changed = true;
+		while(changed) {
+			list.clear();
+			
+			optimizeEmptyJumps(scope);
+			treeToList(scope, list);		
+
+			changed = false;
+			for(int i=0; i<list.size()-2; i++) {
+				CGItem item1 = list.get(i);
+				CGItem item2 = list.get(i+1);
+				CGItem item3 = list.get(i+2);
+				if(item1 instanceof CGIAsmJump && item2 instanceof CGIAsmJump && item3 instanceof CGLabelScope) {
+					CGIAsmJump j1 = (CGIAsmJump)item1;
+					CGIAsmJump j2 = (CGIAsmJump)item2;
+					String name = ((CGLabelScope)item3).getName();
+					
+					if(j1.getText().toLowerCase().startsWith("br") && j2.getText().equalsIgnoreCase("rjmp") && j1.getLabelName().equalsIgnoreCase(name)) {
+						j1.setText(Utils.brInstrInvert(j1.getText()));
+						j1.setLabelName(j2.getLabelName());
+						j2.disable();
+						changed = true;
+					}
+				}
+			}
+		}		
+	}
+
+
+	//TODO рудимент?
 	//Блок оптимизации, вырезает часть команд из условия сравнения преременной с константой, возвращает инструкцию для перехода на false блок
 	public static String localWithConstantComparingCondition(CGExpressionScope eScope) {
 		String result = null;
@@ -34,4 +76,6 @@ public class Optimizator {
 		}
 		return result;
 	}
+	
+	
 }

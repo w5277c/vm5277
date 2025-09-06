@@ -26,17 +26,19 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.semantic.ClassScope;
-import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 
 public class ClassBlockNode extends AstNode {
 	protected	List<AstNode>	children	= new ArrayList<>();
+	private		ClassNode		classNode;
 	
 	public ClassBlockNode(TokenBuffer tb, MessageContainer mc, ClassNode classNode) throws CompileException {
 		super(tb, mc);
         
+		this.classNode = classNode;
+		
 		consumeToken(tb, Delimiter.LEFT_BRACE); // в случае ошибки, останавливаем парсинг файла
 
 		while (!tb.match(TokenType.EOF) && !tb.match(Delimiter.RIGHT_BRACE)) {		
@@ -128,33 +130,29 @@ public class ClassBlockNode extends AstNode {
 
 	@Override
 	public boolean declare(Scope scope) {
+		ClassScope classScope = (ClassScope)scope;
+		
 		for (AstNode node : children) {
 			node.declare(scope);
 		}
+		
+		// Проверка наличия конструктора
+		if (checkNonStaticMembers(classScope)) {
+			List<MethodSymbol> constructors = classScope.getConstructors();
+			if(null == constructors || constructors.isEmpty()) {
+				MethodNode mNode = new MethodNode(classNode);
+				mNode.declare(scope);
+				children.add(mNode);
+				markWarning("Class must have at least one constructor");
+			}
+		}
+		
 		return true;
 	}
 
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		ClassScope classScope = (ClassScope)scope;
-		
-		// Проверка наличия конструктора
-		if (checkNonStaticMembers(classScope)) {
-			List<MethodSymbol> constructors = classScope.getConstructors();
-			if(null == constructors || constructors.isEmpty()) {
-				//Есть не статические методы, но нет конструктора
-				try {
-					MethodScope methodScope = new MethodScope(null, classScope);
-					MethodSymbol methodSymbol = new MethodSymbol(classScope.getName(), null, new ArrayList<>(), false, false, false, false, methodScope, null);
-					methodScope.setSymbol(methodSymbol);
-					classScope.addConstructor(methodSymbol);
-					markWarning("Class must have at least one constructor");
-				}
-				catch(CompileException e) {markError(e);}
-			}
-		}
-		
 		for (AstNode node : children) {
 			node.postAnalyze(scope, cg);
 		}

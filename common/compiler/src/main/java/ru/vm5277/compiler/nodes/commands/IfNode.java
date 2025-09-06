@@ -17,11 +17,9 @@ package ru.vm5277.compiler.nodes.commands;
 
 import java.util.Arrays;
 import java.util.List;
-import ru.vm5277.common.Operator;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.cg.Operand;
-import ru.vm5277.common.cg.scopes.CGBlockScope;
-import ru.vm5277.common.cg.scopes.CGConditionScope;
+import ru.vm5277.common.cg.scopes.CGBranchScope;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -31,10 +29,8 @@ import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
-import ru.vm5277.compiler.nodes.expressions.BinaryExpression;
 import ru.vm5277.compiler.nodes.expressions.InstanceOfExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
@@ -51,6 +47,8 @@ public class IfNode extends CommandNode {
 	private	String			varName;
 	private	boolean			alwaysTrue;
 	private	boolean			alwaysFalse;
+	private	CGBranchScope	brScope;
+	
 	
 	public IfNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
@@ -186,7 +184,9 @@ public class IfNode extends CommandNode {
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		cgScope = cg.enterCondition();
+		cgScope = cg.enterCommand();
+		brScope = cg.enterBranch();
+		
 		// Проверка типа условия
 		if (null != condition) {
 			if (condition.postAnalyze(scope, cg)) {
@@ -198,19 +198,8 @@ public class IfNode extends CommandNode {
 			}
 		}
 
-		// Анализ then-блока
-		if (null != getThenBlock()) getThenBlock().postAnalyze(thenScope, cg);
-
-		// Анализ else-блока
-		if (null != getElseBlock()) getElseBlock().postAnalyze(elseScope, cg);
-		
-		// Проверяем недостижимый код после if с возвратом во всех ветках
-        if (null != getElseBlock() && isControlFlowInterrupted(getThenBlock()) && isControlFlowInterrupted(getElseBlock())) {
-            markWarning("Code after if statement may be unreachable");
-        }
-		
 		try {
-			ExpressionNode optimizedExpr = condition.optimizeWithScope(scope);
+			ExpressionNode optimizedExpr = condition.optimizeWithScope(scope, cg);
 			if(null != optimizedExpr) {
 				condition = optimizedExpr;
 			}
@@ -229,7 +218,21 @@ public class IfNode extends CommandNode {
 		catch (CompileException e) {
 			markFirstError(e);
 		}
-		cg.leaveCondition();
+
+		cg.leaveBranch();
+		
+		// Анализ then-блока
+		if (null != getThenBlock()) getThenBlock().postAnalyze(thenScope, cg);
+
+		// Анализ else-блока
+		if (null != getElseBlock()) getElseBlock().postAnalyze(elseScope, cg);
+		
+		// Проверяем недостижимый код после if с возвратом во всех ветках
+        if (null != getElseBlock() && isControlFlowInterrupted(getThenBlock()) && isControlFlowInterrupted(getElseBlock())) {
+            markWarning("Code after if statement may be unreachable");
+        }
+		
+		cg.leaveCommand();
 		return true;
 	}
 	
@@ -238,14 +241,18 @@ public class IfNode extends CommandNode {
 		if(cgDone) return null;
 		cgDone = true;
 
+		CGScope oldScope = cg.setScope(cgScope);
+		
 		if(alwaysTrue) {
 			thenBlockNode.codeGen(cg);
+			cg.setScope(oldScope);
 			return null;
 		}
 		if(alwaysFalse) {
 			if(getElseBlock() != null) {
 				elseBlockNode.codeGen(cg);
 			}
+			cg.setScope(oldScope);
 			return null;
 		}
 		
@@ -254,12 +261,14 @@ public class IfNode extends CommandNode {
 		//Если результат стал известен без runtime
 		if(obj == CodegenResult.TRUE) {
 			thenBlockNode.codeGen(cg);
+			cg.setScope(oldScope);
 			return null;
 		}
 		if(obj == CodegenResult.FALSE) {
 			if(elseBlockNode != null) {
 				elseBlockNode.codeGen(cg);
 			}
+			cg.setScope(oldScope);
 			return null;
 		}
 
@@ -269,25 +278,12 @@ public class IfNode extends CommandNode {
 			elseBlockNode.codeGen(cg);
 		}
 		
-		cg.eIf(((CGConditionScope)cgScope), condition.getCGScope(), thenBlockNode.getCGScope(), null == elseBlockNode ? null : elseBlockNode.getCGScope());
+		cg.eIf(brScope, condition.getCGScope(), thenBlockNode.getCGScope(), null == elseBlockNode ? null : elseBlockNode.getCGScope());
 		
+		cg.setScope(oldScope);
 		return null;
 	}
 
-/*	private Operator getLastLogicalOperator(ExpressionNode expr) {
-		if (expr instanceof BinaryExpression) {
-			BinaryExpression binExpr = (BinaryExpression) expr;
-			if (binExpr.getOperator().isLogical()) {
-				// Рекурсивно проверяем правый операнд
-				Operator rightOp = getLastLogicalOperator(binExpr.getRight());
-				// Если правый операнд тоже логический - возвращаем его оператор
-				// Иначе возвращаем текущий оператор
-				return (rightOp != null) ? rightOp : binExpr.getOperator();
-			}
-		}
-		// Для не-логических выражений возвращаем null
-		return null;
-	}	*/
 	@Override
 	public List<AstNode> getChildren() {
 		if(null == elseBlockNode) {

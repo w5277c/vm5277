@@ -32,6 +32,9 @@ public class CGLabelScope extends CGScope {
 	public void setUsed() {
 		isUsed = true;
 	}
+	public boolean isUsed() {
+		return isUsed;
+	}
 	
 	@Override
 	public String getSource() {

@@ -15,6 +15,15 @@
  */
 package ru.vm5277.common.cg.items;
 
-public interface CGItem {
-	public String getSource();
+public abstract class CGItem {
+	private	boolean	disabled;
+	
+	public void disable() {
+		disabled = true;
+	}
+	public boolean isDisabled() {
+		return disabled;
+	}
+	
+	public abstract String getSource();
 }

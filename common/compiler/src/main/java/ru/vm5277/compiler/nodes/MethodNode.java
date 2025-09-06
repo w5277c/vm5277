@@ -17,15 +17,12 @@ package ru.vm5277.compiler.nodes;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.cg.items.CGIText;
-import ru.vm5277.common.cg.scopes.CGBlockScope;
-import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGMethodScope;
-import static ru.vm5277.common.cg.scopes.CGScope.VERBOSE_LO;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
@@ -83,6 +80,19 @@ public class MethodNode extends AstNode {
 		}
 	}
 	
+	public MethodNode(ClassNode classNode) {
+		super();
+		
+		this.modifiers = new HashSet<>();
+		this.modifiers.add(Keyword.PUBLIC);
+		this.returnType = null;
+		this.name = classNode.getName();
+		this.classNode = classNode;
+		this.parameters = new ArrayList<>();
+		
+		blockNode = new BlockNode();
+	}
+			
 	public boolean canThrow() {
 		return canThrow;
 	}
@@ -174,8 +184,8 @@ public class MethodNode extends AstNode {
 			parameter.preAnalyze();
 		}
 		
-		if(null != getBody()) {
-			getBody().preAnalyze();
+		if(null != blockNode) {
+			blockNode.preAnalyze();
 		}
 		
 		return true;
@@ -226,12 +236,12 @@ public class MethodNode extends AstNode {
 		}
 		catch(CompileException e) {markError(e);}
 		
-		if(null != getBody()) {
+		if(null != blockNode) {
 			if (!(scope instanceof ClassScope)) { //TODO ввести подержу статики
 				markError(new CompileException(	"Method '" + name + "' cannot have body in interface '" + ((InterfaceScope)scope).getName() + "'"));
 				return false;
 			}
-			getBody().declare(methodScope);
+			blockNode.declare(methodScope);
 		}
 		
 		return true;
@@ -255,29 +265,29 @@ public class MethodNode extends AstNode {
 		}
 
 		if (modifiers.contains(Keyword.NATIVE)) {
-			if (getBody() != null) {
+			if (blockNode != null) {
 				markError("Native method cannot have a body");
 			}
 		}
 		else {
 			// Анализ тела метода (если есть)
-			if (null != getBody() && null != methodScope) {
+			if (null != blockNode && null != methodScope) {
 				for (ParameterNode param : parameters) {
 					param.postAnalyze(methodScope, cg);
 				}
 
 				// Анализируем тело метода
-				getBody().postAnalyze(methodScope, cg);
+				blockNode.postAnalyze(methodScope, cg);
 
 				// Для не-void методов проверяем наличие return
 				// TODO переосмыслить после ConstantFolding
 				if (null != returnType && !returnType.equals(VarType.VOID)) {
-					if (!BlockNode.hasReturnStatement(getBody())) {
+					if (!BlockNode.hasReturnStatement(blockNode)) {
 						markError("Method '" + name + "' must return a value");
 					}
 				}
 
-				List<AstNode> nodes = getBody().getChildren();
+				List<AstNode> nodes = blockNode.getChildren();
 				for (int i = 0; i < nodes.size(); i++) {
 					if (i > 0 && isControlFlowInterrupted(nodes.get(i - 1))) {
 						markError("Unreachable code in method " + name);
@@ -332,10 +342,6 @@ public class MethodNode extends AstNode {
 //			cg.popStackReg(mScope);
 //		}
 		
-/*		if(null == returnType || VarType.VOID == returnType) {
-			cg.eReturn(symbol.getCGScope(), 0);
-		}
-*/
 		classNode.codeGen(cg);		
 
 		if(!(classNode instanceof InterfaceNode)) {

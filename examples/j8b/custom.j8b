@@ -18,13 +18,32 @@ import rtos.System;
 import rtos.RTOSParam;
 
 class Main {
+
+	public void go(byte b) {
+		System.out(b);
+	}
+
     public static void main() {
 		System.setParam(RTOSParam.STDOUT_PORT, 0x12);
 
-		short s2 = 2;
-		short s3 = 3;
-		if (s2 == 2 && s3 != 3 || s2 < 1 || s3 > 5) {
-			System.out(s2);
+/*		byte a=1;
+		byte b=2;
+		byte c=3;
+		byte d=4;
+		byte e=5;
+		byte f=6;
+		byte g=7;
+		byte h=8;
+
+		bool y=true;
+		bool z=true;
+
+		//if (!((!(a == 1 && b != 2) || c == 3) && !(d != 4 || !(e == 5 && f == 6))) || !(g == 7 && h != 8)) {
+		//if (!((a == 1 && b != 2) || !(c == 3 && d != 4) || (e == 5 && f != 6) && (g == 7 || h != 8))) {
+		if(y && !z) {
+			System.out(0x01);
 		}
+		System.out(0x02);*/
+		go(1);
 	}
 }

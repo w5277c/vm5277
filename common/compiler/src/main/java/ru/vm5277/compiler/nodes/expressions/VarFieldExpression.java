@@ -15,8 +15,12 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
+import ru.vm5277.common.Operator;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGBranchScope;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
+import ru.vm5277.common.cg.scopes.CGClassScope;
+import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.CodegenResult;
@@ -25,7 +29,6 @@ import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.AliasSymbol;
-import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.ClassSymbol;
 import ru.vm5277.compiler.semantic.FieldSymbol;
 import ru.vm5277.compiler.semantic.InterfaceScope;
@@ -159,6 +162,19 @@ public class VarFieldExpression extends ExpressionNode {
 		}
 		cg.setScope(oldCGScope);
 		return (accumStore ? CodegenResult.RESULT_IN_ACCUM : null);
+	}
+	
+	public void codeGen(CodeGenerator cg, boolean isInvert, boolean opOr, CGBranchScope brScope) throws Exception {
+		depCodeGen(cg);
+		
+		CGCellsScope cScope =  (CGCellsScope)symbol.getCGScope();
+		if(cScope instanceof CGVarScope) {
+			cg.constCond(cgScope, ((CGVarScope)cScope).getStackOffset(), cScope.getCells(), Operator.NEQ, 0, isInvert, opOr, brScope);
+		}
+		else {
+			cg.constCond(	cgScope, ((CGClassScope)((CGFieldScope)cScope).getParent()).getHeapHeaderSize(), cScope.getCells(), Operator.NEQ, 0, isInvert,
+							opOr, brScope);
+		}
 	}
 	
 	@Override

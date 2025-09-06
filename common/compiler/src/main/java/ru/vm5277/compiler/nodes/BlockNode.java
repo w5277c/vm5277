@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
@@ -304,6 +305,7 @@ public class BlockNode extends AstNode {
 		if(cgDone) return null;
 		cgDone = true;
 		
+		CGScope oldScope = cg.setScope(cgScope);
 		
 		for(AstNode node : children) {
 			//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
@@ -315,6 +317,7 @@ public class BlockNode extends AstNode {
 		cgScope.build(cg, false);
 		cgScope.restoreRegsPool();
 		
+		cg.setScope(oldScope);
 		return null;
 	}
 	
