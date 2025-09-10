@@ -21,7 +21,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.items.CGIAsmJump;
 import ru.vm5277.common.cg.items.CGIAsmLdLabel;
 import ru.vm5277.common.cg.items.CGIContainer;
@@ -34,15 +33,15 @@ public abstract class CodeOptimizer {
 	public abstract void optimizeBranchChains(CGScope scope);
 	
 	protected boolean optimizeEmptyJumps(CGScope scope) {
-		boolean result = false;
+		boolean result=false;
 		
 		ArrayList<CGItem> list = new ArrayList();
-		boolean changed =true;
+		boolean changed=true;
 		while(changed) {
 			list.clear();
 			treeToList(scope, list);
 		
-			changed = false;
+			changed=false;
 			for(int i=0; i<list.size()-1; i++) {
 				CGItem item1 = list.get(i);
 				if(item1 instanceof CGIAsmJump) {
@@ -52,8 +51,8 @@ public abstract class CodeOptimizer {
 						String name = ((CGLabelScope)item2).getName();
 						if(jump.getLabelName().equalsIgnoreCase(name)) {
 							jump.disable();
-							changed = true;
-							result = true;
+							changed=true;
+							result=true;
 						}
 					}
 				}
@@ -62,6 +61,24 @@ public abstract class CodeOptimizer {
 		return result;
 	}
 	
+	public void optimizePushConst(CGScope scope, char iReg) {
+		ArrayList<CGItem> list=new ArrayList();
+		treeToList(scope, list, "ConstToCellBy"+iReg);
+		
+		for(int i=0; i<list.size()-1; i++) {
+			CGItem item1 = list.get(i);
+			CGItem item2 = list.get(i+1);
+			if(item1 instanceof CGIContainer && ("ConstToCellBy"+iReg).equals(((CGIContainer)item1).getTag())) {
+				CGIContainer cont1 = (CGIContainer)item1;
+				if(item2 instanceof CGIContainer && ("ConstToCellBy"+iReg).equals(((CGIContainer)item2).getTag())) {
+					CGIContainer cont2 = (CGIContainer)item2;
+					cont1.getItems().get(cont1.getItems().size()-1).disable();
+					cont2.getItems().get(0).disable();
+				}
+			}
+		}
+	}
+
 	protected void removeUnusedLabels(CGScope scope) {
 		ArrayList<CGItem> list = new ArrayList();
 		Map<String, CGLabelScope> labels = new HashMap<>();
@@ -152,15 +169,22 @@ public abstract class CodeOptimizer {
 	}
 
 	public static void treeToList(CGIContainer cont, List<CGItem> list) {
+		treeToList(cont, list, null);
+	}
+	public static void treeToList(CGIContainer cont, List<CGItem> list, String ignoreScanTag) {
 		for(CGItem item : cont.getItems()) {
 			if(item.isDisabled()) continue;
 			
 			if(item instanceof CGIContainer) {
-				if(((CGIContainer)item).getItems().isEmpty()) {
+				if(null != ignoreScanTag && ignoreScanTag.equalsIgnoreCase(((CGIContainer)item).getTag())) {
+					// Пропускаем анализ вложенности для контейнеров с тегом(контейнер должен рассматриваться как единое целое)
 					list.add(item);
 				}
 				else {
-					treeToList((CGIContainer)item, list);
+					//TODO убрал if(((CGIContainer)item).getItems().isEmpty()) { list.add(item); ... добавлял мусор типа CGExpressionScope, возможно что-то поломал
+					if(!((CGIContainer)item).getItems().isEmpty()) {
+						treeToList((CGIContainer)item, list, ignoreScanTag);
+					}
 				}
 			}
 			else {

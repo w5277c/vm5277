@@ -23,6 +23,8 @@ import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.Operand;
 import ru.vm5277.common.cg.OperandType;
+import ru.vm5277.common.cg.items.CGIContainer;
+import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
@@ -370,7 +372,8 @@ public class MethodCallExpression extends ExpressionNode {
 		
 		InterfaceScope iScope = (InterfaceScope)((MethodSymbol)symbol).getScope().getParent();
 		String classNameStr = iScope.getName();
-
+		CGMethodScope mScope = (CGMethodScope)symbol.getCGScope();
+		
 		if(symbol.isNative()) {
 			Operand[] operands = null;
 			if(!args.isEmpty()) {
@@ -420,12 +423,7 @@ public class MethodCallExpression extends ExpressionNode {
 				else {
 					if(classNameExpr instanceof VarFieldExpression) {
 						CGCellsScope cScope = (CGCellsScope)((VarFieldExpression)classNameExpr).getSymbol().getCGScope();
-						if(cScope instanceof CGVarScope) {
-							cg.setHeapReg(cgScope, ((CGVarScope)cScope).getStackOffset(), cScope.getCells());
-						}
-						else {
-							cg.setHeapReg(cgScope, ((CGClassScope)((CGFieldScope)cScope).getParent()).getHeapHeaderSize(), cScope.getCells());
-						}
+						cg.setHeapReg(cgScope, cScope.getCells());
 					}
 					putArgsToStack(cg, refTypeSize);
 				}
@@ -436,7 +434,6 @@ public class MethodCallExpression extends ExpressionNode {
 					methodSN = ((CGClassScope)symbol.getCGScope().getParent()).getMethodSN((CGMethodScope)symbol.getCGScope());
 				}
 */				
-				CGMethodScope mScope = (CGMethodScope)symbol.getCGScope();
 				if(null != mScope) {
 					cg.invokeClassMethod(cgScope, classNameStr, symbol.getName(), type, argTypes, mScope.getLabel(), classNameExpr instanceof ThisExpression);
 				}
@@ -503,8 +500,12 @@ public class MethodCallExpression extends ExpressionNode {
 		if(!args.isEmpty()) {
 			CGScope oldCGScope = cg.setScope(symbol.getCGScope());
 			
-			((CGMethodScope)symbol.getCGScope()).clearArgs(); //скорее всего не зайдет, нам нужно удалять только те, которые мы даобавили
+			CGMethodScope mScope = (CGMethodScope)symbol.getCGScope();
+			mScope.clearArgs(); //скорее всего не зайдет, нам нужно удалять только те, которые мы даобавили
+			
+			CGIContainer cont = new CGIContainer();
 			for(int i=0; i<args.size(); i++) {
+			//for(int i=args.size()-1; i>=0; i--) {
 				// Получаем параметр вызываемого метода
 				Symbol paramSymbol = ((MethodSymbol)symbol).getParameters().get(i);
 				VarType paramVarType = paramSymbol.getType();
@@ -523,36 +524,44 @@ public class MethodCallExpression extends ExpressionNode {
 					// Создаем новую область видимости переменной в вызываемом методе
 					int varSize = paramVarType.isObject() ? refTypeSize + cg.getRefSize() : exprTypeSize;
 					CGVarScope dstVScope = cg.enterLocal(vSymbol.getType(), varSize, false, vSymbol.getName());
-
-					// Выделяем память в стеке
-					dstVScope.build();
+					dstVScope.build(); // Выделяем память в стеке
 					cg.leaveLocal();
+					
 					vSymbol.setCGScope(dstVScope);
 
 					if(argExpr instanceof LiteralExpression) {
 						// Выполняем зависимость
 						argExpr.depCodeGen(cg);
-						cg.pushConst(argExpr.getCGScope(), exprTypeSize, ((LiteralExpression)argExpr).getNumValue());
+						cont.append(cg.pushConst(null, exprTypeSize, ((LiteralExpression)argExpr).getNumValue()));
 					}
 					else if(argExpr instanceof VarFieldExpression) {
 						// Выполняем зависимость
 						argExpr.depCodeGen(cg);
-						cg.pushCells(argExpr.getCGScope(), 0, exprTypeSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells());
+						cont.append(cg.pushCells(null, exprTypeSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells()));
 					}
 					else if(argExpr instanceof MethodCallExpression) {
 						// Выполняем зависимость
 						argExpr.codeGen(cg, true);
-						cg.pushAccBE(argExpr.getCGScope(), paramVarType.getSize());
+						cont.append(cg.pushAccBE(null, paramVarType.getSize()));
+						//TODO оптимизация FLASH:	rcall push_acc
+						//					pop zh
+						//					pop zl
+						//					push r16
+						//					push r17
+						//					push r18
+						//					push r19
+						//					ijmp
 					}
 					else if (argExpr instanceof BinaryExpression) {
 						argExpr.codeGen(cg, true);
-						cg.pushAccBE(argExpr.getCGScope(), paramVarType.getSize());
+						cont.append(cg.pushAccBE(null, paramVarType.getSize()));
 					}
 					else {
 						throw new CompileException("Unsupported expression:" + argExpr);
 					}
 				}
 			}
+			cgScope.append(cont);
 			cg.setScope(oldCGScope);
 		}
 	}

@@ -22,14 +22,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.LabelNames;
-import ru.vm5277.common.RTOSLibs;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.CodeOptimizer;
 import ru.vm5277.common.cg.RegPair;
-import ru.vm5277.common.cg.items.CGIAsmJump;
-import ru.vm5277.common.cg.items.CGIAsmLdLabel;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGIText;
 import static ru.vm5277.common.cg.scopes.CGScope.verbose;
@@ -46,6 +43,7 @@ public class CGBlockScope extends CGScope {
 	private				Set<RegPair>				usedPool	= new HashSet<>(); // Использованные регистры из regsPool метода
 	private				CGMethodScope				mScope;
 	private				List<Byte>					usedRegs	= new ArrayList<>();
+	private				boolean						isFirstBlock;
 	
 	public CGBlockScope(CodeGenerator cg, CGScope parent, int id) {
 		super(parent, id, "");
@@ -55,26 +53,25 @@ public class CGBlockScope extends CGScope {
 			this.stackOffset = bScope.getStackBlockSize();
 		}
 */		
+		if(parent instanceof CGMethodScope) isFirstBlock = true;
+
 		mScope = parent.getMethodScope();
+		mScope.addBlockScope(this);
 
 		lbEScope = new CGLabelScope(null, null, LabelNames.BLOCK_END, true);
 	//	cg.addLabel(lbEScope);
 	}
 	
-	public void build(CodeGenerator cg, boolean isFirst) throws CompileException {
+	public void build(CodeGenerator cg, boolean isLaunchPoint) throws CompileException {
 		CGIContainer cont = new CGIContainer();
 		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";build block"));
 
-		CGMethodScope mScope = (parent instanceof CGMethodScope ? (CGMethodScope)parent : null);
-		if(0x00 != stackOffset) {
-			cont.append(cg.stackAlloc(null, stackOffset));
-		}
-		else if(null != mScope && 0!=mScope.getStackSize()) {
-			cont.append(cg.stackToStackReg(null));
+		if(0!=mScope.getArgsStackSize() || 0!=stackOffset) {
+			cont.append(cg.stackAlloc(isFirstBlock, mScope.getArgsStackSize(), stackOffset));
 		}
 
 		// Регистры(если используются в качестве переменных) используемые в нативных вызовах должны быть сохранены в методе invokeNative
-		if(!isFirst) {
+		if(!isLaunchPoint) {
 			for(int i=0; i<usedRegs.size(); i++) {
 				cont.append(cg.pushRegAsm(usedRegs.get(i)));
 			}
@@ -83,7 +80,7 @@ public class CGBlockScope extends CGScope {
 		prepend(cont);
 
 		append(lbEScope);
-		if(!isFirst) {
+		if(!isLaunchPoint) {
 			for(int i=usedRegs.size()-1; i>=0; i--) {
 				append(cg.popRegAsm(usedRegs.get(i)));
 			}
@@ -93,8 +90,8 @@ public class CGBlockScope extends CGScope {
 			append(cg.stackFree(null, stackOffset+varSize));
 		}*/
 
-		if(null == mScope && 0!=stackOffset) {
-			append(cg.blockFree(null, stackOffset));
+		if(0!=stackOffset) {
+			append(cg.blockFree(stackOffset));
 //			cg.jump(cg.getScope(), new CGLabelScope(null, -1, "j8bproc_vars_free", true));
 		}
 		
@@ -102,14 +99,16 @@ public class CGBlockScope extends CGScope {
 			cg.moveIReg(cg.getScope(), 'y', (stackOffset+mScope.getVarSize())*(-1));
 		}*/
 
-		if(null != mScope) {
-			append(cg.eReturn(null, mScope.getStackSize(), stackOffset, null == mScope.getType() ? 0x00 : mScope.getType().getSize()));
+		if(isFirstBlock) {
+			append(cg.eReturn(null, mScope.getStackSize(), stackOffset, mScope.getType().getSize()));
 		}
 		
 		CodeOptimizer co = cg.getOptimizer();
 		if(null != co) {
 			co.optimizeJumpChains(this);
 			co.optimizeBranchChains(this);
+			co.optimizePushConst(this, 'Y');
+			co.optimizePushConst(this, 'Z');
 		}
 		
 		if(VERBOSE_LO <= verbose) append(new CGIText(";block end"));
@@ -133,13 +132,13 @@ public class CGBlockScope extends CGScope {
 		return null;
 	}
 
-	public int getStackSize() {
+/*	public int getStackSize() {
 		if(parent instanceof CGBlockScope) {
 			return ((CGBlockScope)parent).getStackSize() + stackOffset;
 		}
-		return ((CGMethodScope)parent).getStackSize() + stackOffset;
+		return ((CGMethodScope)parent).getArgsStackSize() + 0x02 + stackOffset; //TODO cg.getCallStackSize
 	}
-
+*/
 	public void putUsedReg(byte reg) {
 		if(16==reg) return; //r16 всегда свободен и используется для аккумулятора(который используется только временно(для выражений))
 		if(!usedRegs.contains(reg)) {
@@ -181,7 +180,9 @@ public class CGBlockScope extends CGScope {
 			
 			return new CGCells(regPairs);
 		}
-		CGCells cells = new CGCells(CGCells.Type.STACK_FRAME, size, getStackSize());
+		//CGCells cells = new CGCells(CGCells.Type.STACK_FRAME, size, getStackSize());
+		CGCells cells = new CGCells(CGCells.Type.STACK_FRAME, size, stackOffset);
+		cells.setObject(this);
 		stackOffset+=size;
 		return cells;
 	}
@@ -201,7 +202,10 @@ public class CGBlockScope extends CGScope {
 		}
 	}
 */	
-
+	public int getVarsStackSize() {
+		return stackOffset;
+	}
+	
 	public void restoreRegsPool() {
 		if(!usedPool.isEmpty()) {
 			if(VERBOSE_LO <= verbose) append(new CGIText(";restore regs:" + StrUtils.toString(usedPool)));

@@ -167,14 +167,8 @@ public class VarFieldExpression extends ExpressionNode {
 	public void codeGen(CodeGenerator cg, boolean isInvert, boolean opOr, CGBranchScope brScope) throws Exception {
 		depCodeGen(cg);
 		
-		CGCellsScope cScope =  (CGCellsScope)symbol.getCGScope();
-		if(cScope instanceof CGVarScope) {
-			cg.constCond(cgScope, ((CGVarScope)cScope).getStackOffset(), cScope.getCells(), Operator.NEQ, 0, isInvert, opOr, brScope);
-		}
-		else {
-			cg.constCond(	cgScope, ((CGClassScope)((CGFieldScope)cScope).getParent()).getHeapHeaderSize(), cScope.getCells(), Operator.NEQ, 0, isInvert,
-							opOr, brScope);
-		}
+		CGCellsScope cScope = (CGCellsScope)symbol.getCGScope();
+		cg.constCond(cgScope, cScope.getCells(), Operator.NEQ, 0, isInvert, opOr, brScope);
 	}
 	
 	@Override

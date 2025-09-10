@@ -210,15 +210,14 @@ public class FieldNode extends AstNode {
 			else throw new Exception("unexpected expression:" + initializer + " for constant");
 		}
 		else {
-			int heapHeaderSize = ((CGClassScope)fScope.getParent()).getHeapHeaderSize();
 			if(null == initializer) {
 				// Ничего не делаем, инициализация(заполнение нулями необходима только регистрам, остальные проинициализированы вместе с HEAP/STACK)
 			}
 			else if(initializer instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
-				cg.constToCells(cg.getScope(), heapHeaderSize, ((LiteralExpression)initializer).getNumValue(), fScope.getCells());
+				cg.constToCells(cg.getScope(), ((LiteralExpression)initializer).getNumValue(), fScope.getCells());
 			}
 			else if(initializer instanceof FieldAccessExpression) {
-				cg.constToCells(cg.getScope(), heapHeaderSize, -1, fScope.getCells());
+				cg.constToCells(cg.getScope(), -1, fScope.getCells());
 				accUsed = true;
 			}
 			else if(initializer instanceof NewExpression) {

@@ -47,16 +47,19 @@ import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.CGCells;
+import ru.vm5277.common.cg.CodeOptimizer;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.cg.OperandType;
 import ru.vm5277.common.cg.RegPair;
+import ru.vm5277.common.cg.items.CGIAsmIReg;
 import ru.vm5277.common.cg.items.CGIAsmJump;
 import ru.vm5277.common.cg.items.CGIAsmLdLabel;
+import ru.vm5277.common.cg.items.CGItem;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
-import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGBranchScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
+import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
@@ -66,14 +69,16 @@ import ru.vm5277.common.exceptions.CompileException;
 
 public class Generator extends CodeGenerator {
 	private	final	static	String				VERSION		= "0.1";
-	private	final	static	byte[]				usableRegs	= new byte[]{20,21,22,23,24,25,26,27,   19,18,17}; //Используем регистры
-	//private	final	static	byte[]				usableRegs	= new byte[]{}; 	//Без регистров для локальных переменных
+	//private	final	static	byte[]				usableRegs	= new byte[]{20,21,22,23,24,25,26,27,   19,18,17}; //Используем регистры
+	private	final	static	byte[]				usableRegs	= new byte[]{}; 	//Без регистров для локальных переменных
 	//private	final	static	byte[]				usableRegs	= new byte[]{20}; 	//С одним регистром
 	//private	final	static	byte[]				usableRegs	= new byte[]{20,21,22,23}; 	//С 4 регистрами
 	private	final	static	boolean				def_sph		= true; // TODO генератор avr должен знать характеристики МК(чтобы не писать асм код с .ifdef)
 	private	final	static	boolean				def_call	= true; // TODO генератор avr должен знать характеристики МК(чтобы не писать асм код с .ifdef)
 	private	final	static	String				INSTR_JUMP	= "rjmp";
 	private	final	static	String				INSTR_CALL	= "rcall";
+	private	final	static	int					MIN_IREG_OFFSET	= 0;
+	private	final	static	int					MAX_IREG_OFFSET	= 63;
 	
 	public Generator(String platform, Map<String, NativeBinding> nbMap, Map<SystemParam, Object> params) {
 		super(platform, nbMap, params);
@@ -83,68 +88,71 @@ public class Generator extends CodeGenerator {
 	}
 	
 	@Override
-	public CGIContainer stackAlloc(CGScope scope, int size) {
-		CGIContainer result = new CGIContainer();
-		
-		if(VERBOSE_LO <= verbose) result.append(new CGIText(";alloc stack, size:" + size));
-//		result.append(new CGIAsm("push yl"));
-//		if(def_sph) result.append(new CGIAsm("push yh"));
-		
-		if(size<5) {
-			for(int i=0; i<size; i++) {
-				result.append(new CGIAsm("push c0x00"));
+	public CGIContainer stackAlloc(boolean firstBlock, int argsSize, int varsSize) {
+		CGIContainer cont = new CGIContainer();
+
+		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";alloc stack, size:" + varsSize));
+
+		if(firstBlock) {
+			cont.append(new CGIAsm("push yl")); //TODO проверить адрес ячейки
+			if(def_sph) cont.append(new CGIAsm("push yh")); // Если SPH отсутствует, то yh всегда должен быть равен 0
+			cont.append(new CGIAsm("lds yl,SPL")); //TODO проверить адрес ячейки
+			if(def_sph) cont.append(new CGIAsm("lds yh,SPH"));
+//			if(argsSize<MAX_IREG_OFFSET) { //TODO проверить на граничное значение
+				 //Стек растет вниз, берем максимально минимальный адрес с доступностью переменных через y+XX
+//				cont.append(new CGIAsm("sbiw yl," + (MAX_IREG_OFFSET-(argsSize+0x04)))); //0x04 - push y, адрес возврата и учет позиции SP
+//			}
+		}
+
+		// Не просто выделяем память, также инициализируем ее нулями
+		if(varsSize<5) {
+			for(int i=0; i<varsSize; i++) {
+				cont.append(new CGIAsm("push c0x00"));
 			}
-			result.append(new CGIAsm("sbiw yl," + size));
 		}
 		else {
-			result.append(new CGIAsm("ldi yl,low(" + size + ")"));
-			result.append(new CGIAsm("ldi yh,high(" + size + ")"));
-			result.append(new CGIAsm("push c0x00"));
-			result.append(new CGIAsm("sbiw yl,0x01"));
-			result.append(new CGIAsm("brne pc-0x02"));//TODO проверить
-			result.append(new CGIAsm("lds yl,SPL")); //TODO проверить адрес ячейки
-			result.append(new CGIAsm(def_sph ? "lds yh,SPH" : "ldi yh,0x00"));
+			cont.append(new CGIAsm("ldi r16,low(" + varsSize + ")"));
+			cont.append(new CGIAsm("ldi r17,high(" + varsSize + ")"));
+			cont.append(new CGIAsm("push c0x00"));
+			cont.append(new CGIAsm("dec r16"));
+			cont.append(new CGIAsm("brne pc-0x02"));
+			cont.append(new CGIAsm("dec r17"));
+			cont.append(new CGIAsm("brne pc-0x04"));
 		}
-		
-		if(null != scope) scope.append(result);
-		return result;
+		return cont;
 	}
+
+//Продумать освобождение памяти с учетом normalizeIRegConst
 	@Override
-	public CGIContainer blockFree(CGScope scope, int size) {
-		CGIContainer result = new CGIContainer();
+	public CGIContainer blockFree(int size) {
+		CGIContainer cont = new CGIContainer();
 		
-		if(VERBOSE_LO <= verbose) result.append(new CGIText(";block free, size:" + size));
-		result.append(new CGIAsm("subi yl,low(" + size*(-1) + ")"));
-		if(def_sph) result.append(new CGIAsm("sbci yh,high(" + size*(-1) + ")"));
-		if(def_sph) result.append(new CGIAsm("lds zl,SREG"));
-		if(def_sph) result.append(new CGIAsm("cli"));
-		result.append(new CGIAsm("sts SPL,yl"));
-		if(def_sph) result.append(new CGIAsm("sts SPH,yh"));
-		if(def_sph) result.append(new CGIAsm("sts SREG,zl"));
-		
-		/*
-		if(VERBOSE_LO <= verbose) result.append(new CGIText(";free stack, size:" + size));
-		if(size<9) {
+		if(0==size) return cont;
+		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";block free, size:" + size));
+		if((def_sph && size<9) || (!def_sph && size<3)) {
 			for(int i=0; i<size; i++) {
-				result.append(new CGIAsm("pop yl"));
+				cont.append(new CGIAsm("pop j8b_atom"));
 			}
 		}
 		else {
-			if(def_sph) result.append(new CGIAsm("lds yl,SREG"));
+/*			result.append(new CGIAsm("subi yl,low(" + size*(-1) + ")"));
+			if(def_sph) result.append(new CGIAsm("sbci yh,high(" + size*(-1) + ")"));
+			if(def_sph) result.append(new CGIAsm("lds zl,SREG"));
 			if(def_sph) result.append(new CGIAsm("cli"));
-			result.append(new CGIAsm("lds _SPL,SPL"));
-			if(def_sph) result.append(new CGIAsm("lds _SPH,SPH"));
-			result.append(new CGIAsm("subi _SPL,low(-" + size + ")"));
-			if(def_sph) result.append(new CGIAsm("sbci _SPH,high(-" + size + ")"));
-			result.append(new CGIAsm("sts SPL,_SPL"));
-			if(def_sph) result.append(new CGIAsm("sts SPH,_SPH"));
-			if(def_sph) result.append(new CGIAsm("sts SREG,yl"));
+			result.append(new CGIAsm("sts SPL,yl"));
+			if(def_sph) result.append(new CGIAsm("sts SPH,yh"));
+			if(def_sph) result.append(new CGIAsm("sts SREG,zl"));*/
+
+			if(def_sph) cont.append(new CGIAsm("cli"));
+			cont.append(new CGIAsm("lds _SPL,SPL"));
+			if(def_sph) cont.append(new CGIAsm("lds _SPH,SPH"));
+			cont.append(new CGIAsm("subi _SPL,low(" + size*(-1) + ")")); // Оптимизатор по возможности приведет к интрукции adiw
+			if(def_sph) cont.append(new CGIAsm("sbci _SPH,high(" + size*(-1) + ")"));
+			cont.append(new CGIAsm("sts SPL,_SPL"));
+			if(def_sph) cont.append(new CGIAsm("sts SPH,_SPH"));
+			if(def_sph) cont.append(new CGIAsm("sei")); // На верхнем уровне прерывания всегда резешены, проверка(созранение бита) не требуется
 		}
-//		if(def_sph) result.append(new CGIAsm("pop yh"));
-//		result.append(new CGIAsm("pop yl"));
-*/
-		if(null != scope) scope.append(result);
-		return result;
+		return cont;
 	}
 	
 	public CGIAsm pushRegAsm(byte reg) {return new CGIAsm("push r"+reg+"");}
@@ -186,31 +194,24 @@ public class Generator extends CodeGenerator {
 		return result;
 	}
 	
-	@Override
-	public CGIContainer stackToStackReg(CGScope scope) {
-		CGIContainer result = new CGIContainer();
-		if(VERBOSE_LO <= verbose) result.append(new CGIText(";stack addr to stack iReg"));
-		result.append(new CGIAsm("lds yl,SPL")); //TODO проверить адрес ячейки
-		result.append(new CGIAsm(def_sph ? "lds yh,SPH" : "ldi yh,0x00"));
-		if(null != scope) scope.append(result);
-		return result;
-	}
-
-	
 	/**
 	 * pushConst используетя для вызова метода(передачи констант)
 	 * @param scope - область видимости для генерации кода
 	 * @param size - необходимый размер в стеке
 	 * @param value - значение константы
+	 * @return 
 	 */
 	@Override
-	public void pushConst(CGScope scope, int size, long value) {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";push const '" + value + "'"));
+	public CGIContainer pushConst(CGScope scope, int size, long value) {
+		CGIContainer cont = new CGIContainer();
+		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";push const '" + value + "'"));
 		for(int i=0; i<size; i++) {
-			scope.append(new CGIAsm("ldi r30," + (value&0xff)));
-			scope.append(new CGIAsm("push r30"));
+			cont.append(new CGIAsm("ldi r30," + (value&0xff)));
+			cont.append(new CGIAsm("push r30"));
 			value >>= 0x08;
 		}
+		if(null != scope) scope.append(cont);
+		return cont;
 	}
 
 	/**
@@ -235,44 +236,30 @@ public class Generator extends CodeGenerator {
 	 * @param offset - смещение в стеке(если CGCellType.STACK), или смещение в HEAP(если CGCellType.HEAP)
 	 * @param size - необходимый размер в стеке
 	 * @param cells - ячейки указывающие источник данных
+	 * @return 
 	 * @throws CompileException
 	 */
 	@Override
-	public void pushCells(CGScope scope, int offset, int size, CGCells cells) throws CompileException {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";push cells: " + cells));
+	public CGIContainer pushCells(CGScope scope, int size, CGCells cells) throws CompileException {
+		CGIContainer cont = new CGIContainer();
+		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";push cells: " + cells));
 
 		switch(cells.getType()) {
 			case REG:
-				for(int i=0; i<cells.getSize(); i++) scope.append(new CGIAsm("push r" + cells.getId(i)));
+				for(int i=0; i<cells.getSize(); i++) cont.append(new CGIAsm("push r" + cells.getId(i)));
 				break;
+			case ARGS:
 			case STACK_FRAME:
-				if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) {
-					scope.append(new CGIAsm("rcall os_dispatcher_lock"));
-				}
-				int addr = cells.getId(0);
-				boolean needRestoreIReg = Generator.this.moveIReg(scope, 'y', offset+addr, cells.getSize());
 				for(int i=0; i<cells.getSize(); i++) {
-					scope.append(new CGIAsm("ldd j8b_atom,y+" + (cells.getId(i) + (needRestoreIReg ? -addr : offset))));
-					scope.append(new CGIAsm("push j8b_atom"));
-				}
-				if(needRestoreIReg) moveIReg(scope, 'y', offset+addr);
-				if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) {
-					scope.append(new CGIAsm("rcall os_dispatcher_unlock"));
+					cont.append(new CGIAsmIReg(	'y', "ldd j8b_atom,y+", cells.getId(i), "", getCurBlockScope(scope), (CGBlockScope)cells.getObject(),
+												CGCells.Type.ARGS == cells.getType()));
+					cont.append(new CGIAsm("push j8b_atom"));
 				}
 				break;
 			case HEAP:
-				if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) {
-					scope.append(new CGIAsm("rcall os_dispatcher_lock"));
-				}
-				addr = cells.getId(0);
-				needRestoreIReg = Generator.this.moveIReg(scope, 'z', offset+addr, cells.getSize());
 				for(int i=0; i<cells.getSize(); i++) {
-					scope.append(new CGIAsm("ldd j8b_atom,z+" + (cells.getId(i) + (needRestoreIReg ? -addr : offset))));
-					scope.append(new CGIAsm("push j8b_atom"));
-				}
-				if(needRestoreIReg) moveIReg(scope, 'z', offset+addr);
-				if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) {
-					scope.append(new CGIAsm("rcall os_dispatcher_unlock"));
+					cont.append(new CGIAsmIReg('z', "ldd j8b_atom,z+", cells.getId(i), ""));
+					cont.append(new CGIAsm("push j8b_atom"));
 				}
 				break;
 			default:
@@ -280,8 +267,11 @@ public class Generator extends CodeGenerator {
 		}
 		
 		for(int i=cells.getSize(); i<size; i++) {
-			scope.append(new CGIAsm("push c0x00"));
+			cont.append(new CGIAsm("push c0x00"));
 		}
+		
+		if(null!=scope) scope.append(cont);
+		return cont;
 	}
 
 	@Override
@@ -309,23 +299,23 @@ public class Generator extends CodeGenerator {
 			if(VERBOSE_LO <= verbose) scope.append(new CGIText(";accum->var '" + vScope.getName() + "'"));
 		
 			if(!vScope.isConstant()) {
-				regsToVar(scope, getAccRegs(0x04), size, vScope.getStackOffset(), vScope.getCells());
+				regsToVar(scope, getAccRegs(0x04), size, vScope.getCells());
 			}
 		}
 		else if(cScope instanceof CGFieldScope) {
 			CGFieldScope fScope = (CGFieldScope)cScope;
 			if(VERBOSE_LO <= verbose) scope.append(new CGIText(";accum->field " + fScope.getName()));
 			if(!fScope.isStatic()) {
-				accToField(scope, size, ((CGClassScope)fScope.getParent()).getHeapHeaderSize(), fScope.getCells());
+				accToField(scope, size, fScope.getCells());
 			}
 		}
 		else throw new CompileException("Unsupported scope:" + cScope);
 	}
 	
 	@Override
-	public void setHeapReg(CGScope scope, int offset, CGCells cells) throws CompileException {
+	public void setHeapReg(CGScope scope, CGCells cells) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";setHeap " + cells));
-		cellsToRegs(scope, offset, cells, getTempRegs(getCallSize()));
+		cellsToRegs(scope, cells, getTempRegs(getCallSize()));
 		//cellsActionAsm(scope, offset, cells, (int sn, String rOp) -> new CGIAsm("mov " + (0==sn ? "zl" : "zh") + "," + rOp));
 	}
 
@@ -336,14 +326,13 @@ public class Generator extends CodeGenerator {
 			CGVarScope vScope = (CGVarScope)cScope;
 			if(!vScope.isConstant()) {
 				if(VERBOSE_LO <= verbose) scope.append(new CGIText(";var '" + vScope.getName() + "'->accum"));
-				cellsToRegs(scope, vScope.getStackOffset(), vScope.getCells(), getAccRegs(cScope.getSize()));
+				cellsToRegs(scope, vScope.getCells(), getAccRegs(cScope.getSize()));
 			}
 		}
 		else if(cScope instanceof CGFieldScope) {
 			CGFieldScope fScope = (CGFieldScope)cScope;
 			if(VERBOSE_LO <= verbose) scope.append(new CGIText(";field '" + fScope.getName() + "'->accum"));
-			int heapHeaderSize = ((CGClassScope)fScope.getParent()).getHeapHeaderSize();
-			cellsToRegs(scope, heapHeaderSize, fScope.getCells(), getAccRegs(cScope.getSize()));
+			cellsToRegs(scope, fScope.getCells(), getAccRegs(cScope.getSize()));
 		}
 		else throw new CompileException("Unsupported scope:" + cScope);
 	}
@@ -372,7 +361,7 @@ public class Generator extends CodeGenerator {
 		return result;
 	}
 
-	public void cellsToRegs(CGScope scope, int offset, CGCells cells, byte[] registers) throws CompileException {
+	public void cellsToRegs(CGScope scope, CGCells cells, byte[] registers) throws CompileException {
 		switch(cells.getType()) {
 			case REG:
 				LinkedList<Byte> popRegs = new LinkedList<>();
@@ -392,20 +381,16 @@ public class Generator extends CodeGenerator {
 				for(Byte reg : popRegs) scope.append(new CGIAsm("pop r" + reg));
 				break;
 			case STACK_FRAME:
-				int addr = cells.getId(0);
-				boolean needRestoreIReg = Generator.this.moveIReg(scope, 'y', offset+addr, cells.getSize());
+			case ARGS:
 				for(int i=0; i<cells.getSize(); i++) {
-					scope.append(new CGIAsm("ldd r" + registers[i] + ",y+" + (cells.getId(i) + (needRestoreIReg ? -addr : offset))));
+					scope.append(new CGIAsmIReg('y', "ldd r" + registers[i] + ",y+", cells.getId(i), "", getCurBlockScope(scope),
+												(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
 				}
-				if(needRestoreIReg) moveIReg(scope, 'y', offset+addr);
 				break;
 			case HEAP:
-				addr = cells.getId(0);
-				needRestoreIReg = Generator.this.moveIReg(scope, 'z', offset+addr, cells.getSize());
 				for(int i=0; i<cells.getSize(); i++) {
-					scope.append(new CGIAsm("ldd r" + registers[i] + ",z+" + (cells.getId(i) + (needRestoreIReg ? -addr : offset))));
+					scope.append(new CGIAsmIReg('z', "ldd r" + registers[i] + ",z+", cells.getId(i), ""));
 				}
-				if(needRestoreIReg) moveIReg(scope, 'z', offset+addr);
 				break;
 			default:
 				throw new CompileException("Unsupported cell type:" + cells.getType());
@@ -417,33 +402,33 @@ public class Generator extends CodeGenerator {
 	}
 
 	@Override
-	public void constToCells(CGScope scope, int offset, long value, CGCells cells) throws CompileException {
+	public void constToCells(CGScope scope, long value, CGCells cells) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";const '" + value + "'->cells " + cells));
 		switch(cells.getType()) {
 			case REG:
 				for(int i=0; i<cells.getSize(); i++) scope.append(new CGIAsm("ldi r" + cells.getId(i)+ "," + ((value>>(i*8))&0xff)));
 				break;
+			case ARGS:
 			case STACK_FRAME:
-				int addr = cells.getId(0);
-				scope.append(new CGIAsm("push zl"));
-				boolean needRestoreIReg = Generator.this.moveIReg(scope, 'y', offset+addr, cells.getSize());
+				CGIContainer cont = new CGIContainer("ConstToCellByZ");
+				cont.append(new CGIAsm("push zl"));
 				for(int i=0; i<cells.getSize(); i++) {
-					scope.append(new CGIAsm("ldi zl," + ((value>>(i*8))&0xff)));
-					scope.append(new CGIAsm("std y+" + (cells.getId(i) + (needRestoreIReg ? -addr : offset)) + ",zl"));
+					cont.append(new CGIAsm("ldi zl," + ((value>>(i*8))&0xff)));
+					cont.append(new CGIAsmIReg('y', "std y+", cells.getId(i), ",zl", getCurBlockScope(scope), (CGBlockScope)cells.getObject(),
+												CGCells.Type.ARGS == cells.getType()));
 				}
-				scope.append(new CGIAsm("pop zl"));
-				if(needRestoreIReg) moveIReg(scope, 'y', offset+addr);
+				cont.append(new CGIAsm("pop zl"));
+				scope.append(cont);
 				break;
 			case HEAP:
-				addr = cells.getId(0);
-				scope.append(new CGIAsm("push yl"));
-				needRestoreIReg = Generator.this.moveIReg(scope, 'z', offset+addr, cells.getSize());
+				cont = new CGIContainer("ConstToCellByY");
+				cont.append(new CGIAsm("push yl"));
 				for(int i=0; i<cells.getSize(); i++) {
-					scope.append(new CGIAsm("ldi yl," + ((value>>(i*8))&0xff)));
-					scope.append(new CGIAsm("std z+" + (cells.getId(i) + (needRestoreIReg ? -addr : offset)) + ",yl"));
+					cont.append(new CGIAsm("ldi yl," + ((value>>(i*8))&0xff)));
+					cont.append(new CGIAsmIReg('z', "std z+", cells.getId(i), ",yl"));
 				}
-				scope.append(new CGIAsm("pop yl"));
-				if(needRestoreIReg) moveIReg(scope, 'z', offset+addr);
+				cont.append(new CGIAsm("pop yl"));
+				scope.append(cont);
 				break;
 			default:
 				throw new CompileException("Unsupported cell type:" + cells.getType());
@@ -455,11 +440,10 @@ public class Generator extends CodeGenerator {
 	 * @param scope - область видимости для генерации кода
 	 * @param regs - полный набор регистров переменной/поля/аккумулятора
 	 * @param usedRegsQnt - количество действительно используемых регистров, в не используемые будет записан 0x00
-	 * @param offset - смещение в стеке или HEAP'е
 	 * @param cells - ячейки указывающие источник данных
 	 * @throws CompileException
 	 */
-	public void regsToVar(CGScope scope, byte[] regs, int usedRegsQnt, int offset, CGCells cells) throws CompileException {
+	public void regsToVar(CGScope scope, byte[] regs, int usedRegsQnt, CGCells cells) throws CompileException {
 		switch(cells.getType()) {
 			case REG:
 				LinkedList<Byte> popRegs = new LinkedList<>();
@@ -472,20 +456,19 @@ public class Generator extends CodeGenerator {
 						if(pos>i) {
 							scope.append(new CGIAsm("push r" + dstReg));
 							popRegs.addFirst(srcReg);
-							//continue; //TODO прповерить
+							//continue; //TODO проверить
 						}
 						scope.append(new CGIAsm("mov r" + dstReg + ",r" + srcReg));
 					}
 				}
 				for(Byte reg : popRegs) scope.append(new CGIAsm("pop r" + reg));
 				break;
+			case ARGS:
 			case STACK_FRAME:
-				int addr = cells.getId(0);
-				boolean needRestoreIReg = Generator.this.moveIReg(scope, 'y', offset+addr, cells.getSize());
 				for(int i=0; i<cells.getSize(); i++) {
-					scope.append(new CGIAsm("std y+" + (cells.getId(i) + (needRestoreIReg ? -addr : offset)) + ",r" + regs[i]));
+					scope.append(new CGIAsmIReg('y', "std y+", cells.getId(i), ",r" + regs[i], getCurBlockScope(scope),
+												(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
 				}
-				if(needRestoreIReg) moveIReg(scope, 'y', offset+addr);
 				break;
 			default:
 				throw new CompileException("Unsupported cell type:" + cells.getType());
@@ -508,25 +491,23 @@ public class Generator extends CodeGenerator {
 		return -1;
 	}
 
-	public void accToField(CGScope scope, int size, int offset, CGCells cells) {
-		int addr = cells.getId(0);
-		boolean needRestoreIReg = Generator.this.moveIReg(scope, 'z', offset+addr, cells.getSize());
-		
-		scope.append(new CGIAsm("std z+" + (cells.getId(0) + (needRestoreIReg ? -addr : offset)) + ",r16"));
-		if(size>1) scope.append(new CGIAsm("std z+" + (cells.getId(1) + (needRestoreIReg ? -addr : offset)) + ",r17"));
-		if(size>2) scope.append(new CGIAsm("std z+" + (cells.getId(2) + (needRestoreIReg ? -addr : offset)) + ",r18"));
-		if(size>3) scope.append(new CGIAsm("std z+" + (cells.getId(3) + (needRestoreIReg ? -addr : offset)) + ",r19"));
-		
-		if(needRestoreIReg) moveIReg(scope, 'z', offset+addr);
+	public void accToField(CGScope scope, int size, CGCells cells) {
+		scope.append(new CGIAsmIReg('z', "std z+", cells.getId(0), ",r16"));
+		if(size>1) scope.append(new CGIAsmIReg('z', "std z+", cells.getId(1), ",r17"));
+		if(size>2) scope.append(new CGIAsmIReg('z', "std z+", cells.getId(2), ",r18"));
+		if(size>3) scope.append(new CGIAsmIReg('z', "std z+", cells.getId(3), ",r19"));
 	}
 
 	@Override
-	public void pushAccBE(CGScope scope, int size) {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";push accum(BE)"));
+	public CGIContainer pushAccBE(CGScope scope, int size) {
+		CGIContainer result = new CGIContainer();
+		if(VERBOSE_LO <= verbose) result.append(new CGIText(";push accum(BE)"));
 		byte[] regs = getAccRegs(size);
 		for(int i=size-1; i>=0; i--) {
-			scope.append(new CGIAsm("push r" + regs[i]));
+			result.append(new CGIAsm("push r" + regs[i]));
 		}
+		if(null != scope) scope.append(result);
+		return result;
 	}
 	@Override
 	public void popAccBE(CGScope scope, int size) {
@@ -536,27 +517,27 @@ public class Generator extends CodeGenerator {
 	}
 
 	@Override
-	public void emitUnary(CGScope scope, Operator op, int offset, CGCells cells) throws CompileException {
+	public void emitUnary(CGScope scope, Operator op, CGCells cells) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";eUnary " + op + " cells " + cells + " -> accum"));
 		switch(op) {
 			case PLUS:
 				break;
 			case MINUS:
-				cellsActionAsm(scope, offset, cells, (int sn, String reg) -> new CGIAsm("com " + reg));
-				cellsActionAsm(scope, offset, cells, (int sn, String reg) -> new CGIAsm(0 == sn ? "sub " + reg + ",C0x01" : "sbc " + reg + ",C0x00"));
+				cellsActionAsm(scope, cells, (int sn, String reg) -> new CGIAsm("com " + reg));
+				cellsActionAsm(scope, cells, (int sn, String reg) -> new CGIAsm(0 == sn ? "sub " + reg + ",C0x01" : "sbc " + reg + ",C0x00"));
 				break;
 			case BIT_NOT:
-				cellsActionAsm(scope, offset, cells, (int sn, String reg) -> new CGIAsm("com " + reg));
+				cellsActionAsm(scope, cells, (int sn, String reg) -> new CGIAsm("com " + reg));
 			case PRE_INC:
 			case POST_INC:
-				cellsActionAsm(scope, offset, cells, (int sn, String reg) -> new CGIAsm(0 == sn ? "add " + reg + ",C0x01" : "adc " + reg + ",C0x00"));
+				cellsActionAsm(scope, cells, (int sn, String reg) -> new CGIAsm(0 == sn ? "add " + reg + ",C0x01" : "adc " + reg + ",C0x00"));
 				break;
 			case PRE_DEC:
 			case POST_DEC:
-				cellsActionAsm(scope, offset, cells, (int sn, String reg) -> new CGIAsm(0 == sn ? "sub " + reg + ",C0x01" :	"sbc " + reg + ",C0x00"));
+				cellsActionAsm(scope, cells, (int sn, String reg) -> new CGIAsm(0 == sn ? "sub " + reg + ",C0x01" :	"sbc " + reg + ",C0x00"));
 				break;
 			case NOT:
-				cellsActionAsm(scope, offset, cells, (int sn, String reg) -> new CGIAsm("com " + reg));
+				cellsActionAsm(scope, cells, (int sn, String reg) -> new CGIAsm("com " + reg));
 				break;
 			default:
 				throw new CompileException("CG:emitUnary: unsupported operator: " + op);
@@ -566,24 +547,24 @@ public class Generator extends CodeGenerator {
 		
 	// Работаем с аккумулятором!
 	@Override
-	public void cellsAction(CGScope scope, int offset, CGCells cells, Operator op) throws CompileException {
+	public void cellsAction(CGScope scope, CGCells cells, Operator op) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";accum " + op + " cells " + cells + " -> accum"));
 
 		switch(op) {
 			case PLUS:
-				cellsActionAsm(scope, offset, cells, (int sn, String reg) -> new CGIAsm((0 == sn ? "add " : "adc ") + getRightOp(sn, null) + "," + reg));
+				cellsActionAsm(scope, cells, (int sn, String reg) -> new CGIAsm((0 == sn ? "add " : "adc ") + getRightOp(sn, null) + "," + reg));
 				break;
 			case MINUS:
-				cellsActionAsm(scope, offset, cells, (int sn, String reg) -> new CGIAsm((0 == sn ? "sub " : "sbc ") + getRightOp(sn, null) + "," + reg));
+				cellsActionAsm(scope, cells, (int sn, String reg) -> new CGIAsm((0 == sn ? "sub " : "sbc ") + getRightOp(sn, null) + "," + reg));
 				break;
 			case BIT_AND:
-				cellsActionAsm(scope, offset, cells, (int sn, String reg) -> new CGIAsm("and " + getRightOp(sn, null) + "," + reg));
+				cellsActionAsm(scope,  cells, (int sn, String reg) -> new CGIAsm("and " + getRightOp(sn, null) + "," + reg));
 				break;
 			case BIT_OR:
-				cellsActionAsm(scope, offset, cells, (int sn, String reg) -> new CGIAsm("or " + getRightOp(sn, null) + "," + reg));
+				cellsActionAsm(scope,  cells, (int sn, String reg) -> new CGIAsm("or " + getRightOp(sn, null) + "," + reg));
 				break;
 			case BIT_XOR:
-				cellsActionAsm(scope, offset, cells, (int sn, String reg) -> new CGIAsm("eor " + getRightOp(sn, null) + "," + reg));
+				cellsActionAsm(scope,  cells, (int sn, String reg) -> new CGIAsm("eor " + getRightOp(sn, null) + "," + reg));
 				break;
 			default:
 				throw new CompileException("CG:cellsAction: unsupported operator: " + op);
@@ -596,7 +577,7 @@ public class Generator extends CodeGenerator {
 	@Override
 	public void constAction(CGScope scope, Operator op, long k) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";accum " + op + " " + k + " -> accum"));
-		CGIContainer cont = new CGIContainer("constAction:" + op);
+		CGIContainer cont = new CGIContainer();
 		switch(op) {
 			case PLUS:
 				constActionAsm(scope, 0==k?0:~k+1, (int sn, String rOp) -> new CGIAsm((0 == sn ? "subi " : "sbci ") + getRightOp(sn, null) + "," + rOp));
@@ -623,10 +604,10 @@ public class Generator extends CodeGenerator {
 	}
 
 	@Override
-	public void constCond(CGScope scope, int offset, CGCells cells, Operator op, long k, boolean isNot, boolean isOr, CGBranchScope branchScope)
+	public void constCond(CGScope scope, CGCells cells, Operator op, long k, boolean isNot, boolean isOr, CGBranchScope branchScope)
 																																	throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";accum " + op + " " + k + " -> accum (isOr:" + isOr + ", isNot:" + isNot));
-		CGIContainer cont = new CGIContainer("constCondition:" + op);
+		CGIContainer cont = new CGIContainer();
 		
 		if(isNot) { // Инвертируем выражение заменя AND<->OR и инвертируем операторы сравнения
 			isOr = !isOr;
@@ -644,19 +625,6 @@ public class Generator extends CodeGenerator {
 		// Задаем метку на конец блока сравнения байт в мультибайтном значении
 		CGLabelScope lbScope = (0x01 == accum.getSize() ? null : new CGLabelScope(null, null, LabelNames.MULTIBYTE_CP_END, false));
 		
-		Character restoreIReg = null;
-		int addr = 0;
-		if(CGCells.Type.STACK_FRAME == cells.getType() || CGCells.Type.HEAP == cells.getType()) {
-			if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("rcall os_dispatcher_lock"));
-			addr = cells.getId(0);
-			if(CGCells.Type.STACK_FRAME == cells.getType()) {
-				if(Generator.this.moveIReg(scope, 'y', offset+addr, cells.getSize())) restoreIReg = 'y';
-			}
-			else {
-				if(Generator.this.moveIReg(scope, 'z', offset+addr, cells.getSize())) restoreIReg = 'z';
-			}
-		}
-
 		for(int i=accum.getSize()-1; i>=0; i--) {
 			switch(cells.getType()) {
 				case ACC:
@@ -665,12 +633,14 @@ public class Generator extends CodeGenerator {
 				case REG:
 					cont.append(new CGIAsm("cpi r" + cells.getId(i) + "," + ((k>>(i*8))&0xff)));
 					break;
+				case ARGS:
 				case STACK_FRAME:
-					scope.append(new CGIAsm("ldd j8b_atom,y+" + (cells.getId(i) + (null!=restoreIReg ? -addr : offset))));
+					scope.append(new CGIAsmIReg('y', "ldd j8b_atom,y+", cells.getId(i), "", getCurBlockScope(scope), (CGBlockScope)cells.getObject(),
+												CGCells.Type.ARGS == cells.getType()));
 					cont.append(new CGIAsm("cpi j8b_atom," + ((k>>(i*8))&0xff)));
 					break;
 				case HEAP:
-					scope.append(new CGIAsm("ldd j8b_atom,z+" + (cells.getId(i) + (null!=restoreIReg ? -addr : offset))));
+					scope.append(new CGIAsmIReg('z', "ldd j8b_atom,z+",cells.getId(i), ""));
 					cont.append(new CGIAsm("cpi j8b_atom," + ((k>>(i*8))&0xff)));
 					break;
 				default:
@@ -785,11 +755,6 @@ public class Generator extends CodeGenerator {
 				default:
 					throw new CompileException("CG:constAction: unsupported operator: " + op);
 			}
-			
-			if(null != restoreIReg) {
-				moveIReg(scope, restoreIReg, offset+addr);
-				if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("rcall os_dispatcher_unlock"));
-			}
 		}
 		if(0x01 != accum.getSize()) cont.append(lbScope);
 		scope.append(cont);
@@ -807,32 +772,28 @@ public class Generator extends CodeGenerator {
 		return Long.toString((constant>>(sn*8))&0xff);
 	}
 	
-	public void cellsActionAsm(CGScope scope, int offset, CGCells cells, CGActionHandler handler) throws CompileException {
+	public void cellsActionAsm(CGScope scope, CGCells cells, CGActionHandler handler) throws CompileException {
 		switch(cells.getType()) {
 			case REG:
 				for(int i=0; i<cells.getSize(); i++) scope.append(handler.action(i, "r" + cells.getId(i)));
 				break;
+			case ARGS:
 			case STACK_FRAME:
-				int addr = cells.getId(0);
-				boolean needRestoreIReg = Generator.this.moveIReg(scope, 'y', offset+addr, cells.getSize());
 				scope.append(new CGIAsm("push zl"));
 				for(int i=0; i<cells.getSize(); i++) {
-					scope.append(new CGIAsm("ldd zl,y+" + (cells.getId(i) + (needRestoreIReg ? -addr : offset))));
+					scope.append(new CGIAsmIReg('y', "ldd zl,y+", cells.getId(i), "", getCurBlockScope(scope), (CGBlockScope)cells.getObject(),
+												CGCells.Type.ARGS == cells.getType()));
 					scope.append(handler.action(i, "zl"));
 				}
 				scope.append(new CGIAsm("pop zl"));
-				if(needRestoreIReg) moveIReg(scope, 'y', offset+addr);
 				break;
 			case HEAP:
-				addr = cells.getId(0);
-				needRestoreIReg = Generator.this.moveIReg(scope, 'z', offset+addr, cells.getSize());
 				scope.append(new CGIAsm("push yl"));
 				for(int i=0; i<cells.getSize(); i++) {
-					scope.append(new CGIAsm("ldd yl,z+" + (cells.getId(i) + (needRestoreIReg ? -addr : offset))));
+					scope.append(new CGIAsmIReg('z', "ldd yl,z+", cells.getId(i), ""));
 					scope.append(handler.action(i, "yl"));
 				}
 				scope.append(new CGIAsm("pop yl"));
-				if(needRestoreIReg) moveIReg(scope, 'z', offset+addr);
 				break;
 			case STACK:
 				if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) {
@@ -902,11 +863,11 @@ public class Generator extends CodeGenerator {
 		if(0 != types.length || !("getClassTypeId".equals(methodName) || "getClassId".equals(methodName))) {
 			if(0!=types.length || !isInternal) scope.prepend(pushHeapReg(null, isInternal));
 			scope.append(new CGIAsmJump(INSTR_CALL, lbScope));
-			if(def_sph) scope.append(new CGIAsm("lds zl,SREG"));
-			if(def_sph) scope.append(new CGIAsm("cli"));
-			scope.append(new CGIAsm("sts SPL,yl"));
-			if(def_sph) scope.append(new CGIAsm("sts SPH,yh"));
-			if(def_sph) scope.append(new CGIAsm("sts SREG,zl"));
+			int size = 0;
+			for(VarType argType : types) {
+				size += (-1 == argType.getSize() ? getRefSize() : argType.getSize());
+			}
+			if(0 != size) scope.append(blockFree(size));
 			if(0!=types.length || !isInternal) scope.append(popHeapReg(null, isInternal));
 		}
 	}
@@ -917,6 +878,13 @@ public class Generator extends CodeGenerator {
 		scope.append(new CGIAsm("ldi r16," + ifaceType.getId()));
 		scope.append(new CGIAsm("ldi r17," + methodSN));
 		scope.append(new CGIAsmJump(INSTR_CALL, "j8bproc_invoke_method_nr"));
+		int size = 0;
+		for(VarType argType : types) {
+			size += (-1 == argType.getSize() ? getRefSize() : argType.getSize());
+		}
+		if(0 != size) scope.append(blockFree(size));
+		if(0!=types.length) scope.append(popHeapReg(null, false));
+
 	}
 	@Override
 	public void invokeNative(CGScope scope, String className, String methodName, String paramTypes, VarType type, Operand[] ops) throws CompileException {
@@ -991,7 +959,7 @@ public class Generator extends CodeGenerator {
 
 								for(int f=0; f<regs.length;f++) if(!bScope.isFreeReg(regs[f])) scope.append(new CGIAsm("push r"+regs[f]));
 								if(VERBOSE_LO <= verbose) scope.append(new CGIText("\t;load method param"));
-								cellsToRegs(scope, vScope.getStackOffset(), vScope.getCells(), regs);
+								cellsToRegs(scope, vScope.getCells(), regs);
 								for(int f=regs.length-1; f>=0;f--) if(!bScope.isFreeReg(regs[f])) scope.append(new CGIAsm("pop r"+regs[f]));
 							}
 							else {
@@ -1010,7 +978,7 @@ public class Generator extends CodeGenerator {
 //							cells[f] = new CGCellsScope(CGCellsScope.Type.REG, accRegs[f]);
 						}
 						if(VERBOSE_LO <= verbose) scope.append(new CGIText("\t;load method param"));
-						cellsToRegs(scope, 0, new CGCells(CGCells.Type.REG, accRegs), regs);
+						cellsToRegs(scope, new CGCells(CGCells.Type.REG, accRegs), regs);
 						for(int f=regs.length-1; f>=0;f--) if(!bScope.isFreeReg(regs[f])) scope.append(new CGIAsm("pop r"+regs[f]));
 					}
 					else if(OperandType.FLASH_RES == op.getOperandType()) {
@@ -1036,7 +1004,7 @@ public class Generator extends CodeGenerator {
 	}
 	
 	@Override
-	public void updateRefCount(CGScope scope, int offset, CGCells cells, boolean isInc) throws CompileException {
+	public void updateRefCount(CGScope scope, CGCells cells, boolean isInc) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";refCount" + (isInc ? "++" : "--") + " for " + cells));
 	
 		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("rcall os_dispatcher_lock"));
@@ -1053,28 +1021,25 @@ public class Generator extends CodeGenerator {
 					scope.append(new CGIAsm("mov zh,r" + cells.getId(0x01)));
 				}
 				break;
+			case ARGS:
 			case STACK_FRAME:
-				int addr = cells.getId(0);
-				boolean needRestoreIReg = Generator.this.moveIReg(scope, 'y', offset+addr, cells.getSize());
-				scope.append(new CGIAsm("ldd zl,y+" + (cells.getId(0) + (needRestoreIReg ? -addr : offset))));
+				scope.append(new CGIAsmIReg('y', "ldd zl,y+", cells.getId(0), "", getCurBlockScope(scope), (CGBlockScope)cells.getObject(),
+											CGCells.Type.ARGS == cells.getType()));
 				if(0x01 == getRefSize()) {
 					scope.append(new CGIAsm("ldi zh,0x00"));
 				}
 				else {
-					scope.append(new CGIAsm("ldd zh,y+" + (cells.getId(1) + (needRestoreIReg ? -addr : offset))));					
+					scope.append(new CGIAsmIReg('y', "ldd zh,y+", cells.getId(1), ""));
 				}
-				if(needRestoreIReg) moveIReg(scope, 'y', offset+addr);
 				break;
 			case HEAP:
-				addr = cells.getId(0);
-				needRestoreIReg = Generator.this.moveIReg(scope, 'z', offset+addr, cells.getSize());
 				if(0x01 == getRefSize()) {
-					scope.append(new CGIAsm("ldd zl,z+" + (cells.getId(0) + (needRestoreIReg ? -addr : offset))));
+					scope.append(new CGIAsmIReg('z', "ldd zl,z+", cells.getId(0), ""));
 					scope.append(new CGIAsm("ldi zh,0x00"));
 				}
 				else {
-					scope.append(new CGIAsm("ldd j8b_atom,z+" + (cells.getId(0) + (needRestoreIReg ? -addr : offset))));
-					scope.append(new CGIAsm("ldd zh,z+" + (cells.getId(1) + (needRestoreIReg ? -addr : offset))));
+					scope.append(new CGIAsmIReg('z', "ldd j8b_atom,z+", cells.getId(0), ""));
+					scope.append(new CGIAsmIReg('z', "ldd zh,z+", cells.getId(1), ""));
 					scope.append(new CGIAsm("mov zl,j8b_atom"));
 				}
 				break;
@@ -1143,23 +1108,21 @@ public class Generator extends CodeGenerator {
 
 		if(VERBOSE_LO <= verbose) result.append(new CGIText(";return, argsSize:" + argsSize + ", varsSize:" + varsSize + ", retSize:" + retSize));
 		if(0!=varsSize) {
-			result.append(new CGIAsm("subi yl,low(" + varsSize*(-1) + ")"));
-			if(def_sph) result.append(new CGIAsm("sbci yh,high(" + varsSize*(-1) + ")"));
+			result.append(new CGIAsm("pop yh"));
+			result.append(new CGIAsm("pop yl"));
+			result.append(new CGIAsm("ret"));
 		}
-		result.append(new CGIAsm("movw zl,yl")); //TODO проверить смещения
-//		if(0!=argsSize) {
-			argsSize+=2; // Адрес возврата
+		
+/*		if(0!=argsSize) {
+			result.append(new CGIAsm("pop zh"));
+			result.append(new CGIAsm("pop zl"));
 			result.append(new CGIAsm("subi yl,low(" + argsSize*(-1) + ")")); 
 			if(def_sph) result.append(new CGIAsm("sbci yh,high(" + argsSize*(-1) + ")"));
-//		}
-		
-		if(0!=argsSize || 0!=varsSize) {
 			result.append(new CGIAsm("ijmp"));
 		}
 		else {
 			result.append(new CGIAsm("ret"));
-		}
-		
+		}*/
 		
 		if(null != scope) scope.append(result);
 		return result;
@@ -1179,6 +1142,10 @@ public class Generator extends CodeGenerator {
 	@Override
 	public int getCallSize() {
 		return def_call ? 0x02 : 0x01;
+	}
+	@Override
+	public int getCallStackSize() {
+		return 0x02;
 	}
 
 	@Override
@@ -1211,20 +1178,59 @@ public class Generator extends CodeGenerator {
 		return VERSION;
 	}
 
-	public boolean moveIReg(CGScope scope, char iReg, int offset, int size) {
-		if((offset+size) >= 64) {
-			scope.append(new CGIAsm("subi " + iReg + "l,low(-" + offset + ")")); //TODO проверить сложение
-			scope.append(new CGIAsm("sbci " + iReg + "h,high(-" + offset + ")"));
-			return true;
-		}
-		return false;
-	}
 	@Override
-	public CGIContainer moveIReg(CGScope scope, char iReg, int offset) {
-		CGIContainer cont = new CGIContainer();
-		cont.append(new CGIAsm("subi " + iReg + "l,low(" + offset + ")"));
-		cont.append(new CGIAsm("sbci " + iReg + "h,high(" + offset + ")"));
-		if(null != scope) scope.append(cont);
-		return cont;
+	public void normalizeIRegConst(CGMethodScope mScope) {
+		List<CGItem> list = new ArrayList<>();
+		CodeOptimizer.treeToList(mScope, list);
+
+		int yOffset = mScope.getArgsStackSize() + 0x04;
+		int zOffset = 0; //TODO
+		
+		for(CGItem item : list) {
+			if(item instanceof CGIAsmIReg) {
+				CGIAsmIReg instr = (CGIAsmIReg)item;
+				if(!instr.isArg()) {
+					int varsSize=mScope.getArgsStackSize() + 0x04;
+					for(CGBlockScope bScope : mScope.getBlockScopes()) {
+						if(bScope == instr.getVarBlockScope()) break;
+						varsSize += bScope.getVarsStackSize();
+					}
+					instr.setOffset(varsSize + instr.getOffset());
+				}
+			}
+		}
+		for(CGItem item : list) {
+			if(item instanceof CGIAsmIReg) {
+				CGIAsmIReg instr = (CGIAsmIReg)item;
+				if('y'==instr.getIreg()) {
+					int delta = yOffset-instr.getOffset();
+					if(MIN_IREG_OFFSET>delta) {
+						moveIReg(instr.getPrefCont(), 'y', delta-32);
+						yOffset -= (delta-32); 
+					}
+					if(MAX_IREG_OFFSET<delta) {
+						moveIReg(instr.getPrefCont(), 'y', delta-32);
+						yOffset -= (delta-32); 
+					}
+					instr.setOffset(yOffset-instr.getOffset());
+				}
+/*				else { //TODO
+					int delta = instr.getOffset()-zOffset;
+					if(MIN_IREG_OFFSET>delta) {
+						moveIReg(instr.getPrefCont(), 'z', delta);
+						zOffset += delta; 
+					}
+					else if(MAX_IREG_OFFSET<delta) {
+						moveIReg(instr.getPrefCont(), 'z', delta);
+						zOffset += delta; 
+					}
+					instr.setOffset(instr.getOffset()-zOffset);
+				}*/
+			}
+		}
+	}
+	private void moveIReg(CGIContainer cont, char iReg, int offset) {
+		cont.append(new CGIAsm("subi " + iReg + "l,low(" + offset*(-1) + ")"));
+		cont.append(new CGIAsm("sbci " + iReg + "h,high(" + offset*(-1) + ")"));
 	}
 }

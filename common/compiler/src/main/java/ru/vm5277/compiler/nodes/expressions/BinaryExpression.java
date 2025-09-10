@@ -377,10 +377,8 @@ public class BinaryExpression extends ExpressionNode {
 				CGCellsScope cScope = (CGCellsScope)leftExpr.getSymbol().getCGScope();
 				if(VarType.NULL == rightType) {
 					if(null == op) {
-						int offset = (cScope instanceof CGVarScope ?	((CGVarScope)cScope).getStackOffset() :
-																		((CGClassScope)((CGFieldScope)cScope).getParent()).getHeapHeaderSize());
-						cg.constToCells(cgScope, offset, 0x00, cScope.getCells());
-						cg.updateRefCount(cgScope, offset, cScope.getCells(), false);
+						cg.constToCells(cgScope, 0x00, cScope.getCells());
+						cg.updateRefCount(cgScope, cScope.getCells(), false);
 					}
 					else {
 						throw new CompileException("Invalid assignment: cannot use '" + operator.getSymbol() + "' with null value");
@@ -403,14 +401,7 @@ public class BinaryExpression extends ExpressionNode {
 			if(expr1 instanceof LiteralExpression) {
 				expr2.codeGen(cg, false);
 				CGCellsScope cScope = (CGCellsScope)expr2.getSymbol().getCGScope();
-				if(cScope instanceof CGVarScope) {
-					cg.constCond(	cgScope, ((CGVarScope)cScope).getStackOffset(), cScope.getCells(), op,
-									((LiteralExpression)expr1).getNumValue(), isInvert, opOr, (CGBranchScope)brScope);
-				}
-				else {
-					cg.constCond(	cgScope, ((CGClassScope)((CGFieldScope)cScope).getParent()).getHeapHeaderSize(), cScope.getCells(), op,
-									((LiteralExpression)expr1).getNumValue(), isInvert, opOr, (CGBranchScope)brScope);
-				}
+				cg.constCond(cgScope, cScope.getCells(), op, ((LiteralExpression)expr1).getNumValue(), isInvert, opOr, (CGBranchScope)brScope);
 			}
 			else {
 				// Не строим код для expr2(он разместит значение в acc), а нас интересует знaчение в cells(только выполняем зависимость)
@@ -422,12 +413,7 @@ public class BinaryExpression extends ExpressionNode {
 					throw new CompileException("Accum not used for operand:" + expr1);
 				}
 				if(null != op) {
-					if(cScope instanceof CGVarScope) {
-						cg.cellsAction(cgScope, ((CGVarScope)cScope).getStackOffset(), cScope.getCells(), op);
-					}
-					else {
-						cg.cellsAction(cgScope, ((CGClassScope)((CGFieldScope)cScope).getParent()).getHeapHeaderSize(), cScope.getCells(), op);
-					}
+					cg.cellsAction(cgScope, cScope.getCells(), op);
 				}
 			}
 			if(operator.isAssignment()) {
@@ -446,20 +432,13 @@ public class BinaryExpression extends ExpressionNode {
 				if(op.isComparison()) {
 					if(expr1 instanceof BinaryExpression) {
 						expr1.codeGen(cg, true);
-						cg.constCond(	cgScope, 0, new CGCells(CGCells.Type.ACC), op, ((LiteralExpression)expr2).getNumValue(), isInvert, opOr,
+						cg.constCond(	cgScope, new CGCells(CGCells.Type.ACC), op, ((LiteralExpression)expr2).getNumValue(), isInvert, opOr,
 										(CGBranchScope)brScope);
 					}
 					else {
 						expr1.codeGen(cg, false);
 						CGCellsScope cScope = (CGCellsScope)expr1.getSymbol().getCGScope();
-						if(cScope instanceof CGVarScope) {
-							cg.constCond(	cgScope, ((CGVarScope)cScope).getStackOffset(), cScope.getCells(), op,
-											((LiteralExpression)expr2).getNumValue(), isInvert, opOr, (CGBranchScope)brScope);
-						}
-						else {
-							cg.constCond(	cgScope, ((CGClassScope)((CGFieldScope)cScope).getParent()).getHeapHeaderSize(), cScope.getCells(), op,
-											((LiteralExpression)expr2).getNumValue(), isInvert, opOr, (CGBranchScope)brScope);
-						}
+						cg.constCond(cgScope, cScope.getCells(), op, ((LiteralExpression)expr2).getNumValue(), isInvert, opOr, (CGBranchScope)brScope);
 					}
 				}
 				else {
@@ -470,15 +449,7 @@ public class BinaryExpression extends ExpressionNode {
 			if(operator.isAssignment()) {
 				CGCellsScope cScope = (CGCellsScope)expr1.getSymbol().getCGScope();
 				if(Operator.ASSIGN == operator) {
-					if(cScope instanceof CGVarScope) {
-						CGVarScope vScope = (CGVarScope)cScope;
-						cg.constToCells(cgScope, vScope.getStackOffset(), ((LiteralExpression)expr2).getNumValue(), vScope.getCells());
-					}
-					else {
-						CGFieldScope fScope = (CGFieldScope)cScope;
-						cg.constToCells(cgScope, ((CGClassScope)fScope.getParent()).getHeapHeaderSize(), ((LiteralExpression)expr2).getNumValue(),
-										fScope.getCells());
-					}
+					cg.constToCells(cgScope, ((LiteralExpression)expr2).getNumValue(), cScope.getCells());
 				}
 				else {
 					cg.accToCells(cgScope, cScope);
@@ -508,7 +479,7 @@ public class BinaryExpression extends ExpressionNode {
 
 			// Выполняем операцию, левый операнд - аккумулятор, правый операнд - значение на вершине стека
 			if(null != op) {
-				cg.cellsAction(cgScope, 0, new CGCells(CGCells.Type.STACK, size), op);
+				cg.cellsAction(cgScope, new CGCells(CGCells.Type.STACK, size), op);
 			}
 			if(operator.isAssignment()) {
 				// TODO

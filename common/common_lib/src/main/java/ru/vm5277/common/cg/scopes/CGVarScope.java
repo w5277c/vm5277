@@ -22,7 +22,6 @@ import ru.vm5277.common.exceptions.CompileException;
 
 public class CGVarScope extends CGCellsScope {
 	private			boolean		isConstant;
-	private			int			stackOffset;
 	private			CGCells		cells;
 			
 	public CGVarScope(CGScope parent, int resId, VarType type, int size, boolean isConstant, String name) {
@@ -52,13 +51,6 @@ public class CGVarScope extends CGCellsScope {
 	@Override
 	public CGCells getCells() {
 		return cells;
-	}
-	
-	public void setStackOffset(int offset) {
-		this.stackOffset = offset;
-	}
-	public int getStackOffset() {
-		return stackOffset;
 	}
 	
 	public boolean isConstant() {

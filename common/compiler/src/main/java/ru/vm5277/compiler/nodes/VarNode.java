@@ -23,6 +23,7 @@ import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.cg.CGCells;
+import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.VarType;
@@ -34,7 +35,6 @@ import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.nodes.expressions.NewExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
-import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.VarSymbol;
@@ -150,6 +150,8 @@ public class VarNode extends AstNode {
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		try {
+			CGBlockScope bScope = ((CGBlockScope)cg.getScope());
+			
 			symbol.setCGScope(cg.enterLocal(type, (-1 == type.getSize() ? cg.getRefSize() : type.getSize()), VarType.CSTR == type, name));
 			
 			// Проверка инициализации final-полей
@@ -228,13 +230,13 @@ public class VarNode extends AstNode {
 		else {
 			// Инициализация(заполнение нулями необходима только регистрам, остальные проинициализированы вместе с HEAP/STACK)
 			if(null == initializer) {
-				if(CGCells.Type.REG==vScope.getCells().getType()) cg.constToCells(cg.getScope(), vScope.getStackOffset(), 0, vScope.getCells());
+				if(CGCells.Type.REG==vScope.getCells().getType()) cg.constToCells(cg.getScope(), 0, vScope.getCells());
 			}
 			else if(initializer instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
-				cg.constToCells(cg.getScope(), vScope.getStackOffset(), ((LiteralExpression)initializer).getNumValue(), vScope.getCells());
+				cg.constToCells(cg.getScope(), ((LiteralExpression)initializer).getNumValue(), vScope.getCells());
 			}
 			else if(initializer instanceof FieldAccessExpression) {
-				cg.constToCells(cg.getScope(), vScope.getStackOffset(), -1, vScope.getCells());
+				cg.constToCells(cg.getScope(), -1, vScope.getCells());
 				accUsed = true;
 			}
 			else if(initializer instanceof NewExpression) {
@@ -251,7 +253,7 @@ public class VarNode extends AstNode {
 			else {
 				initializer.codeGen(cg);
 				if(VarType.CLASS == vScope.getType()) {
-					cg.updateRefCount(cg.getScope(), vScope.getStackOffset(), vScope.getCells(), true);
+					cg.updateRefCount(cg.getScope(), vScope.getCells(), true);
 				}
 				cg.accToCells(cg.getScope(), vScope);
 				accUsed = true;

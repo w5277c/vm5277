@@ -189,14 +189,7 @@ public class UnaryExpression extends ExpressionNode {
 			else {
 				((VarFieldExpression)operand).codeGen(cg, false);
 				CGCellsScope cScope = (CGCellsScope)operand.getSymbol().getCGScope();
-				int offset;
-				if(cScope instanceof CGVarScope) {
-					offset = ((CGVarScope)cScope).getStackOffset();
-				}
-				else {
-					offset = ((CGClassScope)((CGFieldScope)cScope).getParent()).getHeapHeaderSize();
-				}
-				cg.emitUnary(cgScope, operator, offset, cScope.getCells());
+				cg.emitUnary(cgScope, operator, cScope.getCells());
 			}
 		}
 		else if(operand instanceof UnaryExpression) {

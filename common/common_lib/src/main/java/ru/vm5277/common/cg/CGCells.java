@@ -22,6 +22,7 @@ public class CGCells {
 		REG,			//регистры
 		ACC,			//как и регистры, но ids и size не заполнены
 		STACK_FRAME,	//блок памяти выделенный в стеке
+		ARGS,			//аргументы метода, лежащие в начале стека(размер STACK_FRAME известен только на финальном этапе построения кода метода)
 		STAT,			//глобальный блок памяти выделенный под статические переменные
 		HEAP,			//блок памяти выделенный в инстансе класса
 		STACK;			//значение лежащее на вершине стека
@@ -32,7 +33,7 @@ public class CGCells {
 	private	Type	type;
 	private	int[]	ids;
 	private	int		size;
-	private	String	label;
+	private	Object	obj;
 	private	boolean	isRef;
 	
 	public CGCells(Type type) {
@@ -83,8 +84,11 @@ public class CGCells {
 		return size;
 	}
 	
-	public String getLabel() {
-		return label;
+	public void setObject(Object obj) {
+		this.obj = obj;
+	}
+	public Object getObject() {
+		return obj;
 	}
 	
 	@Override

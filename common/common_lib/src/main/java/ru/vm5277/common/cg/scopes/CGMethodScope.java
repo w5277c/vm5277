@@ -17,11 +17,13 @@ package ru.vm5277.common.cg.scopes;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.CodeOptimizer;
 import ru.vm5277.common.cg.RegPair;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGIText;
@@ -34,10 +36,12 @@ import ru.vm5277.common.exceptions.CompileException;
 public class CGMethodScope extends CGScope {
 	private	final	CGLabelScope				lbScope;
 	private			CGLabelScope				lbCIScope;
+	private	final	List<CGBlockScope>			blockScopes = new ArrayList<>();
 	private	final	Map<Integer, CGVarScope>	args		= new HashMap<>();
 	private	final	VarType						type;
 	private	final	VarType[]					types;
 	private	final	String						signature;
+	private			int							argsStackSize;
 	private			int							stackOffset	= 0;
 	private			int							callSize;
 	private	final	ArrayList<RegPair>			regsPool;	// Свободные регистры, true = cвободен
@@ -56,6 +60,8 @@ public class CGMethodScope extends CGScope {
 		if(null != types) {
 			for (VarType _type : types) {
 				sb.append(_type.getName()).append(",");
+				int typeSize = _type.getSize();
+				argsStackSize += (-1 == typeSize ? cg.getRefSize() : typeSize);
 			}
 			if (0!=types.length) {
 				sb.setLength(sb.length() - 1); // Удаляем последнюю запятую
@@ -94,14 +100,18 @@ public class CGMethodScope extends CGScope {
 		}
 		prepend(cont);
 		
+		cg.normalizeIRegConst(this);
+		
 //		append(cg.eReturn(null, null == type ? 0x00 : type.getSize(), stackOffset));
 		if(VERBOSE_LO <= verbose) append(new CGIText(";method end"));
 	}
 	
 	//Выделение ячеек для переданных параметров (только стек)
 	public CGCells argAllocate(int size) throws CompileException {
+//		stackOffset+=size;
+//		CGCells cells = new CGCells(CGCells.Type.STACK_FRAME, size, types.length-stackOffset);
+		CGCells cells = new CGCells(CGCells.Type.ARGS, size, stackOffset);
 		stackOffset+=size;
-		CGCells cells = new CGCells(CGCells.Type.STACK_FRAME, size, types.length-stackOffset);
 		return cells;
 	}
 	
@@ -161,11 +171,6 @@ public class CGMethodScope extends CGScope {
 		}
 		return null;
 	}
-
-	public int getFiledsSize() {
-		//TODO
-		return 0;
-	}
 	
 	public boolean isFreeReg(byte reg) {
 		RegPair regPair = getReg(reg);
@@ -199,6 +204,10 @@ public class CGMethodScope extends CGScope {
 		return isUsed;
 	}
 	
+	public int getArgsStackSize() {
+		return argsStackSize;
+	}
+	
 	@Override
 	public String toString() {
 		return (null==type ? "constructor" : "method " + type) + " '" + getPath('.') +  "(" + StrUtils.toString(types) + ")";
@@ -207,5 +216,12 @@ public class CGMethodScope extends CGScope {
 	@Override
 	public String getLName() {
 		return "M" + name;
+	}
+
+	public void addBlockScope(CGBlockScope bScope) {
+		this.blockScopes.add(bScope);
+	}
+	public List<CGBlockScope> getBlockScopes() {
+		return blockScopes;
 	}
 }

@@ -167,7 +167,7 @@ public class VarType {
 		}
 	}
 	
-	public int getSize() throws CompileException {
+	public int getSize() {
 		if (this == VOID) return 0;
 		if (this == BOOL) return 1;
 		if (this == BYTE) return 1;

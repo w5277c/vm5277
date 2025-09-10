@@ -17,7 +17,6 @@ package ru.vm5277.common.cg.items;
 
 import java.util.ArrayList;
 import java.util.List;
-import ru.vm5277.common.cg.scopes.CGClassScope;
 
 public class CGIContainer extends CGItem {
 	private	final	List<CGItem>	items	= new ArrayList<>();
@@ -28,6 +27,7 @@ public class CGIContainer extends CGItem {
 		tag = "";
 	}
 	
+	// Если указан тег, то оптимизатор будет рассматривать контейнер как единое целое(раскрытие вложенностей в список производиться не будет)
 	public CGIContainer(String tag) {
 		this.tag = tag;
 	}
@@ -58,13 +58,24 @@ public class CGIContainer extends CGItem {
 		return items;
 	}
 	
+	public boolean isEMpty() {
+		return items.isEmpty();
+	}
+	
 	@Override
 	public String getSource() {
 		StringBuilder sb = new StringBuilder();
 		
 		for(CGItem item : items) {
 			if(!item.isDisabled()) {
-				sb.append(item.getSource());
+				if(item instanceof CGIAsmIReg) {
+					sb.append(((CGIAsmIReg)item).getPrefCont().getSource());
+					sb.append(item.getSource());
+					sb.append(((CGIAsmIReg)item).getPostCont().getSource());
+				}
+				else {
+					sb.append(item.getSource());
+				}
 			}
 		}
 
