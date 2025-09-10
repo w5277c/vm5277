@@ -54,9 +54,11 @@ import ru.vm5277.common.cg.RegPair;
 import ru.vm5277.common.cg.items.CGIAsmIReg;
 import ru.vm5277.common.cg.items.CGIAsmJump;
 import ru.vm5277.common.cg.items.CGIAsmLdLabel;
+import ru.vm5277.common.cg.items.CGIConstrInit;
 import ru.vm5277.common.cg.items.CGItem;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGBranchScope;
+import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGMethodScope;
@@ -68,20 +70,24 @@ import ru.vm5277.common.exceptions.CompileException;
 // этой задачей лучше, а кодогенератор может ему помешать.
 
 public class Generator extends CodeGenerator {
-	private	final	static	String				VERSION		= "0.1";
-	//private	final	static	byte[]				usableRegs	= new byte[]{20,21,22,23,24,25,26,27,   19,18,17}; //Используем регистры
-	private	final	static	byte[]				usableRegs	= new byte[]{}; 	//Без регистров для локальных переменных
+	private	final	static	String				VERSION				= "0.1";
+	private	final	static	byte[]				usableRegs			= new byte[]{20,21,22,23,24,25,26,27,   19,18,17}; //Используем регистры
+	//private	final	static	byte[]				usableRegs	= new byte[]{}; 	//Без регистров для локальных переменных
 	//private	final	static	byte[]				usableRegs	= new byte[]{20}; 	//С одним регистром
 	//private	final	static	byte[]				usableRegs	= new byte[]{20,21,22,23}; 	//С 4 регистрами
-	private	final	static	boolean				def_sph		= true; // TODO генератор avr должен знать характеристики МК(чтобы не писать асм код с .ifdef)
-	private	final	static	boolean				def_call	= true; // TODO генератор avr должен знать характеристики МК(чтобы не писать асм код с .ifdef)
-	private	final	static	String				INSTR_JUMP	= "rjmp";
-	private	final	static	String				INSTR_CALL	= "rcall";
-	private	final	static	int					MIN_IREG_OFFSET	= 0;
-	private	final	static	int					MAX_IREG_OFFSET	= 63;
+	private	final	static	boolean				def_sph				= true; // TODO генератор avr должен знать характеристики МК(чтобы не писать асм код с .ifdef)
+	private	final	static	boolean				def_call			= true; // TODO генератор avr должен знать характеристики МК(чтобы не писать асм код с .ifdef)
+	private	final	static	String				INSTR_JUMP			= "rjmp";
+	private	final	static	String				INSTR_CALL			= "rcall";
+	private	final	static	int					MIN_IREG_OFFSET		= 0;
+	private	final	static	int					MAX_IREG_OFFSET		= 63;
+	private	final			int					refSize;
 	
 	public Generator(String platform, Map<String, NativeBinding> nbMap, Map<SystemParam, Object> params) {
 		super(platform, nbMap, params);
+		
+		refSize = 0x02; //TODO для МК с памятью <= 256 нужно возвращать 0x01;
+		CLASS_HEADER_SIZE = (0x02==refSize ? 0x05 : 0x04);
 		
 		optimizer = new Optimizer();
 		// Собираем RTOS
@@ -344,6 +350,13 @@ public class Generator extends CodeGenerator {
 		if(null != scope) scope.append(result);
 		return result;
 	}
+	@Override
+	public CGIContainer call(CGScope scope, CGLabelScope lScope) throws CompileException {
+		CGIContainer result = new CGIContainer();
+		result.append(new CGIAsmJump(INSTR_CALL, lScope));
+		if(null != scope) scope.append(result);
+		return result;
+	}
 
 	@Override
 	public CGIContainer accCast(CGScope scope, int size) throws CompileException {
@@ -402,37 +415,39 @@ public class Generator extends CodeGenerator {
 	}
 
 	@Override
-	public void constToCells(CGScope scope, long value, CGCells cells) throws CompileException {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";const '" + value + "'->cells " + cells));
+	public CGIContainer constToCells(CGScope scope, long value, CGCells cells) throws CompileException {
+		CGIContainer cont = new CGIContainer();
+		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";const '" + value + "'->cells " + cells));
 		switch(cells.getType()) {
 			case REG:
-				for(int i=0; i<cells.getSize(); i++) scope.append(new CGIAsm("ldi r" + cells.getId(i)+ "," + ((value>>(i*8))&0xff)));
+				for(int i=0; i<cells.getSize(); i++) cont.append(new CGIAsm("ldi r" + cells.getId(i)+ "," + ((value>>(i*8))&0xff)));
 				break;
 			case ARGS:
 			case STACK_FRAME:
-				CGIContainer cont = new CGIContainer("ConstToCellByZ");
-				cont.append(new CGIAsm("push zl"));
+				CGIContainer _cont = new CGIContainer();
+				//cont.append(new CGIAsm("push zl")); //Похоже эта опреация не используется в обработке выражений, а значит r16 свободен
 				for(int i=0; i<cells.getSize(); i++) {
-					cont.append(new CGIAsm("ldi zl," + ((value>>(i*8))&0xff)));
-					cont.append(new CGIAsmIReg('y', "std y+", cells.getId(i), ",zl", getCurBlockScope(scope), (CGBlockScope)cells.getObject(),
+					_cont.append(new CGIAsm("ldi r16," + ((value>>(i*8))&0xff)));
+					_cont.append(new CGIAsmIReg('y', "std y+", cells.getId(i), ",r16", getCurBlockScope(scope), (CGBlockScope)cells.getObject(),
 												CGCells.Type.ARGS == cells.getType()));
 				}
-				cont.append(new CGIAsm("pop zl"));
-				scope.append(cont);
+				//cont.append(new CGIAsm("pop zl"));
+				cont.append(_cont);
 				break;
 			case HEAP:
-				cont = new CGIContainer("ConstToCellByY");
-				cont.append(new CGIAsm("push yl"));
+				_cont = new CGIContainer();
+				//cont.append(new CGIAsm("push yl")); //Похоже эта опреация не используется в обработке выражений, а значит r16 свободен
 				for(int i=0; i<cells.getSize(); i++) {
-					cont.append(new CGIAsm("ldi yl," + ((value>>(i*8))&0xff)));
-					cont.append(new CGIAsmIReg('z', "std z+", cells.getId(i), ",yl"));
+					_cont.append(new CGIAsm("ldi r16," + ((value>>(i*8))&0xff)));
+					_cont.append(new CGIAsmIReg('z', "std z+", cells.getId(i), ",r16"));
 				}
-				cont.append(new CGIAsm("pop yl"));
-				scope.append(cont);
+				//cont.append(new CGIAsm("pop yl"));
+				cont.append(_cont);
 				break;
 			default:
 				throw new CompileException("Unsupported cell type:" + cells.getType());
 		}
+		return cont;
 	}
 
 	/**
@@ -823,12 +838,12 @@ public class Generator extends CodeGenerator {
 
 	// TODO Лучше вынести данный код в виде RTOS функции.
 	@Override
-	public CGIContainer eNewInstance(int size, CGLabelScope iidLabel, VarType type, boolean launchPoint, boolean canThrow) throws CompileException {
+	public CGIContainer eNewInstance(int heapSize, CGLabelScope iidLabel, VarType type, boolean launchPoint, boolean canThrow) throws CompileException {
 		CGIContainer result = new CGIContainer();
-		if(VERBOSE_LO <= verbose) result.append(new CGIText(launchPoint ? ";Launch " : (";eNewInstance '" + type + "', heap size:" + size)));
-		RTOSFeatures.add(RTOSFeature.OS_FT_DRAM); //TODO сейчас реализуется классвовая модель, но что если нужно собрать просто функцию?
-		result.append(new CGIAsm("ldi r16," + (size&0xff)));
-		if(0x02==getRefSize()) result.append(new CGIAsm("ldi r17," + ((size>>0x08)&0xff)));
+		if(VERBOSE_LO <= verbose) result.append(new CGIText(launchPoint ? ";Launch " : (";eNewInstance '" + type + "', heap size:" + heapSize)));
+		RTOSFeatures.add(RTOSFeature.OS_FT_DRAM);
+		result.append(new CGIAsm("ldi r16,low(" + heapSize + ")"));
+		result.append(new CGIAsm("ldi r17,high(" + heapSize + ")"));
 		result.append(new CGIAsm("rcall os_dram_alloc"));
 		int offset=0;
 		result.append(new CGIAsm("std z+" + offset++ +",r16"));
@@ -843,14 +858,13 @@ public class Generator extends CodeGenerator {
 		result.append(new CGIAsmLdLabel("ldi r16,high", iidLabel.getName(), "*2"));
 		result.append(new CGIAsm("std z+" + offset++ +",r16"));
 
-		int stackFrameSize = size-offset;
-		if(0x00!=stackFrameSize) {
+		if(CLASS_HEADER_SIZE!=heapSize) {
 			RTOSLibs.CLEAR_FIELDS.setRequired();
 			result.append(new CGIAsm("rcall j8bproc_clear_fields_nr"));
 		}
 		return result;
 	}
-
+	
 	@Override
 	public void eFree(Operand op) {
 		throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody
@@ -1110,8 +1124,8 @@ public class Generator extends CodeGenerator {
 		if(0!=varsSize) {
 			result.append(new CGIAsm("pop yh"));
 			result.append(new CGIAsm("pop yl"));
-			result.append(new CGIAsm("ret"));
 		}
+		result.append(new CGIAsm("ret"));
 		
 /*		if(0!=argsSize) {
 			result.append(new CGIAsm("pop zh"));
@@ -1135,8 +1149,7 @@ public class Generator extends CodeGenerator {
 	
 	@Override
 	public int getRefSize() {
-		return 0x02;
-		//TODO для МК с памятью <= 256 нужно возвращать 0x01;
+		return refSize;
 	}
 	
 	@Override
@@ -1181,15 +1194,15 @@ public class Generator extends CodeGenerator {
 	@Override
 	public void normalizeIRegConst(CGMethodScope mScope) {
 		List<CGItem> list = new ArrayList<>();
-		CodeOptimizer.treeToList(mScope, list);
+		treeToList(mScope, list);
 
 		int yOffset = mScope.getArgsStackSize() + 0x04;
-		int zOffset = 0; //TODO
+		int zOffset = 0;
 		
 		for(CGItem item : list) {
 			if(item instanceof CGIAsmIReg) {
 				CGIAsmIReg instr = (CGIAsmIReg)item;
-				if(!instr.isArg()) {
+				if(!instr.isArg() && 'y'==instr.getIreg()) {
 					int varsSize=mScope.getArgsStackSize() + 0x04;
 					for(CGBlockScope bScope : mScope.getBlockScopes()) {
 						if(bScope == instr.getVarBlockScope()) break;
@@ -1205,27 +1218,27 @@ public class Generator extends CodeGenerator {
 				if('y'==instr.getIreg()) {
 					int delta = yOffset-instr.getOffset();
 					if(MIN_IREG_OFFSET>delta) {
-						moveIReg(instr.getPrefCont(), 'y', delta-32);
+						moveIReg(instr.getPrefCont(), instr.getIreg(), delta-32);
 						yOffset -= (delta-32); 
 					}
 					if(MAX_IREG_OFFSET<delta) {
-						moveIReg(instr.getPrefCont(), 'y', delta-32);
+						moveIReg(instr.getPrefCont(), instr.getIreg(), delta-32);
 						yOffset -= (delta-32); 
 					}
 					instr.setOffset(yOffset-instr.getOffset());
 				}
-/*				else { //TODO
+				else {
 					int delta = instr.getOffset()-zOffset;
 					if(MIN_IREG_OFFSET>delta) {
-						moveIReg(instr.getPrefCont(), 'z', delta);
-						zOffset += delta; 
+						moveIReg(instr.getPrefCont(), instr.getIreg(), delta-32);
+						yOffset += (delta-32); 
 					}
-					else if(MAX_IREG_OFFSET<delta) {
-						moveIReg(instr.getPrefCont(), 'z', delta);
-						zOffset += delta; 
+					if(MAX_IREG_OFFSET<delta) {
+						moveIReg(instr.getPrefCont(), instr.getIreg(), delta+32);
+						yOffset += (delta+32);
 					}
 					instr.setOffset(instr.getOffset()-zOffset);
-				}*/
+				}
 			}
 		}
 	}

@@ -377,7 +377,7 @@ public class BinaryExpression extends ExpressionNode {
 				CGCellsScope cScope = (CGCellsScope)leftExpr.getSymbol().getCGScope();
 				if(VarType.NULL == rightType) {
 					if(null == op) {
-						cg.constToCells(cgScope, 0x00, cScope.getCells());
+						cgScope.append(cg.constToCells(cgScope, 0x00, cScope.getCells()));
 						cg.updateRefCount(cgScope, cScope.getCells(), false);
 					}
 					else {
@@ -385,10 +385,15 @@ public class BinaryExpression extends ExpressionNode {
 					}
 				}
 				else {
-					if (CodegenResult.RESULT_IN_ACCUM != rightExpr.codeGen(cg)) {
-						throw new CompileException("Accum not used for operand:" + rightExpr);
+					if(rightExpr instanceof LiteralExpression) {
+						cgScope.append(cg.constToCells(cgScope, ((LiteralExpression)rightExpr).getNumValue(), cScope.getCells()));
 					}
-					cg.accToCells(cgScope, cScope);
+					else {
+						if (CodegenResult.RESULT_IN_ACCUM != rightExpr.codeGen(cg)) {
+							throw new CompileException("Accum not used for operand:" + rightExpr);
+						}
+						cg.accToCells(cgScope, cScope);
+					}
 				}
 			}
 			else {
@@ -449,7 +454,7 @@ public class BinaryExpression extends ExpressionNode {
 			if(operator.isAssignment()) {
 				CGCellsScope cScope = (CGCellsScope)expr1.getSymbol().getCGScope();
 				if(Operator.ASSIGN == operator) {
-					cg.constToCells(cgScope, ((LiteralExpression)expr2).getNumValue(), cScope.getCells());
+					cgScope.append(cg.constToCells(cgScope, ((LiteralExpression)expr2).getNumValue(), cScope.getCells()));
 				}
 				else {
 					cg.accToCells(cgScope, cScope);

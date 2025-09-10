@@ -230,13 +230,13 @@ public class VarNode extends AstNode {
 		else {
 			// Инициализация(заполнение нулями необходима только регистрам, остальные проинициализированы вместе с HEAP/STACK)
 			if(null == initializer) {
-				if(CGCells.Type.REG==vScope.getCells().getType()) cg.constToCells(cg.getScope(), 0, vScope.getCells());
+				if(CGCells.Type.REG==vScope.getCells().getType()) cg.getScope().append(cg.constToCells(cg.getScope(), 0, vScope.getCells()));
 			}
 			else if(initializer instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
-				cg.constToCells(cg.getScope(), ((LiteralExpression)initializer).getNumValue(), vScope.getCells());
+				cg.getScope().append(cg.constToCells(cg.getScope(), ((LiteralExpression)initializer).getNumValue(), vScope.getCells()));
 			}
 			else if(initializer instanceof FieldAccessExpression) {
-				cg.constToCells(cg.getScope(), -1, vScope.getCells());
+				cg.getScope().append(cg.constToCells(cg.getScope(), -1, vScope.getCells()));
 				accUsed = true;
 			}
 			else if(initializer instanceof NewExpression) {

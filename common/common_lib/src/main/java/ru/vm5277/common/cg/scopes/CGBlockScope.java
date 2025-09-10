@@ -100,7 +100,7 @@ public class CGBlockScope extends CGScope {
 		}*/
 
 		if(isFirstBlock) {
-			append(cg.eReturn(null, mScope.getStackSize(), stackOffset, mScope.getType().getSize()));
+			append(cg.eReturn(null, mScope.getStackSize(), stackOffset, (null==mScope.getType() ? 0x00 : mScope.getType().getSize())));
 		}
 		
 		CodeOptimizer co = cg.getOptimizer();

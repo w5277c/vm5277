@@ -28,5 +28,6 @@ public class LabelNames {
 	public	static	String	CONSTR_INIT			= PREFIX + "cinit";
 	public	static	String	LOCGIC_END			= PREFIX + "eolb";
 	public	static	String	LOCGIC_NOT_END		= PREFIX + "eonlb";
+	public	static	String	FIELDS_INIT			= PREFIX + "finit";
 	
 }

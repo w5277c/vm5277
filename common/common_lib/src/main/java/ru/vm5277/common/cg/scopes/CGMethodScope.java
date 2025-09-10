@@ -25,6 +25,7 @@ import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.CodeOptimizer;
 import ru.vm5277.common.cg.RegPair;
+import ru.vm5277.common.cg.items.CGIConstrInit;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.compiler.VarType;
@@ -43,9 +44,9 @@ public class CGMethodScope extends CGScope {
 	private	final	String						signature;
 	private			int							argsStackSize;
 	private			int							stackOffset	= 0;
-	private			int							callSize;
 	private	final	ArrayList<RegPair>			regsPool;	// Свободные регистры, true = cвободен
 	private			boolean						isUsed;
+	private			CGIContainer				fieldsInitCallCont;
 	
 	public CGMethodScope(CodeGenerator cg, CGClassScope parent, int resId, VarType type, VarType[] types, String name, ArrayList<RegPair> regsPool) {
 		super(parent, resId, name);
@@ -53,7 +54,6 @@ public class CGMethodScope extends CGScope {
 		this.type = type;
 		this.types = types;
 		this.regsPool = regsPool;
-		this.callSize = cg.getCallSize();
 		
 		StringBuilder sb = new StringBuilder();
 		sb.append(name).append("(");
@@ -95,8 +95,13 @@ public class CGMethodScope extends CGScope {
 		
 		CGClassScope cScope = (CGClassScope)parent;
 		if(null == type) {
-			cont.append(cg.eNewInstance(cScope.getHeapHeaderSize()+cScope.getHeapOffset(), cScope.getIIDLabel(), cScope.getType(), false, false));
+			//cont.append(cg.eNewInstance(cScope.getHeapOffset(), cScope.getIIDLabel(), cScope.getType(), false, false));
+			CGIConstrInit contrInit = new CGIConstrInit(this);
+			cont.append(contrInit);
+			cont.append(contrInit.getCont());
 			cont.append(lbCIScope);
+			fieldsInitCallCont = cg.call(null, cScope.getFieldInitLabel());
+			cont.append(fieldsInitCallCont);
 		}
 		prepend(cont);
 		
@@ -223,5 +228,9 @@ public class CGMethodScope extends CGScope {
 	}
 	public List<CGBlockScope> getBlockScopes() {
 		return blockScopes;
+	}
+	
+	public CGIContainer getFieldInitCallCont() {
+		return fieldsInitCallCont;
 	}
 }

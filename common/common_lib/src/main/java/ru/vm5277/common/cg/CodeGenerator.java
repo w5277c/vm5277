@@ -45,6 +45,7 @@ import ru.vm5277.common.compiler.Case;
 import static ru.vm5277.common.cg.OperandType.LITERAL;
 import ru.vm5277.common.cg.items.CGIAsm;
 import ru.vm5277.common.cg.items.CGIAsmJump;
+import ru.vm5277.common.cg.items.CGIConstrInit;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.scopes.CGCommandScope;
 import ru.vm5277.common.cg.scopes.CGBranchScope;
@@ -62,6 +63,7 @@ public abstract class CodeGenerator extends CGScope {
 	protected	static	final	Map<Integer, DataSymbol>	flashData			= new HashMap<>();
 	protected					CGScope						scope				= null;
 	protected	final			CGAccum						accum				= new CGAccum();
+	public				static	int							CLASS_HEADER_SIZE;
 	
 	public CodeGenerator(String platform, Map<String, NativeBinding> nbMap, Map<SystemParam, Object> params) {
 		this.platform = platform;
@@ -201,13 +203,14 @@ public abstract class CodeGenerator extends CGScope {
 	}
 
 	public abstract CGIContainer jump(CGScope scope, CGLabelScope lScope) throws CompileException;
+	public abstract CGIContainer call(CGScope scope, CGLabelScope lScope) throws CompileException;
 	public abstract CGIContainer accCast(CGScope scope, int size) throws CompileException;
 	public abstract void cellsToAcc(CGScope scope, CGCellsScope cScope) throws CompileException;
 	public abstract void accToCells(CGScope scope, CGCellsScope cScope) throws CompileException;
 //	public abstract void retToCells(CGScope scope, CGCellsScope cScope) throws CompileException;
 	public abstract void setHeapReg(CGScope scope, CGCells cells) throws CompileException;
 	public abstract void constToAcc(CGScope scope, int size, long value);
-	public abstract void constToCells(CGScope scope, long value, CGCells cells) throws CompileException;
+	public abstract CGIContainer constToCells(CGScope scope, long value, CGCells cells) throws CompileException;
 	public abstract void cellsAction(CGScope scope, CGCells cells, Operator op) throws CompileException;
 	public abstract void constAction(CGScope scope, Operator op, long k) throws CompileException;
 	public abstract void constCond(CGScope scope, CGCells cells, Operator op, long k, boolean isNot, boolean isOr, CGBranchScope condScope) throws CompileException;
@@ -230,7 +233,7 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract void emitUnary(CGScope scope, Operator op, CGCells cells) throws CompileException;
 	
 	//TODO набор методов для реализации команд if, switch, for, loop и .т.д
-	public abstract CGIContainer eNewInstance(int size, CGLabelScope iidLabel, VarType type, boolean launchPoint, boolean canThrow) throws CompileException;
+	public abstract CGIContainer eNewInstance(int fieldsSize, CGLabelScope iidLabel, VarType type, boolean launchPoint, boolean canThrow) throws CompileException;
 	public abstract void eFree(Operand op);
 	public abstract void eIf(CGBranchScope labelsScope, CGScope condScope, CGBlockScope thenBlock, CGBlockScope elseBlock) throws CompileException;
 	public abstract void eTry(CGBlockScope blockScope, List<Case> cases, CGBlockScope defaultBlockScope);
@@ -273,6 +276,18 @@ public abstract class CodeGenerator extends CGScope {
 	
 	public void build(VarType classType, int fieldsSize) throws CompileException {
 		append(new CGIText("; vm5277." + platform + " v" + getVersion() + " at " + new Date().toString()));
+		
+		// Во время кодогенерации не знаем какие поля будут использованы в итоге, поэтому размер HEAP можно вычислить только здесь.
+		List<CGItem> list = new ArrayList<>();
+		//TODO не оптимально
+		treeToList(scope, list);
+		for(CGItem item : list) {
+			if(item instanceof CGIConstrInit) {
+				CGIConstrInit constrInit = (CGIConstrInit)item;
+				CGClassScope cScope = (CGClassScope)constrInit.getMScope().getParent();
+				constrInit.getCont().append(eNewInstance(cScope.getHeapOffset(), cScope.getIIDLabel(), cScope.getType(), false, false));
+			}
+		}
 		
 		// Ниже используется eNew, поэтому всегда необходим RTOSFeature.OS_FT_DRAM
 		RTOSFeatures.add(RTOSFeature.OS_FT_DRAM);
@@ -380,6 +395,31 @@ public abstract class CodeGenerator extends CGScope {
 	//	labels.put(lbScope.getResId(), lbScope);
 	//}
 	
-	
-
+	public static void treeToList(CGIContainer cont, List<CGItem> list) {
+		treeToList(cont, list, null);
+	}
+	public static void treeToList(CGIContainer cont, List<CGItem> list, String ignoreScanTag) {
+		for(CGItem item : cont.getItems()) {
+			if(item.isDisabled()) continue;
+			
+			if(item instanceof CGLabelScope) {
+				list.add(item);
+			}
+			else if(item instanceof CGIContainer) {
+				if(null != ignoreScanTag && ignoreScanTag.equalsIgnoreCase(((CGIContainer)item).getTag())) {
+					// Пропускаем анализ вложенности для контейнеров с тегом(контейнер должен рассматриваться как единое целое)
+					list.add(item);
+				}
+				else {
+					//TODO убрал if(((CGIContainer)item).getItems().isEmpty()) { list.add(item); ... добавлял мусор типа CGExpressionScope, возможно что-то поломал
+					if(!((CGIContainer)item).getItems().isEmpty()) {
+						treeToList((CGIContainer)item, list, ignoreScanTag);
+					}
+				}
+			}
+			else {
+				list.add(item);
+			}
+		}
+	}
 }

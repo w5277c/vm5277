@@ -29,28 +29,34 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class CGClassScope extends CGScope {
+	private	final	CodeGenerator				cg;
 	private	final	VarType						type;
 	private	final	List<ImplementInfo>			impl;
 	private	final	Map<Integer, CGFieldScope>	fields			= new HashMap<>();
 	private	final	Map<String, CGMethodScope>	methods			= new HashMap<>();
-	private			int							filedsOffset	= 0;
+	private			int							fieldsOffset	= 0;
 	private	final	boolean						isImported;
-	private			int							heapHeaderSize;
+	private			CGLabelScope				lbFiledsInitScope;
 	private			CGLabelScope				lbIIDSScope;
 	private			CGIContainer				cont			= new CGIContainer();
+	private			CGIContainer				fieldsInitCont	= new CGIContainer();
 	
 	public CGClassScope(CodeGenerator cg, CGScope parent, int id, VarType type, String name, List<ImplementInfo> impl, boolean isRoot) {
 		super(parent, id, name);
 		
+		this.cg = cg;
 		this.type = type;
 		this.impl = impl;
 		this.isImported = isRoot;
 		
+		fieldsOffset = CodeGenerator.CLASS_HEADER_SIZE;
+		
+		lbFiledsInitScope = new CGLabelScope(null, null, LabelNames.FIELDS_INIT, true);
+		fieldsInitCont.append(lbFiledsInitScope);
 		lbIIDSScope = new CGLabelScope(null, null, LabelNames.META, true);
 		
 		Collections.sort(impl);
 		// адрес HEAP, счетчик ссылок, адрес блока реализаций класса и интерфейсов
-		heapHeaderSize = 0x02 + 0x01 + 0x02;
 	}
 
 	public void addField(CGFieldScope field) {
@@ -63,19 +69,20 @@ public class CGClassScope extends CGScope {
 			statOffset+=size;
 			return cells;
 		}
-		CGCells cells = new CGCells(CGCells.Type.HEAP, size, filedsOffset);
-		filedsOffset+=size;
+		CGCells cells = new CGCells(CGCells.Type.HEAP, size, fieldsOffset);
+		fieldsOffset+=size;
 		return cells;
 	}
 	
 	public void build(CodeGenerator cg) throws CompileException {
 		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";======== enter CLASS " + getPath('.') + " ========================"));
 		prepend(cont);
+		
 		if(VERBOSE_LO <= verbose) append(new CGIText(";======== leave CLASS " + getPath('.') + " ========================"));
 	}
 	
 	public int getHeapOffset() {
-		return filedsOffset;
+		return fieldsOffset;
 	}
 	
 	public boolean isImported() {
@@ -91,13 +98,11 @@ public class CGClassScope extends CGScope {
 		return type;
 	}
 	
-	//TODO предоставлять в CGFieldScope
-	public int getHeapHeaderSize() {
-		return heapHeaderSize;
-	}
-	
 	public CGLabelScope getIIDLabel() {
 		return lbIIDSScope;
+	}
+	public CGLabelScope getFieldInitLabel() {
+		return lbFiledsInitScope;
 	}
 	
 	@Override
@@ -107,6 +112,10 @@ public class CGClassScope extends CGScope {
 
 	public void addMethod(CGMethodScope mScope) {
 		methods.put(mScope.getSignature(), mScope);
+	}
+	
+	public CGIContainer getFieldsInitCont() {
+		return fieldsInitCont;
 	}
 	
 	@Override
@@ -153,6 +162,21 @@ public class CGClassScope extends CGScope {
 		}
 		cont.append(new CGIText(implSB.toString()));
 		
+		if(0x01<fieldsInitCont.getItems().size()) {
+			try {
+				fieldsInitCont.append(cg.eReturn(null, 0, 0, 0));
+			}
+			catch(Exception ex) {}
+			cont.append(fieldsInitCont);
+		}
+		else {
+			for(CGMethodScope mScope : methods.values()) {
+				if(null == mScope.getType() && null != mScope.getFieldInitCallCont()) {
+					mScope.getFieldInitCallCont().disable();
+				}
+			}
+		}
+	
 		return super.getSource();
 	}
 }

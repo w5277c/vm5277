@@ -16,6 +16,7 @@
 package ru.vm5277.compiler.avr_codegen;
 
 import java.util.ArrayList;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.CodeOptimizer;
 import ru.vm5277.common.cg.items.CGIAsmJump;
 import ru.vm5277.common.cg.items.CGIContainer;
@@ -36,7 +37,7 @@ public class Optimizer extends CodeOptimizer {
 			list.clear();
 			
 			optimizeEmptyJumps(scope);
-			treeToList(scope, list);		
+			CodeGenerator.treeToList(scope, list);		
 
 			changed = false;
 			for(int i=0; i<list.size()-2; i++) {

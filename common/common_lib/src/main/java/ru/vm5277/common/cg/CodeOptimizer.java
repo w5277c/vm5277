@@ -39,7 +39,7 @@ public abstract class CodeOptimizer {
 		boolean changed=true;
 		while(changed) {
 			list.clear();
-			treeToList(scope, list);
+			CodeGenerator.treeToList(scope, list);
 		
 			changed=false;
 			for(int i=0; i<list.size()-1; i++) {
@@ -63,7 +63,7 @@ public abstract class CodeOptimizer {
 	
 	public void optimizePushConst(CGScope scope, char iReg) {
 		ArrayList<CGItem> list=new ArrayList();
-		treeToList(scope, list, "ConstToCellBy"+iReg);
+		CodeGenerator.treeToList(scope, list, "ConstToCellBy"+iReg);
 		
 		for(int i=0; i<list.size()-1; i++) {
 			CGItem item1 = list.get(i);
@@ -84,7 +84,7 @@ public abstract class CodeOptimizer {
 		Map<String, CGLabelScope> labels = new HashMap<>();
 		Set<String> usedLabels = new HashSet<>();
 		
-		treeToList(scope, list);
+		CodeGenerator.treeToList(scope, list);
 		
 		for(int i=0; i<list.size(); i++) {
 			CGItem item = list.get(i);
@@ -120,7 +120,7 @@ public abstract class CodeOptimizer {
 			replacementMap.clear();
 			
 			optimizeEmptyJumps(scope);
-			treeToList(scope, list);
+			CodeGenerator.treeToList(scope, list);
 
 			for(int i=1; i<list.size()-1; i++) {
 				CGItem item = list.get(i);
@@ -166,30 +166,5 @@ public abstract class CodeOptimizer {
 				}
 			}
 		}		
-	}
-
-	public static void treeToList(CGIContainer cont, List<CGItem> list) {
-		treeToList(cont, list, null);
-	}
-	public static void treeToList(CGIContainer cont, List<CGItem> list, String ignoreScanTag) {
-		for(CGItem item : cont.getItems()) {
-			if(item.isDisabled()) continue;
-			
-			if(item instanceof CGIContainer) {
-				if(null != ignoreScanTag && ignoreScanTag.equalsIgnoreCase(((CGIContainer)item).getTag())) {
-					// Пропускаем анализ вложенности для контейнеров с тегом(контейнер должен рассматриваться как единое целое)
-					list.add(item);
-				}
-				else {
-					//TODO убрал if(((CGIContainer)item).getItems().isEmpty()) { list.add(item); ... добавлял мусор типа CGExpressionScope, возможно что-то поломал
-					if(!((CGIContainer)item).getItems().isEmpty()) {
-						treeToList((CGIContainer)item, list, ignoreScanTag);
-					}
-				}
-			}
-			else {
-				list.add(item);
-			}
-		}
 	}
 }

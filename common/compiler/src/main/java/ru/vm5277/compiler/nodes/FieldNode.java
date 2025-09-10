@@ -25,6 +25,7 @@ import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
+import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
@@ -193,6 +194,7 @@ public class FieldNode extends AstNode {
 		cgDone = true;
 		
 		CGFieldScope fScope = ((CGFieldScope)symbol.getCGScope());
+		CGClassScope cScope = (CGClassScope)fScope.getParent();
 		CGScope oldCGScope = cg.setScope(fScope);
 		
 		Boolean accUsed = null;
@@ -214,10 +216,10 @@ public class FieldNode extends AstNode {
 				// Ничего не делаем, инициализация(заполнение нулями необходима только регистрам, остальные проинициализированы вместе с HEAP/STACK)
 			}
 			else if(initializer instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
-				cg.constToCells(cg.getScope(), ((LiteralExpression)initializer).getNumValue(), fScope.getCells());
+				cScope.getFieldsInitCont().append(cg.constToCells(null, ((LiteralExpression)initializer).getNumValue(), fScope.getCells()));
 			}
 			else if(initializer instanceof FieldAccessExpression) {
-				cg.constToCells(cg.getScope(), -1, fScope.getCells());
+				cScope.getFieldsInitCont().append(cg.constToCells(null, -1, fScope.getCells()));
 				accUsed = true;
 			}
 			else if(initializer instanceof NewExpression) {

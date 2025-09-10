@@ -18,6 +18,22 @@ import rtos.System;
 import rtos.RTOSParam;
 
 class Main {
+	class Test {
+		private byte h1 = 10;
+		private byte h2;
+
+		public Test() {
+			h2 = 20;
+		}
+
+		public Test(byte a) {
+			h2 = a;
+		}
+
+		byte sum() {
+			return h1+h2;
+		}
+	}
 
 	public void go(byte b1, byte b2, byte b3) {
 		byte b4 = 4;
@@ -41,8 +57,9 @@ class Main {
     public static void main() {
 		System.setParam(RTOSParam.STDOUT_PORT, 0x12);
 
-		//byte c=0;
-		//go(1,2+c,3);
 		go(1,2,3);
+
+		Test test = new Test(12);
+		System.out(test.sum());
 	}
 }
