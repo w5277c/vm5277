@@ -1,0 +1,19 @@
+class Main {
+    public static void main() {
+        System.setParam(2, 18);
+        short s1 = 10;
+        short s2 = 2;
+        System.out(s1+2);
+        System.out(s1-2);
+        System.out(s1*2);
+        System.out(s1/2);
+        System.out(s1%2);
+        System.out(s1+s2);
+        System.out(s1-s2);
+        System.out(s1*s2);
+        System.out(s1/s2);
+        System.out(s1%s2);
+    }
+    public Main() {
+    }
+}

@@ -404,9 +404,18 @@ public class BinaryExpression extends ExpressionNode {
 			
 			//TODO Вероятно не совсем корректная модель. Условие ниже 'expr2 instanceof LiteralExpression' вообще возможно?
 			if(expr1 instanceof LiteralExpression) {
-				expr2.codeGen(cg, false);
-				CGCellsScope cScope = (CGCellsScope)expr2.getSymbol().getCGScope();
-				cg.constCond(cgScope, cScope.getCells(), op, ((LiteralExpression)expr1).getNumValue(), isInvert, opOr, (CGBranchScope)brScope);
+				if(op.isComparison()) {
+					expr2.codeGen(cg, false);
+					CGCellsScope cScope = (CGCellsScope)expr2.getSymbol().getCGScope();
+					cg.constCond(cgScope, cScope.getCells(), op, ((LiteralExpression)expr1).getNumValue(), isInvert, opOr, (CGBranchScope)brScope);
+				}
+				else {
+					if(CodegenResult.RESULT_IN_ACCUM != expr2.codeGen(cg, true)) {
+						throw new CompileException("Accum not used for operand:" + expr1);
+					}
+					//Добавить проверку деления на 0
+					cg.constAction(cgScope, op, ((LiteralExpression)expr1).getNumValue());
+				}
 			}
 			else {
 				// Не строим код для expr2(он разместит значение в acc), а нас интересует знaчение в cells(только выполняем зависимость)
@@ -447,7 +456,10 @@ public class BinaryExpression extends ExpressionNode {
 					}
 				}
 				else {
-					expr1.codeGen(cg, false);
+					if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg, true)) {
+						throw new CompileException("Accum not used for operand:" + expr1);
+					}
+					//Добавить проверку деления на 0
 					cg.constAction(cgScope, op, ((LiteralExpression)expr2).getNumValue());
 				}
 			}

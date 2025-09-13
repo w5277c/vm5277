@@ -236,58 +236,125 @@ public class ExpressionNode extends AstNode {
 			}
 		}
 
-		List<Term> terms = new ArrayList<>();
-		collectAdditiveTerms(left, terms, true);
-		terms.add(new Term(op, right, op != Operator.MINUS));
+		// Собираем все термы additive цепочки
+		List<ExpressionNode> positiveTerms = new ArrayList<>();   // Положительные слагаемые
+		List<ExpressionNode> negativeTerms = new ArrayList<>();   // Отрицательные слагаемые
+		// Собираем термы из левой части
+		collectAdditiveTerms(left, positiveTerms, negativeTerms);
+		
+		// Добавляем правую часть в соответствующую группу
+		if (op == Operator.PLUS) positiveTerms.add(right);
+		else negativeTerms.add(right);
+		
 
-		long constValueLong = 0;
-		double constValueDouble = 0;
-		boolean hasDoubles = false;
-		boolean hasLongs = false;
-		List<Term> varTerms = new ArrayList<>();
-		for (Term term : terms) {
-			if (term.isNumber()) {
-				Number num = (Number)((LiteralExpression)term.getNode()).getValue();
-				if (num instanceof Double) {
-					hasDoubles = true;
-					double val = num.doubleValue();
-					constValueDouble = term.isPositive() ? constValueDouble + val : constValueDouble - val;
-				}
-				else {
-					hasLongs = true;
-					long val = num.longValue();
-					constValueLong = term.isPositive() ? constValueLong + val : constValueLong - val;
-				}
+		// Разделяем на константы и переменные
+		double totalConstant = 0.0;
+		List<ExpressionNode> varPositiveTerms = new ArrayList<>();
+		List<ExpressionNode> varNegativeTerms = new ArrayList<>();
+		
+		// Обрабатываем положительные слагаемые
+		for(ExpressionNode term : positiveTerms) {
+			if(term instanceof LiteralExpression && ((LiteralExpression)term).getValue() instanceof Number) {
+				Number num = (Number)((LiteralExpression)term).getValue();
+				totalConstant += num.doubleValue();
 			}
 			else {
-				varTerms.add(term);
+				varPositiveTerms.add(term);
 			}
 		}
-
+		
+		// Обрабатываем отрицательные слагаемые
+		for(ExpressionNode term : negativeTerms) {
+			if(term instanceof LiteralExpression && ((LiteralExpression)term).getValue() instanceof Number) {
+				Number num = (Number)((LiteralExpression)term).getValue();
+				totalConstant -= num.doubleValue();
+			}
+			else {
+				varNegativeTerms.add(term);
+			}
+		}
+		
+		// Строим результирующее выражение
 		ExpressionNode result = null;
-		if (hasDoubles) {
-			double totalConst = constValueDouble + constValueLong;
-			if (totalConst != 0) {
-				result = new LiteralExpression(tb, mc, totalConst);
-			}
-		}
-		else if (constValueLong != 0) {
-			result = new LiteralExpression(tb, mc, constValueLong);
-		}
-
-		for (Term term : varTerms) {
-			ExpressionNode node = term.getNode();
-			if(null == result) {
-				result = term.isPositive() ? node : new UnaryExpression(tb, mc, Operator.MINUS, node);
+		
+		// Добавляем положительные переменные слагаемые
+		for(ExpressionNode varTerm : varPositiveTerms) {
+			if(result == null) {
+				result = varTerm;
 			}
 			else {
-				//Перестановка операндов местами ломает сворачивание констант
-				result = new BinaryExpression(tb, mc, result, term.isPositive() ? Operator.PLUS : Operator.MINUS, node);
+				result = new BinaryExpression(tb, mc, result, Operator.PLUS, varTerm);
 			}
 		}
-		return result != null ? result : new LiteralExpression(tb, mc, hasDoubles ? 0.0 : 0L);
-	}
+		
+		// Добавляем отрицательные переменные слагаемые
+		for(ExpressionNode varTerm : varNegativeTerms) {
+			if(result == null) {
+				result = new UnaryExpression(tb, mc, Operator.MINUS, varTerm);
+			}
+			else {
+				result = new BinaryExpression(tb, mc, result, Operator.MINUS, varTerm);
+			}
+		}
 
+		// Добавляем константу (если она не равна нулю)
+		if(totalConstant != 0.0) {
+			ExpressionNode constantNode = createOptimalConstantNode(totalConstant);
+			if(result == null) {
+				result = constantNode;
+			}
+			else if(totalConstant > 0) {
+				result = new BinaryExpression(tb, mc, result, Operator.PLUS, constantNode);
+			}
+			else {
+				// Для отрицательных констант используем вычитание положительного значения
+				result = new BinaryExpression(tb, mc, result, Operator.MINUS, createOptimalConstantNode(-totalConstant));
+			}
+		}
+
+		return result != null ? result : new LiteralExpression(tb, mc, totalConstant);
+	}
+	private ExpressionNode createOptimalConstantNode(double value) {
+		// Проверяем, является ли значение целым числом
+		if (value == (long)value) {
+			// Целое число - используем long
+			return new LiteralExpression(tb, mc, (long) value);
+		} else {
+			// Дробное число - используем double
+			return new LiteralExpression(tb, mc, value);
+		}
+	}
+	private void collectAdditiveTerms(ExpressionNode node, List<ExpressionNode> positiveTerms, List<ExpressionNode> negativeTerms) {
+		if (node instanceof BinaryExpression) {
+			BinaryExpression bin = (BinaryExpression) node;
+			Operator op = bin.getOperator();
+
+			if (op == Operator.PLUS || op == Operator.MINUS) {
+				// Рекурсивно собираем термы из левой части
+				collectAdditiveTerms(bin.getLeft(), positiveTerms, negativeTerms);
+
+				// Для правой части: PLUS добавляет как положительное, MINUS добавляет как отрицательное
+				if (op == Operator.PLUS) {
+					collectAdditiveTerms(bin.getRight(), positiveTerms, negativeTerms);
+				} else {
+					collectAdditiveTerms(bin.getRight(), negativeTerms, positiveTerms);
+				}
+				return;
+			}
+		}
+
+		if (node instanceof UnaryExpression) {
+			UnaryExpression unary = (UnaryExpression) node;
+			if (unary.getOperator() == Operator.MINUS) {
+				// Унарный минус - добавляем как отрицательное слагаемое
+				collectAdditiveTerms(unary.getOperand(), negativeTerms, positiveTerms);
+				return;
+			}
+		}
+
+		// Базовый случай: простой терм добавляем как положительное слагаемое
+		positiveTerms.add(node);
+	}
 	private ExpressionNode optimizeExpression(ExpressionNode node) throws CompileException {
 		// Оптимизация цепочек примитивных приведений типов
 		if (node instanceof CastExpression) {
@@ -528,56 +595,106 @@ public class ExpressionNode extends AstNode {
 			return new BinaryExpression(tb, mc, left, op, right);
 		}
 		
-		// Оптимизация цепочек
-		List<Term> terms = new ArrayList<>();
-		collectMultiplicativeTerms(left, terms, true);
-		terms.add(new Term(op, right, Operator.MULT==op || Operator.MOD==op));
+		// Собираем все термы multiplicative цепочки
+		List<ExpressionNode> numerators = new ArrayList<>();   // Числители (умножения)
+		List<ExpressionNode> denominators = new ArrayList<>(); // Знаменатели (деления)
+		// Собираем термы из левой части
+		collectMultiplicativeTerms(left, numerators, denominators);
 
-		long constValueLong = 1;
-		double constValueDouble = 1;
-		boolean hasDoubles = false;
-		boolean hasDivision = false;
-		List<Term> varTerms = new ArrayList<>();
+		// Добавляем правую часть в соответствующую группу
+		if (op == Operator.MULT) numerators.add(right);
+		else denominators.add(right);
 
-		for (Term term : terms) {
-			if (term.isNumber()) {
-				Number num = (Number)((LiteralExpression)term.getNode()).getValue();
-				if (num instanceof Double) {
-					hasDoubles = true;
-					double val = num.doubleValue();
-					switch (term.getOperator()) {
-						case MULT: constValueDouble *= val; break;
-						case DIV:  constValueDouble /= val; hasDivision = true; break;
-					}
-				} else {
-					long val = num.longValue();
-					switch (term.getOperator()) {
-						case MULT: constValueLong *= val; break;
-						case DIV:  constValueLong /= val; hasDivision = true; break;
-					}
+		// Разделяем на константы и переменные
+		double totalConstant = 1.0;
+		List<ExpressionNode> varNumerators = new ArrayList<>();
+		List<ExpressionNode> varDenominators = new ArrayList<>();
+		
+		// Обрабатываем числители
+		for (ExpressionNode term : numerators) {
+			if (term instanceof LiteralExpression && ((LiteralExpression)term).getValue() instanceof Number) {
+				Number num = (Number)((LiteralExpression)term).getValue();
+				totalConstant *= num.doubleValue();
+			} else {
+				varNumerators.add(term);
+			}
+		}
+
+		// Обрабатываем знаменатели
+		for (ExpressionNode term : denominators) {
+			if (term instanceof LiteralExpression && ((LiteralExpression)term).getValue() instanceof Number) {
+				Number num = (Number)((LiteralExpression)term).getValue();
+				double value = num.doubleValue();
+				if(0.0 == value) {
+					return new BinaryExpression(tb, mc, left, op, right);
+				}
+				else {
+					totalConstant /= value;
 				}
 			}
 			else {
-				varTerms.add(term);
+				varDenominators.add(term);
 			}
 		}
 
+		if (totalConstant == 0.0) {
+			// Умножение на 0 - возвращаем 0
+			return new LiteralExpression(tb, mc, 0);
+		}
+		double reciprocalValue = 1.0 / totalConstant;
+		
+		// Строим результирующее выражение
 		ExpressionNode result = null;
-		if (hasDoubles) {
-			double totalConst = constValueDouble * constValueLong;
-			if (totalConst != 1 || hasDivision) {
-				result = new LiteralExpression(tb, mc, totalConst);
+		// Добавляем переменные числители
+		for (ExpressionNode varTerm : varNumerators) {
+			result = (result == null ? varTerm : new BinaryExpression(tb, mc, result, Operator.MULT, varTerm));
+		}
+		
+		// Добавляем константу (умножение или деление)
+		if (totalConstant != 1.0) {
+			if (reciprocalValue >= 1.0 && Math.abs(reciprocalValue - Math.round(reciprocalValue)) < 1e-10) {
+				ExpressionNode divisorNode = createOptimalConstantNode(reciprocalValue);
+				result = (result == null ? 
+						new BinaryExpression(tb, mc, createOptimalConstantNode(1), Operator.DIV, divisorNode) :
+						new BinaryExpression(tb, mc, result, Operator.DIV, divisorNode));
+			}
+			else {
+				// Оставляем как есть (не точное значение)
+				ExpressionNode constantNode = createOptimalConstantNode(totalConstant);
+				result = (result == null) ? constantNode : new BinaryExpression(tb, mc, result, Operator.MULT, constantNode);
 			}
 		}
-		else if (constValueLong != 1 || hasDivision) {
-			result = new LiteralExpression(tb, mc, constValueLong);
+		
+		// Добавляем деление на переменные
+		for (ExpressionNode denominator : varDenominators) {
+			result = (result == null ?
+					new BinaryExpression(tb, mc, createOptimalConstantNode(1), Operator.DIV, denominator) :
+					new BinaryExpression(tb, mc, result, Operator.DIV, denominator));
 		}
 
-		for (Term term : varTerms) {
-			ExpressionNode node = term.getNode();
-			result = result == null ? node : new BinaryExpression(tb, mc, result, term.getOperator(), node);
+		return result != null ? result : createOptimalConstantNode(totalConstant);
+	}
+	private void collectMultiplicativeTerms(ExpressionNode node, List<ExpressionNode> numerators, List<ExpressionNode> denominators) {
+		if (node instanceof BinaryExpression) {
+			BinaryExpression bin = (BinaryExpression) node;
+			Operator op = bin.getOperator();
+
+			if (op == Operator.MULT || op == Operator.DIV) {
+				// Рекурсивно собираем термы из левой части
+				collectMultiplicativeTerms(bin.getLeft(), numerators, denominators);
+
+				// Для правой части: MULT добавляет в числители, DIV добавляет в знаменатели
+				if (op == Operator.MULT) {
+					collectMultiplicativeTerms(bin.getRight(), numerators, denominators);
+				} else {
+					collectMultiplicativeTerms(bin.getRight(), denominators, numerators);
+				}
+				return;
+			}
 		}
-		return result != null ? result : new LiteralExpression(tb, mc, hasDoubles ? 1.0 : 1L);
+
+		// Базовый случай: простой терм добавляем в числители
+		numerators.add(node);
 	}
 
 	private ExpressionNode optimizeBitwiseChain(ExpressionNode left, Operator op, ExpressionNode right) {
@@ -645,35 +762,6 @@ public class ExpressionNode extends AstNode {
 			}
 		}
 		return new UnaryExpression(tb, mc, op, operand);
-	}
-	
-	private void collectAdditiveTerms(ExpressionNode node, List<Term> terms, boolean isPositive) {
-		if (node instanceof BinaryExpression) {
-			BinaryExpression binExpr = (BinaryExpression)node;
-			Operator op = binExpr.getOperator();
-			if (Operator.PLUS==op || Operator.MINUS==op) {
-				collectAdditiveTerms(binExpr.getLeft(), terms, isPositive);
-				boolean rightPositive = Operator.PLUS==op ? isPositive : !isPositive;
-				terms.add(new Term(op, binExpr.getRight(), rightPositive));
-				return;
-			}
-		}
-		terms.add(new Term(isPositive ? Operator.PLUS : Operator.MINUS, node, isPositive));
-	}	
-
-	private void collectMultiplicativeTerms(ExpressionNode node, List<Term> terms, boolean isPositive) {
-		if (node instanceof BinaryExpression) {
-			BinaryExpression binExpr = (BinaryExpression)node;
-			Operator op = binExpr.getOperator();
-			// Собираем ТОЛЬКО *, /, %
-			if (Operator.MULT==op || Operator.DIV==op || Operator.MOD==op) {
-				collectMultiplicativeTerms(binExpr.getLeft(), terms, isPositive);
-				boolean rightPositive = Operator.DIV!=op ? isPositive : !isPositive;
-				terms.add(new Term(op, binExpr.getRight(), rightPositive));
-				return;
-			}
-		}
-		terms.add(new Term(isPositive ? Operator.MULT : Operator.DIV, node, isPositive));
 	}
 	
 	private ExpressionNode parseUnary() throws CompileException {

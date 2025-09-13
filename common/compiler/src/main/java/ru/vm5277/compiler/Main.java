@@ -71,6 +71,7 @@ public class Main {
 		Integer	core_freq = null;
 		String source = null;
 		int cgVerbose = 0;
+		boolean dumpIR = false;
 		boolean asmMap = false;
 		boolean asmList = false;
 		
@@ -121,7 +122,10 @@ public class Main {
 					}
 				}
 				
-				if(arg.equalsIgnoreCase("-am") || arg.equals("--asm-map")) {
+				if(arg.equals("--dump-ir")) {
+					dumpIR = true;
+				}
+				else if(arg.equalsIgnoreCase("-am") || arg.equals("--asm-map")) {
 					asmMap = true;
 				}
 				else if(arg.equalsIgnoreCase("-al") || arg.equals("--ams-list")) {
@@ -188,7 +192,16 @@ public class Main {
 
 		//ReachableAnalyzer.analyze(parser.getClazz(), launchMethodName, mc);
 
-		//new ASTPrinter(parser.getClazz());
+		Path targetPath = basePath.resolve("target").normalize();
+		targetPath.toFile().mkdirs();
+
+		if(dumpIR) {
+			Path path = targetPath.resolve(FSUtils.getBaseName(sourcePath));
+			BufferedWriter dumpIrBW = new BufferedWriter(new FileWriter(new File(path.toString() + ".j8bir")));
+			new ASTPrinter(dumpIrBW, parser.getClazz());
+			dumpIrBW.close();
+		}
+
 		if(0 == mc.getErrorCntr()) {
 			try {
 				MethodNode launchNode = null;
@@ -210,9 +223,6 @@ public class Main {
 					launchNode.firstCodeGen(cg);
 					cg.build(VarType.fromClassName(clazz.getName()), 0);
 					//System.out.println("\n" + cg.getAsm());
-					
-					Path targetPath = basePath.resolve("target").normalize();
-					targetPath.toFile().mkdirs();
 					
 					Map<Path, SourceType> sourcePaths	= new HashMap<>();
 					sourcePaths.put(targetPath, SourceType.BASE);
@@ -278,6 +288,7 @@ public class Main {
 		System.out.println("  -F, --freq <MHz>\tMCU clock frequency in MHz (default: platform specific)");
 		System.out.println("  -P, --path <dir>\tCustom toolkit directory path");
 		System.out.println("  -I, --include <dir>\tAdditional include path(s)");
+		System.out.println("      --dump-ir\t\t\tOutput intermediate representation after frontend processing");
 		System.out.println("      --cg-verbose 0-2\t\tGenerate detailed codegen info");
 		System.out.println("  -ao, --asm-output <file> Output HEX file (default: <input>.hex)"); //TODO
 		System.out.println("  -af, --asm-format <fmt>  Output format (hex, bin)"); //TODO

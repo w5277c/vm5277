@@ -15,41 +15,33 @@
  */
 
 ;Черновой вариант
-.IFNDEF OS_DIV16
+.IFNDEF OS_DIV8
 ;-----------------------------------------------------------
-OS_DIV16:
+OS_DIV8:
 ;-----------------------------------------------------------
-;Деление 16b числа на 16бит число
-;IN: ACCUM_L/H-16b делимое, ACCUM_EL/EH-16b делитель
-;OUT: ACCUM_L/H-16b результат, TEMP_L/H-16b остаток
+;Деление 8b числа на 8бит число
+;IN: ACCUM_L-8b делимое, ACCUM_H-8b делитель
+;OUT: ACCUM_L-8b результат, TEMP_L-8b остаток
 ;-----------------------------------------------------------
-	PUSH XL
-	PUSH XH
+	PUSH TEMP_H
 
-	LDI TEMP_L,0x11
-	SUB XH,XH
-	CLR XL
+	LDI TEMP_H,0x09        ; 8 бит + 1
+	SUB TEMP_L,TEMP_L
 
-_OS_DIV16__LOOP:
+_OS_DIV8__LOOP:
 	ROL ACCUM_L
-	ROL ACCUM_H
-	DEC TEMP_L
-	BREQ _OS_DIV16__END
-	ROL XL
-	ROL XH
-	SUB XL,ACCUM_EL
-	SBC XH,ACCUM_EH
+	DEC TEMP_H
+	BREQ _OS_DIV8__END
+	ROL TEMP_L
+	SUB TEMP_L,ACCUM_H
 	BRCS PC+0x03
 	SEC
-	RJMP _OS_DIV16__LOOP
-	ADD XL,ACCUM_EL
-	ADC XH,ACCUM_EH
+	RJMP _OS_DIV8__LOOP
+	ADD TEMP_L,ACCUM_H
 	CLC
-	RJMP _OS_DIV16__LOOP
-_OS_DIV16__END:
-	MOVW TEMP_L,XL
+	RJMP _OS_DIV8__LOOP
+_OS_DIV8__END:
 
-	POP XH
-	POP XL
+	POP TEMP_H
 	RET
 .ENDIF

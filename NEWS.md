@@ -1,5 +1,196 @@
 # Новости и история разработки
 
+## [2025-09-14] - Реализация математических операций в рамках кодогенерации для AVR
+
+### ⚠️ Статус
+Реализация завершена на уровне кодогенерации, но **не была протестирована на реальном устройстве или в симуляторе**.
+Код будет всесторонне проверен и отлажен в будущем. Пока ключевая цель - общая реализация кодогенератора.
+
+### Цель
+Реализованы основные математические операции (сложение, вычитание, умножение, деление, остаток от деления) для целочисленных типов данных в рамках кодогенерации для AVR.
+Оптимизированы цепочки арифметических выражений, добавлена поддержка операций с константами на этапе компиляции.
+
+### Исходный код (Java-подобный)
+
+```java
+import rtos.System;
+import rtos.RTOSParam;
+
+class Main {
+    public static void main() {
+		System.setParam(RTOSParam.STDOUT_PORT, 0x12);
+
+		short s1 = 10;
+		short s2 = 2;
+		System.out(s1 + 2);
+		System.out(s1 - 2);
+		System.out(s1 * 2);
+		System.out(s1 / 2);
+		System.out(s1 % 2);
+
+		System.out(s1 + s2);
+		System.out(s1 - s2);
+		System.out(s1 * s2);
+		System.out(s1 / s2);
+		System.out(s1 % s2);
+
+	}
+}
+```
+
+### Результат на AVR ассемблере
+
+```asm
+; vm5277.avr_codegen v0.1 at Sun Sep 14 04:16:21 VLAT 2025
+.equ stdout_port = 18
+
+.set OS_FT_STDOUT = 1
+.set OS_FT_DRAM = 1
+
+.include "devices/atmega328p.def"
+.include "core/core.asm"
+.include "dmem/dram.asm"
+.include "j8b/inc_refcount.asm"
+.include "j8b/dec_refcount.asm"
+.include "math/mul16.asm"
+.include "math/div16.asm"
+.include "stdio/out_num16.asm"
+
+Main:
+	rjmp j8bCMainMmain
+_j8b_meta18:
+	.db 12,0
+
+j8bCMainMmain:
+	ldi r20,10
+	ldi r21,0
+	ldi r22,2
+	ldi r23,0
+	mov r16,r20
+	mov r17,r21
+	subi r16,254
+	sbci r17,255
+	rcall os_out_num16
+
+	mov r16,r20
+	mov r17,r21
+	subi r16,2
+	sbci r17,0
+	rcall os_out_num16
+
+	mov r16,r20
+	mov r17,r21
+	ldi ACCUM_EL,2
+	ldi ACCUM_EH,0
+	rcall os_mul16
+	rcall os_out_num16
+
+	mov r16,r20
+	mov r17,r21
+	push TEMP_L
+	push TEMP_H
+	ldi ACCUM_EL,2
+	ldi ACCUM_EH,0
+	rcall os_div16
+	pop TEMP_H
+	pop TEMP_L
+	rcall os_out_num16
+
+	mov r16,r20
+	mov r17,r21
+	push TEMP_L
+	push TEMP_H
+	ldi ACCUM_EL,2
+	ldi ACCUM_EH,0
+	rcall os_div16
+	movw ACCUM_L,TEMP_L
+	pop TEMP_H
+	pop TEMP_L
+	rcall os_out_num16
+
+	mov r16,r22
+	mov r17,r23
+	add r16,r20
+	adc r17,r21
+	rcall os_out_num16
+
+	mov r16,r20
+	mov r17,r21
+	sub r16,r22
+	sbc r17,r23
+	rcall os_out_num16
+
+	mov r16,r22
+	mov r17,r23
+	mov ACCUM_EL,r20
+	mov ACCUM_EH,r21
+	rcall os_mul16
+	rcall os_out_num16
+
+	mov r16,r20
+	mov r17,r21
+	mov ACCUM_EL,r22
+	mov ACCUM_EH,r23
+	tst r17
+	brne _j8b_nediv24
+	tst r18
+	brne _j8b_nediv24
+;TODO Division by zero
+	ldi r16,0xff
+	ldi r17,0xff
+	rjmp _j8b_ediv23
+_j8b_nediv24:
+	push TEMP_L
+	push TEMP_H
+	rcall os_div16
+	pop TEMP_H
+	pop TEMP_L
+_j8b_ediv23:
+	rcall os_out_num16
+
+	mov r16,r20
+	mov r17,r21
+	mov ACCUM_EL,r22
+	mov ACCUM_EH,r23
+	tst r17
+	brne _j8b_nediv26
+	tst r18
+	brne _j8b_nediv26
+;TODO Division by zero
+	ldi r16,0xff
+	ldi r17,0xff
+	rjmp _j8b_ediv25
+_j8b_nediv26:
+	push TEMP_L
+	push TEMP_H
+	rcall os_div16
+	movw ACCUM_L,TEMP_L
+	pop TEMP_H
+	pop TEMP_L
+_j8b_ediv25:
+	rcall os_out_num16
+	ret
+```
+
+### Ключевые изменения
+**ExpressionNode.java**: Полностью переработаны методы оптимизации арифметических цепочек
+**Generator.java**: Реализована кодогенерация для математических операций на ассемблере AVR
+**RTOS**: Добавлены функции di8, mul16, mul32
+
+### Достижения
+1. **Поддержка математических операций**: Корректная генерация кода для +, -, *, /, %.
+2. **Оптимизация выражений**: Агрессивное свертывание констант и упрощение выражений на этапе компиляции.
+3. **Обработка ошибок**: Контроль деления на ноль на уровне кодогенерации.
+
+### Технические детали
+- **Процедуры умножения/деления**: Реализованы как отдельные подпрограммы (rcall os_mul8, rcall os_div16 и т.д.) в RTOS для экономии места в коде.
+- **Работа с разрядностью**: Поддержка операций для 8-, 16- и 32-битных операндов.
+- **Константные выражения**: Вычисления с участием констант выполняются на этапе компиляции, что уменьшает размер генерируемого кода и время выполнения.
+
+### Следующие шаги
+- Реализация операций с фиксированной точкой (fixed Q7.8)
+
+
 ## [2025-09-11] - Реализация работы с полями, аргументами и переменными в рамках кодогенерации для AVR
 
 ### Цель

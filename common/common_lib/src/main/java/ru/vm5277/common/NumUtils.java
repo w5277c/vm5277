@@ -1,12 +1,12 @@
 /*
  * Copyright 2025 konstantin@5277.ru
- *
+ * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * 
  *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * 
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -14,26 +14,12 @@
  * limitations under the License.
  */
 
-import rtos.System;
-import rtos.RTOSParam;
+package ru.vm5277.common;
 
-class Main {
-    public static void main() {
-		System.setParam(RTOSParam.STDOUT_PORT, 0x12);
-
-		short s1 = 10;
-		short s2 = 2;
-		System.out(s1 + 2);
-		System.out(s1 - 2);
-		System.out(s1 * 2);
-		System.out(s1 / 2);
-		System.out(s1 % 2);
-
-		System.out(s1 + s2);
-		System.out(s1 - s2);
-		System.out(s1 * s2);
-		System.out(s1 / s2);
-		System.out(s1 % s2);
-
+public class NumUtils {
+	public static int getBytesRequired(long num) {
+		if(num<256) return 1;
+		if(num<65536) return 2;
+		return 4;
 	}
 }

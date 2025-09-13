@@ -15,40 +15,49 @@
  */
 
 ;Черновой вариант
-.IFNDEF OS_DIV16
+.IFNDEF OS_MUL32_NR
 ;-----------------------------------------------------------
-OS_DIV16:
+OS_MUL32_NR:												;NR-NO_RESTORE - не восстанавливаю регистры TEMP_*
 ;-----------------------------------------------------------
-;Деление 16b числа на 16бит число
-;IN: ACCUM_L/H-16b делимое, ACCUM_EL/EH-16b делитель
-;OUT: ACCUM_L/H-16b результат, TEMP_L/H-16b остаток
+;Умножение 32бит числа на 32бит число
+;IN: ACCUM_L/H/EL/EH-32b число, TEMP_L/H/EL/EH-32b число
+;OUT: ACCUM_L/H/EL/EH-32b результат
 ;-----------------------------------------------------------
 	PUSH XL
 	PUSH XH
+	PUSH YL
+	PUSH YH
 
-	LDI TEMP_L,0x11
-	SUB XH,XH
-	CLR XL
+	MOVW XL,ACCUM_L
+	MOVW YL,ACCUM_EL
 
-_OS_DIV16__LOOP:
-	ROL ACCUM_L
-	ROL ACCUM_H
-	DEC TEMP_L
-	BREQ _OS_DIV16__END
-	ROL XL
+	CLR ACCUM_L
+	CLR ACCUM_H
+	CLR ACCUM_EL
+	CLR ACCUM_EH
+
+	LDI FLAGS,0x20
+_OS_MUL32_NR__LOOP:
+	LSR TEMP_EH
+	ROR TEMP_EL
+	ROR TEMP_H
+	ROR TEMP_L
+	BRCC _OS_MUL32_NR__NO_ADD
+	ADD ACCUM_L,XL
+	ADC ACCUM_H,XH
+	ADC ACCUM_EL,YL
+	ADC ACCUM_EH,YH
+_OS_MUL32_NR__NO_ADD:
+	LSL YH
+	ROL YL
 	ROL XH
-	SUB XL,ACCUM_EL
-	SBC XH,ACCUM_EH
-	BRCS PC+0x03
-	SEC
-	RJMP _OS_DIV16__LOOP
-	ADD XL,ACCUM_EL
-	ADC XH,ACCUM_EH
-	CLC
-	RJMP _OS_DIV16__LOOP
-_OS_DIV16__END:
-	MOVW TEMP_L,XL
+	ROL XL
 
+	DEC FLAGS
+	BRNE _OS_MUL32_NR__LOOP
+
+	POP YH
+	POP YL
 	POP XH
 	POP XL
 	RET

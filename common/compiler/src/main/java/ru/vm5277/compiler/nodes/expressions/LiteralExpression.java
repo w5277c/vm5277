@@ -45,7 +45,7 @@ public class LiteralExpression extends ExpressionNode {
 		if (value == null) return VarType.NULL;
 		if (value instanceof Boolean) return VarType.BOOL;
 		if (value instanceof Number)  {
-			if(value instanceof Double) return VarType.FIXED;
+			if(value instanceof Double && ((double)value) != ((Double)value).longValue()) return VarType.FIXED;
 			
 			long l = ((Number)value).longValue();
 			if(l<0) return VarType.FIXED;

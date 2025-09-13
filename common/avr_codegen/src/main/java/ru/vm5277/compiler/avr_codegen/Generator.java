@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Map;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.NativeBinding;
+import ru.vm5277.common.NumUtils;
 import ru.vm5277.common.Operator;
 import static ru.vm5277.common.Operator.BIT_AND;
 import static ru.vm5277.common.Operator.BIT_NOT;
@@ -572,6 +573,365 @@ public class Generator extends CodeGenerator {
 			case MINUS:
 				cellsActionAsm(scope, cells, (int sn, String reg) -> new CGIAsm((0 == sn ? "sub " : "sbc ") + getRightOp(sn, null) + "," + reg));
 				break;
+			case MULT:
+				int maxSize = Math.max(cells.getSize(), accum.getSize());
+				if(0x01==maxSize) {
+					RTOSLibs.MATH_MUL8.setRequired();
+					switch(cells.getType()) {
+						case REG:
+							scope.append(new CGIAsm("mov ACCUM_H,r"+cells.getId(0)));
+							break;
+						case ARGS:
+						case STACK_FRAME:
+							scope.append(new CGIAsmIReg('y', "ldd ACCUM_H,y+", cells.getId(0), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							break;
+						case HEAP:
+							scope.append(new CGIAsmIReg('z', "ldd ACCUM_H,z+", cells.getId(0), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							break;
+						default:
+							throw new CompileException("Unsupported cell type:" + cells.getType());
+					}
+					scope.append(new CGIAsm("rcall os_mul8"));
+				}
+				else if(0x02==maxSize) {
+					RTOSLibs.MATH_MUL16.setRequired();
+					switch(cells.getType()) {
+						case REG:
+							scope.append(new CGIAsm("mov ACCUM_EL,r"+cells.getId(0)));
+							scope.append(new CGIAsm("mov ACCUM_EH,r"+cells.getId(1)));
+							break;
+						case ARGS:
+						case STACK_FRAME:
+							scope.append(new CGIAsmIReg('y', "ldd ACCUM_EL,y+", cells.getId(0), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							scope.append(new CGIAsmIReg('y', "ldd ACCUM_EH,y+", cells.getId(1), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							break;
+						case HEAP:
+							scope.append(new CGIAsmIReg('z', "ldd ACCUM_EL,z+", cells.getId(0), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							scope.append(new CGIAsmIReg('z', "ldd ACCUM_EH,z+", cells.getId(1), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							break;
+						default:
+							throw new CompileException("Unsupported cell type:" + cells.getType());
+					}
+					scope.append(new CGIAsm("rcall os_mul16"));
+				}
+				else if(0x04==maxSize) {
+					RTOSLibs.MATH_MUL32.setRequired();
+					scope.append(new CGIAsm("push TEMP_L"));
+					scope.append(new CGIAsm("push TEMP_H"));
+					scope.append(new CGIAsm("push TEMP_EL"));
+					scope.append(new CGIAsm("push TEMP_EH"));
+					switch(cells.getType()) {
+						case REG:
+							scope.append(new CGIAsm("mov TEMP_L,r"+cells.getId(0)));
+							scope.append(new CGIAsm("mov TEMP_H,r"+cells.getId(1)));
+							scope.append(new CGIAsm("mov TEMP_EL,r"+cells.getId(2)));
+							scope.append(new CGIAsm("mov TEMP_EH,r"+cells.getId(3)));
+							break;
+						case ARGS:
+						case STACK_FRAME:
+							scope.append(new CGIAsmIReg('y', "ldd TEMP_L,y+", cells.getId(0), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							scope.append(new CGIAsmIReg('y', "ldd TEMP_H,y+", cells.getId(1), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							scope.append(new CGIAsmIReg('y', "ldd TEMP_EL,y+", cells.getId(2), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							scope.append(new CGIAsmIReg('y', "ldd TEMP_EH,y+", cells.getId(3), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							break;
+						case HEAP:
+							scope.append(new CGIAsmIReg('z', "ldd TEMP_L,z+", cells.getId(0), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							scope.append(new CGIAsmIReg('z', "ldd TEMP_H,z+", cells.getId(1), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							scope.append(new CGIAsmIReg('z', "ldd TEMP_EL,z+", cells.getId(2), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							scope.append(new CGIAsmIReg('z', "ldd TEMP_EH,z+", cells.getId(3), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							break;
+						default:
+							throw new CompileException("Unsupported cell type:" + cells.getType());
+					}
+					scope.append(new CGIAsm("rcall os_mul32_nr"));
+					scope.append(new CGIAsm("pop TEMP_EH"));
+					scope.append(new CGIAsm("pop TEMP_EL"));
+					scope.append(new CGIAsm("pop TEMP_H"));
+					scope.append(new CGIAsm("pop TEMP_L"));
+				}
+				break;
+			case DIV:
+				maxSize = Math.max(cells.getSize(), accum.getSize());
+				CGLabelScope lbEndScope = new CGLabelScope(null, null, LabelNames.DIV_END, true);
+				CGLabelScope lbNoErrScope = new CGLabelScope(null, null, LabelNames.DIV_NO_ERR, true);
+				if(0x01==maxSize) {
+					RTOSLibs.MATH_DIV8.setRequired();
+					switch(cells.getType()) {
+						case REG:
+							scope.append(new CGIAsm("mov ACCUM_H,r"+cells.getId(0)));
+							break;
+						case ARGS:
+						case STACK_FRAME:
+							scope.append(new CGIAsmIReg('y', "ldd ACCUM_H,y+", cells.getId(0), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							break;
+						case HEAP:
+							scope.append(new CGIAsmIReg('z', "ldd ACCUM_H,z+", cells.getId(0), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							break;
+						default:
+							throw new CompileException("Unsupported cell type:" + cells.getType());
+					}
+					scope.append(new CGIAsm("tst r17"));
+					scope.append(new CGIAsmJump("brne", lbNoErrScope.getName()));
+					scope.append(new CGIText(";TODO Division by zero"));
+					scope.append(new CGIAsm("ldi r16,0xff"));//TODO
+					scope.append(new CGIAsmJump("rjmp", lbEndScope.getName()));
+					scope.append(lbNoErrScope);
+					scope.append(new CGIAsm("push TEMP_L"));
+					scope.append(new CGIAsm("rcall os_div8"));
+					scope.append(new CGIAsm("pop TEMP_L"));
+					scope.append(lbEndScope);
+				}
+				else if(0x02==maxSize) {
+					RTOSLibs.MATH_DIV16.setRequired();
+					switch(cells.getType()) {
+						case REG:
+							scope.append(new CGIAsm("mov ACCUM_EL,r"+cells.getId(0)));
+							scope.append(new CGIAsm("mov ACCUM_EH,r"+cells.getId(1)));
+							break;
+						case ARGS:
+						case STACK_FRAME:
+							scope.append(new CGIAsmIReg('y', "ldd ACCUM_EL,y+", cells.getId(0), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							scope.append(new CGIAsmIReg('y', "ldd ACCUM_EH,y+", cells.getId(1), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							break;
+						case HEAP:
+							scope.append(new CGIAsmIReg('z', "ldd ACCUM_EL,z+", cells.getId(0), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							scope.append(new CGIAsmIReg('z', "ldd ACCUM_EH,z+", cells.getId(1), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							break;
+						default:
+							throw new CompileException("Unsupported cell type:" + cells.getType());
+					}
+					scope.append(new CGIAsm("tst r17"));
+					scope.append(new CGIAsmJump("brne", lbNoErrScope.getName()));
+					scope.append(new CGIAsm("tst r18"));
+					scope.append(new CGIAsmJump("brne", lbNoErrScope.getName()));
+					scope.append(new CGIText(";TODO Division by zero"));
+					scope.append(new CGIAsm("ldi r16,0xff"));//TODO
+					scope.append(new CGIAsm("ldi r17,0xff"));
+					scope.append(new CGIAsmJump("rjmp", lbEndScope.getName()));
+					scope.append(lbNoErrScope);
+					scope.append(new CGIAsm("push TEMP_L"));
+					scope.append(new CGIAsm("push TEMP_H"));
+					scope.append(new CGIAsm("rcall os_div16"));
+					scope.append(new CGIAsm("pop TEMP_H"));
+					scope.append(new CGIAsm("pop TEMP_L"));
+					scope.append(lbEndScope);
+				}
+				else if(0x04==maxSize) {
+					RTOSLibs.MATH_DIV32.setRequired();
+					scope.append(new CGIAsm("push TEMP_L"));
+					scope.append(new CGIAsm("push TEMP_H"));
+					scope.append(new CGIAsm("push TEMP_EL"));
+					scope.append(new CGIAsm("push TEMP_EH"));
+					switch(cells.getType()) {
+						case REG:
+							scope.append(new CGIAsm("mov TEMP_L,r"+cells.getId(0)));
+							scope.append(new CGIAsm("mov TEMP_H,r"+cells.getId(1)));
+							scope.append(new CGIAsm("mov TEMP_EL,r"+cells.getId(2)));
+							scope.append(new CGIAsm("mov TEMP_EH,r"+cells.getId(3)));
+							break;
+						case ARGS:
+						case STACK_FRAME:
+							scope.append(new CGIAsmIReg('y', "ldd TEMP_L,y+", cells.getId(0), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							scope.append(new CGIAsmIReg('y', "ldd TEMP_H,y+", cells.getId(1), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							scope.append(new CGIAsmIReg('y', "ldd TEMP_EL,y+", cells.getId(2), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							scope.append(new CGIAsmIReg('y', "ldd TEMP_EH,y+", cells.getId(3), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							break;
+						case HEAP:
+							scope.append(new CGIAsmIReg('z', "ldd TEMP_L,z+", cells.getId(0), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							scope.append(new CGIAsmIReg('z', "ldd TEMP_H,z+", cells.getId(1), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							scope.append(new CGIAsmIReg('z', "ldd TEMP_EL,z+", cells.getId(2), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							scope.append(new CGIAsmIReg('z', "ldd TEMP_EH,z+", cells.getId(3), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							break;
+						default:
+							throw new CompileException("Unsupported cell type:" + cells.getType());
+					}
+					scope.append(new CGIAsm("tst TEMP_L"));
+					scope.append(new CGIAsmJump("brne", lbNoErrScope.getName()));
+					scope.append(new CGIAsm("tst TEMP_H"));
+					scope.append(new CGIAsmJump("brne", lbNoErrScope.getName()));
+					scope.append(new CGIAsm("tst TEMP_EL"));
+					scope.append(new CGIAsmJump("brne", lbNoErrScope.getName()));
+					scope.append(new CGIAsm("tst TEMP_EH"));
+					scope.append(new CGIAsmJump("brne", lbNoErrScope.getName()));
+					scope.append(new CGIText(";TODO Division by zero"));
+					scope.append(new CGIAsm("ldi r16,0xff"));//TODO
+					scope.append(new CGIAsm("ldi r17,0xff"));
+					scope.append(new CGIAsm("ldi r18,0xff"));
+					scope.append(new CGIAsm("ldi r19,0xff"));
+					scope.append(new CGIAsmJump("rjmp", lbEndScope.getName()));
+					scope.append(lbNoErrScope);
+					scope.append(new CGIAsm("rcall os_div32_nr"));
+					scope.append(lbEndScope);
+					scope.append(new CGIAsm("pop TEMP_EH"));
+					scope.append(new CGIAsm("pop TEMP_EL"));
+					scope.append(new CGIAsm("pop TEMP_H"));
+					scope.append(new CGIAsm("pop TEMP_L"));
+				}
+				break;
+			case MOD:
+				maxSize = Math.max(cells.getSize(), accum.getSize());
+				lbEndScope = new CGLabelScope(null, null, LabelNames.DIV_END, true);
+				lbNoErrScope = new CGLabelScope(null, null, LabelNames.DIV_NO_ERR, true);
+				if(0x01==maxSize) {
+					RTOSLibs.MATH_DIV8.setRequired();
+					switch(cells.getType()) {
+						case REG:
+							scope.append(new CGIAsm("mov ACCUM_H,r"+cells.getId(0)));
+							break;
+						case ARGS:
+						case STACK_FRAME:
+							scope.append(new CGIAsmIReg('y', "ldd ACCUM_H,y+", cells.getId(0), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							break;
+						case HEAP:
+							scope.append(new CGIAsmIReg('z', "ldd ACCUM_H,z+", cells.getId(0), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							break;
+						default:
+							throw new CompileException("Unsupported cell type:" + cells.getType());
+					}
+					scope.append(new CGIAsm("tst r17"));
+					scope.append(new CGIAsmJump("brne", lbNoErrScope.getName()));
+					scope.append(new CGIText(";TODO Division by zero"));
+					scope.append(new CGIAsm("ldi r16,0xff"));//TODO
+					scope.append(new CGIAsmJump("rjmp", lbEndScope.getName()));
+					scope.append(lbNoErrScope);
+					scope.append(new CGIAsm("push TEMP_L"));
+					scope.append(new CGIAsm("rcall os_div8"));
+					scope.append(new CGIAsm("mov ACCUM_L,TEMP_L"));
+					scope.append(new CGIAsm("pop TEMP_L"));
+					scope.append(lbEndScope);
+				}
+				else if(0x02==maxSize) {
+					RTOSLibs.MATH_DIV16.setRequired();
+					switch(cells.getType()) {
+						case REG:
+							scope.append(new CGIAsm("mov ACCUM_EL,r"+cells.getId(0)));
+							scope.append(new CGIAsm("mov ACCUM_EH,r"+cells.getId(1)));
+							break;
+						case ARGS:
+						case STACK_FRAME:
+							scope.append(new CGIAsmIReg('y', "ldd ACCUM_EL,y+", cells.getId(0), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							scope.append(new CGIAsmIReg('y', "ldd ACCUM_EH,y+", cells.getId(1), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							break;
+						case HEAP:
+							scope.append(new CGIAsmIReg('z', "ldd ACCUM_EL,z+", cells.getId(0), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							scope.append(new CGIAsmIReg('z', "ldd ACCUM_EH,z+", cells.getId(1), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							break;
+						default:
+							throw new CompileException("Unsupported cell type:" + cells.getType());
+					}
+					scope.append(new CGIAsm("tst r17"));
+					scope.append(new CGIAsmJump("brne", lbNoErrScope.getName()));
+					scope.append(new CGIAsm("tst r18"));
+					scope.append(new CGIAsmJump("brne", lbNoErrScope.getName()));
+					scope.append(new CGIText(";TODO Division by zero"));
+					scope.append(new CGIAsm("ldi r16,0xff"));//TODO
+					scope.append(new CGIAsm("ldi r17,0xff"));
+					scope.append(new CGIAsmJump("rjmp", lbEndScope.getName()));
+					scope.append(lbNoErrScope);
+					scope.append(new CGIAsm("push TEMP_L"));
+					scope.append(new CGIAsm("push TEMP_H"));
+					scope.append(new CGIAsm("rcall os_div16"));
+					scope.append(new CGIAsm("movw ACCUM_L,TEMP_L"));
+					scope.append(new CGIAsm("pop TEMP_H"));
+					scope.append(new CGIAsm("pop TEMP_L"));
+					scope.append(lbEndScope);
+				}
+				else if(0x04==maxSize) {
+					RTOSLibs.MATH_DIV32.setRequired();
+					scope.append(new CGIAsm("push TEMP_L"));
+					scope.append(new CGIAsm("push TEMP_H"));
+					scope.append(new CGIAsm("push TEMP_EL"));
+					scope.append(new CGIAsm("push TEMP_EH"));
+					switch(cells.getType()) {
+						case REG:
+							scope.append(new CGIAsm("mov TEMP_L,r"+cells.getId(0)));
+							scope.append(new CGIAsm("mov TEMP_H,r"+cells.getId(1)));
+							scope.append(new CGIAsm("mov TEMP_EL,r"+cells.getId(2)));
+							scope.append(new CGIAsm("mov TEMP_EH,r"+cells.getId(3)));
+							break;
+						case ARGS:
+						case STACK_FRAME:
+							scope.append(new CGIAsmIReg('y', "ldd TEMP_L,y+", cells.getId(0), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							scope.append(new CGIAsmIReg('y', "ldd TEMP_H,y+", cells.getId(1), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							scope.append(new CGIAsmIReg('y', "ldd TEMP_EL,y+", cells.getId(2), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							scope.append(new CGIAsmIReg('y', "ldd TEMP_EH,y+", cells.getId(3), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
+							break;
+						case HEAP:
+							scope.append(new CGIAsmIReg('z', "ldd TEMP_L,z+", cells.getId(0), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							scope.append(new CGIAsmIReg('z', "ldd TEMP_H,z+", cells.getId(1), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							scope.append(new CGIAsmIReg('z', "ldd TEMP_EL,z+", cells.getId(2), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							scope.append(new CGIAsmIReg('z', "ldd TEMP_EH,z+", cells.getId(3), "", getCurBlockScope(scope),
+														(CGBlockScope)cells.getObject(), false));
+							break;
+						default:
+							throw new CompileException("Unsupported cell type:" + cells.getType());
+					}
+					scope.append(new CGIAsm("tst TEMP_L"));
+					scope.append(new CGIAsmJump("brne", lbNoErrScope.getName()));
+					scope.append(new CGIAsm("tst TEMP_H"));
+					scope.append(new CGIAsmJump("brne", lbNoErrScope.getName()));
+					scope.append(new CGIAsm("tst TEMP_EL"));
+					scope.append(new CGIAsmJump("brne", lbNoErrScope.getName()));
+					scope.append(new CGIAsm("tst TEMP_EH"));
+					scope.append(new CGIAsmJump("brne", lbNoErrScope.getName()));
+					scope.append(new CGIText(";TODO Division by zero"));
+					scope.append(new CGIAsm("ldi r16,0xff"));//TODO
+					scope.append(new CGIAsm("ldi r17,0xff"));
+					scope.append(new CGIAsm("ldi r18,0xff"));
+					scope.append(new CGIAsm("ldi r19,0xff"));
+					scope.append(new CGIAsmJump("rjmp", lbEndScope.getName()));
+					scope.append(lbNoErrScope);
+					scope.append(new CGIAsm("rcall os_div32"));
+					scope.append(new CGIAsm("movw ACCUM_L,TEMP_L"));
+					scope.append(new CGIAsm("movw ACCUM_EL,TEMP_EL"));
+					scope.append(new CGIAsm("pop TEMP_EH"));
+					scope.append(new CGIAsm("pop TEMP_EL"));
+					scope.append(new CGIAsm("pop TEMP_H"));
+					scope.append(new CGIAsm("pop TEMP_L"));
+					scope.append(lbEndScope);
+				}
+				break;
 			case BIT_AND:
 				cellsActionAsm(scope,  cells, (int sn, String reg) -> new CGIAsm("and " + getRightOp(sn, null) + "," + reg));
 				break;
@@ -599,6 +959,126 @@ public class Generator extends CodeGenerator {
 				break;
 			case MINUS:
 				constActionAsm(scope, k, (int sn, String rOp) -> new CGIAsm((0 == sn ? "subi " : "sbci ") + getRightOp(sn, null) + "," + rOp));
+				break;
+			case MULT:
+				//TODO ранее размер брал с аккумулятора, его размер точно отражает размер константы?
+				int maxSize = Math.max(NumUtils.getBytesRequired(k), accum.getSize());
+				if(0x01==maxSize) {
+					RTOSLibs.MATH_MUL8.setRequired();
+					scope.append(new CGIAsm("ldi ACCUM_H,"+(k&0xff)));
+					scope.append(new CGIAsm("rcall os_mul8"));
+				}
+				else if(0x02==maxSize) {
+					RTOSLibs.MATH_MUL16.setRequired();
+					scope.append(new CGIAsm("ldi ACCUM_EL,"+(k&0xff)));
+					scope.append(new CGIAsm("ldi ACCUM_EH,"+((k>>8)&0xff)));
+					scope.append(new CGIAsm("rcall os_mul16"));
+				}
+				else if(0x04==maxSize) {
+					RTOSLibs.MATH_MUL32.setRequired();
+					scope.append(new CGIAsm("push TEMP_L"));//TODO добавить проверку на занятось регистров
+					scope.append(new CGIAsm("push TEMP_H"));
+					scope.append(new CGIAsm("push TEMP_EL"));
+					scope.append(new CGIAsm("push TEMP_EH"));
+					scope.append(new CGIAsm("ldi TEMP_L,"+(k&0xff)));
+					scope.append(new CGIAsm("ldi TEMP_H,"+((k>>8)&0xff)));
+					scope.append(new CGIAsm("ldi TEMP_EL,"+((k>>16)&0xff)));
+					scope.append(new CGIAsm("ldi TEMP_EH,"+((k>>24)&0xff)));
+					scope.append(new CGIAsm("rcall os_mul32_nr"));
+					scope.append(new CGIAsm("pop TEMP_EH"));
+					scope.append(new CGIAsm("pop TEMP_EL"));
+					scope.append(new CGIAsm("pop TEMP_H"));
+					scope.append(new CGIAsm("pop TEMP_L"));
+				}
+				break;
+			case DIV:
+				if(accum.getSize()<NumUtils.getBytesRequired(k)) {
+					scope.append(new CGIAsm("ldi r16,0x00"));
+					accum.setSize(0x01);
+				}
+				else {
+					maxSize = Math.max(NumUtils.getBytesRequired(k), accum.getSize());
+					if(0x01==maxSize) {
+						RTOSLibs.MATH_DIV8.setRequired();
+						scope.append(new CGIAsm("push TEMP_L"));
+						scope.append(new CGIAsm("ldi ACCUM_H,"+(k&0xff)));
+						scope.append(new CGIAsm("rcall os_div8"));
+						scope.append(new CGIAsm("pop TEMP_L"));
+					}
+					else if(0x02==maxSize) {
+						RTOSLibs.MATH_DIV16.setRequired();
+						scope.append(new CGIAsm("push TEMP_L"));
+						scope.append(new CGIAsm("push TEMP_H"));
+						scope.append(new CGIAsm("ldi ACCUM_EL,"+(k&0xff)));
+						scope.append(new CGIAsm("ldi ACCUM_EH,"+((k>>8)&0xff)));
+						scope.append(new CGIAsm("rcall os_div16"));
+						scope.append(new CGIAsm("pop TEMP_H"));
+						scope.append(new CGIAsm("pop TEMP_L"));
+					}
+					else if(0x04==maxSize) {
+						RTOSLibs.MATH_DIV32.setRequired();
+						scope.append(new CGIAsm("push TEMP_L"));//TODO добавить проверку на занятось регистров
+						scope.append(new CGIAsm("push TEMP_H"));
+						scope.append(new CGIAsm("push TEMP_EL"));
+						scope.append(new CGIAsm("push TEMP_EH"));
+						scope.append(new CGIAsm("ldi TEMP_L,"+(k&0xff)));
+						scope.append(new CGIAsm("ldi TEMP_H,"+((k>>8)&0xff)));
+						scope.append(new CGIAsm("ldi TEMP_EL,"+((k>>16)&0xff)));
+						scope.append(new CGIAsm("ldi TEMP_EH,"+((k>>24)&0xff)));
+						scope.append(new CGIAsm("rcall os_div32"));
+						scope.append(new CGIAsm("pop TEMP_EH"));
+						scope.append(new CGIAsm("pop TEMP_EL"));
+						scope.append(new CGIAsm("pop TEMP_H"));
+						scope.append(new CGIAsm("pop TEMP_L"));
+					}
+				}
+				break;
+			case MOD:
+				if(accum.getSize()<NumUtils.getBytesRequired(k)) {
+					scope.append(new CGIAsm("ldi r16,0x00"));
+					accum.setSize(0x01);
+				}
+				else {
+					maxSize = Math.max(NumUtils.getBytesRequired(k), accum.getSize());
+					if(0x01==maxSize) {
+						RTOSLibs.MATH_DIV8.setRequired();
+						scope.append(new CGIAsm("push TEMP_L"));
+						scope.append(new CGIAsm("ldi ACCUM_H,"+(k&0xff)));
+						scope.append(new CGIAsm("rcall os_div8"));
+						scope.append(new CGIAsm("mov ACCUM_L,TEMP_L"));
+						scope.append(new CGIAsm("pop TEMP_L"));
+					}
+					else if(0x02==maxSize) {
+						RTOSLibs.MATH_DIV16.setRequired();
+						scope.append(new CGIAsm("push TEMP_L"));
+						scope.append(new CGIAsm("push TEMP_H"));
+						scope.append(new CGIAsm("ldi ACCUM_EL,"+(k&0xff)));
+						scope.append(new CGIAsm("ldi ACCUM_EH,"+((k>>8)&0xff)));
+						scope.append(new CGIAsm("rcall os_div16"));
+						scope.append(new CGIAsm("movw ACCUM_L,TEMP_L"));
+						scope.append(new CGIAsm("pop TEMP_H"));
+						scope.append(new CGIAsm("pop TEMP_L"));
+					}
+					else if(0x04==maxSize) {
+						RTOSLibs.MATH_DIV32.setRequired();
+						scope.append(new CGIAsm("push TEMP_L"));//TODO добавить проверку на занятось регистров
+						scope.append(new CGIAsm("push TEMP_H"));
+						scope.append(new CGIAsm("push TEMP_EL"));
+						scope.append(new CGIAsm("push TEMP_EH"));
+						scope.append(new CGIAsm("ldi TEMP_L,"+(k&0xff)));
+						scope.append(new CGIAsm("ldi TEMP_H,"+((k>>8)&0xff)));
+						scope.append(new CGIAsm("ldi TEMP_EL,"+((k>>16)&0xff)));
+						scope.append(new CGIAsm("ldi TEMP_EH,"+((k>>24)&0xff)));
+						scope.append(new CGIAsm("rcall os_div32"));
+						scope.append(new CGIAsm("movw ACCUM_L,TEMP_L"));
+						scope.append(new CGIAsm("movw ACCUM_EL,TEMP_EL"));
+						scope.append(new CGIAsm("pop TEMP_EH"));
+						scope.append(new CGIAsm("pop TEMP_EL"));
+						scope.append(new CGIAsm("pop TEMP_H"));
+						scope.append(new CGIAsm("pop TEMP_L"));
+					}
+				}
+				break;
 			case BIT_AND:
 				constActionAsm(scope, k,  (int sn, String reg) -> new CGIAsm("andi " + getRightOp(sn, null) + "," + reg));
 				break;
@@ -609,7 +1089,7 @@ public class Generator extends CodeGenerator {
 				cont.append(new CGIAsm("push yl"));
 				for(int i=accum.getSize()-1; i>=0; i--) {
 					cont.append(new CGIAsm("ldi yl," + ((k>>(i*8))&0xff)));
-					cont.append(new CGIAsm("eor " + getRightOp(i, null) + ",r16"));
+					cont.append(new CGIAsm("eor " + getRightOp(i, null) + ",r"+getAccRegs(accum.getSize())[i]));
 				}
 				cont.append(new CGIAsm("pop yl"));
 				break;

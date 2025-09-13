@@ -15,6 +15,9 @@
  */
 package ru.vm5277.compiler;
 
+import java.io.BufferedWriter;
+import java.io.OutputStream;
+import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.Operator;
@@ -60,6 +63,11 @@ public class ASTPrinter {
 	private class Printer {
 		private	StringBuilder	sb		= new StringBuilder();
 		private	StringBuilder	spacer	= new StringBuilder();
+		private	BufferedWriter	bw;
+		
+		public Printer(BufferedWriter bw) {
+			this.bw = bw;
+		}
 		
 		public void put(String str) {
 			sb.append(str);
@@ -75,18 +83,23 @@ public class ASTPrinter {
 			sb.delete(sb.length()-qnt, sb.length());
 		}
 		public void print() {
-			System.out.print(spacer.toString());
+			try {bw.write(spacer.toString());}catch(Exception ex) {}
 			printLeft();
 		}
 		public void printLeft() {
-			System.out.println(sb.toString());
+			try {
+				bw.write(sb.toString());
+				bw.write("\r\n");
+			}
+			catch(Exception ex) {}
 			sb = new StringBuilder();
 		}
 	}
 	
-	private	Printer	out	= new Printer();
+	private	Printer	out;
 	
-	public ASTPrinter(ClassNode clazz) {
+	public ASTPrinter(BufferedWriter bw, ClassNode clazz) {
+		out = new Printer(bw);
 		printClass(clazz);
 	}
 
