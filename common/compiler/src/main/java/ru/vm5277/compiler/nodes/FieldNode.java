@@ -169,11 +169,26 @@ public class FieldNode extends AstNode {
 				// Проверка совместимости типов
 				VarType initType = initializer.getType(scope);
 				if (!isCompatibleWith(scope, type, initType)) {
-					markError("Type mismatch: cannot assign " + initType + " to " + type);
+					// Дополнительная проверка втоматического привдения целочисленной константы к fixed.
+					if(VarType.FIXED == type && initializer instanceof LiteralExpression && initType.isInteger()) {
+						long num = ((LiteralExpression)initializer).getNumValue();
+						if(num<VarType.FIXED_MIN || num>VarType.FIXED_MAX) {
+							markError("Type mismatch: cannot assign " + initType + " to " + type);
+							cg.leaveField();
+							return false;
+						}
+					}
+					else {
+						markError("Type mismatch: cannot assign " + initType + " to " + type);
+						cg.leaveField();
+						return false;
+					}
 				}
 				// Дополнительная проверка на сужающее преобразование
 				if (type.isNumeric() && initType.isNumeric() && type.getSize() < initType.getSize()) {
 					markError("Narrowing conversion from " + initType + " to " + type + " requires explicit cast");
+					cg.leaveField();
+					return false;
 				}
 
 				ExpressionNode optimizedExpr = initializer.optimizeWithScope(scope, cg);
@@ -216,10 +231,12 @@ public class FieldNode extends AstNode {
 				// Ничего не делаем, инициализация(заполнение нулями необходима только регистрам, остальные проинициализированы вместе с HEAP/STACK)
 			}
 			else if(initializer instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
-				cScope.getFieldsInitCont().append(cg.constToCells(null, ((LiteralExpression)initializer).getNumValue(), fScope.getCells()));
+				LiteralExpression le = (LiteralExpression)initializer;
+				boolean isFixed = le.isFixed() || VarType.FIXED == fScope.getType();
+				cScope.getFieldsInitCont().append(cg.constToCells(null, isFixed ? le.getFixedValue() : le.getNumValue(), fScope.getCells(), isFixed));
 			}
 			else if(initializer instanceof FieldAccessExpression) {
-				cScope.getFieldsInitCont().append(cg.constToCells(null, -1, fScope.getCells()));
+				cScope.getFieldsInitCont().append(cg.constToCells(null, 0, fScope.getCells(), false));
 				accUsed = true;
 			}
 			else if(initializer instanceof NewExpression) {

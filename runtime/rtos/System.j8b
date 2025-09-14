@@ -23,6 +23,7 @@ public class System {
 	public static native void out(byte i);
 	public static native void out(short i);
 	public static native void out(int i);
+	public static native void out(fixed i);
 
 	public static native void stop();
 }

@@ -92,7 +92,7 @@ public class CastExpression extends ExpressionNode {
 		Object result = operand.codeGen(cg);
 		if (sourceType != targetType) {
 			if (sourceType.isNumeric() && targetType.isNumeric()) {
-				cg.accCast(cgScope, targetType.getSize());
+				cg.accCast(cgScope, targetType.getSize(), !sourceType.isFixedPoint() && targetType.isFixedPoint());
 			}
 		}
 		return result;

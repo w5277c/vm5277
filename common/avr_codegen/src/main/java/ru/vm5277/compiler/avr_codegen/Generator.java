@@ -48,18 +48,15 @@ import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.CGCells;
-import ru.vm5277.common.cg.CodeOptimizer;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.cg.OperandType;
 import ru.vm5277.common.cg.RegPair;
 import ru.vm5277.common.cg.items.CGIAsmIReg;
 import ru.vm5277.common.cg.items.CGIAsmJump;
 import ru.vm5277.common.cg.items.CGIAsmLdLabel;
-import ru.vm5277.common.cg.items.CGIConstrInit;
 import ru.vm5277.common.cg.items.CGItem;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGBranchScope;
-import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGMethodScope;
@@ -209,9 +206,10 @@ public class Generator extends CodeGenerator {
 	 * @return 
 	 */
 	@Override
-	public CGIContainer pushConst(CGScope scope, int size, long value) {
+	public CGIContainer pushConst(CGScope scope, int size, long value, boolean isFixed) {
 		CGIContainer cont = new CGIContainer();
-		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";push const '" + value + "'"));
+		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";push const '" + (isFixed ? value/256.0 : value) + "'"));
+		
 		for(int i=0; i<size; i++) {
 			cont.append(new CGIAsm("ldi r30," + (value&0xff)));
 			cont.append(new CGIAsm("push r30"));
@@ -282,19 +280,13 @@ public class Generator extends CodeGenerator {
 	}
 
 	@Override
-	public void constToAcc(CGScope scope, int size, long value) {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";const '" + value + "'->accum "));
+	public void constToAcc(CGScope scope, int size, long value, boolean isFixed) {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";const '" + (isFixed ? value/256.0 : value) + "'->accum "));
 		accum.setSize(size);
 		scope.append(new CGIAsm("ldi r16," + (value&0xff))); value >>= 0x08;
 		if(size>1) scope.append(new CGIAsm("ldi r17," + (value&0xff))); value >>= 0x08;
 		if(size>2) scope.append(new CGIAsm("ldi r18," + (value&0xff))); value >>= 0x08;
 		if(size>3) scope.append(new CGIAsm("ldi r19," + (value&0xff)));
-	}
-	
-	public void loadRegsConst(CGScope scope, byte[] regs, long value) {
-		for(byte reg : regs) {
-			scope.append(new CGIAsm("ldi r" + reg + "," + (value&0xff))); value >>= 0x08;
-		}
 	}
 
 	@Override
@@ -360,16 +352,23 @@ public class Generator extends CodeGenerator {
 	}
 
 	@Override
-	public CGIContainer accCast(CGScope scope, int size) throws CompileException {
+	public CGIContainer accCast(CGScope scope, int size, boolean toFixed) throws CompileException {
 		CGIContainer result = new CGIContainer();
-		if(accum.getSize() != size) {
-			if(VERBOSE_LO <= verbose) result.append(new CGIText(";acc cast " + accum.getSize() + "->" + size));
-			if(accum.getSize() < size) {
-				for(int i=accum.getSize(); i<size; i++) {
-					result.append(new CGIAsm("ldi r" + getAccRegs(4)[i] + ",0x00"));
+		if(toFixed) {
+			if(VERBOSE_LO <= verbose) result.append(new CGIText(";acc cast to Fixed"));
+			result.append(new CGIAsm("mov r17,r16"));
+			result.append(new CGIAsm("clr r16"));
+		}
+		else {
+			if(accum.getSize() != size) {
+				if(VERBOSE_LO <= verbose) result.append(new CGIText(";acc cast " + accum.getSize() + "->" + size));
+				if(accum.getSize() < size) {
+					for(int i=accum.getSize(); i<size; i++) {
+						result.append(new CGIAsm("ldi r" + getAccRegs(4)[i] + ",0x00"));
+					}
 				}
+				accum.setSize(size);
 			}
-			accum.setSize(size);
 		}
 		if(null != scope) scope.append(result);
 		return result;
@@ -416,19 +415,19 @@ public class Generator extends CodeGenerator {
 	}
 
 	@Override
-	public CGIContainer constToCells(CGScope scope, long value, CGCells cells) throws CompileException {
+	public CGIContainer constToCells(CGScope scope, long value, CGCells cells, boolean isFixed) throws CompileException {
 		CGIContainer cont = new CGIContainer();
-		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";const '" + value + "'->cells " + cells));
+		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";const '" + (isFixed ? value/256.0 : value) + "'->cells " + cells));
 		switch(cells.getType()) {
 			case REG:
-				for(int i=0; i<cells.getSize(); i++) cont.append(new CGIAsm("ldi r" + cells.getId(i)+ "," + ((value>>(i*8))&0xff)));
+				for(int i=0; i<cells.getSize(); i++) cont.append(new CGIAsm("ldi r" + cells.getId(i)+ "," + (value>>(i*8)&0xff)));
 				break;
 			case ARGS:
 			case STACK_FRAME:
 				CGIContainer _cont = new CGIContainer();
 				//cont.append(new CGIAsm("push zl")); //Похоже эта опреация не используется в обработке выражений, а значит r16 свободен
 				for(int i=0; i<cells.getSize(); i++) {
-					_cont.append(new CGIAsm("ldi r16," + ((value>>(i*8))&0xff)));
+					_cont.append(new CGIAsm("ldi r16," + (value>>(i*8)&0xff)));
 					_cont.append(new CGIAsmIReg('y', "std y+", cells.getId(i), ",r16", getCurBlockScope(scope), (CGBlockScope)cells.getObject(),
 												CGCells.Type.ARGS == cells.getType()));
 				}
@@ -439,7 +438,7 @@ public class Generator extends CodeGenerator {
 				_cont = new CGIContainer();
 				//cont.append(new CGIAsm("push yl")); //Похоже эта опреация не используется в обработке выражений, а значит r16 свободен
 				for(int i=0; i<cells.getSize(); i++) {
-					_cont.append(new CGIAsm("ldi r16," + ((value>>(i*8))&0xff)));
+					_cont.append(new CGIAsm("ldi r16," + (value>>(i*8)&0xff)));
 					_cont.append(new CGIAsmIReg('z', "std z+", cells.getId(i), ",r16"));
 				}
 				//cont.append(new CGIAsm("pop yl"));
@@ -563,8 +562,8 @@ public class Generator extends CodeGenerator {
 		
 	// Работаем с аккумулятором!
 	@Override
-	public void cellsAction(CGScope scope, CGCells cells, Operator op) throws CompileException {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";accum " + op + " cells " + cells + " -> accum"));
+	public void cellsAction(CGScope scope, CGCells cells, Operator op, boolean isFixed) throws CompileException {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";accum " + op + " cells " + cells + " -> accum" + (isFixed ? "[FIXED]" : "")));
 
 		switch(op) {
 			case PLUS:
@@ -596,7 +595,8 @@ public class Generator extends CodeGenerator {
 					scope.append(new CGIAsm("rcall os_mul8"));
 				}
 				else if(0x02==maxSize) {
-					RTOSLibs.MATH_MUL16.setRequired();
+					if(isFixed) RTOSLibs.MATH_MULQ7N8.setRequired();
+					else RTOSLibs.MATH_MUL16.setRequired();
 					switch(cells.getType()) {
 						case REG:
 							scope.append(new CGIAsm("mov ACCUM_EL,r"+cells.getId(0)));
@@ -618,7 +618,7 @@ public class Generator extends CodeGenerator {
 						default:
 							throw new CompileException("Unsupported cell type:" + cells.getType());
 					}
-					scope.append(new CGIAsm("rcall os_mul16"));
+					scope.append(new CGIAsm("rcall " + (isFixed ? "os_mulq7n8" : "os_mul16")));
 				}
 				else if(0x04==maxSize) {
 					RTOSLibs.MATH_MUL32.setRequired();
@@ -698,7 +698,8 @@ public class Generator extends CodeGenerator {
 					scope.append(lbEndScope);
 				}
 				else if(0x02==maxSize) {
-					RTOSLibs.MATH_DIV16.setRequired();
+					if(isFixed) RTOSLibs.MATH_DIVQ7N8.setRequired();
+					else RTOSLibs.MATH_DIV16.setRequired();
 					switch(cells.getType()) {
 						case REG:
 							scope.append(new CGIAsm("mov ACCUM_EL,r"+cells.getId(0)));
@@ -720,9 +721,9 @@ public class Generator extends CodeGenerator {
 						default:
 							throw new CompileException("Unsupported cell type:" + cells.getType());
 					}
-					scope.append(new CGIAsm("tst r17"));
-					scope.append(new CGIAsmJump("brne", lbNoErrScope.getName()));
 					scope.append(new CGIAsm("tst r18"));
+					scope.append(new CGIAsmJump("brne", lbNoErrScope.getName()));
+					scope.append(new CGIAsm("tst r19"));
 					scope.append(new CGIAsmJump("brne", lbNoErrScope.getName()));
 					scope.append(new CGIText(";TODO Division by zero"));
 					scope.append(new CGIAsm("ldi r16,0xff"));//TODO
@@ -731,7 +732,7 @@ public class Generator extends CodeGenerator {
 					scope.append(lbNoErrScope);
 					scope.append(new CGIAsm("push TEMP_L"));
 					scope.append(new CGIAsm("push TEMP_H"));
-					scope.append(new CGIAsm("rcall os_div16"));
+					scope.append(new CGIAsm("rcall " + (isFixed ? "os_divq7n8" : "os_div16")));
 					scope.append(new CGIAsm("pop TEMP_H"));
 					scope.append(new CGIAsm("pop TEMP_L"));
 					scope.append(lbEndScope);
@@ -797,6 +798,7 @@ public class Generator extends CodeGenerator {
 				}
 				break;
 			case MOD:
+				if(isFixed) throw new CompileException("CG:cellsAction: unsupported operator: " + op);
 				maxSize = Math.max(cells.getSize(), accum.getSize());
 				lbEndScope = new CGLabelScope(null, null, LabelNames.DIV_END, true);
 				lbNoErrScope = new CGLabelScope(null, null, LabelNames.DIV_NO_ERR, true);
@@ -933,13 +935,28 @@ public class Generator extends CodeGenerator {
 				}
 				break;
 			case BIT_AND:
-				cellsActionAsm(scope,  cells, (int sn, String reg) -> new CGIAsm("and " + getRightOp(sn, null) + "," + reg));
+				if(!isFixed) {
+					cellsActionAsm(scope,  cells, (int sn, String reg) -> new CGIAsm("and " + getRightOp(sn, null) + "," + reg));
+				}
+				else {
+					throw new CompileException("CG:cellsAction: unsupported operator: " + op);
+				}
 				break;
 			case BIT_OR:
-				cellsActionAsm(scope,  cells, (int sn, String reg) -> new CGIAsm("or " + getRightOp(sn, null) + "," + reg));
+				if(!isFixed) {
+					cellsActionAsm(scope,  cells, (int sn, String reg) -> new CGIAsm("or " + getRightOp(sn, null) + "," + reg));
+				}
+				else {
+					throw new CompileException("CG:cellsAction: unsupported operator: " + op);
+				}
 				break;
 			case BIT_XOR:
-				cellsActionAsm(scope,  cells, (int sn, String reg) -> new CGIAsm("eor " + getRightOp(sn, null) + "," + reg));
+				if(!isFixed) {
+					cellsActionAsm(scope,  cells, (int sn, String reg) -> new CGIAsm("eor " + getRightOp(sn, null) + "," + reg));
+				}
+				else {
+					throw new CompileException("CG:cellsAction: unsupported operator: " + op);
+				}
 				break;
 			default:
 				throw new CompileException("CG:cellsAction: unsupported operator: " + op);
@@ -950,8 +967,8 @@ public class Generator extends CodeGenerator {
 	// Оптиммизировано для экономии памяти, для экономии FLASH можно воспользоваться CPC инструкцией
 	// В операциях сравнения резултат во флаге C, в остальных результат в аккумуляторе
 	@Override
-	public void constAction(CGScope scope, Operator op, long k) throws CompileException {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";accum " + op + " " + k + " -> accum"));
+	public void constAction(CGScope scope, Operator op, long k, boolean isFixed) throws CompileException {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";accum " + op + " " + (isFixed ? k/256.0 : k) + " -> accum"));
 		CGIContainer cont = new CGIContainer();
 		switch(op) {
 			case PLUS:
@@ -969,10 +986,11 @@ public class Generator extends CodeGenerator {
 					scope.append(new CGIAsm("rcall os_mul8"));
 				}
 				else if(0x02==maxSize) {
-					RTOSLibs.MATH_MUL16.setRequired();
+					if(isFixed) RTOSLibs.MATH_MULQ7N8.setRequired();
+					else RTOSLibs.MATH_MUL16.setRequired();
 					scope.append(new CGIAsm("ldi ACCUM_EL,"+(k&0xff)));
 					scope.append(new CGIAsm("ldi ACCUM_EH,"+((k>>8)&0xff)));
-					scope.append(new CGIAsm("rcall os_mul16"));
+					scope.append(new CGIAsm("rcall " + (isFixed ? "os_mulq7n8" : "os_mul16")));
 				}
 				else if(0x04==maxSize) {
 					RTOSLibs.MATH_MUL32.setRequired();
@@ -1006,12 +1024,13 @@ public class Generator extends CodeGenerator {
 						scope.append(new CGIAsm("pop TEMP_L"));
 					}
 					else if(0x02==maxSize) {
-						RTOSLibs.MATH_DIV16.setRequired();
+						if(isFixed) RTOSLibs.MATH_DIVQ7N8.setRequired();
+						else RTOSLibs.MATH_DIV16.setRequired();
 						scope.append(new CGIAsm("push TEMP_L"));
 						scope.append(new CGIAsm("push TEMP_H"));
 						scope.append(new CGIAsm("ldi ACCUM_EL,"+(k&0xff)));
 						scope.append(new CGIAsm("ldi ACCUM_EH,"+((k>>8)&0xff)));
-						scope.append(new CGIAsm("rcall os_div16"));
+						scope.append(new CGIAsm("rcall " + (isFixed ? "os_divq7n8" : "os_div16")));
 						scope.append(new CGIAsm("pop TEMP_H"));
 						scope.append(new CGIAsm("pop TEMP_L"));
 					}
@@ -1034,6 +1053,7 @@ public class Generator extends CodeGenerator {
 				}
 				break;
 			case MOD:
+				if(isFixed) throw new CompileException("CG:constAction: unsupported operator: " + op);
 				if(accum.getSize()<NumUtils.getBytesRequired(k)) {
 					scope.append(new CGIAsm("ldi r16,0x00"));
 					accum.setSize(0x01);
@@ -1080,18 +1100,33 @@ public class Generator extends CodeGenerator {
 				}
 				break;
 			case BIT_AND:
-				constActionAsm(scope, k,  (int sn, String reg) -> new CGIAsm("andi " + getRightOp(sn, null) + "," + reg));
+				if(!isFixed) {
+					constActionAsm(scope, k,  (int sn, String reg) -> new CGIAsm("andi " + getRightOp(sn, null) + "," + reg));
+				}
+				else {
+					throw new CompileException("CG:constAction: unsupported operator: " + op);
+				}
 				break;
 			case BIT_OR:
-				constActionAsm(scope, k, (int sn, String reg) -> new CGIAsm("ori " + getRightOp(sn, null) + "," + reg));
+				if(!isFixed) {
+					constActionAsm(scope, k, (int sn, String reg) -> new CGIAsm("ori " + getRightOp(sn, null) + "," + reg));
+				}
+				else {
+					throw new CompileException("CG:constAction: unsupported operator: " + op);
+				}
 				break;
 			case BIT_XOR:
-				cont.append(new CGIAsm("push yl"));
-				for(int i=accum.getSize()-1; i>=0; i--) {
-					cont.append(new CGIAsm("ldi yl," + ((k>>(i*8))&0xff)));
-					cont.append(new CGIAsm("eor " + getRightOp(i, null) + ",r"+getAccRegs(accum.getSize())[i]));
+				if(!isFixed) {
+					cont.append(new CGIAsm("push yl"));
+					for(int i=accum.getSize()-1; i>=0; i--) {
+						cont.append(new CGIAsm("ldi yl," + ((k>>(i*8))&0xff)));
+						cont.append(new CGIAsm("eor " + getRightOp(i, null) + ",r"+getAccRegs(accum.getSize())[i]));
+					}
+					cont.append(new CGIAsm("pop yl"));
 				}
-				cont.append(new CGIAsm("pop yl"));
+				else {
+					throw new CompileException("CG:constAction: unsupported operator: " + op);
+				}
 				break;
 			default:
 				throw new CompileException("CG:constAction: unsupported operator: " + op);
@@ -1309,9 +1344,16 @@ public class Generator extends CodeGenerator {
 		}
 	};
 	
-	public void constActionAsm(CGScope scope, long k, CGActionHandler handler) throws CompileException {
-		for(int i=0; i<accum.getSize(); i++) {
-			scope.append(handler.action(i, Long.toString((k>>(i*8))&0xff)));
+	public void constActionAsm(CGScope scope, Object k, CGActionHandler handler) throws CompileException {
+		if(k instanceof byte[]) {
+			for(int i=0; i<accum.getSize(); i++) {
+				scope.append(handler.action(i, Long.toString(((byte[])k)[i]&0xff)));
+			}
+		}
+		else {
+			for(int i=0; i<accum.getSize(); i++) {
+				scope.append(handler.action(i, Long.toString((((long)k)>>(i*8))&0xff)));
+			}
 		}
 	};
 
@@ -1489,7 +1531,9 @@ public class Generator extends CodeGenerator {
 					else {
 						value = getNum(ops[i]);
 						if(VERBOSE_LO <= verbose) scope.append(new CGIText("\t;load method param"));
-						loadRegsConst(scope, regs, value);
+						for(byte reg : regs) {
+							scope.append(new CGIAsm("ldi r" + reg + "," + (value&0xff))); value>>=0x08;
+						}
 					}
 				}
 			}
@@ -1597,7 +1641,7 @@ public class Generator extends CodeGenerator {
 	@Override
 	public CGIContainer eReturn(CGScope scope, int argsSize, int varsSize, int retSize) throws CompileException {
 		CGIContainer result = new CGIContainer();
-		if(0 != retSize) result.append(accCast(null, retSize));
+		if(0 != retSize) result.append(accCast(null, retSize, false));
 
 
 		if(VERBOSE_LO <= verbose) result.append(new CGIText(";return, argsSize:" + argsSize + ", varsSize:" + varsSize + ", retSize:" + retSize));

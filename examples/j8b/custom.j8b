@@ -22,18 +22,26 @@ class Main {
 		System.setParam(RTOSParam.STDOUT_PORT, 0x12);
 
 		short s1 = 10;
-		short s2 = 2;
+		fixed f1 = 6;
+		fixed f2 = 1.5;
+
 		System.out(s1 + 2);
+		System.out(s1 + 1.5);
+		System.out(f1 + 1.5);
 		System.out(s1 - 2);
+		System.out(s1 - 1.5);
+		System.out(f1 - 1.5);
 		System.out(s1 * 2);
+		System.out(s1 * 1.5);
+		System.out(f1 * 1.5);
 		System.out(s1 / 2);
+		System.out(s1 / 1.5);
+		System.out(f1 / 1.5);
 		System.out(s1 % 2);
 
-		System.out(s1 + s2);
-		System.out(s1 - s2);
-		System.out(s1 * s2);
-		System.out(s1 / s2);
-		System.out(s1 % s2);
-
+		System.out(f1 + f2);
+		System.out(f1 - f2);
+		System.out(f1 * f2);
+		System.out(f1 / f2);
 	}
 }

@@ -176,9 +176,20 @@ public class VarNode extends AstNode {
 					}
 				}
 				else if (!isCompatibleWith(scope, type, initType)) {
-					markError("Type mismatch: cannot assign " + initType + " to " + type);
-					cg.leaveLocal();
-					return false;
+					// Дополнительная проверка втоматического привдения целочисленной константы к fixed.
+					if(VarType.FIXED == type && initializer instanceof LiteralExpression && initType.isInteger()) {
+						long num = ((LiteralExpression)initializer).getNumValue();
+						if(num<VarType.FIXED_MIN || num>VarType.FIXED_MAX) {
+							markError("Type mismatch: cannot assign " + initType + " to " + type);
+							cg.leaveLocal();
+							return false;
+						}
+					}
+					else {
+						markError("Type mismatch: cannot assign " + initType + " to " + type);
+						cg.leaveLocal();
+						return false;
+					}
 				}
 
 				// Дополнительная проверка на сужающее преобразование
@@ -230,13 +241,15 @@ public class VarNode extends AstNode {
 		else {
 			// Инициализация(заполнение нулями необходима только регистрам, остальные проинициализированы вместе с HEAP/STACK)
 			if(null == initializer) {
-				if(CGCells.Type.REG==vScope.getCells().getType()) cg.getScope().append(cg.constToCells(cg.getScope(), 0, vScope.getCells()));
+				if(CGCells.Type.REG==vScope.getCells().getType()) cg.getScope().append(cg.constToCells(cg.getScope(), 0, vScope.getCells(), false));
 			}
 			else if(initializer instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
-				cg.getScope().append(cg.constToCells(cg.getScope(), ((LiteralExpression)initializer).getNumValue(), vScope.getCells()));
+				LiteralExpression le = (LiteralExpression)initializer;
+				boolean isFixed = le.isFixed() || VarType.FIXED == vScope.getType();
+				cg.getScope().append(cg.constToCells(cg.getScope(), isFixed ? le.getFixedValue() : le.getNumValue(), vScope.getCells(), isFixed));
 			}
 			else if(initializer instanceof FieldAccessExpression) {
-				cg.getScope().append(cg.constToCells(cg.getScope(), -1, vScope.getCells()));
+				cg.getScope().append(cg.constToCells(cg.getScope(), 0, vScope.getCells(), false));
 				accUsed = true;
 			}
 			else if(initializer instanceof NewExpression) {

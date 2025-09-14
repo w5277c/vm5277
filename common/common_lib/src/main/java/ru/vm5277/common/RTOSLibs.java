@@ -27,9 +27,11 @@ public enum RTOSLibs {
 	INVOKE_METHOD("j8b/invoke_method.asm"),
 	MATH_MUL8("math/mul8.asm"),
 	MATH_MUL16("math/mul16.asm"),
+	MATH_MULQ7N8("math/mulq7n8.asm"),
 	MATH_MUL32("math/mul32.asm"),
 	MATH_DIV8("math/div8.asm"),
 	MATH_DIV16("math/div16.asm"),
+	MATH_DIVQ7N8("math/divq7n8.asm"),
 	MATH_DIV32("math/div32.asm");
 	
 	private	final	String	path;

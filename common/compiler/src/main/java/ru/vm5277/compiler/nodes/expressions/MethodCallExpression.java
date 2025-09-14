@@ -220,6 +220,7 @@ public class MethodCallExpression extends ExpressionNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		boolean result = true;
 		try {
 			ExpressionNode optimizedParentScope = classNameExpr.optimizeWithScope(scope, cg);
 			if(null != optimizedParentScope) {
@@ -232,36 +233,41 @@ public class MethodCallExpression extends ExpressionNode {
 
 			// Проверка parent (если есть)
 			if (null != classNameExpr) {
-				if (!classNameExpr.postAnalyze(scope, cg)) return false;
-
-				try {
-					VarType parentType = classNameExpr.getType(scope);
-					if (null == parentType) {
-						markError("Cannot determine type of parent expression");
-						cg.leaveExpression();
-						return false;
-					}
+				if (!classNameExpr.postAnalyze(scope, cg)) {
+					result = false;
 				}
-				catch (CompileException e) {
-					markError("Parent type error: " + e.getMessage());
-					cg.leaveExpression();
-					return false;
+				else {
+					try {
+						VarType parentType = classNameExpr.getType(scope);
+						if (null == parentType) {
+							markError("Cannot determine type of parent expression");
+							cg.leaveExpression();
+							return false;
+						}
+					}
+					catch (CompileException e) {
+						markError("Parent type error: " + e.getMessage());
+						result = false;
+					}
 				}
 			}
 
 			// Проверка аргументов
 			for (int i=0; i<args.size(); i++) {
 				ExpressionNode arg = args.get(i);
-				if (!arg.postAnalyze(scope, cg)) return false;
-
-				try {
-					ExpressionNode optimizedExpr = arg.optimizeWithScope(scope, cg);
-					if(null != optimizedExpr) {
-						args.set(i, optimizedExpr);
-					}
+				if (!arg.postAnalyze(scope, cg)) {
+					result = false;
 				}
-				catch(CompileException e) {
-					e.printStackTrace();
+				else {
+					try {
+						ExpressionNode optimizedExpr = arg.optimizeWithScope(scope, cg);
+						if(null != optimizedExpr) {
+							args.set(i, optimizedExpr);
+						}
+					}
+					catch(CompileException e) {
+						e.printStackTrace();
+					}
 				}
 			}
 			
@@ -363,7 +369,7 @@ public class MethodCallExpression extends ExpressionNode {
         }
 		
 		cg.leaveExpression();
-		return true;
+		return result;
 	}
 	
 	@Override
@@ -411,7 +417,7 @@ public class MethodCallExpression extends ExpressionNode {
 			else if(0 == argTypes.length && "getClassTypeId".equals(symbol.getName())) {
 				// Только для информирования
 				cg.invokeClassMethod(cgScope, classNameStr, symbol.getName(), type, argTypes, null, false);
-				cg.constToAcc(cgScope, cg.getRefSize(), classType.getId());
+				cg.constToAcc(cgScope, cg.getRefSize(), classType.getId(), false);
 			}
 			else {
 				int refTypeSize = 1; // TODO Определить значение на базе количества используемых типов класса
@@ -474,6 +480,9 @@ public class MethodCallExpression extends ExpressionNode {
 				vScope.setDataSymbol(cg.defineData(vScope.getResId(), (String)le.getValue()));
 				return new Operand(OperandType.FLASH_RES, vScope.getResId());
 			}
+			else if(le.isFixed()) {
+				return new Operand(OperandType.LITERAL_FIXED, le.getFixedValue());
+			}
 			else {
 				return new Operand(OperandType.LITERAL, le.getNumValue());
 			}
@@ -532,7 +541,8 @@ public class MethodCallExpression extends ExpressionNode {
 					if(argExpr instanceof LiteralExpression) {
 						// Выполняем зависимость
 						argExpr.depCodeGen(cg);
-						cont.append(cg.pushConst(null, exprTypeSize, ((LiteralExpression)argExpr).getNumValue()));
+						LiteralExpression le = (LiteralExpression)argExpr;
+						cont.append(cg.pushConst(null, exprTypeSize, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed()));
 					}
 					else if(argExpr instanceof VarFieldExpression) {
 						// Выполняем зависимость

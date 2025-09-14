@@ -45,14 +45,14 @@ public class Generator extends CodeGenerator {
 		super(platform, nbMap, params);
 	}
 	
-	@Override public CGIContainer accCast(CGScope scope, int size) throws CompileException {return null;}
+	@Override public CGIContainer accCast(CGScope scope, int size, boolean toFixed) throws CompileException {return null;}
 	@Override public void cellsToAcc(CGScope scope, CGCellsScope cScope) throws CompileException {}
 	@Override public void accToCells(CGScope scope, CGCellsScope cScope) throws CompileException {}
 	@Override public void setHeapReg(CGScope scope, CGCells cells) throws CompileException {}
-	@Override public void constToAcc(CGScope scope, int size, long value) {}
-	@Override public CGIContainer constToCells(CGScope scope, long value, CGCells cells) throws CompileException {return null;}
-	@Override public void cellsAction(CGScope scope, CGCells cells, Operator op) throws CompileException {}
-	@Override public void constAction(CGScope scope, Operator op, long k) throws CompileException {}
+	@Override public void constToAcc(CGScope scope, int size, long value, boolean isFixed) {}
+	@Override public CGIContainer constToCells(CGScope scope, long value, CGCells cells, boolean isFixed) throws CompileException {return null;}
+	@Override public void cellsAction(CGScope scope, CGCells cells, Operator op, boolean isFixed) throws CompileException {}
+	@Override public void constAction(CGScope scope, Operator op, long k, boolean isFixed) throws CompileException {}
 	@Override public CGIContainer pushAccBE(CGScope scope, int size) {return null;}
 	@Override public void popAccBE(CGScope scope, int size) {}
 	@Override public CGIContainer pushHeapReg(CGScope scope, boolean half) {return null;}
@@ -75,7 +75,7 @@ public class Generator extends CodeGenerator {
 	@Override public int getRefSize() {return 1;}
 	@Override public int getCallSize() {return 1;}
 	@Override public ArrayList<RegPair> buildRegsPool() {return null;}
-	@Override public CGIContainer pushConst(CGScope scope, int size, long value) {return null;}
+	@Override public CGIContainer pushConst(CGScope scope, int size, long value, boolean isFixed) {return null;}
 	@Override public CGIContainer pushCells(CGScope scope, int size, CGCells cells) throws CompileException {return null;}
 	@Override public CGIContainer stackAlloc(boolean firstBlock, int argsSize, int varsSize) {return null;}
 	@Override public CGIContainer blockFree(int size) {return null;}

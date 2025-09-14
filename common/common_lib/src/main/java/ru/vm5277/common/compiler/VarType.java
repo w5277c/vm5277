@@ -20,6 +20,8 @@ import java.util.Map;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class VarType {
+	public	static	final	double					FIXED_MIN	= -128.0d;
+	public	static	final	double					FIXED_MAX	= 127.99609375d;
 	private	static	final	Map<String, VarType>	CLASS_TYPES = new HashMap<>();
 	static {
 		CLASS_TYPES.put("Object", new VarType("class:Object", "Object"));
@@ -163,7 +165,8 @@ public class VarType {
 		}
 		else if(this == FIXED) {
 			double d = (num instanceof Double ? ((Double)num) : (num.doubleValue()));
-			if(d<-128.0 || d > 127.99609375d) throw new CompileException(String.format("fixed value out of range (-128.0..127.99609375). Given: %.8f", d));
+			if(d<FIXED_MIN || d>FIXED_MAX) throw new CompileException(	String.format("fixed value out of range (" + FIXED_MIN + ".." + FIXED_MAX +
+																		"). Given: %.8f", d));
 		}
 	}
 	

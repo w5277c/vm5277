@@ -140,8 +140,8 @@ public class ReturnNode extends CommandNode {
 			//TODO необходимо определиться где именно устанавливается значение в аккумулятор. Лучше в самом выражении, но
 			//ReturnNode не имеет собственного CGScope, выражение видит CGMethodScope
 			if(expr instanceof LiteralExpression) {
-				//cg.setAcc(cgScope, returnType.getSize(), ((LiteralExpression)expr).getNumValue());
-				cg.constToAcc(cgScope, returnType.getSize(), ((LiteralExpression)expr).getNumValue());
+				LiteralExpression le = (LiteralExpression)expr;
+				cg.constToAcc(cgScope, returnType.getSize(), le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed());
 			}
 		}
 		// Можно было бы вызвать cg.eReturn(cgScope, returnType.getSize());, но в блоке мог быть выделен STACK_FRAME и возможно что-то еще, поэтому переходим

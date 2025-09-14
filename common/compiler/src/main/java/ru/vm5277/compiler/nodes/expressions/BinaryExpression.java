@@ -24,13 +24,9 @@ import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
-import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGBranchScope;
-import ru.vm5277.common.cg.scopes.CGExpressionScope;
-import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
@@ -132,6 +128,7 @@ public class BinaryExpression extends ExpressionNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		boolean result = true;
 		try {
 			cgScope = cg.enterExpression();
 			// Анализ операндов
@@ -192,6 +189,10 @@ public class BinaryExpression extends ExpressionNode {
 					return false;
 				}
 			}
+			else if(Operator.MOD == operator && VarType.FIXED==rightType) {
+				markError("Modulo operator % cannot be applied to 'fixed'");
+				result = false;
+			}
 			else if ((Operator.DIV == operator || Operator.MOD == operator)) { // Проверка деления на ноль (универсальная для всех типов)
 				if (rightExpr instanceof LiteralExpression) {
 					Object val = ((LiteralExpression)rightExpr).getValue();
@@ -216,7 +217,6 @@ public class BinaryExpression extends ExpressionNode {
 					if(leftType.isFixedPoint() || rightType.isFixedPoint()) {
 						double leftVal = leftLE.getValue() instanceof Double ? ((Double)leftLE.getValue()) : ((Number)leftLE.getValue()).doubleValue();
 						double rightVal = rightLE.getValue() instanceof Double ? ((Double)rightLE.getValue()) : ((Number)rightLE.getValue()).doubleValue();
-						double result = 0;
 						
 						try	{					
 							switch (operator) {
@@ -235,7 +235,6 @@ public class BinaryExpression extends ExpressionNode {
 					else {
 						long leftVal = ((Number)leftLE.getValue()).longValue();
 						long rightVal = ((Number)rightLE.getValue()).longValue();
-						long result = 0;
 
 						try {
 							switch (operator) {
@@ -267,7 +266,7 @@ public class BinaryExpression extends ExpressionNode {
 		catch(CompileException e) {markError(e); cg.leaveExpression(); return false;}
 
 		cg.leaveExpression();
-		return true;
+		return result;
 	}
 	
 	@Override
@@ -377,7 +376,7 @@ public class BinaryExpression extends ExpressionNode {
 				CGCellsScope cScope = (CGCellsScope)leftExpr.getSymbol().getCGScope();
 				if(VarType.NULL == rightType) {
 					if(null == op) {
-						cgScope.append(cg.constToCells(cgScope, 0x00, cScope.getCells()));
+						cgScope.append(cg.constToCells(cgScope, 0x00, cScope.getCells(), false));
 						cg.updateRefCount(cgScope, cScope.getCells(), false);
 					}
 					else {
@@ -386,7 +385,9 @@ public class BinaryExpression extends ExpressionNode {
 				}
 				else {
 					if(rightExpr instanceof LiteralExpression) {
-						cgScope.append(cg.constToCells(cgScope, ((LiteralExpression)rightExpr).getNumValue(), cScope.getCells()));
+						LiteralExpression le = (LiteralExpression)rightExpr;
+						boolean isFixed = le.isFixed() || VarType.FIXED == cScope.getType();
+						cgScope.append(cg.constToCells(cgScope, isFixed ? le.getFixedValue() : le.getNumValue(), cScope.getCells(), isFixed));
 					}
 					else {
 						if (CodegenResult.RESULT_IN_ACCUM != rightExpr.codeGen(cg)) {
@@ -404,17 +405,21 @@ public class BinaryExpression extends ExpressionNode {
 			
 			//TODO Вероятно не совсем корректная модель. Условие ниже 'expr2 instanceof LiteralExpression' вообще возможно?
 			if(expr1 instanceof LiteralExpression) {
+				LiteralExpression le = (LiteralExpression)expr1;
 				if(op.isComparison()) {
 					expr2.codeGen(cg, false);
 					CGCellsScope cScope = (CGCellsScope)expr2.getSymbol().getCGScope();
-					cg.constCond(cgScope, cScope.getCells(), op, ((LiteralExpression)expr1).getNumValue(), isInvert, opOr, (CGBranchScope)brScope);
+					cg.constCond(cgScope, cScope.getCells(), op, le.getNumValue(), isInvert, opOr, (CGBranchScope)brScope);
 				}
 				else {
 					if(CodegenResult.RESULT_IN_ACCUM != expr2.codeGen(cg, true)) {
 						throw new CompileException("Accum not used for operand:" + expr1);
 					}
+					if(VarType.FIXED != expr2.getType(null) && le.isFixed()) {
+						cg.accCast(cgScope, 2, true);
+					}
 					//Добавить проверку деления на 0
-					cg.constAction(cgScope, op, ((LiteralExpression)expr1).getNumValue());
+					cg.constAction(cgScope, op, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed());
 				}
 			}
 			else {
@@ -427,7 +432,10 @@ public class BinaryExpression extends ExpressionNode {
 					throw new CompileException("Accum not used for operand:" + expr1);
 				}
 				if(null != op) {
-					cg.cellsAction(cgScope, cScope.getCells(), op);
+					if(VarType.FIXED != expr1.getType(null) && VarType.FIXED == expr2.getType(null)) {
+						cg.accCast(cgScope, 2, true);
+					}
+					cg.cellsAction(cgScope, cScope.getCells(), op, VarType.FIXED == expr2.getType(null));
 				}
 			}
 			if(operator.isAssignment()) {
@@ -460,13 +468,19 @@ public class BinaryExpression extends ExpressionNode {
 						throw new CompileException("Accum not used for operand:" + expr1);
 					}
 					//Добавить проверку деления на 0
-					cg.constAction(cgScope, op, ((LiteralExpression)expr2).getNumValue());
+					LiteralExpression le = (LiteralExpression)expr2;
+					if(VarType.FIXED != expr1.getType(null) && le.isFixed()) {
+						cg.accCast(cgScope, 2, true);
+					}
+					cg.constAction(cgScope, op, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed());
 				}
 			}
 			if(operator.isAssignment()) {
 				CGCellsScope cScope = (CGCellsScope)expr1.getSymbol().getCGScope();
 				if(Operator.ASSIGN == operator) {
-					cgScope.append(cg.constToCells(cgScope, ((LiteralExpression)expr2).getNumValue(), cScope.getCells()));
+					LiteralExpression le = (LiteralExpression)expr2;
+					boolean isFixed = le.isFixed() || VarType.FIXED == cScope.getType();
+					cgScope.append(cg.constToCells(cgScope, isFixed ? le.getFixedValue() : le.getNumValue(), cScope.getCells(), isFixed));
 				}
 				else {
 					cg.accToCells(cgScope, cScope);
@@ -493,10 +507,12 @@ public class BinaryExpression extends ExpressionNode {
 				throw new CompileException("Accum not used for operand:" + expr1);
 			}
 
-
 			// Выполняем операцию, левый операнд - аккумулятор, правый операнд - значение на вершине стека
 			if(null != op) {
-				cg.cellsAction(cgScope, new CGCells(CGCells.Type.STACK, size), op);
+				if(VarType.FIXED != expr1.getType(null) && VarType.FIXED == expr2.getType(null)) {
+					cg.accCast(cgScope, 2, true);
+				}
+				cg.cellsAction(cgScope, new CGCells(CGCells.Type.STACK, size), op, VarType.FIXED == expr2.getType(null));
 			}
 			if(operator.isAssignment()) {
 				// TODO

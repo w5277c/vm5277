@@ -153,10 +153,11 @@ public class ClassBlockNode extends AstNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		boolean result = true;
 		for (AstNode node : children) {
-			node.postAnalyze(scope, cg);
+			result &= node.postAnalyze(scope, cg);
 		}
-		return true;
+		return result;
 	}
 	
 	private boolean checkNonStaticMembers(ClassScope classScope) {

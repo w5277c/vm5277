@@ -16,9 +16,10 @@
 package ru.vm5277.common.cg;
 
 public enum OperandType {
-	LITERAL,	//число в виде константы(сразу записывается в регистр)
-	TYPE,		//reference? т.е. заполнен resId?
-	FLASH_RES,	//данные размещенные во FLASH области
-	LOCAL_RES,	//field или var, заполнен resId.
-	ACCUM;		//аккумулятор
+	LITERAL,		//число в виде константы(сразу записывается в регистр)
+	LITERAL_FIXED,	//число в виде константы в формате FIXED(сразу записывается в регистр)
+	TYPE,			//reference? т.е. заполнен resId?
+	FLASH_RES,		//данные размещенные во FLASH области
+	LOCAL_RES,		//field или var, заполнен resId.
+	ACCUM;			//аккумулятор
 }

@@ -67,6 +67,17 @@ public class LiteralExpression extends ExpressionNode {
 		return value instanceof Integer || value instanceof Long;
 	}
 	
+	public boolean isFixed() {
+		return (value instanceof Double) || ((value instanceof Number) && 0>((Number)value).longValue());
+	}
+	
+	public long getFixedValue() {
+		if(value instanceof Double) {
+			return Math.round(((Double)value)*256.0) & 0xffffl;
+		}
+		return (getNumValue()*256l) & 0xffffl;
+	}
+	
 	public boolean isBoolean() {
 		return value instanceof Boolean;
 	}
@@ -85,7 +96,14 @@ public class LiteralExpression extends ExpressionNode {
 		else if(value instanceof VarType) {
 			return ((VarType)value).getId();
 		}
-		return ((Number)value).longValue();
+		else if(value instanceof Double) {
+			return Math.round(((Double)value));
+		}
+		else {
+			long result = ((Number)value).longValue();
+			if(0>result) return 0l;
+			return result;
+		}
 	}
 	
 	@Override

@@ -204,15 +204,15 @@ public abstract class CodeGenerator extends CGScope {
 
 	public abstract CGIContainer jump(CGScope scope, CGLabelScope lScope) throws CompileException;
 	public abstract CGIContainer call(CGScope scope, CGLabelScope lScope) throws CompileException;
-	public abstract CGIContainer accCast(CGScope scope, int size) throws CompileException;
+	public abstract CGIContainer accCast(CGScope scope, int size, boolean toFixed) throws CompileException;
 	public abstract void cellsToAcc(CGScope scope, CGCellsScope cScope) throws CompileException;
 	public abstract void accToCells(CGScope scope, CGCellsScope cScope) throws CompileException;
 //	public abstract void retToCells(CGScope scope, CGCellsScope cScope) throws CompileException;
 	public abstract void setHeapReg(CGScope scope, CGCells cells) throws CompileException;
-	public abstract void constToAcc(CGScope scope, int size, long value);
-	public abstract CGIContainer constToCells(CGScope scope, long value, CGCells cells) throws CompileException;
-	public abstract void cellsAction(CGScope scope, CGCells cells, Operator op) throws CompileException;
-	public abstract void constAction(CGScope scope, Operator op, long k) throws CompileException;
+	public abstract void constToAcc(CGScope scope, int size, long value, boolean isFixed);
+	public abstract CGIContainer constToCells(CGScope scope, long value, CGCells cells, boolean isFixed) throws CompileException;
+	public abstract void cellsAction(CGScope scope, CGCells cells, Operator op, boolean isFixed) throws CompileException;
+	public abstract void constAction(CGScope scope, Operator op, long k, boolean isFixed) throws CompileException;
 	public abstract void constCond(CGScope scope, CGCells cells, Operator op, long k, boolean isNot, boolean isOr, CGBranchScope condScope) throws CompileException;
 	public abstract	CGIContainer pushAccBE(CGScope scope, int size);
 	public abstract	void popAccBE(CGScope scope, int size);
@@ -245,7 +245,7 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract int getCallSize();
 	public abstract int getCallStackSize();
 	public abstract ArrayList<RegPair> buildRegsPool();
-	public abstract CGIContainer pushConst(CGScope scope, int size, long value);
+	public abstract CGIContainer pushConst(CGScope scope, int size, long value, boolean isFixed);
 	public abstract CGIContainer pushCells(CGScope scope, int size, CGCells cells) throws CompileException;
 //	public abstract void setValueByIndex(Operand op, int size, List<Byte> tempRegs) throws CompileException;
 	public abstract CGIContainer stackAlloc(boolean firstBlock, int argsSize, int varsSize);
@@ -259,6 +259,8 @@ public abstract class CodeGenerator extends CGScope {
 				if(op.getValue() instanceof Character) {
 					return (long)(Character)op.getValue();
 				}
+				return ((Number)op.getValue()).longValue();
+			case LITERAL_FIXED:
 				return ((Number)op.getValue()).longValue();
 			default: throw new CompileException("CG: getNum, unsupported operand:" + op);
 		}

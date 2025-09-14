@@ -249,6 +249,7 @@ public class MethodNode extends AstNode {
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		boolean result = true;
 		VarType[] types = null;
 		if(!parameters.isEmpty()) {
 			types = new VarType[parameters.size()];
@@ -277,7 +278,7 @@ public class MethodNode extends AstNode {
 				}
 
 				// Анализируем тело метода
-				blockNode.postAnalyze(methodScope, cg);
+				result &= blockNode.postAnalyze(methodScope, cg);
 
 				// Для не-void методов проверяем наличие return
 				// TODO переосмыслить после ConstantFolding
@@ -303,7 +304,7 @@ public class MethodNode extends AstNode {
 		else {
 			cg.leaveMethod();
 		}
-		return true;
+		return result;
 	}
 	
 	public void firstCodeGen(CodeGenerator cg) throws Exception {

@@ -241,6 +241,7 @@ public class BlockNode extends AstNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		boolean result = true;
 		cgScope = cg.enterBlock(cg.getScope());
 		
 		boolean inTryBlock = false;
@@ -250,7 +251,7 @@ public class BlockNode extends AstNode {
 			AstNode node = children.get(i);
 
 			// Анализируем текущую ноду
-			node.postAnalyze(blockScope, cg);
+			result &= node.postAnalyze(blockScope, cg);
 			
 			// Если нашли try-block, отмечаем начало зоны обработки исключений
 			if (node instanceof TryNode) {
@@ -283,7 +284,7 @@ public class BlockNode extends AstNode {
 		}
 		
 		cg.leaveBlock();
-		return true;
+		return result;
 	}
 
 	

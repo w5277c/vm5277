@@ -652,7 +652,7 @@ public class ExpressionNode extends AstNode {
 		
 		// Добавляем константу (умножение или деление)
 		if (totalConstant != 1.0) {
-			if (reciprocalValue >= 1.0 && Math.abs(reciprocalValue - Math.round(reciprocalValue)) < 1e-10) {
+			if (reciprocalValue >= 1.0 && countDecimalDigits(reciprocalValue) < countDecimalDigits(totalConstant)) {
 				ExpressionNode divisorNode = createOptimalConstantNode(reciprocalValue);
 				result = (result == null ? 
 						new BinaryExpression(tb, mc, createOptimalConstantNode(1), Operator.DIV, divisorNode) :
@@ -673,6 +673,19 @@ public class ExpressionNode extends AstNode {
 		}
 
 		return result != null ? result : createOptimalConstantNode(totalConstant);
+	}
+	private int countDecimalDigits(double value) {
+		if(value == (long)value) return 0;
+
+		String str = String.valueOf(value);
+		int dotPos = str.indexOf('.');
+		if(dotPos==-1) return 0;
+
+		int end = str.length() - 1;
+		while (end>dotPos && str.charAt(end)=='0') {
+			end--;
+		}
+		return end-dotPos;
 	}
 	private void collectMultiplicativeTerms(ExpressionNode node, List<ExpressionNode> numerators, List<ExpressionNode> denominators) {
 		if (node instanceof BinaryExpression) {
