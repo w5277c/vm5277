@@ -52,6 +52,7 @@ public class NativeBinding {
 				methodParams = new VarType[paramsParts.length];
 				for(int i=0; i<paramsParts.length; i++) {
 					switch(paramsParts[i].trim().toLowerCase()) {
+						case "bool": methodParams[i] = VarType.BOOL; break;
 						case "byte": methodParams[i] = VarType.BYTE; break;
 						case "short": methodParams[i] = VarType.SHORT; break;
 						case "int": methodParams[i] = VarType.INT; break;

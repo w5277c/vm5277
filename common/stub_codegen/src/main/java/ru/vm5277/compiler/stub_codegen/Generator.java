@@ -82,7 +82,9 @@ public class Generator extends CodeGenerator {
 	@Override public String getVersion() {return VERSION;}
 	@Override public CGIContainer jump(CGScope scope, CGLabelScope lScope) throws CompileException {return null;}
 	@Override public void pushLabel(CGScope scope, String label) {}
-	@Override public void constCond(CGScope scope, CGCells cells, Operator op, long k, boolean isNot, boolean isOr, CGBranchScope condScope) throws CompileException {}
+	@Override public void cellsCond(CGScope scope, CGCells cells, Operator op, boolean isNot, boolean isOr, CGBranchScope branchScope) throws CompileException {}
+	@Override public void constCond(CGScope scope, CGCells cells, Operator op, long k, boolean isNot, boolean isOr, CGBranchScope branchScope) throws CompileException {}
+	@Override public void boolCond(CGScope scope, CGBranchScope branchScope) throws CompileException {}
 	@Override public CGIAsm pushRegAsm(byte reg) {return null;}
 	@Override public CGIAsm popRegAsm(byte reg) {return null;}
 	@Override public CGIContainer call(CGScope scope, CGLabelScope lScope) throws CompileException {return null;}

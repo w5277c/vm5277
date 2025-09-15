@@ -1,0 +1,164 @@
+; vm5277.avr_codegen v0.1 at Tue Sep 16 01:17:37 VLAT 2025
+.equ stdout_port = 18
+
+.set OS_FT_STDOUT = 1
+.set OS_FT_DRAM = 1
+
+.include "devices/atmega328p.def"
+.include "core/core.asm"
+.include "dmem/dram.asm"
+.include "j8b/inc_refcount.asm"
+.include "j8b/dec_refcount.asm"
+.include "math/mul16.asm"
+.include "math/mulq7n8.asm"
+.include "math/div16.asm"
+.include "math/divq7n8.asm"
+.include "stdio/out_num16.asm"
+.include "stdio/out_q7n8.asm"
+
+Main:
+	rjmp j8bCMainMmain
+_j8b_meta19:
+	.db 12,0
+
+j8bCMainMmain:
+	ldi r20,10
+	ldi r21,0
+	ldi r22,0
+	ldi r23,6
+	ldi r24,128
+	ldi r25,1
+	mov r16,r20
+	mov r17,r21
+	subi r16,254
+	sbci r17,255
+	rcall os_out_num16
+	mov r16,r20
+	mov r17,r21
+	mov r17,r16
+	clr r16
+	subi r16,128
+	sbci r17,254
+	rcall os_out_q7n8
+	mov r16,r22
+	mov r17,r23
+	subi r16,128
+	sbci r17,254
+	rcall os_out_q7n8
+	mov r16,r20
+	mov r17,r21
+	subi r16,2
+	sbci r17,0
+	rcall os_out_num16
+	mov r16,r20
+	mov r17,r21
+	mov r17,r16
+	clr r16
+	subi r16,128
+	sbci r17,1
+	rcall os_out_q7n8
+	mov r16,r22
+	mov r17,r23
+	subi r16,128
+	sbci r17,1
+	rcall os_out_q7n8
+	mov r16,r20
+	mov r17,r21
+	ldi ACCUM_EL,2
+	ldi ACCUM_EH,0
+	rcall os_mul16
+	rcall os_out_num16
+	mov r16,r20
+	mov r17,r21
+	mov r17,r16
+	clr r16
+	ldi ACCUM_EL,128
+	ldi ACCUM_EH,1
+	rcall os_mulq7n8
+	rcall os_out_q7n8
+	mov r16,r22
+	mov r17,r23
+	ldi ACCUM_EL,128
+	ldi ACCUM_EH,1
+	rcall os_mulq7n8
+	rcall os_out_q7n8
+	mov r16,r20
+	mov r17,r21
+	push TEMP_L
+	push TEMP_H
+	ldi ACCUM_EL,2
+	ldi ACCUM_EH,0
+	rcall os_div16
+	pop TEMP_H
+	pop TEMP_L
+	rcall os_out_num16
+	mov r16,r20
+	mov r17,r21
+	mov r17,r16
+	clr r16
+	push TEMP_L
+	push TEMP_H
+	ldi ACCUM_EL,128
+	ldi ACCUM_EH,1
+	rcall os_divq7n8
+	pop TEMP_H
+	pop TEMP_L
+	rcall os_out_q7n8
+	mov r16,r22
+	mov r17,r23
+	push TEMP_L
+	push TEMP_H
+	ldi ACCUM_EL,128
+	ldi ACCUM_EH,1
+	rcall os_divq7n8
+	pop TEMP_H
+	pop TEMP_L
+	rcall os_out_q7n8
+	mov r16,r20
+	mov r17,r21
+	push TEMP_L
+	push TEMP_H
+	ldi ACCUM_EL,2
+	ldi ACCUM_EH,0
+	rcall os_div16
+	movw ACCUM_L,TEMP_L
+	pop TEMP_H
+	pop TEMP_L
+	rcall os_out_num16
+	mov r16,r24
+	mov r17,r25
+	add r16,r22
+	adc r17,r23
+	rcall os_out_q7n8
+	mov r16,r22
+	mov r17,r23
+	sub r16,r24
+	sbc r17,r25
+	rcall os_out_q7n8
+	mov r16,r24
+	mov r17,r25
+	mov ACCUM_EL,r22
+	mov ACCUM_EH,r23
+	rcall os_mulq7n8
+	rcall os_out_q7n8
+	mov r16,r22
+	mov r17,r23
+	mov ACCUM_EL,r24
+	mov ACCUM_EH,r25
+	tst r17
+	brne _j8b_nediv25
+	tst r18
+	brne _j8b_nediv25
+;TODO Division by zero
+	ldi r16,0xff
+	ldi r17,0xff
+	rjmp _j8b_ediv24
+_j8b_nediv25:
+	push TEMP_L
+	push TEMP_H
+	rcall os_divq7n8
+	pop TEMP_H
+	pop TEMP_L
+_j8b_ediv24:
+	rcall os_out_q7n8
+	ret

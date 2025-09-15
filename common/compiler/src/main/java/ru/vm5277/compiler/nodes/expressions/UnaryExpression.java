@@ -22,10 +22,8 @@ import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.cg.scopes.CGBranchScope;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
-import ru.vm5277.common.cg.scopes.CGClassScope;
-import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.cg.scopes.CGVarScope;
+import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -173,6 +171,8 @@ public class UnaryExpression extends ExpressionNode {
 		return codeGen(cg, false, false, accumStore);
 	}
 	public Object codeGen(CodeGenerator cg, boolean isInvert, boolean opOr, boolean accumStore) throws Exception {
+		CodegenResult result = null;
+		
 		CGScope brScope = cg.getScope();
 		while(null != brScope && !(brScope instanceof CGBranchScope)) {
 			brScope = brScope.getParent();
@@ -183,13 +183,15 @@ public class UnaryExpression extends ExpressionNode {
 			((BinaryExpression)operand).codeGen(cg, !isInvert, true, false);
 		}
 		else if(operand instanceof VarFieldExpression) {
-			if(Operator.NOT == operator) {
-				((VarFieldExpression)operand).codeGen(cg, !isInvert, opOr, (CGBranchScope)brScope);
+			VarFieldExpression ve = (VarFieldExpression)operand;
+			if(null != brScope && Operator.NOT == operator) { //TODO вероятно не корректно проверять по brScope(но без блока условий нужен именно emitUnary
+				ve.codeGen(cg, !isInvert, opOr, (CGBranchScope)brScope);
 			}
 			else {
-				((VarFieldExpression)operand).codeGen(cg, false);
+				ve.codeGen(cg, false);
 				CGCellsScope cScope = (CGCellsScope)operand.getSymbol().getCGScope();
 				cg.emitUnary(cgScope, operator, cScope.getCells());
+				result = CodegenResult.RESULT_IN_ACCUM;
 			}
 		}
 		else if(operand instanceof UnaryExpression) {
@@ -200,7 +202,7 @@ public class UnaryExpression extends ExpressionNode {
 			throw new CompileException("Unsupported operand '" + operand + " in unary expression");
 		}
 		cg.setScope(oldCGScope);
-		return null;
+		return result;
 	}
 	
 	@Override

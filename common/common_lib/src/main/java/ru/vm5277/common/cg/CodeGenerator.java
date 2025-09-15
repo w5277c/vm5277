@@ -213,7 +213,9 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract CGIContainer constToCells(CGScope scope, long value, CGCells cells, boolean isFixed) throws CompileException;
 	public abstract void cellsAction(CGScope scope, CGCells cells, Operator op, boolean isFixed) throws CompileException;
 	public abstract void constAction(CGScope scope, Operator op, long k, boolean isFixed) throws CompileException;
-	public abstract void constCond(CGScope scope, CGCells cells, Operator op, long k, boolean isNot, boolean isOr, CGBranchScope condScope) throws CompileException;
+	public abstract void cellsCond(CGScope scope, CGCells cells, Operator op, boolean isNot, boolean isOr, CGBranchScope branchScope) throws CompileException;
+	public abstract void constCond(CGScope scope, CGCells cells, Operator op, long k, boolean isNot, boolean isOr, CGBranchScope branchScope) throws CompileException;
+	public abstract void boolCond(CGScope scope, CGBranchScope branchScope) throws CompileException;
 	public abstract	CGIContainer pushAccBE(CGScope scope, int size);
 	public abstract	void popAccBE(CGScope scope, int size);
 	public abstract	CGIContainer pushHeapReg(CGScope scope, boolean half);

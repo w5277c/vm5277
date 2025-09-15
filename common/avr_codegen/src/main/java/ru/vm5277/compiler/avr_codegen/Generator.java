@@ -534,28 +534,46 @@ public class Generator extends CodeGenerator {
 	@Override
 	public void emitUnary(CGScope scope, Operator op, CGCells cells) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";eUnary " + op + " cells " + cells + " -> accum"));
-		switch(op) {
-			case PLUS:
-				break;
-			case MINUS:
-				cellsActionAsm(scope, cells, (int sn, String reg) -> new CGIAsm("com " + reg));
-				cellsActionAsm(scope, cells, (int sn, String reg) -> new CGIAsm(0 == sn ? "sub " + reg + ",C0x01" : "sbc " + reg + ",C0x00"));
-				break;
-			case BIT_NOT:
-				cellsActionAsm(scope, cells, (int sn, String reg) -> new CGIAsm("com " + reg));
-			case PRE_INC:
-			case POST_INC:
-				cellsActionAsm(scope, cells, (int sn, String reg) -> new CGIAsm(0 == sn ? "add " + reg + ",C0x01" : "adc " + reg + ",C0x00"));
-				break;
-			case PRE_DEC:
-			case POST_DEC:
-				cellsActionAsm(scope, cells, (int sn, String reg) -> new CGIAsm(0 == sn ? "sub " + reg + ",C0x01" :	"sbc " + reg + ",C0x00"));
-				break;
-			case NOT:
-				cellsActionAsm(scope, cells, (int sn, String reg) -> new CGIAsm("com " + reg));
-				break;
-			default:
-				throw new CompileException("CG:emitUnary: unsupported operator: " + op);
+		for(int i=cells.getSize()-1; i>=0; i--) {
+			byte racc = getAccRegs(cells.getSize())[i];
+			switch(cells.getType()) {
+				case REG:
+					scope.append(new CGIAsm("mov r" + racc + ",r" + cells.getId(i)));
+					break;
+				case ARGS:
+				case STACK_FRAME:
+					scope.append(new CGIAsmIReg('y', "ldd " + racc + ",y+", cells.getId(i), "", getCurBlockScope(scope), (CGBlockScope)cells.getObject(),
+												CGCells.Type.ARGS == cells.getType()));
+					break;
+				case HEAP:
+					scope.append(new CGIAsmIReg('z', "ldd " + racc + ",z+",cells.getId(i), ""));
+					break;
+				default:
+					throw new CompileException("Unsupported cell type:" + cells.getType());
+			}
+
+			switch(op) {
+//				case PLUS:
+//					break;
+				case NOT:
+				case BIT_NOT:
+					scope.append(new CGIAsm("com r" + racc));
+					break;
+				case MINUS:
+					scope.append(new CGIAsm("com r" + racc));
+				case PRE_INC:
+				case POST_INC:
+					if(0==i) scope.append(new CGIAsm("add r" + racc + ",C0x01"));
+					else scope.append(new CGIAsm("adc r" + racc + ",C0x00"));
+					break;
+				case PRE_DEC:
+				case POST_DEC:
+					if(0==i) scope.append(new CGIAsm("sub r" + racc + ",C0x01"));
+					else scope.append(new CGIAsm("sbc r" + racc + ",C0x00"));
+					break;
+				default:
+					throw new CompileException("CG:emitUnary: unsupported operator: " + op);
+			}
 		}
 	}
 		
@@ -934,6 +952,7 @@ public class Generator extends CodeGenerator {
 					scope.append(lbEndScope);
 				}
 				break;
+			case AND:
 			case BIT_AND:
 				if(!isFixed) {
 					cellsActionAsm(scope,  cells, (int sn, String reg) -> new CGIAsm("and " + getRightOp(sn, null) + "," + reg));
@@ -942,6 +961,7 @@ public class Generator extends CodeGenerator {
 					throw new CompileException("CG:cellsAction: unsupported operator: " + op);
 				}
 				break;
+			case OR:
 			case BIT_OR:
 				if(!isFixed) {
 					cellsActionAsm(scope,  cells, (int sn, String reg) -> new CGIAsm("or " + getRightOp(sn, null) + "," + reg));
@@ -1134,9 +1154,8 @@ public class Generator extends CodeGenerator {
 	}
 
 	@Override
-	public void constCond(CGScope scope, CGCells cells, Operator op, long k, boolean isNot, boolean isOr, CGBranchScope branchScope)
-																																	throws CompileException {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";accum " + op + " " + k + " -> accum (isOr:" + isOr + ", isNot:" + isNot));
+	public void constCond(CGScope scope, CGCells cells, Operator op, long k, boolean isNot, boolean isOr, CGBranchScope branchScope) throws CompileException {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";cells " + cells.toString() + " " + op + " " + k + " -> accum (isOr:" + isOr + ", isNot:" + isNot));
 		CGIContainer cont = new CGIContainer();
 		
 		if(isNot) { // Инвертируем выражение заменя AND<->OR и инвертируем операторы сравнения
@@ -1176,118 +1195,174 @@ public class Generator extends CodeGenerator {
 				default:
 					throw new CompileException("Unsupported cell type:" + cells.getType());
 			}
-
-			switch(op) {
-				case LT:
-					if(isOr) { // В связке с OR
-						cont.append(new CGIAsmJump("brcs", branchScope.getEnd())); // True
-						if(0!=i) {  // Старшие байты
-							cont.append(new CGIAsmJump("brne", lbScope));
-							lbScope.setUsed();
-							// Если == - продолжаем без перехода
-						}
-					}
-					else { // В связке с AND 
-						if(0!=i) {  // Старшие байты
-							cont.append(new CGIAsm("breq pc+0x02"));
-						}
-						cont.append(new CGIAsmJump("brcc", branchScope.getEnd())); // False
-					}
-					break;
-				case GTE:
-					if(isOr) { // В связке с OR
-						cont.append(new CGIAsmJump("brcc", branchScope.getEnd())); // Если >=
-						if(0!=i) {  // Старшие байты
-							cont.append(new CGIAsmJump("brne", lbScope)); // Если < - продолжить
-							lbScope.setUsed();
-						}
-					}
-					else { // В связке с AND 
-						cont.append(new CGIAsmJump("brcs", branchScope.getEnd())); // Если <
-					}
-					break;
-				case GT:
-					if(isOr) { // В связке с OR
-						if(0!=i) {  // Старшие байты
-							cont.append(new CGIAsm("breq pc+0x03")); // Если =, пропустить байт
-							cont.append(new CGIAsmJump("brcc", branchScope.getEnd())); // Если >
-							cont.append(new CGIAsmJump("brne", lbScope)); // Если < - продолжить
-							lbScope.setUsed();
-						}
-						else { // Младший байт
-							cont.append(new CGIAsm("breq pc+0x02")); // Если =, пропустить brcc
-							cont.append(new CGIAsmJump("brcc", branchScope.getEnd())); // Если >
-						}
-					}
-					else { // В связке с AND 
-						cont.append(new CGIAsmJump("brcs", branchScope.getEnd())); // Если <
-						if(0!=i) {  // Старшие байты
-							cont.append(new CGIAsmJump("brne", lbScope)); // Если > - продолжить
-							lbScope.setUsed();
-						}
-						else { // Младший байт
-							cont.append(new CGIAsmJump("breq", branchScope.getEnd())); // Если =
-						}
-					}
-					break;
-				case LTE:
-					if(isOr) { // В связке с OR
-						cont.append(new CGIAsmJump("brcs", branchScope.getEnd())); // Если <
-						if(0!=i) {  // Старшие байты
-							cont.append(new CGIAsmJump("brne", lbScope)); // Если > - продолжить
-							lbScope.setUsed();
-						}
-						else { // Младший байт
-							cont.append(new CGIAsmJump("breq", branchScope.getEnd())); // Если =
-						}
-					}
-					else { // В связке с AND 
-						if(0!=i) {  // Старшие байты
-							cont.append(new CGIAsm("breq pc+0x03")); // Если =, пропустить brcc
-							cont.append(new CGIAsmJump("brcc", branchScope.getEnd())); // Если >
-							cont.append(new CGIAsmJump("brne", lbScope)); // Если < - продолжить
-							lbScope.setUsed();
-						}
-						else { // Младший байт
-							cont.append(new CGIAsm("breq pc+0x02")); // Если =, пропустить brcc
-							cont.append(new CGIAsmJump("brcc", branchScope.getEnd())); // Если >
-						}
-					}
-					break;
-				case NEQ:
-					if(isOr) { // В связке с OR
-						cont.append(new CGIAsmJump("brne", branchScope.getEnd()));
-					}
-					else { // В связке с AND 
-						if(0!=i) {  //Старшие байты
-							cont.append(new CGIAsmJump("brne", lbScope));
-							lbScope.setUsed();
-						}
-						else { // Младший байт
-							cont.append(new CGIAsmJump("breq", branchScope.getEnd()));
-						}
-					}
-					break;
-				case EQ:
-					if(isOr) { // В связке с OR
-						if(0!=i) {  //Старшие байты
-							cont.append(new CGIAsmJump("brne", lbScope));
-							lbScope.setUsed();
-						}
-						else { // Младший байт
-							cont.append(new CGIAsmJump("breq", branchScope.getEnd()));
-						}
-					}
-					else { // В связке с AND 
-						cont.append(new CGIAsmJump("brne", branchScope.getEnd()));
-					}
-					break;
-				default:
-					throw new CompileException("CG:constAction: unsupported operator: " + op);
-			}
+			cond(cont, i, op, isOr, lbScope, branchScope);
 		}
 		if(0x01 != accum.getSize()) cont.append(lbScope);
 		scope.append(cont);
+	}
+
+	@Override
+	public void cellsCond(CGScope scope, CGCells cells, Operator op, boolean isNot, boolean isOr, CGBranchScope branchScope) throws CompileException {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";accum " + op + " " + cells.toString() + " -> accum (isOr:" + isOr + ", isNot:" + isNot));
+		CGIContainer cont = new CGIContainer();
+		
+		if(isNot) { // Инвертируем выражение заменя AND<->OR и инвертируем операторы сравнения
+			isOr = !isOr;
+			switch(op) {
+				case LT: op = Operator.GTE; break;
+				case LTE: op = Operator.GT; break;
+				case GT: op = Operator.LTE; break;
+				case GTE: op = Operator.LT; break;
+				case EQ: op = Operator.NEQ; break;
+				case NEQ: op = Operator.EQ; break;
+				default: throw new CompileException("CG:constAction: unsupported operator: " + op);
+			}
+		}
+		
+		// Задаем метку на конец блока сравнения байт в мультибайтном значении
+		CGLabelScope lbScope = (0x01 == accum.getSize() ? null : new CGLabelScope(null, null, LabelNames.MULTIBYTE_CP_END, false));
+		
+		for(int i=accum.getSize()-1; i>=0; i--) {
+			byte racc = getAccRegs(accum.getSize())[i];
+			switch(cells.getType()) {
+				case REG:
+					cont.append(new CGIAsm("cp r" + racc + ",r" + cells.getId(i)));
+					break;
+				case ARGS:
+				case STACK_FRAME:
+					scope.append(new CGIAsmIReg('y', "ldd j8b_atom,y+", cells.getId(i), "", getCurBlockScope(scope), (CGBlockScope)cells.getObject(),
+												CGCells.Type.ARGS == cells.getType()));
+					cont.append(new CGIAsm("cp r" + racc + ",j8b_atom"));
+					break;
+				case HEAP:
+					scope.append(new CGIAsmIReg('z', "ldd j8b_atom,z+",cells.getId(i), ""));
+					cont.append(new CGIAsm("cp r" + racc + ",j8b_atom"));
+					break;
+				default:
+					throw new CompileException("Unsupported cell type:" + cells.getType());
+			}
+			cond(cont, i, op, isOr, lbScope, branchScope);
+		}
+		if(0x01 != accum.getSize()) cont.append(lbScope);
+		scope.append(cont);
+	}
+	
+	@Override
+	public void boolCond(CGScope scope, CGBranchScope branchScope) throws CompileException {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";accum bool is true"));
+		scope.append(new CGIAsm("tst r16"));
+		scope.append(new CGIAsmJump("breq ", branchScope.getEnd()));
+	}
+
+	private void cond(CGIContainer cont, int index, Operator op, boolean isOr, CGLabelScope lbScope, CGBranchScope branchScope) throws CompileException {
+		switch(op) {
+			case LT:
+				if(isOr) { // В связке с OR
+					cont.append(new CGIAsmJump("brcs", branchScope.getEnd())); // True
+					if(0!=index) {  // Старшие байты
+						cont.append(new CGIAsmJump("brne", lbScope));
+						lbScope.setUsed();
+						// Если == - продолжаем без перехода
+					}
+				}
+				else { // В связке с AND 
+					if(0!=index) {  // Старшие байты
+						cont.append(new CGIAsm("breq pc+0x02"));
+					}
+					cont.append(new CGIAsmJump("brcc", branchScope.getEnd())); // False
+				}
+				break;
+			case GTE:
+				if(isOr) { // В связке с OR
+					cont.append(new CGIAsmJump("brcc", branchScope.getEnd())); // Если >=
+					if(0!=index) {  // Старшие байты
+						cont.append(new CGIAsmJump("brne", lbScope)); // Если < - продолжить
+						lbScope.setUsed();
+					}
+				}
+				else { // В связке с AND 
+					cont.append(new CGIAsmJump("brcs", branchScope.getEnd())); // Если <
+				}
+				break;
+			case GT:
+				if(isOr) { // В связке с OR
+					if(0!=index) {  // Старшие байты
+						cont.append(new CGIAsm("breq pc+0x03")); // Если =, пропустить байт
+						cont.append(new CGIAsmJump("brcc", branchScope.getEnd())); // Если >
+						cont.append(new CGIAsmJump("brne", lbScope)); // Если < - продолжить
+						lbScope.setUsed();
+					}
+					else { // Младший байт
+						cont.append(new CGIAsm("breq pc+0x02")); // Если =, пропустить brcc
+						cont.append(new CGIAsmJump("brcc", branchScope.getEnd())); // Если >
+					}
+				}
+				else { // В связке с AND 
+					cont.append(new CGIAsmJump("brcs", branchScope.getEnd())); // Если <
+					if(0!=index) {  // Старшие байты
+						cont.append(new CGIAsmJump("brne", lbScope)); // Если > - продолжить
+						lbScope.setUsed();
+					}
+					else { // Младший байт
+						cont.append(new CGIAsmJump("breq", branchScope.getEnd())); // Если =
+					}
+				}
+				break;
+			case LTE:
+				if(isOr) { // В связке с OR
+					cont.append(new CGIAsmJump("brcs", branchScope.getEnd())); // Если <
+					if(0!=index) {  // Старшие байты
+						cont.append(new CGIAsmJump("brne", lbScope)); // Если > - продолжить
+						lbScope.setUsed();
+					}
+					else { // Младший байт
+						cont.append(new CGIAsmJump("breq", branchScope.getEnd())); // Если =
+					}
+				}
+				else { // В связке с AND 
+					if(0!=index) {  // Старшие байты
+						cont.append(new CGIAsm("breq pc+0x03")); // Если =, пропустить brcc
+						cont.append(new CGIAsmJump("brcc", branchScope.getEnd())); // Если >
+						cont.append(new CGIAsmJump("brne", lbScope)); // Если < - продолжить
+						lbScope.setUsed();
+					}
+					else { // Младший байт
+						cont.append(new CGIAsm("breq pc+0x02")); // Если =, пропустить brcc
+						cont.append(new CGIAsmJump("brcc", branchScope.getEnd())); // Если >
+					}
+				}
+				break;
+			case NEQ:
+				if(isOr) { // В связке с OR
+					cont.append(new CGIAsmJump("brne", branchScope.getEnd()));
+				}
+				else { // В связке с AND 
+					if(0!=index) {  //Старшие байты
+						cont.append(new CGIAsmJump("brne", lbScope));
+						lbScope.setUsed();
+					}
+					else { // Младший байт
+						cont.append(new CGIAsmJump("breq", branchScope.getEnd()));
+					}
+				}
+				break;
+			case EQ:
+				if(isOr) { // В связке с OR
+					if(0!=index) {  //Старшие байты
+						cont.append(new CGIAsmJump("brne", lbScope));
+						lbScope.setUsed();
+					}
+					else { // Младший байт
+						cont.append(new CGIAsmJump("breq", branchScope.getEnd()));
+					}
+				}
+				else { // В связке с AND 
+					cont.append(new CGIAsmJump("brne", branchScope.getEnd()));
+				}
+				break;
+			default:
+				throw new CompileException("CG:constAction: unsupported operator: " + op);
+		}
 	}
 
 	String getRightOp(int sn, Long constant) { //возвращает либо байт константы, либо регистр аккумуляора, если constant is null

@@ -502,6 +502,11 @@ public class MethodCallExpression extends ExpressionNode {
 			be.codeGen(cg);
 			return new Operand(OperandType.ACCUM, null);
 		}
+		else if(expr instanceof UnaryExpression) {
+			UnaryExpression ue = (UnaryExpression)expr;
+			ue.codeGen(cg);
+			return new Operand(OperandType.ACCUM, null);
+		}
 		else throw new Exception("Unexpected expression:" + expr);
 	}
 	

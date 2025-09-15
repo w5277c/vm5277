@@ -264,14 +264,18 @@ public class IfNode extends CommandNode {
 			cg.setScope(oldScope);
 			return null;
 		}
-		if(obj == CodegenResult.FALSE) {
+		else if(obj == CodegenResult.FALSE) {
 			if(elseBlockNode != null) {
 				elseBlockNode.codeGen(cg);
 			}
 			cg.setScope(oldScope);
 			return null;
 		}
-
+		else if(obj == CodegenResult.RESULT_IN_ACCUM) {
+			cg.boolCond(condition.getCGScope(), brScope);
+		}
+		
+		
 		thenBlockNode.codeGen(cg);
 
 		if(null != elseBlockNode) {

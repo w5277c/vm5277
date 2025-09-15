@@ -14,17 +14,34 @@
  * limitations under the License.
  */
 
-public class System {
-	public static native void setParam(byte paramId, byte value);
+import rtos.System;
+import rtos.RTOSParam;
 
-	public static native void outChar(byte b);
+class Main {
+    public static void main() {
+		System.setParam(RTOSParam.STDOUT_PORT, 0x12);
 
-	public static native void outCStr(cstr text);
-	public static native void out(byte i);
-	public static native void out(short i);
-	public static native void out(int i);
-	public static native void out(fixed i);
-	public static native void out(bool i);
+		short s1 = 10;
+		fixed f1 = 6;
+		fixed f2 = 1.5;
 
-	public static native void stop();
+		System.out(s1 + 2);
+		System.out(s1 + 1.5);
+		System.out(f1 + 1.5);
+		System.out(s1 - 2);
+		System.out(s1 - 1.5);
+		System.out(f1 - 1.5);
+		System.out(s1 * 2);
+		System.out(s1 * 1.5);
+		System.out(f1 * 1.5);
+		System.out(s1 / 2);
+		System.out(s1 / 1.5);
+		System.out(f1 / 1.5);
+		System.out(s1 % 2);
+
+		System.out(f1 + f2);
+		System.out(f1 - f2);
+		System.out(f1 * f2);
+		System.out(f1 / f2);
+	}
 }
