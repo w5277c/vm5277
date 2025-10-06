@@ -195,6 +195,6 @@ public class VarType {
 
 	@Override
 	public String toString() {
-		return isArray ? getElementType() + "[]" : getName();
+		return isArray ? getElementType() + "[" + (0==arraySize ? "" : arraySize) + "]" : getName();
 	}
 }

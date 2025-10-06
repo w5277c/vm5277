@@ -23,11 +23,11 @@ import java.util.List;
 import ru.vm5277.common.compiler.Case;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.semantic.BlockScope;
@@ -213,26 +213,26 @@ public class TryNode extends CommandNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
 		if(cgDone) return null;
 		cgDone = true;
 
-		CGBlockScope blockScope = cg.enterBlock(cg.getScope());
-		tryBlock.codeGen(cg);
+		CGBlockScope blockScope = cg.enterBlock();
+		tryBlock.codeGen(cg, null, false);
 		cg.leaveBlock();
 		
 		List<Case> cases = new ArrayList<>();
 		for(AstCase astCase : catchCases) {
-			CGBlockScope caseBlockScope = cg.enterBlock(cg.getScope());
-			astCase.getBlock().codeGen(cg);
+			CGBlockScope caseBlockScope = cg.enterBlock();
+			astCase.getBlock().codeGen(cg, null, false);
 			cg.leaveBlock();
 			cases.add(new Case(astCase.getFrom(), astCase.getTo(), caseBlockScope));
 		}
 			
 		CGBlockScope defaultBlockScope = null;
 		if(null != catchDefaultBlock) {
-			defaultBlockScope = cg.enterBlock(cg.getScope());
-			catchDefaultBlock.codeGen(cg);
+			defaultBlockScope = cg.enterBlock();
+			catchDefaultBlock.codeGen(cg, null, false);
 			cg.leaveBlock();
 		}
 		

@@ -1,5 +1,229 @@
 # Новости и история разработки
 
+## [2025-10-07] - Реализация поддержки массивов и оптимизация кода
+
+### ✅ Статус
+Реализована полная поддержка многомерных массивов, добавлены новые оптимизации и улучшена система кодогенерации.
+Внесены значительные изменения в архитектуру компилятора для поддержки сложных структур данных.
+**Изменения не были протестированы на реальном устройстве или в симуляторе**.
+Код будет всесторонне проверен и отлажен в будущем. Пока ключевая цель - общая реализация кодогенератора.
+
+### Цель
+Реализовать полную поддержку многомерных массивов в языке J8B, включая создание, инициализацию, доступ к элементам и свойствам массивов.
+Одновременно внедрить систему оптимизаций для улучшения производительности генерируемого кода и расширить возможности кодогенератора для работы со сложными структурами данных.
+
+### Исходный код (Java-подобный)
+```Java
+class Main {
+    public static void main() {
+		System.setParam(RTOSParam.STDOUT_PORT, 0x12);
+
+		byte b1 = 254;
+		fixed[][] arr = new fixed[][]{{0.5,-1},{-2*2,(fixed)b1},{-4,100.99}};
+		System.out(arr[0][0]);
+
+		byte size=8;
+		short[] arr2 = new short[size];
+		arr2[1] = 3;
+
+		short s=0x0101;
+		s++;
+		if(s<arr2[3]) {
+			System.out(arr2[3]);
+		}
+
+		arr[0][0] = arr2[1];
+		arr = null;
+		arr2 = null;
+	}
+}
+```
+
+### Результат на AVR ассемблере
+
+```asm
+; vm5277.avr_codegen v0.1 at Tue Oct 07 02:00:17 VLAT 2025
+.equ stdout_port = 18
+
+.set OS_ARRAY_2D = 1
+.set OS_FT_STDOUT = 1
+.set OS_FT_DRAM = 1
+.set OS_ARRAY_1D = 1
+
+.include "devices/atmega328p.def"
+.include "core/core.asm"
+.include "dmem/dram.asm"
+.include "j8b/arr_celladdr.asm"
+.include "j8b/arr_refcount.asm"
+.include "mem/rom_read16.asm"
+.include "stdio/out_num16.asm"
+.include "stdio/out_q7n8.asm"
+
+j8bD25:
+.dw 128,0,0,32256,0,25853
+
+Main:
+	rjmp j8bCMainMmain
+_j8b_meta20:
+	.db 12,0
+
+j8bCMainMmain:
+	ldi r16,19
+	ldi r17,0
+	push r30
+	push r31
+	rcall os_dram_alloc
+	movw r26,r30
+	pop r31
+	pop r30
+	movw r16,xl
+	ldi r19,17
+	st x+,r19
+	st x+,C0x01
+	ldi r19,9
+	st x+,r19
+	ldi r19,3
+	st x+,r19
+	st x+,c0x00
+	ldi r19,2
+	st x+,r19
+	st x+,c0x00
+	push r17
+	push r16
+	push zl
+	push zh
+	ldi zl,low(j8bD25*2)
+	ldi zh,high(j8bD25*2)
+	ldi r16,low(12)
+	ldi r17,high(12)
+	rcall os_rom_read16_nr
+	pop zh
+	pop zl
+	pop r16
+	pop r17
+	movw r20,r16
+	push c0x00
+	push c0x00
+	push c0x00
+	push c0x00
+	movw r26,r20
+	rcall j8bproc_arr_celladdr
+	ld r16,x+
+	ld r17,x
+	rcall os_out_q7n8
+	ldi r16,21
+	ldi r17,0
+	push r30
+	push r31
+	rcall os_dram_alloc
+	movw r26,r30
+	pop r31
+	pop r30
+	movw r16,xl
+	ldi r19,16
+	st x+,r19
+	st x+,C0x01
+	ldi r19,9
+	st x+,r19
+	ldi r19,8
+	st x+,r19
+	st x+,c0x00
+	movw r22,r16
+	push c0x01
+	push c0x00
+	movw r26,r22
+	rcall j8bproc_arr_celladdr
+	ldi r16,3
+	st x+,r16
+	st x,c0x00
+	ldi r24,1
+	ldi r25,1
+	add r24,C0x01
+	adc r25,C0x00
+	movw r16,r24
+	ldi r19,3
+	push r19
+	push c0x00
+	movw r26,r22
+	rcall j8bproc_arr_celladdr
+	ld r19,-x
+	cp r17,r19
+	breq pc+0x02
+	brcc _j8b_eoc22
+	ld r19,-x
+	cp r16,r19
+	brcc _j8b_eoc22
+	ldi r19,3
+	push r19
+	push c0x00
+	movw r26,r22
+	rcall j8bproc_arr_celladdr
+	ld r16,x+
+	ld r17,x
+	rcall os_out_num16
+_j8b_eoc22:
+	push c0x01
+	push c0x00
+	movw r26,r22
+	rcall j8bproc_arr_celladdr
+	ld r16,x+
+	ld r17,x
+	push c0x00
+	push c0x00
+	push c0x00
+	push c0x00
+	movw r26,r20
+	rcall j8bproc_arr_celladdr
+	mov r17,r16
+	clr r16
+	st x+,r16
+	st x,r17
+	movw r26,r20
+	rcall j8bproc_arr_refcount_dec
+	ldi r20,0
+	ldi r21,0
+	movw r26,r22
+	rcall j8bproc_arr_refcount_dec
+	ldi r22,0
+	ldi r23,0
+	ret
+```
+
+**Смотрите также файлы-примеры arrays.j8b, arrays2.j8b, arrays3.j8b**
+
+### Ключевые изменения
+
+#### 1. Поддержка многомерных массивов
+- **Новые классы выражений**:
+  - `NewArrayExpression` - создание массивов с указанием размерностей
+  - `ArrayExpression` - доступ к элементам массива
+  - `ArrayInitExpression` - инициализация массивов
+  - `ArrayPropertyExpression` - доступ к свойствам массивов (length)
+
+- **Типизация массивов**: Добавлена поддержка массивов любой вложенности (до 3 уровней)
+- **Инициализация**: Поддержка инициализации `{1, value, 3, arr[1]}`
+- **Доступ к элементам**: Полная поддержка многомерного индексирования `arr[i][j][k]`
+
+#### 2. Система оптимизаций
+- **Уровни оптимизации**: Добавлены флаги `-o none|size|speed`
+- **Свёртка констант**: Улучшена оптимизация арифметических выражений
+- **Оптимизация логических операций**: Сокращённые вычисления для `&&` и `||`
+- **Выявление константных переменных**: Автоматическое определение `final` переменных
+
+#### 3. Улучшения кодогенерации
+- **Улучшена система областей видимости**: Переработана архитектура CGScope
+- **Оптимизация работы с памятью**: Улучшено распределение регистров и стековых фреймов
+
+#### 4. Существенный багфиксинг
+- **Особое внимание к классам выражений**: Исправлено множество ошибок и расширен функционал
+
+
+### Следующие шаги
+- **Операторы управления**: `for`, `break`, `continue`, `switch`
+- **Метки**: Именованные переходы для вложенных циклов
+
+
+
 ## [2025-09-16] - Полная реализация boolean типа и логических операций
 
 ### ✅ Статус

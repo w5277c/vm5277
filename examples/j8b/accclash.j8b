@@ -23,10 +23,15 @@ class Main {
 		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
 		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
 
-		short s1 = 0x0001;
-		short s2 = 0x0010;
-		short s3 = 0x0100;
-		short s4 = 0x1000;
+		short s1 = 0x0000;
+		s1++;
+		short s2 = 0x000f;
+		s2++;
+		short s3 = 0x00ff;
+		s3++;
+		short s4 = 0x0fff;
+		s4++;
+		// Инкремент необходим в качестве reassigned, иначе свернется в константу
 		System.out((s1+s2) + (s3+s4));
     }
 }

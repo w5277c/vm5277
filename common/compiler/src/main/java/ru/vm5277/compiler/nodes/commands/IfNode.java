@@ -88,19 +88,19 @@ public class IfNode extends CommandNode {
 		}
 	}
 
-    // Геттеры
-    public ExpressionNode getCondition() {
-        return condition;
-    }
+	// Геттеры
+	public ExpressionNode getCondition() {
+		return condition;
+	}
 
-    public BlockNode getThenBlock() {
-        return thenBlockNode;
-    }
+	public BlockNode getThenBlock() {
+		return thenBlockNode;
+	}
 
-    public BlockNode getElseBlock() {
-        return elseBlockNode;
-    }
-	
+	public BlockNode getElseBlock() {
+		return elseBlockNode;
+	}
+
 	public String getVarName() {
 		return varName;
 	}
@@ -123,13 +123,13 @@ public class IfNode extends CommandNode {
 		else markError("If condition cannot be null");
 
 		// Проверка что есть хотя бы один блок
-		if (null == getThenBlock() && null == getElseBlock()) markError("If statement must have at least one block (then or else)");
+		if (null == thenBlockNode && null == elseBlockNode) markError("If statement must have at least one block (then or else)");
 		
 		// Проверка then-блока
-		if (null != getThenBlock()) getThenBlock().preAnalyze();
+		if (null != thenBlockNode) thenBlockNode.preAnalyze();
 
 		// Проверка else-блока (если есть)
-		if (null != getElseBlock()) getElseBlock().preAnalyze();
+		if (null != elseBlockNode) elseBlockNode.preAnalyze();
 		
 		return true;
 	}
@@ -140,7 +140,7 @@ public class IfNode extends CommandNode {
 		if (null != condition) condition.declare(scope);
 		
 		// Объявление then-блока в новой области видимости
-		if (null != getThenBlock()) {
+		if (null != thenBlockNode) {
 			thenScope = new BlockScope(scope);
 		}
 		
@@ -170,13 +170,13 @@ public class IfNode extends CommandNode {
 		}		
 
 		if(null != thenScope) {
-			getThenBlock().declare(thenScope);
+			thenBlockNode.declare(thenScope);
 		}
 
 		// Объявление else-блока в новой области видимости
-		if (null != getElseBlock()) {
+		if (null != elseBlockNode) {
 			elseScope = new BlockScope(scope);
-			getElseBlock().declare(elseScope);
+			elseBlockNode.declare(elseScope);
 		}
 		
 		return true;
@@ -222,13 +222,13 @@ public class IfNode extends CommandNode {
 		cg.leaveBranch();
 		
 		// Анализ then-блока
-		if (null != getThenBlock()) getThenBlock().postAnalyze(thenScope, cg);
+		if (null != thenBlockNode) thenBlockNode.postAnalyze(thenScope, cg);
 
 		// Анализ else-блока
-		if (null != getElseBlock()) getElseBlock().postAnalyze(elseScope, cg);
+		if (null != elseBlockNode) elseBlockNode.postAnalyze(elseScope, cg);
 		
 		// Проверяем недостижимый код после if с возвратом во всех ветках
-        if (null != getElseBlock() && isControlFlowInterrupted(getThenBlock()) && isControlFlowInterrupted(getElseBlock())) {
+        if (null != elseBlockNode && isControlFlowInterrupted(thenBlockNode) && isControlFlowInterrupted(elseBlockNode)) {
             markWarning("Code after if statement may be unreachable");
         }
 		
@@ -237,54 +237,48 @@ public class IfNode extends CommandNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
 		if(cgDone) return null;
 		cgDone = true;
 
-		CGScope oldScope = cg.setScope(cgScope);
-		
+		//!!!CGScope oldScope = cg.setScope(brScope);
 		if(alwaysTrue) {
-			thenBlockNode.codeGen(cg);
-			cg.setScope(oldScope);
+			thenBlockNode.codeGen(cg, null, false);
 			return null;
 		}
 		if(alwaysFalse) {
-			if(getElseBlock() != null) {
-				elseBlockNode.codeGen(cg);
+			if(elseBlockNode != null) {
+				elseBlockNode.codeGen(cg, null, false);
 			}
-			cg.setScope(oldScope);
 			return null;
 		}
 		
-		Object obj = condition.codeGen(cg);
+		Object obj = condition.codeGen(cg, null, true);
 		
 		//Если результат стал известен без runtime
 		if(obj == CodegenResult.TRUE) {
-			thenBlockNode.codeGen(cg);
-			cg.setScope(oldScope);
+			thenBlockNode.codeGen(cg, null, false);
 			return null;
 		}
 		else if(obj == CodegenResult.FALSE) {
 			if(elseBlockNode != null) {
-				elseBlockNode.codeGen(cg);
+				elseBlockNode.codeGen(cg, null, false);
 			}
-			cg.setScope(oldScope);
 			return null;
 		}
+		//TODO оптимизировать на прямую проверку(без участия аккумулятора)
 		else if(obj == CodegenResult.RESULT_IN_ACCUM) {
 			cg.boolCond(condition.getCGScope(), brScope);
 		}
 		
-		
-		thenBlockNode.codeGen(cg);
+		thenBlockNode.codeGen(cg, null, false);
 
 		if(null != elseBlockNode) {
-			elseBlockNode.codeGen(cg);
+			elseBlockNode.codeGen(cg, null, false);
 		}
 		
-		cg.eIf(brScope, condition.getCGScope(), thenBlockNode.getCGScope(), null == elseBlockNode ? null : elseBlockNode.getCGScope());
+		cg.eIf(cgScope, brScope, thenBlockNode.getCGScope(), null == elseBlockNode ? null : elseBlockNode.getCGScope());
 		
-		cg.setScope(oldScope);
 		return null;
 	}
 

@@ -71,13 +71,6 @@ public class ClassScope extends InterfaceScope {
 		if (classes.containsKey(classScope.getName())) throw new CompileException("Duplicate class: " + scopeName);
 		if (interfaces.containsKey(classScope.getName())) throw new CompileException("Class: " + scopeName + " already defined as interface");
 		
-/*		// Получаем символ Object из родительской области
-		InterfaceScope objectInterface = resolveInterface("Object");
-		if (null == objectInterface) throw new CompileException("Base interface 'Object' not found");
-		if (!"Object".equals(scopeName)) {
-			classScope.addInterface(objectInterface); // Добавляем существующий символ
-		}
-*/		
 		classes.put(scopeName, classScope);
 	}
 	

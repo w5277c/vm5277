@@ -24,10 +24,10 @@ class Main {
 		byte a = 1;
 		byte b = 2;
 		byte c = 3;
-		System.out(inc(a+b, inc(c, 8)));
+		System.out(add(a+b, add(c, 8)));
 	}
 
-	private byte inc(byte b1, byte b2) {
+	private byte add(byte b1, byte b2) {
 		return b1+b2;
 	}
 }

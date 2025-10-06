@@ -15,7 +15,6 @@
  */
 package ru.vm5277.compiler.nodes;
 
-import java.util.Iterator;
 import java.util.ListIterator;
 import java.util.Stack;
 import ru.vm5277.common.SourcePosition;

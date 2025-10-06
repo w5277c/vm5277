@@ -21,7 +21,6 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class CGVarScope extends CGCellsScope {
-	private			boolean		isConstant;
 	private			CGCells		cells;
 			
 	public CGVarScope(CGScope parent, int resId, VarType type, int size, boolean isConstant, String name) {
@@ -52,9 +51,8 @@ public class CGVarScope extends CGCellsScope {
 	public CGCells getCells() {
 		return cells;
 	}
-	
-	public boolean isConstant() {
-		return isConstant;
+	public void setCells(CGCells cells) {
+		this.cells = cells;
 	}
 	
 	@Override

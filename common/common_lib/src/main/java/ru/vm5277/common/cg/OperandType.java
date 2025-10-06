@@ -20,6 +20,7 @@ public enum OperandType {
 	LITERAL_FIXED,	//число в виде константы в формате FIXED(сразу записывается в регистр)
 	TYPE,			//reference? т.е. заполнен resId?
 	FLASH_RES,		//данные размещенные во FLASH области
-	LOCAL_RES,		//field или var, заполнен resId.
-	ACCUM;			//аккумулятор
+	LOCAL_RES,		//field или var(заполнен resId)
+	ACCUM,			//аккумулятор
+	ARRAY;			//массив, содержит field или var(заполнен resId) и индексы
 }

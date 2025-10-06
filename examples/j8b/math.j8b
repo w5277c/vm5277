@@ -21,9 +21,12 @@ class Main {
     public static void main() {
 		System.setParam(RTOSParam.STDOUT_PORT, 0x12);
 
-		short s1 = 10;
-		fixed f1 = 6;
-		fixed f2 = 1.5;
+		short s1;
+		s1 = 10;
+		fixed f1;
+		f1 = 6;
+		fixed f2;
+		f2 = 1.5;
 
 		System.out(s1 + 2);
 		System.out(s1 + 1.5);

@@ -1,4 +1,4 @@
-; vm5277.avr_codegen v0.1 at Tue Sep 16 01:17:37 VLAT 2025
+; vm5277.avr_codegen v0.1 at Sun Sep 28 10:25:31 VLAT 2025
 .equ stdout_port = 18
 
 .set OS_FT_STDOUT = 1
@@ -18,147 +18,134 @@
 
 Main:
 	rjmp j8bCMainMmain
-_j8b_meta19:
+_j8b_meta20:
 	.db 12,0
 
 j8bCMainMmain:
+	ldi r20,0
+	ldi r21,0
 	ldi r20,10
 	ldi r21,0
 	ldi r22,0
+	ldi r23,0
+	ldi r22,0
 	ldi r23,6
+	ldi r24,0
+	ldi r25,0
 	ldi r24,128
 	ldi r25,1
-	mov r16,r20
-	mov r17,r21
+	movw r16,r20
 	subi r16,254
 	sbci r17,255
 	rcall os_out_num16
-	mov r16,r20
-	mov r17,r21
+	movw r16,r20
 	mov r17,r16
 	clr r16
 	subi r16,128
 	sbci r17,254
 	rcall os_out_q7n8
-	mov r16,r22
-	mov r17,r23
+	movw r16,r22
 	subi r16,128
 	sbci r17,254
 	rcall os_out_q7n8
-	mov r16,r20
-	mov r17,r21
+	movw r16,r20
 	subi r16,2
 	sbci r17,0
 	rcall os_out_num16
-	mov r16,r20
-	mov r17,r21
+	movw r16,r20
 	mov r17,r16
 	clr r16
 	subi r16,128
 	sbci r17,1
 	rcall os_out_q7n8
-	mov r16,r22
-	mov r17,r23
+	movw r16,r22
 	subi r16,128
 	sbci r17,1
 	rcall os_out_q7n8
-	mov r16,r20
-	mov r17,r21
-	ldi ACCUM_EL,2
-	ldi ACCUM_EH,0
+	movw r16,r20
+	ldi r18,2
+	ldi r19,0
 	rcall os_mul16
 	rcall os_out_num16
-	mov r16,r20
-	mov r17,r21
+	movw r16,r20
 	mov r17,r16
 	clr r16
-	ldi ACCUM_EL,128
-	ldi ACCUM_EH,1
+	ldi r18,128
+	ldi r19,1
 	rcall os_mulq7n8
 	rcall os_out_q7n8
-	mov r16,r22
-	mov r17,r23
-	ldi ACCUM_EL,128
-	ldi ACCUM_EH,1
+	movw r16,r22
+	ldi r18,128
+	ldi r19,1
 	rcall os_mulq7n8
 	rcall os_out_q7n8
-	mov r16,r20
-	mov r17,r21
-	push TEMP_L
-	push TEMP_H
-	ldi ACCUM_EL,2
-	ldi ACCUM_EH,0
+	movw r16,r20
+	push r24
+	push r25
+	ldi r18,2
+	ldi r19,0
 	rcall os_div16
-	pop TEMP_H
-	pop TEMP_L
+	pop r25
+	pop r24
 	rcall os_out_num16
-	mov r16,r20
-	mov r17,r21
+	movw r16,r20
 	mov r17,r16
 	clr r16
-	push TEMP_L
-	push TEMP_H
-	ldi ACCUM_EL,128
-	ldi ACCUM_EH,1
+	push r24
+	push r25
+	ldi r18,128
+	ldi r19,1
 	rcall os_divq7n8
-	pop TEMP_H
-	pop TEMP_L
+	pop r25
+	pop r24
 	rcall os_out_q7n8
-	mov r16,r22
-	mov r17,r23
-	push TEMP_L
-	push TEMP_H
-	ldi ACCUM_EL,128
-	ldi ACCUM_EH,1
+	movw r16,r22
+	push r24
+	push r25
+	ldi r18,128
+	ldi r19,1
 	rcall os_divq7n8
-	pop TEMP_H
-	pop TEMP_L
+	pop r25
+	pop r24
 	rcall os_out_q7n8
-	mov r16,r20
-	mov r17,r21
-	push TEMP_L
-	push TEMP_H
-	ldi ACCUM_EL,2
-	ldi ACCUM_EH,0
+	movw r16,r20
+	push r24
+	push r25
+	ldi r18,2
+	ldi r19,0
 	rcall os_div16
-	movw ACCUM_L,TEMP_L
-	pop TEMP_H
-	pop TEMP_L
+	movw r16,r24
+	pop r25
+	pop r24
 	rcall os_out_num16
-	mov r16,r24
-	mov r17,r25
+	movw r16,r24
 	add r16,r22
 	adc r17,r23
 	rcall os_out_q7n8
-	mov r16,r22
-	mov r17,r23
+	movw r16,r22
 	sub r16,r24
 	sbc r17,r25
 	rcall os_out_q7n8
-	mov r16,r24
-	mov r17,r25
-	mov ACCUM_EL,r22
-	mov ACCUM_EH,r23
+	movw r16,r24
+	movw r18,r22
 	rcall os_mulq7n8
 	rcall os_out_q7n8
-	mov r16,r22
-	mov r17,r23
-	mov ACCUM_EL,r24
-	mov ACCUM_EH,r25
-	tst r17
-	brne _j8b_nediv25
+	movw r16,r22
+	movw r18,r24
 	tst r18
-	brne _j8b_nediv25
+	brne _j8b_nediv26
+	tst r19
+	brne _j8b_nediv26
 ;TODO Division by zero
 	ldi r16,0xff
 	ldi r17,0xff
-	rjmp _j8b_ediv24
-_j8b_nediv25:
-	push TEMP_L
-	push TEMP_H
+	rjmp _j8b_ediv25
+_j8b_nediv26:
+	push r24
+	push r25
 	rcall os_divq7n8
-	pop TEMP_H
-	pop TEMP_L
-_j8b_ediv24:
+	pop r25
+	pop r24
+_j8b_ediv25:
 	rcall os_out_q7n8
 	ret

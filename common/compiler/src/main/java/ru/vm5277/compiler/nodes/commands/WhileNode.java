@@ -18,7 +18,6 @@ package ru.vm5277.compiler.nodes.commands;
 import java.util.Arrays;
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -120,30 +119,23 @@ public class WhileNode extends CommandNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
 		if(cgDone) return null;
 		cgDone = true;
 
 		if(condition instanceof LiteralExpression) {
 			LiteralExpression le = (LiteralExpression)condition;
 			if(0x00 != le.getNumValue()) {
-				blockNode.codeGen(cg);
+				blockNode.codeGen(cg, null, false);
 				cg.eWhile(cgScope, null, blockNode.getCGScope());
 			}
 		}
 		else {
-			condition.codeGen(cg);
-			blockNode.codeGen(cg);
+			condition.codeGen(cg, null, false);
+			blockNode.codeGen(cg, null, false);
 			cg.eWhile(cgScope, condition.getSymbol().getCGScope(), blockNode.getCGScope());
 		}
 		
-
-//		int bodyBlockId = cg.enterBlock();
-//		body.codeGen(cg);
-//		cg.leaveBlock();
-
-//		cg.eWhile(condBlockId, bodyBlockId);
-
 		return null;
 	}
 	

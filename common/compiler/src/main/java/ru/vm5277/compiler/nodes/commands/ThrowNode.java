@@ -17,11 +17,11 @@ package ru.vm5277.compiler.nodes.commands;
 
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -82,11 +82,11 @@ public class ThrowNode extends CommandNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
 		if(cgDone) return null;
 		cgDone = true;
 
-		exceptionExpr.codeGen(cg);
+		exceptionExpr.codeGen(cg, null, false);
 		cg.eThrow();
 		
 		return null;

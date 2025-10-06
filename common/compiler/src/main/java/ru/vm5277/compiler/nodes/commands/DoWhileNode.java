@@ -26,7 +26,6 @@ import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;

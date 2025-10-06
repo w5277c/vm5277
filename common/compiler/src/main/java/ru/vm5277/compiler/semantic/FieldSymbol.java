@@ -23,6 +23,7 @@ public class FieldSymbol extends Symbol implements AstHolder {
 	private	final	ClassScope		scope;
 	private			AstNode			astNode;
 	private			boolean			isPrivate;
+	private			int[]			arrayDimensions	= null;
 	
 	public FieldSymbol(String name, VarType returnType, boolean isFinal, boolean isStatic, boolean isPrivate, ClassScope scope, FieldNode astNode) {
 		super(name, returnType, isFinal, isStatic);

@@ -1,0 +1,42 @@
+class Main {
+    static public void main() {
+        System.setParam(0, 16);
+        System.setParam(2, 18);
+        System.setParam(3, 1);
+        {
+            System.outChar('A');
+        }
+        
+        {
+            System.outChar('C');
+        }
+        {
+            System.outChar('D');
+        }
+        byte s1;
+        s1=1;
+        if (s1==3) {
+            System.outChar(' ');
+        }
+        bool b1;
+        b1=false;
+        if (b1) {
+            System.out('2');
+        }
+        if (!b1) {
+            System.out('3');
+        }
+        byte i = 1;
+        i++;
+        byte j = 2;
+        j++;
+        if (i+j<2) {
+            System.outChar('F');
+        }
+        else {
+            System.outChar('G');
+        }
+    }
+    public Main() {
+    }
+}

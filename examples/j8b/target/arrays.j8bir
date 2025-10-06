@@ -1,0 +1,22 @@
+class Main {
+    static public void main() {
+        System.setParam(2, 18);
+        byte b1 = 254;
+        b1++;
+        fixed[][] arr = new fixed[][]{{0.5,-1},{-4,(fixed)b1},{-4,100.99}};
+        System.out(arr[0][0]);
+        //CONST final byte size = 8;
+        short[] arr2 = new short[8];
+        arr2[1]=3;
+        short s = 257;
+        s++;
+        if (s<arr2[3]) {
+            System.out(arr2[3]);
+        }
+        arr[0][0]=arr2[1];
+        arr=null;
+        arr2=null;
+    }
+    public Main() {
+    }
+}

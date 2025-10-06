@@ -1,4 +1,4 @@
-; vm5277.avr_codegen v0.1 at Sat Aug 23 22:43:54 VLAT 2025
+; vm5277.avr_codegen v0.1 at Sat Sep 27 09:58:23 VLAT 2025
 .equ stdout_port = 18
 
 .set OS_FT_DRAM = 1
@@ -9,78 +9,89 @@
 .include "dmem/dram.asm"
 .include "j8b/inc_refcount.asm"
 .include "j8b/dec_refcount.asm"
-.include "j8b/clear_heap.asm"
+.include "j8b/clear_fields.asm"
 .include "stdio/out_num8.asm"
 .include "stdio/out_num16.asm"
 
 Main:
-	jmp j8bCMainMmain
-j8bI0CMain: .db 1,12
-j8bI10CByte: .db 2,14,13,0
-j8bC11CByteMByte:
-	ldi r16,6
-	ldi r17,0
-	mcall os_dram_alloc
+	rjmp j8bCMainMmain
+_j8b_meta20:
+	.db 12,0
+_j8b_meta22:
+	.db 14,1,13,1
+	.dw j8bC26CByteMtoByte
+
+j8bC23CByteMByte:
+	ldi r16,low(6)
+	ldi r17,high(6)
+	rcall os_dram_alloc
 	std z+0,r16
 	std z+1,r17
 	std z+2,c0x00
-	ldi r16,low(j8bI10CByte*2)
+	ldi r16,low(_j8b_meta22*2)
 	std z+3,r16
-	ldi r16,high(j8bI10CByte*2)
+	ldi r16,high(_j8b_meta22*2)
 	std z+4,r16
-	mcall j8bproc_clear_heap_nr
-j8bCI12CByteMByte:
-	ldd r16,y+0
+	rcall j8bproc_clear_fields_nr
+_j8b_cinit24:
+	push yl
+	push yh
+	lds yl,SPL
+	lds yh,SPH
+	ldd r16,y+5
 	std z+5,r16
-j8bE13CByteMByteB19:
 	ret
-j8bC14CByteMtoByte:
+
+j8bC26CByteMtoByte:
 	ldd r16,z+5
-	jmp j8bE15CByteMtoByteB21
-j8bE15CByteMtoByteB21:
 	ret
-j8bCmainMmain:
-	push_z
-	ldi zl,1
+
+j8bCMainMmain:
 	push zl
-	mcall j8bC11CByteMByte
-	pop_z
-	mov r20,r16
-	mov r21,r17
-	push_z
-	mov r30,r20
-	mov r31,r21
-	mcall j8bC14CByteMtoByte
-	pop_z
-	mcall os_out_num8
+	push zh
+	ldi r30,1
+	push r30
+	rcall j8bC23CByteMByte
+	pop j8b_atom
+	pop zh
+	pop zl
+	movw r20,r16
+	push zl
+	push zh
+	movw r30,r20
+	rcall j8bC26CByteMtoByte
+	pop zh
+	pop zl
+	rcall os_out_num8
+	push zl
+	push zh
+	movw r30,r20
+	rcall j8bproc_dec_refcount
+	pop zh
+	pop zl
 	ldi r20,0
 	ldi r21,0
-	push_z
-	mov zl,r20
-	mov zh,r21
-	mcall j8bproc_dec_refcount
-	pop_z
-	push_z
-	ldi zl,1
 	push zl
-	mcall j8bC11CByteMByte
-	pop_z
-	mov r22,r16
-	mov r23,r17
-	push_z
-	mov r30,r22
-	mov r31,r23
-	mcall j8bC14CByteMtoByte
-	pop_z
-	mcall os_out_num8
+	push zh
+	ldi r30,1
+	push r30
+	rcall j8bC23CByteMByte
+	pop j8b_atom
+	pop zh
+	pop zl
+	movw r22,r16
+	push zl
+	push zh
+	movw r30,r22
+	rcall j8bC26CByteMtoByte
+	pop zh
+	pop zl
+	rcall os_out_num8
 	ldi r16,14
 	ldi r17,0
-	mcall os_out_num16
-	mov r16,r22
-	mov r17,r23
-	mcall os_out_num16
+	rcall os_out_num16
+	movw r16,r22
+	rcall os_out_num16
 	ldi r16,33
-	mcall os_out_num8
-j8bE19CMainMmainB25B28:
-j8bE18CMainMmainB25:
+	rcall os_out_num8
 	ret

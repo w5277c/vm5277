@@ -75,32 +75,44 @@ public class VarFieldExpression extends ExpressionNode {
 		}
 		return true;
 	}
+	
+	@Override
+	public boolean declare(Scope scope) {
+		boolean result = true;
+		//После оптимизации теряем symbol, попробую пеенести в postAnalyze
+		symbol = scope.resolveSymbol(value);
+		if(null==symbol) {
+			markError("Variable '" + value + "' is not declared");
+			result = false;
+		}
+		return result;
+	}
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		boolean result = true;
-		try {
-			this.scope = scope;
-			
-			cgScope = cg.enterExpression();
-			if (symbol == null) {
-				symbol = scope.resolveSymbol(value);
-				if(null == symbol) {
-					InterfaceScope iScope = scope.getThis().resolveScope(value);
-					if(null != iScope) {
-						// TODO что здесь делает ClassSymbol? 
-						symbol = new ClassSymbol(value, VarType.fromClassName(value), false, false, iScope);
-					}
-				}
+		this.scope = scope;
+		cgScope = cg.enterExpression(toString());
+
+		symbol = scope.resolveSymbol(value);
+		if(null == symbol) {
+			InterfaceScope iScope = scope.getThis().resolveScope(value);
+			if(null != iScope) {
+				// TODO что здесь делает ClassSymbol? 
+				symbol = new ClassSymbol(value, VarType.fromClassName(value), false, false, iScope);
 			}
 		}
-		catch (CompileException e) {markError(e); result = false;}
-		if (null == symbol) {
+
+		if(null==symbol) {
 			markError("Variable '" + value + "' is not declared");
 			result = false;
 		}
-		
-		if(symbol instanceof VarSymbol) ((VarSymbol)symbol).markUsed();
+		else {
+//			symbol.setCGScope(cg.enterExpression());
+			if(symbol instanceof VarSymbol) {
+				((VarSymbol)symbol).markUsed();
+			}
+		}
 		
 		cg.leaveExpression();
 		return result;
@@ -117,15 +129,20 @@ public class VarFieldExpression extends ExpressionNode {
 			return symbol;
 		}
 		if(null != scope) { //TODO вероятно всегда null
+			//TODO вообще сомнительная логика, нужно перепроверить
+			//CGScope cgScope = symbol.getCGScope();
 			symbol = scope.resolveSymbol(value);
+			//symbol.setCGScope(cgScope);
 		}
 		return symbol;
 	}
 
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
-		CGScope oldCGScope = cg.setScope(cgScope);
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+		if(disabled) return null;
+		
+		CGScope cgs = null == parent ? cgScope : parent;
 		
 		// Актуализируем symbol
 		getSymbol();
@@ -139,9 +156,9 @@ public class VarFieldExpression extends ExpressionNode {
 					vSymbol = scope.resolveSymbol(symbol.getName());
 					if(null != vSymbol && null != vSymbol.getCGScope()) {
 						depCodeGen(cg);
-						if(accumStore) {
+						if(toAccum) {
 							CGVarScope vScope = (CGVarScope)vSymbol.getCGScope();
-							cg.cellsToAcc(cgScope, vScope);
+							cg.cellsToAcc(cgs, vScope);
 							//Назначаем алиас ссылающийся на реальную переменную
 						}
 						symbol = vSymbol;
@@ -150,16 +167,19 @@ public class VarFieldExpression extends ExpressionNode {
 				}
 			}
 			else {
-				if(symbol.getCGScope() instanceof CGCellsScope) {
-					if(accumStore) cg.cellsToAcc(cgScope, (CGCellsScope)symbol.getCGScope());
-				}
-				else {
-					throw new CompileException("Unsupported scope: " + symbol.getCGScope());
-				}
+//				CGCellsScope cScope = (CGCellsScope)symbol.getCGScope(CGCellsScope.class);
+//				if(null!=cScope) {
+					if(toAccum) {
+						cg.cellsToAcc(cgs, (CGCellsScope)symbol.getCGScope());
+					}
+//				}
+//				else {
+//					throw new CompileException("Unsupported scope: " + symbol.getCGScope());
+//				}
 			}
 		}
-		cg.setScope(oldCGScope);
-		return (accumStore ? CodegenResult.RESULT_IN_ACCUM : null);
+
+		return (toAccum ? CodegenResult.RESULT_IN_ACCUM : null);
 	}
 	
 	public void codeGen(CodeGenerator cg, boolean isInvert, boolean opOr, CGBranchScope brScope) throws Exception {
@@ -167,7 +187,7 @@ public class VarFieldExpression extends ExpressionNode {
 		
 		if(null != brScope) {
 			CGCellsScope cScope = (CGCellsScope)symbol.getCGScope();
-			cg.constCond(cgScope, cScope.getCells(), Operator.NEQ, 0, isInvert, opOr, brScope);
+			cg.constCond(cgScope, cScope.getCells(), Operator.NEQ, 0, isInvert, opOr, brScope); // NEQ, так как проверяем на 0
 		}
 	}
 	

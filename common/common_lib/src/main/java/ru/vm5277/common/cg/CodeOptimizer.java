@@ -18,9 +18,9 @@ package ru.vm5277.common.cg;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.items.CGIAsmJump;
 import ru.vm5277.common.cg.items.CGIAsmLdLabel;
 import ru.vm5277.common.cg.items.CGIContainer;
@@ -31,6 +31,7 @@ import ru.vm5277.common.cg.scopes.CGScope;
 public abstract class CodeOptimizer {
 
 	public abstract void optimizeBranchChains(CGScope scope);
+	public abstract void optimizeBaseInstr(CGScope scope);
 	
 	protected boolean optimizeEmptyJumps(CGScope scope) {
 		boolean result=false;
@@ -79,7 +80,7 @@ public abstract class CodeOptimizer {
 		}
 	}
 
-	protected void removeUnusedLabels(CGScope scope) {
+	public void removeUnusedLabels(CGScope scope, CGLabelScope... lbScopes) {
 		ArrayList<CGItem> list = new ArrayList();
 		Map<String, CGLabelScope> labels = new HashMap<>();
 		Set<String> usedLabels = new HashSet<>();
@@ -101,11 +102,19 @@ public abstract class CodeOptimizer {
 				}
 			}
 		}
-		
+
+		l1:		
 		for(String labelName : labels.keySet()) {
 			if(!usedLabels.contains(labelName)) {
-				CGLabelScope lbScope = labels.get(labelName);
-				lbScope.disable();
+				if(!LabelNames.MAIN.equalsIgnoreCase(labelName)) {
+					for(CGLabelScope lbScope : lbScopes) {
+						if(null != lbScope && lbScope.getName().equalsIgnoreCase(labelName)) {
+							continue l1;
+						}
+					}
+					CGLabelScope lbScope = labels.get(labelName);
+					lbScope.disable();
+				}
 			}
 		}
 	}
@@ -138,7 +147,7 @@ public abstract class CodeOptimizer {
 			}
 
 			if(replacementMap.isEmpty()) {
-				removeUnusedLabels(scope);
+//				removeUnusedLabels(scope);
 				break;
 			}
 			

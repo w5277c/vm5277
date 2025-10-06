@@ -16,8 +16,6 @@
 package ru.vm5277.compiler;
 
 import java.io.BufferedWriter;
-import java.io.OutputStream;
-import java.nio.charset.Charset;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.Operator;
@@ -45,6 +43,8 @@ import ru.vm5277.compiler.nodes.commands.SwitchNode;
 import ru.vm5277.compiler.nodes.commands.ThrowNode;
 import ru.vm5277.compiler.nodes.commands.TryNode;
 import ru.vm5277.compiler.nodes.commands.WhileNode;
+import ru.vm5277.compiler.nodes.expressions.ArrayExpression;
+import ru.vm5277.compiler.nodes.expressions.ArrayInitExpression;
 import ru.vm5277.compiler.nodes.expressions.BinaryExpression;
 import ru.vm5277.compiler.nodes.expressions.CastExpression;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
@@ -52,8 +52,10 @@ import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
 import ru.vm5277.compiler.nodes.expressions.InstanceOfExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.nodes.expressions.MethodCallExpression;
+import ru.vm5277.compiler.nodes.expressions.NewArrayExpression;
 import ru.vm5277.compiler.nodes.expressions.NewExpression;
 import ru.vm5277.compiler.nodes.expressions.TernaryExpression;
+import ru.vm5277.compiler.nodes.expressions.ThisExpression;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
 import ru.vm5277.compiler.nodes.expressions.UnaryExpression;
 import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
@@ -119,9 +121,6 @@ public class ASTPrinter {
 				else if(node instanceof MethodNode) {
 					printMethod((MethodNode)node);
 				}
-//				else if(node instanceof ArrayDeclarationNode) {
-//					//printArray((ArrayDeclarationNode)node);
-//				}
 				else if(node instanceof FieldNode) {
 					printField((FieldNode)node); out.put(";");out.print();
 				}
@@ -152,9 +151,6 @@ public class ASTPrinter {
 				if(node instanceof MethodNode) {
 					printMethod((MethodNode)node);
 				}
-//				else if(node instanceof ArrayDeclarationNode) {
-//					//printArray((ArrayDeclarationNode)node);
-//				}
 				else if(node instanceof FieldNode) {
 					printField((FieldNode)node); out.put(";");out.print();
 				}
@@ -325,12 +321,15 @@ public class ASTPrinter {
 				out.put(";");
 			}
 			else if(node instanceof VarNode) {
+				VarNode vNode = (VarNode)node; //TODO повотрить для остальных
+				if(vNode.isFinal() && null != vNode.getSymbol() && !vNode.getSymbol().isReassigned()) {
+					out.put("//CONST ");
+				}
 				printVar((VarNode)node);
 				out.put(";");
 			}
 			else if(node instanceof ExpressionNode) {
-				printExpr((ExpressionNode)node);
-				out.put(";");
+				if(printExpr((ExpressionNode)node)) out.put(";");
 			}
 			else if(node instanceof BlockNode) {
 				printBody((BlockNode)node);
@@ -391,7 +390,12 @@ public class ASTPrinter {
 	void printField(FieldNode node) {
 		printModifiers(node.getModifiers());
 		if(null != node.getType()) {
-			out.put(node.getType() + " ");
+			if(node.getType().isArray()) {
+				out.put(node.getType().getElementType() + "[] ");
+			}
+			else {
+				out.put(node.getType() + " ");
+			}
 		}
 		out.put(node.getName());
 		if(null != node.getInitializer()) {
@@ -403,7 +407,19 @@ public class ASTPrinter {
 	void printVar(VarNode node) {
 		printModifiers(node.getModifiers());
 		if(null != node.getType()) {
-			out.put(node.getType() + " ");
+			if(node.getType().isArray()) {
+				VarType vt = node.getType();
+				String tmp = "";
+				while(vt.isArray()) {
+					tmp += "[]";
+					vt = vt.getElementType();
+				}
+				out.put(vt.getName());
+				out.put(tmp + " ");
+			}
+			else {
+				out.put(node.getType() + " ");
+			}
 		}
 		out.put(node.getName());
 		if(null != node.getInitializer()) {
@@ -412,7 +428,9 @@ public class ASTPrinter {
 		}
 	}
 
-	void printExpr(ExpressionNode expr) {
+	boolean printExpr(ExpressionNode expr) {
+		if(null==expr || expr.isDisabled()) return false;
+		
 		if(expr instanceof BinaryExpression) {
 			BinaryExpression be = (BinaryExpression)expr;
 			printOperand(be.getLeft(), be.getOperator(), true);
@@ -497,9 +515,58 @@ public class ASTPrinter {
 				printExpr(ce.getOperand());
 			}
 		}
+		else if(expr instanceof NewArrayExpression) {
+			NewArrayExpression nae = (NewArrayExpression)expr;
+			out.put("new ");
+			VarType vt = null;
+			try {
+				vt = nae.getType(null);
+				while(vt.isArray()) {
+					vt = vt.getElementType();
+				}
+			}
+			catch(Exception ex) {
+			}
+			out.put(vt.getName());
+			for(int i=0; i<nae.getDimensions().size(); i++) {
+				out.put("[");
+				if(null == nae.getInitializer()) {
+					printExpr(nae.getDimensions().get(i));
+				}
+				out.put("]");
+			}
+			if(null != nae.getInitializer()) {
+				printExpr(nae.getInitializer());
+			}
+		}
+		else if(expr instanceof ArrayExpression) {
+			ArrayExpression ae = (ArrayExpression)expr;
+			printExpr(ae.getTargetExpr());
+			for(int i=0; i<ae.getDepth(); i++) {
+				out.put("[");
+				printExpr(ae.getIndexesExpr()[i]);
+				out.put("]");
+			}
+		}
+		else if(expr instanceof ArrayInitExpression) {
+			ArrayInitExpression aie = (ArrayInitExpression)expr;
+			out.put("{");
+			if(!aie.getValueExprs().isEmpty()) {
+				for(ExpressionNode _expr : aie.getValueExprs()) {
+					printExpr(_expr);
+					out.put(",");
+				}
+				out.removeLast(1);
+			}
+			out.put("}");
+		}
+		else if(expr instanceof ThisExpression) {
+			out.put("this");
+		}
 		else {
 			out.put("!unknown expr:" + expr); out.print();
 		}
+		return true;
 	}
 	
 	void printOperand(ExpressionNode operand, Operator parentOp, boolean isLeft) {

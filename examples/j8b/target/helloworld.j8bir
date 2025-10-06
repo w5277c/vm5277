@@ -1,0 +1,12 @@
+class Main {
+    static public void main() {
+        System.setParam(0, 16);
+        System.setParam(2, 18);
+        System.setParam(3, 1);
+        final cstr text = "Hello world!\r\nПривет!\r\n";
+        System.outCStr(text);
+        System.stop();
+    }
+    public Main() {
+    }
+}

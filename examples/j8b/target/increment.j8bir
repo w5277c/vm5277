@@ -1,0 +1,20 @@
+class Main {
+    static public void main() {
+        System.setParam(0, 16);
+        System.setParam(2, 18);
+        System.setParam(3, 1);
+        //CONST final byte num = 32;
+        byte ch = 'A';
+        System.outChar(ch);
+        ch++;
+        System.outChar(ch);
+        ch++;
+        System.outChar(ch);
+        ch++;
+        ch=ch+32;
+        System.outChar(ch);
+        System.stop();
+    }
+    public Main() {
+    }
+}

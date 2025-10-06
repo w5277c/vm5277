@@ -36,6 +36,11 @@ public class UnresolvedReferenceExpression extends ExpressionNode {
 		return null;
 	}
 	
+	@Override
+	public boolean preAnalyze() {
+		return true;
+	}
+	
 	public String getId() {
 		return id;
 	}

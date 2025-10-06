@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.Arrays;
@@ -26,7 +27,6 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
-import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.FieldSymbol;
 import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
@@ -34,11 +34,11 @@ import ru.vm5277.compiler.semantic.Scope;
 public class FieldAccessExpression extends ExpressionNode {
 	private			ExpressionNode	target;
 	private	final	String			fieldName;
-	
 	private			String			className;
     
 	public FieldAccessExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode target, String fieldName) {
 		super(tb, mc);
+		
 		this.target = target;
 		this.fieldName = fieldName;
 	}
@@ -153,34 +153,20 @@ public class FieldAccessExpression extends ExpressionNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		try {
-			cgScope = cg.enterExpression();
-		
-			if(null == symbol) {
-				cg.leaveExpression();
-				return false;
-			}
-
-			// Проверка видимости поля
-			if (((FieldSymbol)symbol).isPrivate() && !(target instanceof ThisExpression)) {
-				markError("Private field '" + fieldName + "' is not accessible");
-				cg.leaveExpression();
-				return false;
-			}
-
-			if(!target.postAnalyze(scope, cg)) {
-				cg.leaveExpression();
-				return false;
-			}
+		boolean result = true;
+		//symbol.setCGScope();
+		cgScope = cg.enterExpression(toString());
+				
+		// Проверка видимости поля
+		if (((FieldSymbol)symbol).isPrivate() && !(target instanceof ThisExpression)) {
+			markError("Private field '" + fieldName + "' is not accessible");
+			result = false;
 		}
-		catch (CompileException e) {
-			markError(e.getMessage());
 
-			cg.leaveExpression();
-			return false;
-		}
+		result&=target.postAnalyze(scope, cg);
+
 		cg.leaveExpression();
-		return true;
+		return result;
 	}
 	
 	public Object getValue() {
@@ -188,8 +174,7 @@ public class FieldAccessExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
-		CGScope oldCGScope = cg.setScope(cgScope);
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
 		if(null == depCodeGen(cg)) {
 			if(symbol.getCGScope() instanceof CGCellsScope) {
 				cg.cellsToAcc(cgScope, (CGCellsScope)symbol.getCGScope());
@@ -198,7 +183,6 @@ public class FieldAccessExpression extends ExpressionNode {
 				throw new CompileException("Unsupported scope: " + symbol.getCGScope());
 			}
 		}
-		cg.setScope(oldCGScope);
 		return CodegenResult.RESULT_IN_ACCUM;
 	}
 	

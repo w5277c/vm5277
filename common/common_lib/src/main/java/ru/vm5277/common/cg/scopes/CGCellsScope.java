@@ -24,6 +24,7 @@ public abstract class CGCellsScope extends CGScope {
 	protected	final	VarType		type;
 	protected	final	int			size;
 	protected			DataSymbol	dataSymbol;
+	protected			boolean		isConstant;
 	
 	public CGCellsScope(CGScope parent, int resId, VarType type, int size, String name) {
 		super(parent, resId, name);
@@ -46,5 +47,9 @@ public abstract class CGCellsScope extends CGScope {
 	
 	public int getSize() {
 		return size;
+	}
+	
+	public boolean isConstant() {
+		return isConstant;
 	}
 }

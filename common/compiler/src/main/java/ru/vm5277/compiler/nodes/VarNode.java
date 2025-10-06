@@ -18,32 +18,39 @@ package ru.vm5277.compiler.nodes;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
+import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.cg.CGCells;
-import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.cg.scopes.CGBranchScope;
+import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
+import ru.vm5277.compiler.nodes.expressions.ArrayExpression;
+import ru.vm5277.compiler.nodes.expressions.BinaryExpression;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
+import ru.vm5277.compiler.nodes.expressions.NewArrayExpression;
 import ru.vm5277.compiler.nodes.expressions.NewExpression;
+import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.VarSymbol;
+import ru.vm5277.compiler.semantic.InitNodeHolder;
 
-public class VarNode extends AstNode {
+public class VarNode extends AstNode implements InitNodeHolder {
 	private	final	Set<Keyword>	modifiers;
-	private	final	VarType			type;
+	private			VarType			type;
 	private	final	String			name;
-	private			ExpressionNode	initializer;
+	private			ExpressionNode	init;
 	
 	public VarNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType type, String name) {
 		super(tb, mc);
@@ -53,11 +60,14 @@ public class VarNode extends AstNode {
 		this.name = name;
 
 		if (!tb.match(Operator.ASSIGN)) {
-            initializer = null;
+            init = null;
         }
 		else {
 			consumeToken(tb);
-			try {initializer = new ExpressionNode(tb, mc).parse();} catch(CompileException e) {markFirstError(e);}
+			try {
+				init = new ExpressionNode(tb, mc).parse();
+			}
+			catch(CompileException e) {markFirstError(e);}
 		}
         try {consumeToken(tb, Delimiter.SEMICOLON);}catch(CompileException e) {markFirstError(e);}
 	}
@@ -71,7 +81,7 @@ public class VarNode extends AstNode {
 	}
 	
 	public ExpressionNode getInitializer() {
-		return initializer;
+		return init;
 	}
 	
 	public boolean isStatic() {
@@ -98,24 +108,47 @@ public class VarNode extends AstNode {
 
 	@Override
 	public boolean preAnalyze() {
+		boolean result = true;
 		try{validateModifiers(modifiers, Keyword.STATIC, Keyword.FINAL);} catch(CompileException e) {addMessage(e);}
 		
 		if(Character.isUpperCase(name.charAt(0))) addMessage(new WarningMessage("Variable name should start with lowercase letter:" + name, sp));
 
-		if(null != initializer) {
-			if(!initializer.preAnalyze()) {
-				return false;
+		if(null != init) {
+			result &= init.preAnalyze();
+			
+			if(init instanceof VarFieldExpression) {
+				if(name.equals(((VarFieldExpression)init).getValue())) {
+					markError("Self-assignment for '" + ((VarFieldExpression)init).getValue() + "' has no effect");
+					result = false;
+				}
 			}
 		}
-		
-		return true;
+		return result;
 	}
 
 	
 	@Override
 	public boolean declare(Scope scope) {
-		if(null != initializer) {
-			if(!initializer.declare(scope)) {
+		if(null != init) {
+			if(init instanceof NewArrayExpression) {
+				try {
+					NewArrayExpression nae = (NewArrayExpression)init;
+					if(null != nae.getType(scope)) {
+						if(type.getArrayDepth() != nae.getType(scope).getArrayDepth()) {
+							markError("Array dimension mismatch, expected:" + type.getArrayDepth() + ", found:" + nae.getType(scope).getArrayDepth());
+							return false;
+						}
+						type = nae.getType(scope);
+						// Проверяем вложенность массивов
+						if (type.getArrayDepth() > 3) {
+							markError("Array nesting depth exceeds maximum allowed (3)");
+							return false;
+						}
+					}
+				}
+				catch(Exception ex){}
+			}
+			if(!init.declare(scope)) {	
 				return false;
 			}
 		}
@@ -123,26 +156,17 @@ public class VarNode extends AstNode {
 		if(scope instanceof BlockScope) {
 			BlockScope blockScope = (BlockScope)scope;
 			symbol = new VarSymbol(name, type, isFinal() || VarType.CSTR == type, isStatic(), scope, this);
-			//TODO рудимент
-			/*
-			if(VarType.CSTR == type && null != initializer) {
-				if(initializer instanceof LiteralExpression) {
-					LiteralExpression le = (LiteralExpression)initializer;
-					symbol.setOperand(new Operand(le.getType(scope), OperandType.FLASH_RES, null)); //TODO лишнее
-				}
-				else {
-					markError("Unsupported " + initializer.toString());
-				}*/
-/*				else if(initializer instanceof VarFieldExpression) {
-					VarFieldExpression ve = (VarFieldExpression)initializer;
-					symbol.setOperand(new Operand(ve.getType(scope), OperandType.TYPE, ve.getValue()));
-				}*/
-			/*}*/
 
 			try {blockScope.addVariable(symbol);}
 			catch(CompileException e) {markError(e);}
+			
+//			if(init instanceof NewArrayExpression) {
+//				((VarSymbol)symbol).setArrayDimensions(((NewArrayExpression)init).getConsDimensions());
+//			}
 		}
-		else markError("Unexpected scope:" + scope.getClass().getSimpleName() + " in var:" + name);
+		else {
+			markError("Unexpected scope:" + scope.getClass().getSimpleName() + " in var:" + name);
+		}
 
 		return true;
 	}
@@ -150,21 +174,21 @@ public class VarNode extends AstNode {
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		try {
-			CGBlockScope bScope = ((CGBlockScope)cg.getScope());
-			
-			symbol.setCGScope(cg.enterLocal(type, (-1 == type.getSize() ? cg.getRefSize() : type.getSize()), VarType.CSTR == type, name));
+
+			cgScope = cg.enterLocal(type, (-1 == type.getSize() ? cg.getRefSize() : type.getSize()), VarType.CSTR == type, name);
+			symbol.setCGScope(cgScope);
 			
 			// Проверка инициализации final-полей
-			if (isFinal() && initializer == null) markError("Final variable  '" + name + "' must be initialized");
+			if (isFinal() && init == null) markError("Final variable  '" + name + "' must be initialized");
 
 			// Анализ инициализатора, если есть
-			if (initializer != null) {
-				if(!initializer.postAnalyze(scope, cg)) {
+			if (init != null) {
+				if(!init.postAnalyze(scope, cg)) {
 					cg.leaveLocal();
 					return false;
 				}
 				// Проверка совместимости типов
-				VarType initType = initializer.getType(scope);
+				VarType initType = init.getType(scope);
 				if(initType.isClassType() && type.isClassType()) {
 					if(initType != type) {
 						InterfaceScope iScope = scope.getThis().resolveScope(initType.getClassName());
@@ -176,9 +200,9 @@ public class VarNode extends AstNode {
 					}
 				}
 				else if (!isCompatibleWith(scope, type, initType)) {
-					// Дополнительная проверка втоматического привдения целочисленной константы к fixed.
-					if(VarType.FIXED == type && initializer instanceof LiteralExpression && initType.isInteger()) {
-						long num = ((LiteralExpression)initializer).getNumValue();
+					// Дополнительная проверка автоматического привдения целочисленной константы к fixed.
+					if(VarType.FIXED == type && init instanceof LiteralExpression && initType.isInteger()) {
+						long num = ((LiteralExpression)init).getNumValue();
 						if(num<VarType.FIXED_MIN || num>VarType.FIXED_MAX) {
 							markError("Type mismatch: cannot assign " + initType + " to " + type);
 							cg.leaveLocal();
@@ -199,9 +223,22 @@ public class VarNode extends AstNode {
 					return false;
 				}
 
-				ExpressionNode optimizedExpr = initializer.optimizeWithScope(scope, cg);
+				ExpressionNode optimizedExpr = init.optimizeWithScope(scope, cg);
 				if(null != optimizedExpr) {
-					initializer = optimizedExpr; //TODO не передаю созданный Symbol?
+					init = optimizedExpr; //TODO не передаю созданный Symbol?
+				}
+
+				if(!symbol.isReassigned()) {
+					if(	init instanceof LiteralExpression ||
+						(init instanceof VarFieldExpression && null!=((VarFieldExpression)init).getSymbol() &&
+						((VarFieldExpression)init).getSymbol().isFinal())) {
+
+						modifiers.add(Keyword.FINAL);
+						symbol.setFinal(true);
+						if(type.isArray() || VarType.CSTR==type) {
+							symbol.setReassigned();
+						}
+					}
 				}
 			}
 		}
@@ -216,69 +253,121 @@ public class VarNode extends AstNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
-		if(cgDone) return null;
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+		if(cgDone || disabled) return null;
 		cgDone = true;
 
-		CGVarScope vScope = ((CGVarScope)symbol.getCGScope());
-		
-		// !!! Нужно,чтобы выражение строилось именно в данном CGScope(актуально, если метод вызван через depCodeGen(у него как правило другой CGScope))
-		CGScope oldCGScope = cg.setScope(vScope);
+		CGVarScope vScope = (CGVarScope)cgScope;
 		
 		Boolean accUsed = null;
 		vScope.build();
 		if(VarType.CSTR == type) {
-			if(initializer instanceof LiteralExpression) {
-				LiteralExpression le = (LiteralExpression)initializer;
+			if(init instanceof LiteralExpression) {
+				LiteralExpression le = (LiteralExpression)init;
 				if(VarType.CSTR == le.getType(null)) {
-					vScope.setDataSymbol(cg.defineData(vScope.getResId(), (String)le.getValue()));
+					vScope.setDataSymbol(cg.defineData(vScope.getResId(), -1, (String)le.getValue()));
 					//TODO рудимент?
 					//symbol.getConstantOperand().setValue(cgScope.getResId());
 				}
 			}
-			else throw new Exception("unexpected expression:" + initializer + " for constant");
+			else throw new Exception("unexpected expression:" + init + " for constant");
 		}
 		else {
 			// Инициализация(заполнение нулями необходима только регистрам, остальные проинициализированы вместе с HEAP/STACK)
-			if(null == initializer) {
-				if(CGCells.Type.REG==vScope.getCells().getType()) cg.getScope().append(cg.constToCells(cg.getScope(), 0, vScope.getCells(), false));
+			if(null == init) {
+				if(CGCells.Type.REG==vScope.getCells().getType()) cgScope.append(cg.constToCells(cgScope, 0, vScope.getCells(), false));
 			}
-			else if(initializer instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
-				LiteralExpression le = (LiteralExpression)initializer;
+			else if(init instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
+				LiteralExpression le = (LiteralExpression)init;
 				boolean isFixed = le.isFixed() || VarType.FIXED == vScope.getType();
-				cg.getScope().append(cg.constToCells(cg.getScope(), isFixed ? le.getFixedValue() : le.getNumValue(), vScope.getCells(), isFixed));
+				cgScope.append(cg.constToCells(cgScope, isFixed ? le.getFixedValue() : le.getNumValue(), vScope.getCells(), isFixed));
 			}
-			else if(initializer instanceof FieldAccessExpression) {
-				cg.getScope().append(cg.constToCells(cg.getScope(), 0, vScope.getCells(), false));
+			else if(init instanceof FieldAccessExpression) {
+				cgScope.append(cg.constToCells(cgScope, 0, vScope.getCells(), false));
 				accUsed = true;
 			}
-			else if(initializer instanceof NewExpression) {
-				initializer.codeGen(cg);
-				cg.accToCells(initializer.getCGScope(), vScope);
+			else if(init instanceof NewExpression) {
+				init.codeGen(cg, null, true);
+				cg.accCast(null, VarType.SHORT);
+				cg.accToCells(cgScope, vScope);
 			}
-/*			else if(initializer instanceof MethodCallExpression) {
-				initializer.codeGen(cg);
-				if(VarType.CLASS == vScope.getType()) {
-					cg.updateRefCount(cg.getScope(), vScope.getStackOffset(), vScope.getCells(), true);
+			else if(init instanceof NewArrayExpression) {
+				init.codeGen(cg, null, true);
+				//TODO оптимизация, можно сразу назначать счетчику 1
+				//cg.updateRefCount(vScope, vScope.getCells(), true);
+				
+				//Перенес в declare //((VarSymbol)symbol).setArrayDimensions(((NewArrayExpression)initializer).getConsDimensions());
+				cg.accCast(null, VarType.SHORT);
+				cg.accToCells(cgScope, vScope);
+			}
+//			else if(init instanceof ArrayExpression) {
+//				init.codeGen(cg, null, true);
+//				//cg.arrToCells(cgScope, (CGArrCells)((CGCellsScope)init.getSymbol().getCGScope()).getCells(), vScope.getCells());
+//				//cg.arrToCells(cgScope, (CGArrCells)((CGCellsScope)init.getSymbol().getCGScope()).getCells(), vScope.getCells());
+//			}
+			else if(init instanceof BinaryExpression) {
+				CGScope oldScope = cg.setScope(cgScope);
+				CGScope brScope = cg.enterBranch();
+				init.codeGen(cg, brScope, true);
+				//TODO проверить на объекты и на массивы(передача ref)
+				VarType initType = init.getType(null);
+				if(VarType.CLASS == initType) {
+					cg.updateClassRefCount(brScope, vScope.getCells(), true);
 				}
-				cg.accToCells(cg.getScope(), vScope);
-			}*/
+				else if(initType.isArray()) {
+					cg.updateArrRefCount(brScope, vScope.getCells(), true, init instanceof ArrayExpression);
+				}
+				if(((CGBranchScope)brScope).isUsed()) {
+					cg.constToAcc(brScope, 1, 1, false);
+					CGLabelScope lbScope = new CGLabelScope(null, null, LabelNames.LOCGIC_END, true);
+					cg.jump(brScope, lbScope);
+					brScope.append(((CGBranchScope)brScope).getEnd());
+					cg.constToAcc(brScope, 1, 0, false);
+					brScope.append(lbScope);
+					cg.accToCells(brScope, vScope);
+				}
+				accUsed = true;
+				cg.leaveBranch();
+				cg.setScope(oldScope);
+			}
+			else if(init instanceof ArrayExpression) {
+				init.codeGen(cg, cgScope, false);
+				cg.accToCells(cgScope, vScope);
+				VarType initType = init.getType(null);
+				if(VarType.CLASS == initType) {
+					cg.updateClassRefCount(cgScope, vScope.getCells(), true);
+				}
+				else if(initType.isArray()) {
+					cg.updateArrRefCount(cgScope, vScope.getCells(), true, init instanceof ArrayExpression);
+				}
+				accUsed = true;
+			}
 			else {
-				initializer.codeGen(cg);
-				if(VarType.CLASS == vScope.getType()) {
-					cg.updateRefCount(cg.getScope(), vScope.getCells(), true);
+				init.codeGen(cg, cgScope, true);
+				cg.accToCells(cgScope, vScope);
+				VarType initType = init.getType(null);
+				if(VarType.CLASS == initType) {
+					cg.updateClassRefCount(cgScope, vScope.getCells(), true);
 				}
-				cg.accToCells(cg.getScope(), vScope);
+				else if(initType.isArray()) {
+					cg.updateArrRefCount(cgScope, vScope.getCells(), true, init instanceof ArrayExpression);
+				}
+
 				accUsed = true;
 			}
 		}
-		cg.setScope(oldCGScope);
+
 		return accUsed;
 	}
 
 	@Override
 	public List<AstNode> getChildren() {
-		if(null != initializer) return Arrays.asList(initializer);
+		if(null != init) return Arrays.asList(init);
 		return null;
+	}
+	
+	@Override
+	public ExpressionNode getInitNode() {
+		return init;
 	}
 }

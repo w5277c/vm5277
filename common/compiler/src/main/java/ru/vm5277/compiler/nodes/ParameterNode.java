@@ -17,6 +17,7 @@ package ru.vm5277.compiler.nodes;
 
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
@@ -29,8 +30,6 @@ public class ParameterNode extends AstNode {
 	private			VarType	type;
     private	final	String	name;
 	private	final	boolean	isFinal;
-	/* не требуется
-	private			CGScope	cgScope;*/
 	
 	public ParameterNode(TokenBuffer tb, MessageContainer mc) throws CompileException {
 		super(tb, mc);
@@ -41,7 +40,8 @@ public class ParameterNode extends AstNode {
 		}
 		
 		this.type = checkPrimtiveType();
-		if (null == this.type) this.type = checkClassType();
+		if(null == type) type = checkClassType();
+		if(null != type) type = checkArrayType(type);
 		this.name = (String)consumeToken(tb, TokenType.ID).getValue();
 	}
 
@@ -98,33 +98,15 @@ public class ParameterNode extends AstNode {
 			return false;
 		}
 
-		// Уже сделано уровнем выше
-/*		try {
-			// Создаем символ параметра и добавляем его в область видимости метода
-			Symbol paramSymbol = new Symbol(name, type, isFinal, false);
-			((MethodScope)scope).getSymbol().getParameters().add(paramSymbol);
-		}
-		catch (Exception e) {
-			markError("Failed to declare parameter: " + e.getMessage());
-		}*/
-		
 		return true;
 	}
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		/* не требуется
-		cgScope = cg.getScope();*/
-		
 		// Проверка типа параметра
 		if (VarType.UNKNOWN == type || VarType.NULL == type) {
 			markError("Invalid parameter type: " + type);
 		}
-		/* не требуеся
-		symbol = scope.resolve(name);
-		if(null == symbol) {
-			markError("TODO Parameter not found: " + name);
-		}*/
 		
 		// Дополнительные проверки для массивов
 		if (type.isArray()) {
@@ -149,15 +131,7 @@ public class ParameterNode extends AstNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
-/*		int refTypeSize = 1; // TODO Определить значение на базе количества используемых типов класса(также используется в MethodCallExpression)
-		
-		byte accReg=16;
-		if(type.isObject()) {
-			for(int i=0; i<refTypeSize; i++) {
-				cg.popRegAsm(accReg+i);
-			}
-		}*/
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
 		return null;
 	}
 	

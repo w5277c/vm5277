@@ -1,0 +1,19 @@
+class Main {
+    static public void main() {
+        System.setParam(2, 18);
+        byte[] arr = new byte[10];
+        System.out(this.method1(arr));
+        arr[arr[arr[0]]]=arr[this.method1(arr)]+this.method2(5)[0];
+    }
+    public byte method1(byte[] barr) {
+        return barr[1];
+    }
+    public byte[] method2(byte b) {
+        return new byte[b];
+    }
+    public byte method3() {
+        return 3;
+    }
+    public Main() {
+    }
+}

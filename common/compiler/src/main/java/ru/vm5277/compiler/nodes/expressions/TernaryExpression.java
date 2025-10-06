@@ -50,48 +50,55 @@ public class TernaryExpression extends ExpressionNode {
 	
 	@Override
 	public boolean preAnalyze() {
-		if (null== condition || null == trueExpr || null == falseExpr) {
+		boolean result = true;
+		
+		if(null==condition || null==trueExpr || null==falseExpr) {
 			markError("All parts of ternary expression must be non-null");
-			return false;
+			result = false;
 		}
 
-		if (!condition.preAnalyze()) return false;
-		if (!trueExpr.preAnalyze()) return false;
-		if (!falseExpr.preAnalyze()) return false;
+		if(result) {
+			result&=condition.preAnalyze();
+			result&=trueExpr.preAnalyze();
+			result&=falseExpr.preAnalyze();
+		}
 
-		return true;
+		return result;
 	}
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		boolean result = true;
+		cgScope = cg.enterExpression(toString());
+		
 		try {
 			// Проверяем условие и ветки
-			if (!condition.postAnalyze(scope, cg)) return false;
-			if (!trueExpr.postAnalyze(scope, cg)) return false;
-			if (!falseExpr.postAnalyze(scope, cg)) return false;
+			result&=condition.postAnalyze(scope, cg);
+			result&=trueExpr.postAnalyze(scope, cg);
+			result&=falseExpr.postAnalyze(scope, cg);
 
 			// Проверяем тип условия
 			VarType condType = condition.getType(scope);
-			if (VarType.BOOL != condType) {
+			if(VarType.BOOL != condType) {
 				markError("Condition must be boolean, got: " + condType);
-				return false;
+				result = false;
 			}
 
 			// Проверяем совместимость типов веток
 			VarType trueType = trueExpr.getType(scope);
 			VarType falseType = falseExpr.getType(scope);
-
 			if (!isCompatibleWith(scope, trueType, falseType)) {
 				markError("Incompatible types in branches: " + trueType + " and " + falseType);
-				return false;
+				result = false;
 			}
-
-			return true;
 		}
 		catch (CompileException e) {
 			markError(e.getMessage());
-			return false;
+			result = false;
 		}
+		
+		cg.leaveExpression();
+		return result;
 	}
 	
 	// Геттеры

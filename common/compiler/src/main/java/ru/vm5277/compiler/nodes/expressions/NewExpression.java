@@ -17,6 +17,7 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -29,18 +30,9 @@ public class NewExpression extends MethodCallExpression {
     }
 	
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
-/*		CGMethodScope mScope = (CGMethodScope)((MethodSymbol)symbol).getCGScope();
-		CGClassScope cScope = (CGClassScope)mScope.getParent();
-		ArrayList<VarType> classTypes = new ArrayList<>();
-		classTypes.add(cScope.getType());
-		if(null != cScope.getInterfaceTypes()) {
-			for(VarType classType : cScope.getInterfaceTypes()) {
-				classTypes.add(classType);
-			}
-		}
-*/		
-		super.codeGen(cg);
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+		super.codeGen(cg, null, false);
+
 		return true;
 	}
 	

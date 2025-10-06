@@ -30,6 +30,7 @@ import ru.vm5277.common.cg.RegPair;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGIText;
 import static ru.vm5277.common.cg.scopes.CGScope.verbose;
+import ru.vm5277.common.compiler.Optimization;
 import ru.vm5277.common.exceptions.CompileException;
 
 // STACK(reg Y) - необходимо выделять блок памяти в стеке для локальных переменных, Y не изменяем. Y изменяется только если выходим за 64 слова, затем
@@ -55,7 +56,7 @@ public class CGBlockScope extends CGScope {
 */		
 		if(parent instanceof CGMethodScope) isFirstBlock = true;
 
-		mScope = parent.getMethodScope();
+		mScope = (CGMethodScope)parent.getScope(CGMethodScope.class);
 		mScope.addBlockScope(this);
 
 		lbEScope = new CGLabelScope(null, null, LabelNames.BLOCK_END, true);
@@ -100,15 +101,18 @@ public class CGBlockScope extends CGScope {
 		}*/
 
 		if(isFirstBlock) {
-			append(cg.eReturn(null, mScope.getStackSize(), stackOffset, (null==mScope.getType() ? 0x00 : mScope.getType().getSize())));
+			append(cg.eReturn(null, mScope.getStackSize(), stackOffset, mScope.getType()));
 		}
 		
-		CodeOptimizer co = cg.getOptimizer();
-		if(null != co) {
-			co.optimizeJumpChains(this);
-			co.optimizeBranchChains(this);
-			co.optimizePushConst(this, 'Y');
-			co.optimizePushConst(this, 'Z');
+		if(Optimization.NONE != cg.getOptLevel()) {
+			CodeOptimizer co = cg.getOptimizer();
+			if(null != co) {
+				co.optimizeJumpChains(this);
+				co.optimizeBranchChains(this);
+				co.optimizePushConst(this, 'Y');
+				co.optimizePushConst(this, 'Z');
+				co.optimizeBaseInstr(this);
+			}
 		}
 		
 		if(VERBOSE_LO <= verbose) append(new CGIText(";block end"));
@@ -127,7 +131,7 @@ public class CGBlockScope extends CGScope {
 		
 			if(scope instanceof CGMethodScope) return ((CGMethodScope)scope).getArg(resId);
 			if(scope instanceof CGBlockScope) return ((CGBlockScope)scope).getVar(resId);
-			if(scope instanceof CGCommandScope) return scope.getBlockScope().getVar(resId);
+			if(scope instanceof CGCommandScope) return ((CGBlockScope)scope.getScope(CGBlockScope.class)).getVar(resId);
 		}
 		return null;
 	}

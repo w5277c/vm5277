@@ -24,10 +24,14 @@ import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import static ru.vm5277.common.AssemblerInterface.STRICT_LIGHT;
+import static ru.vm5277.common.AssemblerInterface.STRICT_NONE;
+import static ru.vm5277.common.AssemblerInterface.STRICT_STRONG;
 import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.SourceType;
 import ru.vm5277.common.SystemParam;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.compiler.Optimization;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.compiler.codegen.PlatformLoader;
@@ -39,14 +43,17 @@ import ru.vm5277.compiler.nodes.MethodNode;
 import ru.vm5277.compiler.semantic.ClassScope;
 
 public class Main {
-    public	final	static	String	VERSION				= "0.0.23";
+    public	final	static	String	VERSION				= "0.1.0";
 	public			static	boolean	isWindows;
 	public			static	Path	toolkitPath;
 	public			static	String	launchMethodName	= "main";
+	private			static	int		stirctLevel			= STRICT_LIGHT;
+	private			static	int		optLevel			= Optimization.SIZE;
 	
 	public static void main(String[] args) throws IOException, Exception {
 		long startTimestamp = System.currentTimeMillis();
 		System.out.println("j8b compiler v" + VERSION + " started");
+		showDisclaimer();
 		
 		isWindows = (null != System.getProperty("os.name") && System.getProperty("os.name").toLowerCase().contains("windows"));
 
@@ -102,6 +109,26 @@ public class Main {
 						catch(Exception e) {
 							System.err.println("[ERROR] Invalid parameter " + arg + " value: " + value);
 							break;
+						}
+						continue;
+					}
+					else if(arg.equals("-s") || arg.equals("--strict")) {
+						String strictStr = args[++i];
+						if(strictStr.equalsIgnoreCase("strong")) stirctLevel = STRICT_STRONG;
+						else if(strictStr.equalsIgnoreCase("none")) stirctLevel = STRICT_NONE;
+						else if(!strictStr.equalsIgnoreCase("light")) {
+							showInvalidStrictLevel(strictStr);
+							System.exit(0);
+						}
+						continue;
+					}
+					else if(arg.equals("-o") || arg.equals("--opt")) {
+						String optStr = args[++i];
+						if(optStr.equalsIgnoreCase("none")) optLevel = Optimization.NONE;
+						else if(optStr.equalsIgnoreCase("speed")) optLevel = Optimization.SPEED;
+						else if(!optStr.equalsIgnoreCase("size")) {
+							showInvalidOptLevel(optStr);
+							System.exit(0);
 						}
 						continue;
 					}
@@ -175,7 +202,7 @@ public class Main {
 		if(null != core_freq) {
 			params.put(SystemParam.CORE_FREQ, core_freq);
 		}
-		CodeGenerator cg = PlatformLoader.loadGenerator(platform, libDir, nbr.getMap(), params);
+		CodeGenerator cg = PlatformLoader.loadGenerator(platform, libDir, optLevel, nbr.getMap(), params);
 		CodeGenerator.verbose = cgVerbose;
 		
 		long timestamp = System.currentTimeMillis();
@@ -185,90 +212,112 @@ public class Main {
 		float time = (System.currentTimeMillis() - timestamp) / 1000f;
 		System.out.println("Parsing done, time:" + String.format(Locale.US, "%.2f", time) + " s");
 		timestamp = System.currentTimeMillis();
-		System.out.println("Semantic...");
-		SemanticAnalyzer.analyze(globalScope, parser.getClazz(), cg);
-		time = (System.currentTimeMillis() - timestamp) / 1000f;
-		System.out.println("Semantic done, time:" + String.format(Locale.US, "%.2f", time) + " s");
-
-		//ReachableAnalyzer.analyze(parser.getClazz(), launchMethodName, mc);
-
-		Path targetPath = basePath.resolve("target").normalize();
-		targetPath.toFile().mkdirs();
-
-		if(dumpIR) {
-			Path path = targetPath.resolve(FSUtils.getBaseName(sourcePath));
-			BufferedWriter dumpIrBW = new BufferedWriter(new FileWriter(new File(path.toString() + ".j8bir")));
-			new ASTPrinter(dumpIrBW, parser.getClazz());
-			dumpIrBW.close();
+		if(null == clazz) {
+			mc.add(new ErrorMessage("Main class or interface not found", null));
 		}
+		else {
+			System.out.println("Semantic...");
+			SemanticAnalyzer.analyze(globalScope, clazz, cg);
+			time = (System.currentTimeMillis() - timestamp) / 1000f;
+			System.out.println("Semantic done, time:" + String.format(Locale.US, "%.2f", time) + " s");
 
-		if(0 == mc.getErrorCntr()) {
-			try {
-				MethodNode launchNode = null;
-				ClassBlockNode classBlockNode = clazz.getBody();
-				for(AstNode node : classBlockNode.getChildren()) {
-					if(node instanceof MethodNode) {
-						MethodNode mNode = (MethodNode)node;
-						if(mNode.isPublic() && mNode.isStatic() && mNode.getParameters().isEmpty() && mNode.getName().equals(launchMethodName)) {
-							launchNode = mNode;
-							break;
+			//ReachableAnalyzer.analyze(parser.getClazz(), launchMethodName, mc);
+
+			Path targetPath = basePath.resolve("target").normalize();
+			targetPath.toFile().mkdirs();
+
+			if(dumpIR) {
+				try {
+					Path path = targetPath.resolve(FSUtils.getBaseName(sourcePath));
+					File dumpIrFile = new File(path.toString() + ".j8bir");
+					dumpIrFile.setWritable(true);
+					BufferedWriter dumpIrBW = new BufferedWriter(new FileWriter(dumpIrFile));
+					new ASTPrinter(dumpIrBW, clazz);
+					dumpIrBW.close();
+					dumpIrFile.setReadOnly();
+				}
+				catch(Exception ex) {
+					ex.printStackTrace();
+				}
+			}
+
+			if(0 == mc.getErrorCntr()) {
+				try {
+					MethodNode launchNode = null;
+					ClassBlockNode classBlockNode = clazz.getBody();
+					for(AstNode node : classBlockNode.getChildren()) {
+						if(node instanceof MethodNode) {
+							MethodNode mNode = (MethodNode)node;
+							if(mNode.isPublic() && mNode.isStatic() && mNode.getParameters().isEmpty() && mNode.getName().equals(launchMethodName)) {
+								launchNode = mNode;
+								break;
+							}
 						}
 					}
-				}
 
-				if(null != launchNode) {
-					timestamp = System.currentTimeMillis();
-					System.out.println("Codegen...");
+					if(null != launchNode) {
+						timestamp = System.currentTimeMillis();
+						System.out.println("Codegen...");
 
-					launchNode.firstCodeGen(cg);
-					cg.build(VarType.fromClassName(clazz.getName()), 0);
-					//System.out.println("\n" + cg.getAsm());
-					
-					Map<Path, SourceType> sourcePaths	= new HashMap<>();
-					sourcePaths.put(targetPath, SourceType.BASE);
-					sourcePaths.put(rtosPath, SourceType.RTOS);
-					sourcePaths.put(libPath, SourceType.LIB);
-					Path asmPath = targetPath.resolve(FSUtils.getBaseName(sourcePath));
-					
-					File asmFile = new File(asmPath.toString() + ".asm");
-					asmFile.createNewFile();
-					FileWriter fw = new FileWriter(asmFile);
-					fw.write(cg.getAsm());
-					fw.close();
-					
-					File asmMapFile = null;
-					if(asmMap) {
-						asmMapFile = new File(asmPath.toString() + ".map");
+						clazz.firstCodeGen(cg, launchNode);
+						cg.build(VarType.fromClassName(clazz.getName()), 0);
+						//System.out.println("\n" + cg.getAsm());
+
+						Map<Path, SourceType> sourcePaths	= new HashMap<>();
+						sourcePaths.put(targetPath, SourceType.BASE);
+						sourcePaths.put(rtosPath, SourceType.RTOS);
+						sourcePaths.put(libPath, SourceType.LIB);
+						Path asmPath = targetPath.resolve(FSUtils.getBaseName(sourcePath));
+
+						File asmFile = new File(asmPath.toString() + ".asm");
+						asmFile.createNewFile();
+						FileWriter fw = new FileWriter(asmFile);
+						fw.write(cg.getAsm());
+						fw.close();
+
+						File asmMapFile = null;
+						if(asmMap) {
+							asmMapFile = new File(asmPath.toString() + ".map");
+						}
+
+						BufferedWriter listBw = null;
+						if(asmList) {
+							listBw = new BufferedWriter(new FileWriter(new File(asmPath.toString() + ".lst")));
+						}
+
+						time = (System.currentTimeMillis() - timestamp) / 1000f;
+						System.out.println("Codegen done, time:" + String.format(Locale.US, "%.2f", time) + " s");
+
+						timestamp = System.currentTimeMillis();
+						System.out.println("Assembling...");
+						PlatformLoader.launchAssembler(platform, libDir, mc, asmFile.toPath(), sourcePaths, asmPath.toString(), asmMapFile, listBw);
+						time = (System.currentTimeMillis() - timestamp) / 1000f;
+						System.out.println("Assembling done, time:" + String.format(Locale.US, "%.2f", time) + " s");
+
 					}
-					
-					BufferedWriter listBw = null;
-					if(asmList) {
-						listBw = new BufferedWriter(new FileWriter(new File(asmPath.toString() + ".lst")));
+					else {
+						mc.add(new ErrorMessage("TODO Can't find launch point 'public static void main() {...'", null));
 					}
-					
-					time = (System.currentTimeMillis() - timestamp) / 1000f;
-					System.out.println("Codegen done, time:" + String.format(Locale.US, "%.2f", time) + " s");
-
-					timestamp = System.currentTimeMillis();
-					System.out.println("Assembling...");
-					PlatformLoader.launchAssembler(platform, libDir, mc, asmFile.toPath(), sourcePaths, asmPath.toString(), asmMapFile, listBw);
-					time = (System.currentTimeMillis() - timestamp) / 1000f;
-					System.out.println("Assembling done, time:" + String.format(Locale.US, "%.2f", time) + " s");
-
 				}
-				else {
-					mc.add(new ErrorMessage("TODO Can't find launch point 'public static void main() {...'", null));
+				catch(Exception e) {
+					e.printStackTrace();
 				}
 			}
-			catch(Exception e) {
-				e.printStackTrace();
-			}
-			
 		}
 		time = (System.currentTimeMillis() - startTimestamp) / 1000f;
 		System.out.println("Total time:" + String.format(Locale.US, "%.2f", time) + " s");
 
     }
+	
+	private static void showDisclaimer() {
+		System.out.println("================================================================");
+		System.out.println("WARNING: This project is under active development.");
+		System.out.println("The primary focus is on functionality; testing is currently limited.");
+		System.out.println("It is strongly recommended to carefully review the generated");
+		System.out.println("assembler code before flashing the device.");
+		System.out.println("Please report any bugs found to: konstantin@5277.ru");
+		System.out.println("================================================================");
+	}
 	
 	private static void showHelp() {
 		System.out.println("j8b compiler: Java-like source code compiler for vm5277 Embedded Toolkit");
@@ -290,14 +339,18 @@ public class Main {
 		System.out.println("  -I, --include <dir>\tAdditional include path(s)");
 		System.out.println("      --dump-ir\t\t\tOutput intermediate representation after frontend processing");
 		System.out.println("      --cg-verbose 0-2\t\tGenerate detailed codegen info");
+		System.out.println("  -s, --strict      <strong|light|none> Ambiguity handling level");
+		System.out.println("                     strong  - Treat as error");
+		System.out.println("                     light   - Show warning (default)");
+		System.out.println("                     none    - Silent mode");
+		System.out.println("  -o, --opt         <none|size|speed> Optimization high language(j8b) level");
+		System.out.println("                     none    - No optimization");
+		System.out.println("                     size    - Size(Flash) optimization (default)");
+		System.out.println("                     speed   - Execution speed optimization");
 		System.out.println("  -ao, --asm-output <file> Output HEX file (default: <input>.hex)"); //TODO
 		System.out.println("  -af, --asm-format <fmt>  Output format (hex, bin)"); //TODO
 		System.out.println("                     hex     - Intel HEX (default)");
 		System.out.println("                     bin     - Raw binary");
-		System.out.println("  -as, --asm-strict <strong|light|none> Ambiguity handling level"); //TODO
-		System.out.println("                     strong  - Treat as error");
-		System.out.println("                     light   - Show warning (default)");
-		System.out.println("                     none    - Silent mode");
 		System.out.println("  -am, --asm-map			Generate asm memory map file");
 		System.out.println("  -al, --asm-list			Generate asm listing file");
 		System.out.println("  -v, --version\t\tDisplay version");
@@ -327,5 +380,21 @@ public class Main {
 		System.err.println("1. Specify custom path with --path (-P) option");
 		System.err.println("2. Add toolkit directory(VM5277) to system environment variables");
 		System.err.println("3. Check project source or documentation at https://github.com/w5277c/vm5277");
+	}
+	
+	private static void showInvalidStrictLevel(String invalidParam) {
+		System.err.println("[ERROR] TODO Invalid strict(-s) level:" + invalidParam + ", expected error|warning|ignore");
+	}
+
+	private static void showInvalidOptLevel(String invalidParam) {
+		System.err.println("[ERROR] TODO Invalid optimization level:" + invalidParam + ", expected none|size|speed");
+	}
+
+	public static int getStrictLevel() {
+		return stirctLevel;
+	}
+	
+	public static int getOptLevel() {
+		return optLevel;
 	}
 }

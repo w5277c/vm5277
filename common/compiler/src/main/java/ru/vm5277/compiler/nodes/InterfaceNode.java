@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
@@ -96,7 +97,7 @@ public class InterfaceNode extends ClassNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		cg.enterInterface(VarType.fromClassName(name), name);
+		cgScope = cg.enterInterface(VarType.fromClassName(name), name);
 
 		// Проверка что интерфейс не содержит конструкторов
 		for (AstNode decl : blockIfaceNode.getDeclarations()) {
@@ -131,7 +132,7 @@ public class InterfaceNode extends ClassNode {
 		// Проверка вложенных интерфейсов
 		for (AstNode decl : blockIfaceNode.getDeclarations()) {
 			if (decl instanceof InterfaceNode) {
-				decl.postAnalyze(scope, cg);
+				decl.postAnalyze(interfaceScope, cg); // Заменил scope на interfaceScope, надо проверить
 			}
 		}
 
@@ -140,10 +141,10 @@ public class InterfaceNode extends ClassNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
-		if(cgDone) return null;
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+		if(cgDone || disabled) return null;
 		cgDone = true;
-
+		
 /* Уже есть в postAnalyze
 int[] interfaceIds = null;
 		if(!impl.isEmpty()) {
@@ -155,7 +156,7 @@ int[] interfaceIds = null;
 			
 		cg.enterInterface(VarType.fromClassName(name), interfaceIds, name);
 */
-		blockIfaceNode.codeGen(cg);
+		blockIfaceNode.codeGen(cg, null, false);
 		
 /*		finally {
 			cg.leaveInterface();

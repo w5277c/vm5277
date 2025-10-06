@@ -62,7 +62,10 @@ public class CGClassScope extends CGScope {
 	public void addField(CGFieldScope field) {
 		fields.put(field.getResId(), field);
 	}
-
+	public CGFieldScope getField(int resId) {
+		return fields.get(resId);
+	}
+	
 	public CGCells memAllocate(int size, boolean isStatic) {
 		if(isStatic) {
 			CGCells cells = new CGCells(CGCells.Type.STAT, size, statOffset);
@@ -164,7 +167,7 @@ public class CGClassScope extends CGScope {
 		
 		if(0x01<fieldsInitCont.getItems().size()) {
 			try {
-				fieldsInitCont.append(cg.eReturn(null, 0, 0, 0));
+				fieldsInitCont.append(cg.eReturn(null, 0, 0, null));
 			}
 			catch(Exception ex) {}
 			cont.append(fieldsInitCont);

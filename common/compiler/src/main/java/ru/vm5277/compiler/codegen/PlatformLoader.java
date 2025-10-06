@@ -38,7 +38,7 @@ public class PlatformLoader {
 	private	static	final	String	LIB_ASM_CLASSPREFIX	= "ru.vm5277.";
 	private	static	final	String	LIB_ASM_CLASSPOSTFIX= "_asm.Assembler";
 	
-	public static CodeGenerator loadGenerator(	String platform, File libsDir, Map<String, NativeBinding> nbMap,
+	public static CodeGenerator loadGenerator(	String platform, File libsDir, int optLevel, Map<String, NativeBinding> nbMap,
 												Map<SystemParam, Object> params) throws Exception {
 		// Формируем имя JAR-файла (например, "codegen-avr.jar")
 		String jarName =  platform + LIB_CG_POSTFIX + ".jar";
@@ -52,10 +52,10 @@ public class PlatformLoader {
 		// Загружаем класс-генератор (ожидаемое имя: ru.vm5277.compiler.PLATFORM_codegen.Generator)
 		String className = LIB_CG_CLASSPREFIX + platform + LIB_CG_CLASSPOSTFIX;
 		Class<?> generatorClass = classLoader.loadClass(className);
-		Constructor<?> constructor = generatorClass.getConstructor(String.class, Map.class, Map.class);
+		Constructor<?> constructor = generatorClass.getConstructor(String.class, int.class, Map.class, Map.class);
 
 		// Создаем экземпляр, передавая параметры
-		return (CodeGenerator) constructor.newInstance(platform + LIB_CG_POSTFIX, nbMap, params);
+		return (CodeGenerator) constructor.newInstance(platform + LIB_CG_POSTFIX, optLevel, nbMap, params);
 	}
 	
 	public static boolean launchAssembler(	String platform, File libsDir, MessageContainer mc, Path sourcePath, Map<Path, SourceType> sourcePaths,
@@ -77,5 +77,4 @@ public class PlatformLoader {
 		return (boolean) method.invoke(	asmClass.newInstance(), mc, null, sourcePath, sourcePaths, AssemblerInterface.STRICT_LIGHT, outputFilename, mapFile,
 										listBW);
 	}
-
 }

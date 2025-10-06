@@ -91,6 +91,12 @@ public class Lexer {
 				continue;
 			}
 			
+			if(sb.hasNext(1) && '*'==ch && '/'==sb.getChar(1)) {
+				mc.add(new ErrorMessage("Unexpected end of comment '*/' without start", sb.snapSP()));
+				sb.next(2);
+				continue;
+			}
+			
 			// Символ
 			if ('\''==ch) {
 				tokens.add(new TChar(sb, mc));

@@ -1,0 +1,133 @@
+; vm5277.avr_codegen v0.1 at Sun Sep 28 09:38:06 VLAT 2025
+.equ stdout_port = 18
+
+.set OS_FT_DRAM = 1
+.set OS_FT_STDOUT = 1
+
+.include "devices/atmega328p.def"
+.include "core/core.asm"
+.include "dmem/dram.asm"
+.include "j8b/inc_refcount.asm"
+.include "j8b/dec_refcount.asm"
+.include "stdio/out_num16.asm"
+.include "stdio/out_bool.asm"
+.include "stdio/out_q7n8.asm"
+
+Main:
+	rjmp j8bCMainMmain
+_j8b_meta20:
+	.db 12,0
+
+j8bCMainMmain:
+	ldi r20,0
+	ldi r20,0
+	ldi r21,0
+	ldi r21,0
+	ldi r22,0
+	ldi r23,0
+	ldi r22,0
+	ldi r23,0
+	ldi r24,2
+	ldi r25,1
+	ldi r26,4
+	ldi r27,3
+	add r24,C0x01
+	adc r25,C0x00
+	sub r24,C0x01
+	sbc r25,C0x00
+	add r24,C0x01
+	adc r25,C0x00
+	sub r24,C0x01
+	sbc r25,C0x00
+	movw r16,r24
+	add r24,C0x01
+	adc r25,C0x00
+	movw r26,r16
+	movw r16,r24
+	sub r24,C0x01
+	sbc r25,C0x00
+	movw r26,r16
+	add r24,C0x01
+	adc r25,C0x00
+	movw r16,r24
+	movw r26,r16
+	sub r24,C0x01
+	sbc r25,C0x00
+	movw r16,r24
+	movw r26,r16
+	mov r16,r20
+	com r16
+	mov r21,r16
+	mov r16,r24
+	com r16
+	mov r17,r25
+	com r17
+	add r16,C0x01
+	adc r17,C0x00
+	movw r26,r16
+	mov r16,r20
+	com r16
+	ldi r17,0x00
+	movw r24,r16
+	mov r16,r20
+	com r16
+	mov r17,r16
+	clr r16
+	movw r22,r16
+	mov r16,r24
+	com r16
+	mov r17,r25
+	com r17
+	add r16,C0x01
+	adc r17,C0x00
+	mov r17,r16
+	clr r16
+	movw r22,r16
+	add r24,C0x01
+	adc r25,C0x00
+	movw r16,r24
+	mov r17,r16
+	clr r16
+	movw r22,r16
+	sub r24,C0x01
+	sbc r25,C0x00
+	movw r16,r24
+	mov r17,r16
+	clr r16
+	movw r22,r16
+	movw r16,r24
+	add r24,C0x01
+	adc r25,C0x00
+	mov r17,r16
+	clr r16
+	movw r22,r16
+	movw r16,r24
+	sub r24,C0x01
+	sbc r25,C0x00
+	mov r17,r16
+	clr r16
+	movw r22,r16
+	add r24,C0x01
+	adc r25,C0x00
+	movw r16,r24
+	movw r24,r16
+	sub r24,C0x01
+	sbc r25,C0x00
+	movw r16,r24
+	movw r24,r16
+	mov r16,r20
+	com r16
+	push r16
+	mov r16,r21
+	pop j8b_atom
+	or r16,j8b_atom
+	rcall os_out_bool
+	movw r16,r24
+	rcall os_out_num16
+	movw r16,r26
+	rcall os_out_num16
+	movw r16,r22
+	rcall os_out_q7n8
+	mov r16,r21
+	rcall os_out_bool
+	ret

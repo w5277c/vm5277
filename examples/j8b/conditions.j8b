@@ -42,8 +42,26 @@ class Main {
 			System.outChar('E'); //69
 		}
 
+		byte s1;
+		s1=0x01;
+		if(s1==0x03) {
+			System.outChar(' '); //32
+		}
+
+		bool b1;
+		b1=false;
+		if(b1) {
+			System.out('2'); //50
+		}
+		if(!b1) {
+			System.out('3'); //51
+		}
+
+
 		byte i=1;
+		i++;
 		byte j=2;
+		j++;
 		if(i+j<2) {
 			System.outChar('F'); //70
 		}

@@ -1,3 +1,19 @@
+/*
+ * Copyright 2025 konstantin@5277.ru
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
 package ru.vm5277.compiler;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -21,8 +37,6 @@ public class ParserTests {
 								"	bool b6=!(65>3); bool b7=3<=3; bool b8=5%2==1; " +
 								"	int t1=-5; int t2=5+i1+i2-2-i3; int t3=7==10-6/2?7:2; int t4=5<3 ? 7:2; int t5=true?1:0;}";
 
-//TODO byte[] s5='1'+'z'
-//		String source = "class A{ int t3=7==10-6/2?7:2;}";
 		MessageContainer mc = new MessageContainer(100, true, false);		
 		Lexer lexer = new Lexer(source, mc);
 		ASTParser parser = new ASTParser(null, null, lexer.getTokens(), mc);

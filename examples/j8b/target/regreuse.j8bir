@@ -1,0 +1,38 @@
+class Main {
+    static public void main() {
+        System.setParam(0, 16);
+        System.setParam(2, 18);
+        System.setParam(3, 1);
+        byte a;
+        a=100;
+        {
+            byte b;
+            b=10;
+            byte c;
+            c=20;
+            System.out(b+c+a);
+        }
+        
+        {
+            byte d;
+            d=30;
+            byte e;
+            e=40;
+            System.out(d+e);
+            {
+                byte f;
+                f=50;
+                System.out(f);
+            }
+            
+        }
+        
+        byte g;
+        g=60;
+        byte h;
+        h=70;
+        System.out(a+g+h);
+    }
+    public Main() {
+    }
+}

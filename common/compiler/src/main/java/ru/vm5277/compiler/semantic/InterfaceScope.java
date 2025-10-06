@@ -83,12 +83,6 @@ public class InterfaceScope extends Scope {
 
 	@Override
 	public Symbol resolveSymbol(String name) {
-/*		// Поиск методов (без параметров - для простых случаев)
-		if (methods.containsKey(name) && !methods.get(name).isEmpty()) {
-			// Возвращаем первый метод с таким именем (для точного поиска нужно использовать resolveMethod)
-			return methods.get(name).get(0);
-		}
-*/
 		// Поиск в родительской области видимости (если есть)
 		if (parent != null) {
 			return parent.resolveSymbol(name);
@@ -158,6 +152,8 @@ public class InterfaceScope extends Scope {
 	
 	public boolean isImplements(VarType ifaceType) {
 		if(null == impl) return false;
+		if(ifaceType.isPrimitive()) return false;
+		if(ifaceType.isObject()) return true;
 		for(VarType type : impl) {
 			if(ifaceType == type) return true;
 			InterfaceScope iScope = resolveInterface(type.getClassName());

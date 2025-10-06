@@ -20,9 +20,14 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import ru.vm5277.common.StrUtils;
+import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGMethodScope;
+import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
@@ -193,6 +198,8 @@ public class MethodNode extends AstNode {
 
 	@Override
 	public boolean declare(Scope scope) {
+		boolean result = true;
+		
 		List<Symbol> paramSymbols = new ArrayList<>();
 		for (ParameterNode param : parameters) {
 			paramSymbols.add(new Symbol(param.getName(), param.getType(), param.isFinal(), false));
@@ -206,7 +213,6 @@ public class MethodNode extends AstNode {
 			// Устанавливаем обратную ссылку
 			methodScope.setSymbol((MethodSymbol)symbol);
 
-			
 			// Проверяем, является ли scope ClassScope или InterfaceScope
 			if (scope instanceof ClassScope) {
 				ClassScope cScope = (ClassScope) scope;				
@@ -241,10 +247,10 @@ public class MethodNode extends AstNode {
 				markError(new CompileException(	"Method '" + name + "' cannot have body in interface '" + ((InterfaceScope)scope).getName() + "'"));
 				return false;
 			}
-			blockNode.declare(methodScope);
+			result &=blockNode.declare(methodScope);
 		}
 		
-		return true;
+		return result;
 	}
 
 	@Override
@@ -259,38 +265,64 @@ public class MethodNode extends AstNode {
 		}
 
 		if(null == returnType) {
-			symbol.setCGScope(cg.enterConstructor(types));
+			cgScope = cg.enterConstructor(types);
 		}
 		else {
-			symbol.setCGScope(cg.enterMethod(returnType, types, name));
+			cgScope = cg.enterMethod(returnType, types, name);
 		}
+		symbol.setCGScope(cgScope);
+		
+		if(!isNative()) {
+			// Создаем CGScope для каждого параметра
+			CGMethodScope mScope = (CGMethodScope)cgScope;
+			int offset = 0;
+			for(Symbol pSymbol : ((MethodSymbol)symbol).getParameters()) {
+				try {
+					int size = (-1==pSymbol.getType().getSize() ? cg.getRefSize() : pSymbol.getType().getSize());
+// Создаем CGScope для параметра
+					CGVarScope pScope = cg.enterLocal(	pSymbol.getType(),
+														size, false,
+														pSymbol.getName());
+					pScope.setCells(new CGCells(CGCells.Type.ARGS, size, offset));
+					offset+=size;
+					cg.leaveLocal();
 
-		if (modifiers.contains(Keyword.NATIVE)) {
-			if (blockNode != null) {
+					// Устанавливаем CGScope для символа параметра
+					pSymbol.setCGScope(pScope);
+				}
+				catch (CompileException ex) {
+					markError(ex);
+					result = false;
+				}
+			}
+		}
+		
+		if(modifiers.contains(Keyword.NATIVE)) {
+			if(blockNode != null) {
 				markError("Native method cannot have a body");
 			}
 		}
 		else {
 			// Анализ тела метода (если есть)
-			if (null != blockNode && null != methodScope) {
-				for (ParameterNode param : parameters) {
+			if(null != blockNode && null != methodScope) {
+				for(ParameterNode param : parameters) {
 					param.postAnalyze(methodScope, cg);
 				}
 
 				// Анализируем тело метода
-				result &= blockNode.postAnalyze(methodScope, cg);
+				result&=blockNode.postAnalyze(methodScope, cg);
 
 				// Для не-void методов проверяем наличие return
 				// TODO переосмыслить после ConstantFolding
-				if (null != returnType && !returnType.equals(VarType.VOID)) {
-					if (!BlockNode.hasReturnStatement(blockNode)) {
+				if(null != returnType && !returnType.equals(VarType.VOID)) {
+					if(!BlockNode.hasReturnStatement(blockNode)) {
 						markError("Method '" + name + "' must return a value");
 					}
 				}
 
 				List<AstNode> nodes = blockNode.getChildren();
-				for (int i = 0; i < nodes.size(); i++) {
-					if (i > 0 && isControlFlowInterrupted(nodes.get(i - 1))) {
+				for(int i = 0; i < nodes.size(); i++) {
+					if(i > 0 && isControlFlowInterrupted(nodes.get(i - 1))) {
 						markError("Unreachable code in method " + name);
 						break;
 					}
@@ -310,59 +342,32 @@ public class MethodNode extends AstNode {
 	public void firstCodeGen(CodeGenerator cg) throws Exception {
 		cgDone = true;
 		
-		if(null != blockNode) blockNode.firstCodeGen(cg);
-		
-		classNode.codeGen(cg);		
+		if(null != blockNode) {
+			blockNode.firstCodeGen(cg);
+		}
+
+		classNode.codeGen(cg, null, false);		
 
 		if(!(classNode instanceof InterfaceNode)) {
-			((CGMethodScope)symbol.getCGScope()).build(cg);
+			((CGMethodScope)cgScope).build(cg);
 		}
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
-		if(cgDone) return null;
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+		if(cgDone || disabled) return null;
 		cgDone = true;
 
-//		CGMethodScope mScope = (CGMethodScope)symbol.getCGScope();
-//		if(VERBOSE_LO <= cg.getVerbose()) mScope.append(new CGIText(";build " + mScope.toString()));
-//		mScope.append(mScope.getLabel());
+		if(null != blockNode) blockNode.codeGen(cg, null, false);
 		
-//		if(isConstructor()) {
-//			CGClassScope cScope = (CGClassScope)mScope.getParent();
-//			cg.eNewInstance(mScope, cScope.getHeapHeaderSize()+cScope.getHeapOffset(),	cScope.getType(), Arrays.asList(mScope.getTypes()), false, false);
-//			mScope.append(mScope.getInitLabel());
-//		}
-		
-//		if(!blockNode.getChildren().isEmpty()) {
-//			cg.pushStackReg(mScope);
-//			cg.stackToStackReg(mScope);
-
-			if(null != blockNode) blockNode.codeGen(cg);
-		
-//			cg.popStackReg(mScope);
-//		}
-		
-		classNode.codeGen(cg);		
+		classNode.codeGen(cg, null, false);
 
 		if(!(classNode instanceof InterfaceNode)) {
-			((CGMethodScope)symbol.getCGScope()).build(cg);
+			((CGMethodScope)cgScope).build(cg);
 		}
 		return null;
 	}
-/*
-	@Override
-	public Boolean isUsed() {
-		if(null != super.isUsed() && super.isUsed()) return true;
-		if(null == methodScope) return null;
-		return methodScope.isUsed();
-	}
-	@Override
-	public void setUsed() {
-		super.setUsed();
-		if(null != methodScope) methodScope.setUsed();
-	}
-*/
+
 	@Override
 	public List<AstNode> getChildren() {
 		return Arrays.asList(blockNode);

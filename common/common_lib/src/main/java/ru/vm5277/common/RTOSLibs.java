@@ -19,8 +19,7 @@ public enum RTOSLibs {
 	STACK_ALLOC("sys/stack_alloc.asm"),
 	STACK_FREE("sys/stack_free.asm"),
 	DRAM("dmem/dram.asm"),
-	INC_REFCOUNT("j8b/inc_refcount.asm"),
-	DEC_REFCOUNT("j8b/dec_refcount.asm"),
+	CLASS_REFCOUNT("j8b/class_refcount.asm"),
 	INCTANCEOF("j8b/instanceof.asm"),
 	CLEAR_FIELDS("j8b/clear_fields.asm"),
 	DISPATCHER("core/dispatcher.asm"),
@@ -32,7 +31,13 @@ public enum RTOSLibs {
 	MATH_DIV8("math/div8.asm"),
 	MATH_DIV16("math/div16.asm"),
 	MATH_DIVQ7N8("math/divq7n8.asm"),
-	MATH_DIV32("math/div32.asm");
+	MATH_DIV32("math/div32.asm"),
+	ARR_CELLADDR("j8b/arr_celladdr.asm"),
+	ARR_SIZE("j8b/arr_size.asm"),
+	ARR_REFCOUNT("j8b/arr_refcount.asm"),
+	ARRVIEW_MAKE("j8b/arrview_make.asm"),
+	ARRVIEW_ARRADDR("j8b/arrview_arraddr.asm"),
+	ROM_READ16("mem/rom_read16.asm");
 	
 	private	final	String	path;
 	private			boolean	required;

@@ -2,11 +2,14 @@ class Main {
     public bool test(bool _b1, bool _b2) {
         return _b1&&_b2;
     }
-    public static void main() {
+    static public void main() {
         System.setParam(2, 18);
-        bool b10 = true;
-        bool b1 = true;
-        bool b2 = false;
+        bool b10 = false;
+        b10=!b10;
+        bool b1 = false;
+        b1=!b1;
+        bool b2 = true;
+        b2=!b2;
         System.out(true);
         System.out(false);
         System.out(false);
@@ -35,8 +38,7 @@ class Main {
         if (b1&&b2) {
             System.out('5');
         }
-        System.out(!unknown expr:ThisExpression
-        .test(b1, b2));
+        System.out(this.test(b1, b2));
         bool b4 = b1||b2||b10;
         System.out(b4);
         bool b5 = b1&&b2;

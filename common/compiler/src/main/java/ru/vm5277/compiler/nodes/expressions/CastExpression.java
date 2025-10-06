@@ -23,6 +23,7 @@ import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.cg.CodeGenerator;
 import java.util.List;
 import java.util.Arrays;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.nodes.AstNode;
 
 public class CastExpression extends ExpressionNode {
@@ -57,42 +58,37 @@ public class CastExpression extends ExpressionNode {
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		try {
-			cgScope = cg.enterExpression();
-			if (!operand.postAnalyze(scope, cg)) {
-				cg.leaveExpression();
-				return false;
-			}
+		boolean result = true;
+		cgScope = cg.enterExpression(toString());
+		
+		result &=operand.postAnalyze(scope, cg);
 
-			try {
-				sourceType = operand.getType(scope);
-				if(!canCast(sourceType, targetType)) {
-					markError("Invalid cast from " + sourceType + " to " + targetType);
-					cg.leaveExpression();
-					return false;
-				}
+		try {
+			sourceType = operand.getType(scope);
+			if(!canCast(sourceType, targetType)) {
+				markError("Invalid cast from " + sourceType + " to " + targetType);
+				result = false;
 			}
-			catch (CompileException e) {
-				markError(e);
-				cg.leaveExpression();
-				return false;
-			}
-			cg.leaveExpression();
-			return true;
 		}
 		catch (CompileException e) {
-			markError(e.getMessage());
-			cg.leaveExpression();
-			return false;
+			markError(e);
+			result = false;
 		}
+
+		cg.leaveExpression();
+		return result;
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
-		Object result = operand.codeGen(cg);
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+		CGScope cgs = (null==parent ? cgScope : parent);
+		
+		Object result = operand.codeGen(cg, cgs, toAccum);
 		if (sourceType != targetType) {
 			if (sourceType.isNumeric() && targetType.isNumeric()) {
-				cg.accCast(cgScope, targetType.getSize(), !sourceType.isFixedPoint() && targetType.isFixedPoint());
+				//TODO бардак с CGScope - не понятно какой должен быть, в теории всегда нужно использовать cgScope, cg.getScope вообще не должен существовать
+				//cgScope.append(cg.accCast(sourceType, targetType));
+				cgs.append(cg.accCast(sourceType, targetType));
 			}
 		}
 		return result;
@@ -104,6 +100,9 @@ public class CastExpression extends ExpressionNode {
 	
 	public ExpressionNode getOperand() {
 		return operand;
+	}
+	public void setOperand(ExpressionNode expr)  {
+		operand = expr;
 	}
 	
 	@Override

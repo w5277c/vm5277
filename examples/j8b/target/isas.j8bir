@@ -1,0 +1,30 @@
+class Main {
+    public interface Number {
+        public byte toByte();
+        public short toShort();
+    }
+    public class Short {
+        private short value;
+        public Short(short value) {
+            null.value=value;
+        }
+        public byte toByte() {
+            return (byte)value;
+        }
+        public short toShort() {
+            return value;
+        }
+    }
+    static public void main() {
+        System.setParam(0, 16);
+        System.setParam(2, 18);
+        System.setParam(3, 1);
+        Object num2 = Short.Short(258);
+        if (num2 is Short as s) {
+            System.out(s.toShort());
+            System.outCStr(" is short\n");
+        }
+    }
+    public Main() {
+    }
+}

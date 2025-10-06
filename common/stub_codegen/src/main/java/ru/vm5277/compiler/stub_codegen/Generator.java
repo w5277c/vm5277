@@ -22,8 +22,10 @@ import java.util.Map;
 import ru.vm5277.common.NativeBinding;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.SystemParam;
+import ru.vm5277.common.cg.CGArrCells;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.DataSymbol;
 import ru.vm5277.common.cg.Operand;
 import ru.vm5277.common.cg.RegPair;
 import ru.vm5277.common.cg.items.CGIAsm;
@@ -41,11 +43,11 @@ import ru.vm5277.common.exceptions.CompileException;
 public class Generator extends CodeGenerator {
 	private	final	static	String				VERSION		= "0.1";
 
-	public Generator(String platform, Map<String, NativeBinding> nbMap, Map<SystemParam, Object> params) {
-		super(platform, nbMap, params);
+	public Generator(String platform, int optLevel, Map<String, NativeBinding> nbMap, Map<SystemParam, Object> params) {
+		super(platform, optLevel, nbMap, params);
 	}
 	
-	@Override public CGIContainer accCast(CGScope scope, int size, boolean toFixed) throws CompileException {return null;}
+	@Override public CGIContainer accCast(VarType accType, VarType opType) throws CompileException {return null;}
 	@Override public void cellsToAcc(CGScope scope, CGCellsScope cScope) throws CompileException {}
 	@Override public void accToCells(CGScope scope, CGCellsScope cScope) throws CompileException {}
 	@Override public void setHeapReg(CGScope scope, CGCells cells) throws CompileException {}
@@ -53,24 +55,25 @@ public class Generator extends CodeGenerator {
 	@Override public CGIContainer constToCells(CGScope scope, long value, CGCells cells, boolean isFixed) throws CompileException {return null;}
 	@Override public void cellsAction(CGScope scope, CGCells cells, Operator op, boolean isFixed) throws CompileException {}
 	@Override public void constAction(CGScope scope, Operator op, long k, boolean isFixed) throws CompileException {}
-	@Override public CGIContainer pushAccBE(CGScope scope, int size) {return null;}
-	@Override public void popAccBE(CGScope scope, int size) {}
+	@Override public CGIContainer pushAccBE(CGScope scope, Integer size) {return null;}
+	@Override public void popAccBE(CGScope scope, Integer size) {}
 	@Override public CGIContainer pushHeapReg(CGScope scope, boolean half) {return null;}
 	@Override public CGIContainer popHeapReg(CGScope scope, boolean half) {return null;}
 	@Override public CGIContainer pushStackReg(CGScope scope) {return null;}
 	@Override public CGIContainer popStackReg(CGScope scope) {return null;}
-	@Override public void updateRefCount(CGScope scope, CGCells cells, boolean isInc) throws CompileException {}
+	@Override public void updateClassRefCount(CGScope scope, CGCells cells, boolean isInc) throws CompileException {}
 	@Override public void invokeClassMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, CGLabelScope lbScope, boolean isInternal) throws CompileException {}
 	@Override public void invokeInterfaceMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, VarType ifaceType, int methodSN) throws CompileException {}
 	@Override public void invokeNative(CGScope scope, String className, String methodName, String params, VarType type, Operand[] operands) throws CompileException {}
 	@Override public void eInstanceof(CGScope scope, VarType type) throws CompileException {}
-	@Override public void emitUnary(CGScope scope, Operator opt, CGCells cells) throws CompileException {}
+	@Override public void eUnary(CGScope scope, Operator opt, CGCells cells, boolean toAccum) throws CompileException {}
 	@Override public CGIContainer eNewInstance(int size, CGLabelScope iidLabel, VarType type, boolean launchPoint, boolean canThrow) throws CompileException {return null;}
-	@Override public void eFree(Operand op) {}
-	@Override public void eIf(CGBranchScope branchScope, CGScope condScope, CGBlockScope thenScope, CGBlockScope elseScope) throws CompileException {}
+	@Override public CGIContainer eNewArray(VarType type, int depth, int[] cDims) throws CompileException {return null;}
+	@Override public CGIContainer eNewArrView(int depth) throws CompileException {return null;}
+	@Override public void eIf(CGScope scope, CGBranchScope branchScope, CGBlockScope thenScope, CGBlockScope elseScope) throws CompileException {}
 	@Override public void eTry(CGBlockScope blockScope, List<Case> cases, CGBlockScope defaultBlockScope) {}
 	@Override public void eWhile(CGScope scope, CGScope condScope, CGBlockScope bodyScope) throws CompileException {}
-	@Override public CGIContainer eReturn(CGScope scope, int argsSize, int varsSize, int retSize) throws CompileException {return null;}
+	@Override public CGIContainer eReturn(CGScope scope, int argsSize, int varsSize, VarType retType) throws CompileException {return null;}
 	@Override public void eThrow() {}
 	@Override public int getRefSize() {return 1;}
 	@Override public int getCallSize() {return 1;}
@@ -90,4 +93,17 @@ public class Generator extends CodeGenerator {
 	@Override public CGIContainer call(CGScope scope, CGLabelScope lScope) throws CompileException {return null;}
 	@Override public int getCallStackSize() {return 0;}
 	@Override public void normalizeIRegConst(CGMethodScope mScope) {}
+	@Override public void computeArrCellAddr(CGScope scope, CGCells arrAddrCells, CGArrCells arrCells) throws CompileException {}
+	@Override public void arrToAcc(CGScope scope, CGArrCells arrCells) throws CompileException {}
+	@Override public void accToArr(CGScope scope, CGArrCells arrScope) throws CompileException {}
+	@Override public void arrToCells(CGScope scope, CGArrCells arrCells, CGCells cells) throws CompileException {}
+	@Override public void flashDataToArr(CGScope scope, DataSymbol symbol, int offset) {}
+	@Override public void updateArrRefCount(CGScope cgScope, CGCells cells, boolean isInc, boolean isView) throws CompileException {}
+	@Override public void cellsToArrReg(CGScope cgScope, CGCells cells) throws CompileException {}
+	@Override public CGIContainer pushArrReg(CGScope scope) {return null;}
+	@Override public CGIContainer popArrReg(CGScope scope) {return null;}
+	@Override public void arrSizetoAcc(CGScope cgScope, boolean isView) {}
+	@Override public void arrRegToCells(CGScope scope, CGCells cells) throws CompileException {}
+	@Override public void arrRegToAcc(CGScope scope) throws CompileException {}
+	@Override public void accToArrReg(CGScope scope) throws CompileException {}
 }

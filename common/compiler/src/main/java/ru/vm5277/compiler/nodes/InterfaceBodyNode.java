@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
@@ -58,7 +59,8 @@ public class InterfaceBodyNode extends AstNode {
 
 			// Определение типа (примитив или класс)
 			VarType type = checkPrimtiveType();
-			if (null == type) type = checkClassType();
+			if(null == type) type = checkClassType();
+			if(null != type) type = checkArrayType(type);
 
 			// Получаем имя поля/метода
 			String name = null;
@@ -199,10 +201,10 @@ public class InterfaceBodyNode extends AstNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
-		if(cgDone) return null;
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+		if(cgDone || disabled) return null;
 		cgDone = true;
-
+		
 /*		for(AstNode node : children) {
 			if(node instanceof MethodNode && ((MethodNode)node).isStatic()) {
 				node.codeGen(cg);

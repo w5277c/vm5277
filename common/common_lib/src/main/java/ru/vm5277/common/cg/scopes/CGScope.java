@@ -108,24 +108,15 @@ public class CGScope extends CGIContainer {
 		return name;
 	}
 	
-	public CGBlockScope getBlockScope() {
+	public<T> CGScope getScope(Class<T> clazz) {
 		CGScope _scope = this;
 		while(null != _scope) {
-			if(_scope instanceof CGBlockScope) return (CGBlockScope)_scope;
+			if(clazz.isInstance(_scope)) return _scope;
 			_scope = _scope.getParent();
 		}
 		return null;
 	}
 	
-	public CGMethodScope getMethodScope() {
-		CGScope _scope = this;
-		while(null != _scope) {
-			if(_scope instanceof CGMethodScope) return (CGMethodScope)_scope;
-			_scope = _scope.getParent();
-		}
-		return null;
-	}
-
 	public int getVerbose() {
 		return verbose;
 	}

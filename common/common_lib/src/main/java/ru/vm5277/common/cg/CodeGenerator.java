@@ -35,6 +35,7 @@ import ru.vm5277.common.ImplementInfo;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.NativeBinding;
 import ru.vm5277.common.Operator;
+import ru.vm5277.common.Pair;
 import ru.vm5277.common.RTOSFeature;
 import ru.vm5277.common.RTOSLibs;
 import ru.vm5277.common.SystemParam;
@@ -44,7 +45,6 @@ import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.compiler.Case;
 import static ru.vm5277.common.cg.OperandType.LITERAL;
 import ru.vm5277.common.cg.items.CGIAsm;
-import ru.vm5277.common.cg.items.CGIAsmJump;
 import ru.vm5277.common.cg.items.CGIConstrInit;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.scopes.CGCommandScope;
@@ -60,21 +60,22 @@ public abstract class CodeGenerator extends CGScope {
 	//protected			final	Map<Integer, CGLabelScope>	labels				= new HashMap<>();
 	protected			final	Map<SystemParam, Object>	params;
 	protected					CodeOptimizer				optimizer;
+	protected			final	int							optLevel;
 	protected	static	final	Map<Integer, DataSymbol>	flashData			= new HashMap<>();
 	protected					CGScope						scope				= null;
 	protected	final			CGAccum						accum				= new CGAccum();
 	public				static	int							CLASS_HEADER_SIZE;
+	protected			static	boolean						arraysUsage			= false;
 	
-	public CodeGenerator(String platform, Map<String, NativeBinding> nbMap, Map<SystemParam, Object> params) {
+	public CodeGenerator(String platform, int optLevel, Map<String, NativeBinding> nbMap, Map<SystemParam, Object> params) {
 		this.platform = platform;
 		this.nbMap = nbMap;
 		this.params = params;
+		this.optLevel = optLevel;
 	}
 	
 	public CGClassScope enterClass(VarType type, String name, List<ImplementInfo> impl, boolean isRoot) {
 		scope = new CGClassScope(this, scope, genId(), type, name, impl, null != scope && isRoot);
-		RTOSLibs.INC_REFCOUNT.setRequired();
-		RTOSLibs.DEC_REFCOUNT.setRequired();
 		return (CGClassScope)scope;
 	}
 	public void leaveClass() {
@@ -93,7 +94,7 @@ public abstract class CodeGenerator extends CGScope {
 	}
 
 	public CGMethodScope enterConstructor(VarType[] types) {
-		CGMethodScope mScope = new CGMethodScope(this, (CGClassScope)scope, genId(), null, types, ((CGClassScope)scope).getName(), buildRegsPool());
+		CGMethodScope mScope = new CGMethodScope(this, (CGClassScope)scope, genId(), null, 0, types, ((CGClassScope)scope).getName(), buildRegsPool());
 		((CGClassScope)scope).addMethod(mScope);
 		scope = mScope;
 		return mScope;
@@ -103,7 +104,8 @@ public abstract class CodeGenerator extends CGScope {
 	}
 
 	public CGMethodScope enterMethod(VarType type, VarType[] types, String name) {
-		CGMethodScope mScope = new CGMethodScope(this, (CGClassScope)scope, genId(), type, types, name, buildRegsPool());
+		int size = (-1 == type.getSize() ? getRefSize() : type.getSize());
+		CGMethodScope mScope = new CGMethodScope(this, (CGClassScope)scope, genId(), type, size, types, name, buildRegsPool());
 		((CGClassScope)scope).addMethod(mScope);
 		scope = mScope;
 		return mScope;
@@ -112,7 +114,7 @@ public abstract class CodeGenerator extends CGScope {
 		scope = scope.free();
 	}
 
-	public CGBlockScope enterBlock(CGScope parent) {
+	public CGBlockScope enterBlock() {
 		scope = new CGBlockScope(this, scope, genId());
 		return (CGBlockScope)scope;
 	}
@@ -172,11 +174,22 @@ public abstract class CodeGenerator extends CGScope {
 	}
 	
 	
-	public CGExpressionScope enterExpression() throws CompileException {
-		scope = new CGExpressionScope(scope);
+	public CGExpressionScope enterExpression(String name) {
+		scope = new CGExpressionScope(scope, name);
 		return (CGExpressionScope)scope;
 	}
 	public void leaveExpression() {
+		scope = scope.free();
+	}
+
+	public CGCellsScope enterArrayExpression(VarType type, int size, final CGCells cells) {
+		scope = new CGCellsScope(scope, genId(), type, size, "arrExpr") {
+			@Override
+			public CGCells getCells() {return cells;}
+		};
+		return (CGCellsScope)scope;
+	}
+	public void leaveArrayExpression() {
 		scope = scope.free();
 	}
 
@@ -196,17 +209,29 @@ public abstract class CodeGenerator extends CGScope {
 		scope = scope.free();
 	}
 
-	public DataSymbol defineData(int resId, Object obj) {
-		DataSymbol ds = new DataSymbol("j8bD" + resId, -1, obj);
+	public DataSymbol defineData(int resId, int size, Object obj) {
+		DataSymbol ds = new DataSymbol("j8bD" + resId, size, obj);
 		flashData.put(resId, ds);
 		return ds;
 	}
 
 	public abstract CGIContainer jump(CGScope scope, CGLabelScope lScope) throws CompileException;
 	public abstract CGIContainer call(CGScope scope, CGLabelScope lScope) throws CompileException;
-	public abstract CGIContainer accCast(CGScope scope, int size, boolean toFixed) throws CompileException;
+	public abstract CGIContainer accCast(VarType accType, VarType opType) throws CompileException;
 	public abstract void cellsToAcc(CGScope scope, CGCellsScope cScope) throws CompileException;
 	public abstract void accToCells(CGScope scope, CGCellsScope cScope) throws CompileException;
+	
+	public abstract void computeArrCellAddr(CGScope scope, CGCells arrAddrCells, CGArrCells arrCells) throws CompileException;
+	public abstract void arrToAcc(CGScope scope, CGArrCells arrCells) throws CompileException;
+	public abstract void accToArr(CGScope scope, CGArrCells arrScope) throws CompileException;
+	public abstract void arrToCells(CGScope scope, CGArrCells arrCells, CGCells cells) throws CompileException;
+	public abstract void flashDataToArr(CGScope scope, DataSymbol symbol, int offset);
+	public abstract void cellsToArrReg(CGScope cgScope, CGCells cells) throws CompileException;
+	public abstract void arrSizetoAcc(CGScope cgScope, boolean isView);
+	public abstract void arrRegToCells(CGScope scope, CGCells cells) throws CompileException;
+	public abstract void arrRegToAcc(CGScope scope) throws CompileException;
+	public abstract void accToArrReg(CGScope scope) throws CompileException;
+	
 //	public abstract void retToCells(CGScope scope, CGCellsScope cScope) throws CompileException;
 	public abstract void setHeapReg(CGScope scope, CGCells cells) throws CompileException;
 	public abstract void constToAcc(CGScope scope, int size, long value, boolean isFixed);
@@ -216,31 +241,34 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract void cellsCond(CGScope scope, CGCells cells, Operator op, boolean isNot, boolean isOr, CGBranchScope branchScope) throws CompileException;
 	public abstract void constCond(CGScope scope, CGCells cells, Operator op, long k, boolean isNot, boolean isOr, CGBranchScope branchScope) throws CompileException;
 	public abstract void boolCond(CGScope scope, CGBranchScope branchScope) throws CompileException;
-	public abstract	CGIContainer pushAccBE(CGScope scope, int size);
-	public abstract	void popAccBE(CGScope scope, int size);
+	public abstract	CGIContainer pushAccBE(CGScope scope, Integer size);
+	public abstract	void popAccBE(CGScope scope, Integer size);
 	public abstract	CGIContainer pushHeapReg(CGScope scope, boolean half);
 	public abstract	CGIContainer popHeapReg(CGScope scope, boolean half);
 	public abstract	CGIContainer pushStackReg(CGScope scope);
 	public abstract	CGIContainer popStackReg(CGScope scope);
+	public abstract	CGIContainer pushArrReg(CGScope scope);
+	public abstract	CGIContainer popArrReg(CGScope scope);
 	public abstract CGIAsm pushRegAsm(byte reg);
 	public abstract CGIAsm popRegAsm(byte reg);
 	public abstract void pushLabel(CGScope scope, String label);
-	public abstract void updateRefCount(CGScope scope, CGCells cells, boolean isInc) throws CompileException;
-	
+	public abstract void updateClassRefCount(CGScope scope, CGCells cells, boolean isInc) throws CompileException;
+	public abstract void updateArrRefCount(CGScope cgScope, CGCells cells, boolean isInc, boolean isView) throws CompileException;
 	public abstract void invokeClassMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, CGLabelScope lbScope, boolean isInternal) throws CompileException;
 	public abstract void invokeInterfaceMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, VarType ifaceType, int methodSN) throws CompileException;
 	public abstract void invokeNative(CGScope scope, String className, String methodName, String params, VarType type, Operand[] operands)
 																																	throws CompileException;
 	public abstract void eInstanceof(CGScope scope, VarType type) throws CompileException;
-	public abstract void emitUnary(CGScope scope, Operator op, CGCells cells) throws CompileException;
+	public abstract void eUnary(CGScope scope, Operator op, CGCells cells, boolean toAccum) throws CompileException;
 	
 	//TODO набор методов для реализации команд if, switch, for, loop и .т.д
 	public abstract CGIContainer eNewInstance(int fieldsSize, CGLabelScope iidLabel, VarType type, boolean launchPoint, boolean canThrow) throws CompileException;
-	public abstract void eFree(Operand op);
-	public abstract void eIf(CGBranchScope labelsScope, CGScope condScope, CGBlockScope thenBlock, CGBlockScope elseBlock) throws CompileException;
+	public abstract CGIContainer eNewArray(VarType type, int depth, int[] cDims) throws CompileException;
+	public abstract CGIContainer eNewArrView(int depth) throws CompileException;
+	public abstract void eIf(CGScope scope, CGBranchScope labelsScope, CGBlockScope thenBlock, CGBlockScope elseBlock) throws CompileException;
 	public abstract void eTry(CGBlockScope blockScope, List<Case> cases, CGBlockScope defaultBlockScope);
 	public abstract void eWhile(CGScope scope, CGScope condScope, CGBlockScope bodyScope) throws CompileException;
-	public abstract CGIContainer eReturn(CGScope scope, int argsSize, int varsSize, int retSize) throws CompileException;
+	public abstract CGIContainer eReturn(CGScope scope, int argsSize, int varsSize, VarType retType) throws CompileException;
 	public abstract void eThrow();
 	
 	public abstract int getRefSize();
@@ -268,14 +296,23 @@ public abstract class CodeGenerator extends CGScope {
 		}
 	}
 
-	protected CGVarScope getLocal(CGScope scope, int resId) throws CompileException {
-		if(scope instanceof CGVarScope && scope.getResId() == resId) return (CGVarScope)scope;
-
-		CGBlockScope bScope = scope.getBlockScope();
+	protected CGCellsScope getVarField(CGScope scope, int resId) throws CompileException {
+		if(scope instanceof CGVarScope && scope.getResId() == resId) return (CGCellsScope)scope;
+		if(scope instanceof CGFieldScope && scope.getResId() == resId) return (CGCellsScope)scope;
+		CGCellsScope result = null;
+		
+		CGBlockScope bScope = (CGBlockScope)scope.getScope(CGBlockScope.class);
 		if(null != bScope) {
-			return bScope.getVar(resId);
+			result = bScope.getVar(resId);
 		}
-		else throw new CompileException("CG: getNum, can't access to method scope, for resId:" + resId);
+		if(null == result) {
+			CGClassScope cScope = (CGClassScope)scope.getScope(CGClassScope.class);
+			result = cScope.getField(resId);
+		}
+		if(null == result) {
+			throw new CompileException("CG: getNum, can't access to method scope, for resId:" + resId);
+		}
+		return result;
 	}
 	
 	public void build(VarType classType, int fieldsSize) throws CompileException {
@@ -337,6 +374,7 @@ public abstract class CodeGenerator extends CGScope {
 				append(new CGIText(CGKOI8R.decode(ds.getValue().toString())));
 			}
 			else if(ds.getValue() instanceof Number) {
+				//TODO рудимент
 				StringBuilder sb = new StringBuilder(".db ");
 				long value = ((Number)ds.getValue()).longValue();
 				for(int i=0; i<ds.getSize(); i++) {
@@ -346,6 +384,36 @@ public abstract class CodeGenerator extends CGScope {
 				sb.deleteCharAt(sb.length()-1);
 				if(0 != (ds.getSize()&0x01)) sb.append(",0x00");
 				append(new CGIText(sb.toString()));
+			}
+			else if(ds.getValue() instanceof Pair) {
+				Pair pair = (Pair)ds.getValue();
+				if(pair.getK() instanceof VarType) {
+					StringBuilder sb = new StringBuilder();
+					int size = ((VarType)pair.getK()).getSize();
+					if(-1==size) size = getRefSize();
+
+					switch(((VarType)pair.getK()).getSize()) {
+						case 4:
+							sb.append(".dq ");
+							break;
+
+						case 2:
+							sb.append(".dw ");
+							break;
+						default:
+							sb.append(".db ");
+					}
+					
+					for(Long value : (ArrayList<Long>)pair.getV()) {
+						sb.append(value).append(",");
+					}
+					sb.deleteCharAt(sb.length()-1);
+					if(1==size && 0!=(((ArrayList<Object>)pair.getV()).size()&0x01)) {
+						sb.append(",0x00");
+					}
+					append(new CGIText(sb.toString()));
+				}
+				else throw new CompileException("CG: build, unsupported value:" + ds.getValue());
 			}
 			else throw new CompileException("CG: build, unsupported value:" + ds.getValue());
 			append(new CGIText(""));
@@ -374,9 +442,9 @@ public abstract class CodeGenerator extends CGScope {
 		return 0 == (reg&0x01);
 	}
 	
-	public CGScope getScope() {
-		return scope;
-	}
+//	public CGScope getScope() {
+//		return scope;
+//	}
 	public CGScope setScope(CGScope scope) {
 		CGScope old = this.scope;
 		this.scope = scope;
@@ -425,5 +493,24 @@ public abstract class CodeGenerator extends CGScope {
 				list.add(item);
 			}
 		}
+	}
+	
+	public void setRTOSFeature(RTOSFeature feature) {
+		RTOSFeatures.add(feature);
+	}
+	
+	public int getOptLevel() {
+		return optLevel;
+	}
+	
+	public static void setArraysUsage() {
+		arraysUsage = true;
+	}
+	public static boolean isArraysUsage() {
+		return arraysUsage;
+	}
+	
+	public int getAccumSize() {
+		return accum.getSize();
 	}
 }

@@ -28,18 +28,18 @@ import ru.vm5277.common.cg.RegPair;
 import ru.vm5277.common.cg.items.CGIConstrInit;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGIText;
+import ru.vm5277.common.compiler.Optimization;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
 // STACK(reg Y) - Необходимо выделять память в стеке для значений параметров, так-же сохранять старый Y и устанавливать новый на выделенный блок
 // при завершении необходимо восстанавливать Y
 
-public class CGMethodScope extends CGScope {
+public class CGMethodScope extends CGCellsScope {
 	private	final	CGLabelScope				lbScope;
 	private			CGLabelScope				lbCIScope;
 	private	final	List<CGBlockScope>			blockScopes = new ArrayList<>();
 	private	final	Map<Integer, CGVarScope>	args		= new HashMap<>();
-	private	final	VarType						type;
 	private	final	VarType[]					types;
 	private	final	String						signature;
 	private			int							argsStackSize;
@@ -47,13 +47,17 @@ public class CGMethodScope extends CGScope {
 	private	final	ArrayList<RegPair>			regsPool;	// Свободные регистры, true = cвободен
 	private			boolean						isUsed;
 	private			CGIContainer				fieldsInitCallCont;
+	private			CGCells						cells;
 	
-	public CGMethodScope(CodeGenerator cg, CGClassScope parent, int resId, VarType type, VarType[] types, String name, ArrayList<RegPair> regsPool) {
-		super(parent, resId, name);
+	public CGMethodScope(CodeGenerator cg, CGClassScope parent, int resId, VarType type, int size, VarType[] types, String name, ArrayList<RegPair> regsPool) {
+		super(parent, resId, type, size, name);
 		
-		this.type = type;
 		this.types = types;
 		this.regsPool = regsPool;
+	
+		if(null!=type) {
+			this.cells = new CGCells(CGCells.Type.ACC, size);
+		}
 		
 		StringBuilder sb = new StringBuilder();
 		sb.append(name).append("(");
@@ -108,6 +112,13 @@ public class CGMethodScope extends CGScope {
 		cg.normalizeIRegConst(this);
 		
 //		append(cg.eReturn(null, null == type ? 0x00 : type.getSize(), stackOffset));
+		if(Optimization.NONE != cg.getOptLevel()) {
+			CodeOptimizer co = cg.getOptimizer();
+			if(null != co) {
+				co.removeUnusedLabels(this, lbScope, lbCIScope);
+			}
+		}
+
 		if(VERBOSE_LO <= verbose) append(new CGIText(";method end"));
 	}
 	
@@ -137,7 +148,7 @@ public class CGMethodScope extends CGScope {
 		
 			if(scope instanceof CGMethodScope) return ((CGMethodScope)scope).getArg(resId);
 			if(scope instanceof CGBlockScope) return ((CGBlockScope)scope).getVar(resId);
-			if(scope instanceof CGCommandScope) return scope.getBlockScope().getVar(resId);
+			if(scope instanceof CGCommandScope) return ((CGBlockScope)scope.getScope(CGBlockScope.class)).getVar(resId);
 		}
 		return null;
 	}
@@ -150,6 +161,24 @@ public class CGMethodScope extends CGScope {
 	public RegPair[] borrowReg(int size) {
 		if(regsPool.isEmpty()) return null;
 
+		if(0x02==size) {
+			RegPair[] pair = findPair();
+			if(null!=pair) return pair;
+		}
+		else if(0x04==size) {
+			RegPair[] pair1 = findPair();
+			if(null!=pair1) {
+				RegPair[] pair2 = findPair();
+				if(null!=pair2) {
+					return new RegPair[]{pair1[0x00], pair1[0x01], pair2[0x00], pair2[0x01]};
+				}
+				else {
+					pair1[0x00].setFree(true);
+					pair1[0x01].setFree(true);
+				}
+			}
+		}
+		
 		RegPair[] result = new RegPair[size];
 		int index = 0;
 		for(RegPair pair : regsPool) {
@@ -168,6 +197,22 @@ public class CGMethodScope extends CGScope {
 		}
 		return null;
 	}
+	// Вероятно эта парная аллокация полезна только для AVR. Похоже нужно будет вынести в библиотеку кодогенератора
+	private RegPair[] findPair() {
+		for(RegPair pair1 : regsPool) {
+			if(pair1.isFree() && 0==(pair1.getReg()&0x01)) {
+				for(RegPair pair2 : regsPool) {
+					if(pair1.getReg()+0x01==pair2.getReg()) {
+						pair1.setFree(false);
+						pair2.setFree(false);
+						return new RegPair[]{pair1, pair2};
+					}
+				}
+			}
+		}
+		return null;
+	}
+
 	public RegPair getReg(byte reg) {
 		for(RegPair pair : regsPool) {
 			if(pair.getReg() == reg) {
@@ -201,10 +246,6 @@ public class CGMethodScope extends CGScope {
 		return types;
 	}
 	
-	public VarType getType() {
-		return type;
-	}
-	
 	public boolean isUsed() {
 		return isUsed;
 	}
@@ -232,5 +273,10 @@ public class CGMethodScope extends CGScope {
 	
 	public CGIContainer getFieldInitCallCont() {
 		return fieldsInitCallCont;
+	}
+
+	@Override
+	public CGCells getCells() {
+		return cells;
 	}
 }

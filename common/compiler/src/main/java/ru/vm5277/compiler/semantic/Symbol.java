@@ -26,6 +26,7 @@ public class Symbol {
 	protected			boolean				isFinal;
 	protected			boolean				isNative;
 	private				CGScope				cgScope;
+	private				boolean				reassigned = false;
 	
 	protected Symbol(String name) {
 		this.name = name;
@@ -68,9 +69,20 @@ public class Symbol {
 	public CGScope getCGScope() {
 		return cgScope;
 	}
-	
+	public<T> CGScope getCGScope(Class<T> clazz) {
+		CGScope _scope = cgScope;
+		while(null != _scope) {
+			if(clazz.isInstance(_scope)) return _scope;
+			_scope = _scope.getParent();
+		}
+		return null;
+	}
+
 	public boolean isFinal() {
 		return isFinal;
+	}
+	public void setFinal(boolean isFinal) {
+		this.isFinal = isFinal;
 	}
 	
 	public boolean isStatic() {
@@ -84,5 +96,12 @@ public class Symbol {
 	@Override
 	public String toString() {
 		return	(isNative ? "native " : "") + (isFinal ? "final " : "") + (isStatic ? "static " : "") + type + " " + name;
+	}
+
+	public void setReassigned() {
+		reassigned = true;
+	}
+	public boolean isReassigned() {
+		return reassigned;
 	}
 }

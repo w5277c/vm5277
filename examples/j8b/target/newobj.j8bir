@@ -1,0 +1,31 @@
+class Main {
+    public interface Number {
+        public byte toByte();
+    }
+    public class Byte {
+        private byte value;
+        public Byte(byte value) {
+            null.value=value;
+        }
+        public byte toByte() {
+            return value;
+        }
+        public void finalize() {
+        }
+    }
+    static public void main() {
+        System.setParam(2, 18);
+        Byte b1 = Byte.Byte(1);
+        System.out(b1.toByte());
+        b1=null;
+        Byte b2 = Byte.Byte(1);
+        System.out(b2.toByte());
+        System.out(b2.getClassTypeId());
+        System.out(b2.getClassId());
+        {
+            System.out(33);
+        }
+    }
+    public Main() {
+    }
+}

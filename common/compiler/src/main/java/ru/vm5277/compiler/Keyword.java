@@ -41,7 +41,6 @@ public class Keyword {
 	public	static	final	Keyword					CONTINUE	= new Keyword("continue", TokenType.COMMAND);
 	public	static	final	Keyword					BREAK		= new Keyword("break", TokenType.COMMAND);
 	public	static	final	Keyword					SWITCH		= new Keyword("switch", TokenType.COMMAND);
-	public	static	final	Keyword					FREE		= new Keyword("free", TokenType.COMMAND);
 	// Модификаторы
 	public	static	final	Keyword					STATIC		= new Keyword("static", TokenType.MODIFIER);
 	public	static	final	Keyword					FINAL		= new Keyword("final", TokenType.MODIFIER);

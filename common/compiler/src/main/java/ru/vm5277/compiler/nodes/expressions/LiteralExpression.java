@@ -15,8 +15,10 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
+import ru.vm5277.common.NumUtils;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -33,13 +35,6 @@ public class LiteralExpression extends ExpressionNode {
 		this.value = value;
     }
 
-	protected LiteralExpression(TokenBuffer tb, MessageContainer mc, Object value, CGScope cgScope) {
-        super(tb, mc);
-        
-		this.value = value;
-		this.cgScope = cgScope;
-    }
-    
 	@Override
 	public VarType getType(Scope scope) {
 		if (value == null) return VarType.NULL;
@@ -67,6 +62,10 @@ public class LiteralExpression extends ExpressionNode {
 		return value instanceof Integer || value instanceof Long;
 	}
 	
+	public boolean isString() {
+		return value instanceof String;
+	}
+
 	public boolean isFixed() {
 		return (value instanceof Double) || ((value instanceof Number) && 0>((Number)value).longValue());
 	}
@@ -106,6 +105,17 @@ public class LiteralExpression extends ExpressionNode {
 		}
 	}
 	
+	public boolean getBooleanValue() {
+		if(value instanceof Boolean) return (Boolean)value;
+		if(value instanceof Number) return 0!=((Number)value).longValue();
+		if(value instanceof Double) return 0.0!=((Double)value).doubleValue();
+		return false;
+	}
+	
+	public String getStringValue() {
+		return (String)value;
+	}
+	
 	@Override
 	public boolean preAnalyze() {
 		return true;
@@ -113,43 +123,41 @@ public class LiteralExpression extends ExpressionNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		boolean result = true;
+		cgScope = cg.enterExpression(toString());
+		
 		try {
-			cgScope = cg.enterExpression();
-			if (value instanceof Number) {
+			if(value instanceof Number) {
 				VarType type = getType(scope);
-				if (type == VarType.UNKNOWN) {
+				if(type == VarType.UNKNOWN) {
 					markError("Unsupported numeric literal type");
-					cg.leaveExpression();
-					return false;
+					result = false;
 				}
-				// Проверка диапазона через VarType.checkRange
-				type.checkRange((Number)value);
+				else {
+					// Проверка диапазона через VarType.checkRange
+					type.checkRange((Number)value);
+				}
 			}
-			
-			cg.leaveExpression();
-			return true;
 		} 
 		catch (CompileException e) {
 			markError(e.getMessage());
-
-			cg.leaveExpression();
-			return false;
+			result = false;
 		}
+		
+		cg.leaveExpression();
+		return result;
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
-		//TODO перенести код в VarNode и FieldNode
-		//TODO отключен
-//		if(cgScope.getParent() instanceof CGCellsScope) {
-//			CGCellsScope cScope = (CGCellsScope)cgScope.getParent();
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+		//TODO попыка вынести запись в аккумулятор на свое место
+		if(toAccum) {
+			//cg.constToAcc(cgScope, returnType.getSize(), isFixed() ? getFixedValue() : getNumValue(), isFixed());
+			long v = isFixed() ? getFixedValue() : getNumValue();
+			cg.constToAcc(cgScope, NumUtils.getBytesRequired(v), v, isFixed());
+			return CodegenResult.RESULT_IN_ACCUM;
+		}
 
-//			if(VarType.NULL == cScope.getType()) {
-//				cg.setAcc(cScope, 0x01, 0);
-//			}
-			//accum.set(scope, size, value);
-//			cg.constToAcc(cScope, cScope.getSize(), getNumValue());
-//		}
 		return null;
 	}
 	

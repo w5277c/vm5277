@@ -21,6 +21,7 @@ import ru.vm5277.common.cg.CodeGenerator;
 
 public class CGBranchScope extends CGScope {
 	private Stack<CGLabelScope>	lbEndScopes	= new Stack<>();	// Выход из текущего подвыражения
+	private	boolean				isUsed		= false;
 	
 	public CGBranchScope(CodeGenerator cg, CGScope parent) {
 		super(parent, -1, null);
@@ -36,6 +37,11 @@ public class CGBranchScope extends CGScope {
 	}
 	
 	public CGLabelScope getEnd() {
+		isUsed = true;
 		return lbEndScopes.lastElement();
+	}
+	
+	public boolean isUsed() {
+		return isUsed;
 	}
 }

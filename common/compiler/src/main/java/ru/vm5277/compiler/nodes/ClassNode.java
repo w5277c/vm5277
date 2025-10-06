@@ -24,6 +24,7 @@ import java.util.Set;
 import ru.vm5277.common.ImplementInfo;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGClassScope;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
@@ -44,7 +45,6 @@ public class ClassNode extends AstNode {
 	protected			List<String>	impl			= new ArrayList<>();
 	private				ClassBlockNode	blockNode;
 	private				ClassScope		classScope;
-	private				CGClassScope	cgScope;
 	
 	public ClassNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, String parentClassName, List<ClassNode> importedClasses)
 																																	throws CompileException {
@@ -135,9 +135,11 @@ public class ClassNode extends AstNode {
 	
 	@Override
 	public boolean declare(Scope parentScope) {
+		boolean result = true;
+		
 		if(null != importedClasses) {
 			for (ClassNode imported : importedClasses) {
-				imported.declare(parentScope);
+				result &= imported.declare(parentScope);
 			}
 		}
 		
@@ -149,11 +151,11 @@ public class ClassNode extends AstNode {
 			classScope = new ClassScope(name, parentScope, implTypes);
 			if(null != parentScope) ((ClassScope)parentScope).addClass(classScope);
 			
-			blockNode.declare(classScope);
+			result &= blockNode.declare(classScope);
 		}
 		catch(CompileException e) {markError(e); return false;}
 
-		return true;
+		return result;
 	}
 	
 	
@@ -161,7 +163,7 @@ public class ClassNode extends AstNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		if(null != importedClasses) {
 			for (ClassNode imported : importedClasses) {
-				imported.postAnalyze(scope, cg);
+				imported.postAnalyze(classScope, cg); // Заменил scope на classScope, надо проверить
 			}
 		}
 
@@ -238,35 +240,29 @@ public class ClassNode extends AstNode {
 		return allMethodsImplemented;
 	}
 	
-	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
-		if(cgDone) return null;
+	public void firstCodeGen(CodeGenerator cg, MethodNode methodNode) throws Exception {
 		cgDone = true;
 
-		cgScope.build(cg);
+		methodNode.firstCodeGen(cg);
+
+		((CGClassScope)cgScope).build(cg);
+	}
+
+	@Override
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+		if(cgDone || disabled) return null;
+		cgDone = true;
+
+		((CGClassScope)cgScope).build(cg);
 /*		if(null != importedClasses) {
 			for (ClassNode imported : importedClasses) {
 				if(isUsed()) imported.codeGen(cg);
 			}
 		}
 */
-		
 		return null;
 	}
 	
-/*	
-	@Override
-	public Boolean isUsed() {
-		if(null != super.isUsed() && super.isUsed()) return true;
-		if(null == classScope) return null;
-		return classScope.isUsed();
-	}
-	@Override
-	public void setUsed() {
-		super.setUsed();
-		if(null != classScope) classScope.setUsed();
-	}
-*/
 	@Override
 	public List<AstNode> getChildren() {
 		return Arrays.asList(blockNode);

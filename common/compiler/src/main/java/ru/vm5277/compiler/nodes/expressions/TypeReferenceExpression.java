@@ -16,6 +16,7 @@
 package ru.vm5277.compiler.nodes.expressions;
 
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -80,7 +81,7 @@ public class TypeReferenceExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
 		//cg.setAcc(new Operand(VarType.CLASS, OperandType.TYPE, varType.getId()));
 		return null;
 	}

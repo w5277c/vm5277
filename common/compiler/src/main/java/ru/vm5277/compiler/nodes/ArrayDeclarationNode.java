@@ -38,7 +38,8 @@ public class ArrayDeclarationNode extends AstNode {
     private	final	String			name;
 	private			ExpressionNode	size;
 	private			ExpressionNode	initializer;
-
+	
+	//TODO рудимент?
 	public ArrayDeclarationNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType type, String name) {
 		super(tb, mc);
 		

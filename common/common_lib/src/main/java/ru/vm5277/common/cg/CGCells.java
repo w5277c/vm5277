@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.common.cg;
 
 import ru.vm5277.common.StrUtils;
@@ -25,16 +26,17 @@ public class CGCells {
 		ARGS,			//аргументы метода, лежащие в начале стека(размер STACK_FRAME известен только на финальном этапе построения кода метода)
 		STAT,			//глобальный блок памяти выделенный под статические переменные
 		HEAP,			//блок памяти выделенный в инстансе класса
-		STACK;			//значение лежащее на вершине стека
+		STACK,			//значение лежащее на вершине стека
+		ARRAY;			//Массив
 
 //		REF;	//адрес на объект(класс, массив)
 	}
 	
-	private	Type	type;
-	private	int[]	ids;
-	private	int		size;
-	private	Object	obj;
-	private	boolean	isRef;
+	private		Type	type;
+	private		int[]	ids;
+	protected	int		size;
+	private		Object	obj;
+	private		boolean	isRef;
 	
 	public CGCells(Type type) {
 		this.type = type;
@@ -54,6 +56,12 @@ public class CGCells {
 		}
 	}
 
+	public CGCells(Type type, int[] ids) {
+		this.type = type;
+		this.ids = ids;
+		this.size = ids.length;
+	}
+	
 	public CGCells(Type type, byte[] ids) {
 		this.type = type;
 		this.ids = new int[ids.length];
@@ -62,7 +70,7 @@ public class CGCells {
 			this.ids[i] = ids[i];
 		}
 	}
-	
+
 	public CGCells(RegPair[] regPairs) {
 		this.type = Type.REG;
 		this.ids = new int[regPairs.length];
@@ -82,6 +90,9 @@ public class CGCells {
 	
 	public int getSize() {
 		return size;
+	}
+	public void setSize(int size) {
+		this.size = size;
 	}
 	
 	public void setObject(Object obj) {

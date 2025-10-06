@@ -19,9 +19,7 @@ import java.util.Arrays;
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
-import ru.vm5277.common.cg.scopes.CGClassScope;
-import ru.vm5277.common.cg.scopes.CGFieldScope;
-import ru.vm5277.common.cg.scopes.CGVarScope;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
@@ -30,7 +28,6 @@ import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.BlockScope;
-import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
@@ -125,37 +122,27 @@ public class InstanceOfExpression extends ExpressionNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		boolean result = true;
 		this.scope = scope;
-		try {
-			cgScope = cg.enterExpression();
-			
-			if (!leftExpr.postAnalyze(scope, cg)) {
-				cg.leaveExpression();
-				return false;
-			}
+		cgScope = cg.enterExpression(toString());
 
-			// Анализируем правую часть (тип)
-			if (!rightExpr.postAnalyze(scope, cg)) {
-				cg.leaveExpression();
-				return false;
-			}
+		try {
+			result&=leftExpr.postAnalyze(scope, cg);
+			result&=rightExpr.postAnalyze(scope, cg);
 
 			if(VarType.UNKNOWN == rightType) {
 				markError("Unknown right-hand side of 'is': " + rightExpr);
-				cg.leaveExpression();
-				return false;
+				result = false;
 			}
 			if(VarType.VOID == rightType) {
 				markError("Right-hand side of 'is' cant be void");
-				cg.leaveExpression();
-				return false;
+				result = false;
 			}
 
 			leftType = leftExpr.getType(scope);
 			if (leftExpr instanceof LiteralExpression) {
 				markError("Cannot check type of literals at runtime");
-				cg.leaveExpression();
-				return false;
+				result = false;
 			}
 			
 			// Проверка реализации интерфейса
@@ -166,22 +153,20 @@ public class InstanceOfExpression extends ExpressionNode {
 				else {
 					InterfaceScope leftIScope = scope.getThis().resolveScope(leftType.getClassName());
 					InterfaceScope rightIScope = scope.getThis().resolveInterface(rightType.getClassName());
-
 					
 					if (null != leftIScope && null != rightIScope) {
 						fulfillsContract = leftIScope.getInterfaces().containsKey(rightIScope.getName());
 					}
 				}
 			}
-			
-			cg.leaveExpression();
-			return true;
 		}
 		catch (CompileException e) {
 			markError(e.getMessage());
-			cg.leaveExpression();
-			return false;
+			result = false;
 		}
+
+		cg.leaveExpression();
+		return result;
 	}
 
 	public VarType getLeftType() {
@@ -201,14 +186,14 @@ public class InstanceOfExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, boolean accumStore) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
 		//Обходимся без рантайма, пока в левой части примитив или это константа
 		//Но нужно вызывать рантайм, если встречаем объект, так как только в рантайм данных есть информация о типе переменной
 		
 		Symbol varSymbol = leftExpr.getSymbol();
 		if(varSymbol.isFinal()) return (isCompatibleWith(scope, varSymbol.getType(), rightType) ? CodegenResult.TRUE : CodegenResult.FALSE);
 
-		leftExpr.codeGen(cg, false);
+		leftExpr.codeGen(cg, null, false);
 
 		// TODO весь код можно вынести в RTOS j8b утилиты и просто вызывать как функцию
 		boolean heapSaved=false;

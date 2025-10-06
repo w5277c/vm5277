@@ -28,7 +28,6 @@ import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
@@ -55,6 +54,11 @@ public class ForNode extends CommandNode {
 			try {
 				VarType type = checkPrimtiveType();
 				if(null == type) type = checkClassType();
+				List<ExpressionNode> arrDimensions = null;
+				if(null != type) arrDimensions = parseArrayDimensions(); //TODO
+				if(null != arrDimensions) {
+					for(int i=0; i<arrDimensions.size(); i++) type = VarType.arrayOf(type);
+				}
 				if(null != type) {
 					String name = null;
 					try {name = consumeToken(tb, TokenType.ID).getStringValue();} catch(CompileException e) {markFirstError(e);}

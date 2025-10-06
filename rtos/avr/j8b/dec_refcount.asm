@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+.include "dmem/dram.asm"
+
 .IFNDEF J8BPROC_DEC_REFCOUNT
 ;-----------------------------------------------------------
 J8BPROC_DEC_REFCOUNT:

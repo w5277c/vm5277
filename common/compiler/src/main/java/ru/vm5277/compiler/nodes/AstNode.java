@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import ru.vm5277.common.ArrayProperties;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.SourcePosition;
@@ -46,6 +47,7 @@ import ru.vm5277.compiler.TokenType;
 import ru.vm5277.compiler.nodes.commands.CommandNode.AstCase;
 import ru.vm5277.compiler.nodes.commands.ThrowNode;
 import ru.vm5277.compiler.nodes.commands.TryNode;
+import ru.vm5277.compiler.nodes.expressions.ArrayPropertyExpression;
 import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
 import ru.vm5277.compiler.nodes.expressions.ThisExpression;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
@@ -63,8 +65,8 @@ public abstract class AstNode extends SemanticAnalyzer {
 	protected			MessageContainer		mc;
 	protected			Symbol					symbol;
 	protected			boolean					cgDone;
-
-	private				CGScope					depCGScope;
+	protected			boolean					disabled;
+	protected			CGScope					cgScope;
 	
 	protected AstNode() {
 	}
@@ -129,18 +131,15 @@ public abstract class AstNode extends SemanticAnalyzer {
 	protected VarType checkPrimtiveType() throws CompileException {
 		if(tb.match(TokenType.TYPE)) {
 			Keyword kw = (Keyword)consumeToken(tb).getValue();
-			VarType type;
-			if (null == kw) type = VarType.UNKNOWN;
-			else if(Keyword.VOID == kw) type = VarType.VOID;
-			else if(Keyword.BOOL == kw) type = VarType.BOOL;
-			else if(Keyword.BYTE == kw) type = VarType.BYTE;
-			else if(Keyword.SHORT == kw) type = VarType.SHORT;
-			else if(Keyword.INT == kw) type = VarType.INT;
-			else if(Keyword.FIXED == kw) type = VarType.FIXED;
-			else if(Keyword.CSTR == kw) type = VarType.CSTR;
-			else if(Keyword.CLASS == kw) type = VarType.CLASS;
-			else type = VarType.UNKNOWN;
-			return checkArrayType(type);
+			if(Keyword.VOID == kw) return VarType.VOID;
+			if(Keyword.BOOL == kw) return VarType.BOOL;
+			if(Keyword.BYTE == kw) return VarType.BYTE;
+			if(Keyword.SHORT == kw) return VarType.SHORT;
+			if(Keyword.INT == kw) return VarType.INT;
+			if(Keyword.FIXED == kw) return VarType.FIXED;
+			if(Keyword.CSTR == kw) return VarType.CSTR;
+			if(Keyword.CLASS == kw) return VarType.CLASS;
+			return VarType.UNKNOWN;
 		}
 		return null;
 	}
@@ -165,6 +164,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		}
 		return null;
 	}
+	//TODO Не корректно, необходимо возвращать Expression.
 	protected VarType checkArrayType(VarType type) throws CompileException {
 		// Обработка полей-массивов
 		if (null != type && tb.match(Delimiter.LEFT_BRACKET)) { //'['
@@ -184,11 +184,33 @@ public abstract class AstNode extends SemanticAnalyzer {
 					}
 					type = VarType.arrayOf(type, size);
 				}
-				AstNode.this.consumeToken(tb, Delimiter.RIGHT_BRACKET);  // Потребляем ']'
-				type = size != null ? VarType.arrayOf(type, size) : VarType.arrayOf(type);
+				consumeToken(tb, Delimiter.RIGHT_BRACKET);  // Потребляем ']'
+				if(null == size) type = VarType.arrayOf(type);
 			}
 		}
 		return type;
+	}
+
+	protected List<ExpressionNode> parseArrayDimensions() throws CompileException {
+		List<ExpressionNode> result = new ArrayList<>();
+		
+		if (tb.match(Delimiter.LEFT_BRACKET)) { //'['
+			while (tb.match(Delimiter.LEFT_BRACKET)) { //'['
+				consumeToken(tb); // Потребляем '['
+
+				if(!tb.match(Delimiter.RIGHT_BRACKET)) { //']'
+					if(0x03<result.size()) {
+						throw new CompileException("Maximum array nesting depth is 3", sp);
+					}
+					result.add(new ExpressionNode(tb, mc).parse());
+				}
+				else {
+					result.add(null);
+				}
+				consumeToken(tb, Delimiter.RIGHT_BRACKET);  // Потребляем ']'
+			}
+		}
+		return result;
 	}
 
 	protected ExpressionNode parseFullQualifiedExpression(TokenBuffer tb) throws CompileException {
@@ -222,8 +244,14 @@ public abstract class AstNode extends SemanticAnalyzer {
 		while (tb.match(Delimiter.DOT)) {
 			consumeToken(tb);
 			String methodName = (String)AstNode.this.consumeToken(tb, TokenType.ID).getValue();
-
-			if (tb.match(Delimiter.LEFT_PAREN)) {
+			ArrayProperties arrProp = null;
+			try {arrProp = ArrayProperties.valueOf(methodName.toUpperCase());} catch(Exception ex){}
+			
+			if (null!=arrProp && !tb.match(Delimiter.LEFT_PAREN)) {
+				parent = new ArrayPropertyExpression(tb, mc, parent, arrProp);
+				break;
+			}
+			else if (tb.match(Delimiter.LEFT_PAREN)) {
 				// Это вызов метода с полным именем класса
 				parent = new MethodCallExpression(tb, mc, parent, methodName, parseArguments(tb));
 			}
@@ -245,17 +273,6 @@ public abstract class AstNode extends SemanticAnalyzer {
 				//Необходимо для поддерки приведения типов
 				args.add(new ExpressionNode(tb, mc).parse());
 
-/*				if(tb.match(TokenType.NUMBER) || tb.match(TokenType.STRING) || tb.match(TokenType.CHAR) || tb.match(TokenType.LITERAL)) {
-					args.add(new LiteralExpression(tb, mc, tb.consume().getValue()));
-				}
-				else if(tb.match(TokenType.ID)) {
-					// Парсим выражение-аргумент
-					args.add(parseFullQualifiedExpression(tb));
-				}
-				else {
-					markError("Unexpected token:" + tb.current());
-				}
-				*/
 				// Если после выражения нет запятой - выходим из цикла
 				if (!tb.match(Delimiter.COMMA)) break;
             
@@ -376,11 +393,6 @@ public abstract class AstNode extends SemanticAnalyzer {
 		return false;
 	}
 
-	
-/*	public List<BlockNode> getBlocks() {
-		return blocks;
-	}
-*/	
 	public SourcePosition getSP() {
 		return sp;
 	}
@@ -416,7 +428,6 @@ public abstract class AstNode extends SemanticAnalyzer {
         }
 		else throw parserError("Expected " + TokenType.KEYWORD + ", but got " + tb.current().getType());
     }
-	
 	
 	public CompileException parserError(String text) {
 		ErrorMessage message = new ErrorMessage(text, sp);
@@ -482,8 +493,9 @@ public abstract class AstNode extends SemanticAnalyzer {
 	
 	public abstract List<AstNode> getChildren();
 	
-	// Возвращаем null, если результат завивит от runtime, актуально для некоторых записей типа if(obj is byte)
-	public Object codeGen(CodeGenerator cg) throws Exception { 
+	// Формирует код AST ноды единожды(см. cgDone), загружает результат в аккумулятор, если включен toAccum
+	// Код записываем в parentCgScope, но если null, то записываем в cg.getScope() он содержит текущий cgScope AST ноды
+	public Object codeGen(CodeGenerator cg, CGScope parentCgScope, boolean toAccum) throws Exception { 
 		throw new UnsupportedOperationException(this.toString());
 	}
 	
@@ -494,22 +506,25 @@ public abstract class AstNode extends SemanticAnalyzer {
 		if(null != symbol && symbol instanceof AstHolder) {
 			AstNode node = ((AstHolder)symbol).getNode();
 			if(null != node) {
-				Object obj = node.codeGen(cg);
+				Object obj = node.codeGen(cg, null, false);
 				if(null != obj) return symbol.getCGScope();
 			}
 		}
 		return null;
 	}
 	
+	public CGScope getCGScope() {
+		return cgScope;
+	}
+	
 	public boolean isCGDone() {
 		return cgDone;
 	}
 	
-	// TODO костыль
-	public void setDepCGScope(CGScope cgScope) {
-		this.depCGScope = cgScope;
+	public void disable() {
+		disabled = true;
 	}
-	public CGScope getDepCGScope() {
-		return depCGScope;
+	public boolean isDisabled() {
+		return disabled;
 	}
 }

@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
@@ -66,6 +67,7 @@ public class ClassBlockNode extends AstNode {
 				isClassName = checkClassName(classNode.getName());
 				if(!isClassName) type = checkClassType();
 			}
+			if(null != type) type = checkArrayType(type);
 			
 			// Получаем имя метода/конструктора
 			String name = null;
@@ -89,6 +91,7 @@ public class ClassBlockNode extends AstNode {
 
 			if(null != type) {
 				if (tb.match(Delimiter.LEFT_BRACKET)) { // Это объявление массива
+					//TODO рудимент?
 					children.add(new ArrayDeclarationNode(tb, mc, modifiers, type, name));
 				}
 				else { // Поле
@@ -130,10 +133,11 @@ public class ClassBlockNode extends AstNode {
 
 	@Override
 	public boolean declare(Scope scope) {
+		boolean result = true;
 		ClassScope classScope = (ClassScope)scope;
 		
 		for (AstNode node : children) {
-			node.declare(scope);
+			result &= node.declare(scope);
 		}
 		
 		// Проверка наличия конструктора
@@ -147,13 +151,14 @@ public class ClassBlockNode extends AstNode {
 			}
 		}
 		
-		return true;
+		return result;
 	}
 
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		boolean result = true;
+		
 		for (AstNode node : children) {
 			result &= node.postAnalyze(scope, cg);
 		}
@@ -175,12 +180,12 @@ public class ClassBlockNode extends AstNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg) throws Exception {
-		if(cgDone) return null;
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+		if(cgDone || disabled) return null;
 		cgDone = true;
 		
 		for(AstNode node : children) {
-			node.codeGen(cg);
+			node.codeGen(cg, null, false);
 		}
 		
 		return null;
