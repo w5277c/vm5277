@@ -17,8 +17,14 @@ package ru.vm5277.compiler.nodes.commands;
 
 import java.util.Arrays;
 import java.util.List;
+import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.cg.scopes.CGBranchScope;
+import ru.vm5277.common.cg.scopes.CGLabelScope;
+import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
@@ -35,6 +41,9 @@ public class WhileNode extends CommandNode {
 	private	ExpressionNode	condition;
 	private	BlockNode		blockNode;
 	private	BlockScope		blockScope;
+	private	CGBranchScope	brScope;
+	private	boolean			alwaysTrue;
+	private	boolean			alwaysFalse;
 		
 	public WhileNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
@@ -44,12 +53,10 @@ public class WhileNode extends CommandNode {
 		try {this.condition = new ExpressionNode(tb, mc).parse();} catch(CompileException e) {markFirstError(e);}
 		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(CompileException e) {markFirstError(e);}
 
-		tb.getLoopStack().add(this);
 		try {
 			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
 		}
 		catch(CompileException e) {markFirstError(e);}
-		tb.getLoopStack().remove(this);
 	}
 
 	public ExpressionNode getCondition() {
@@ -67,55 +74,102 @@ public class WhileNode extends CommandNode {
 
 	@Override
 	public boolean preAnalyze() {
+		boolean result = true;
 		// Проверка условия цикла
-		if (null != condition) condition.preAnalyze();
-		else markError("While condition cannot be null");
+		if(null!=condition) {
+			result&=condition.preAnalyze();
+		}
+		else {
+			markError("While condition cannot be null");
+			result = false;
+		}
 
-		if (null != blockNode) blockNode.preAnalyze();
+		if(null!=blockNode) {
+			tb.getLoopStack().add(this);
+			result&=blockNode.preAnalyze();
+			tb.getLoopStack().remove(this);
+		}
 		
-		return true;
+		return result;
 	}
 
 	@Override
 	public boolean declare(Scope scope) {
+		boolean result = true;
+		
 		// Объявление переменных условия (если нужно)
-		if (null != condition) condition.declare(scope);
+		result&=condition.declare(scope);
 
 		// Создаем новую область видимости для тела цикла
 		blockScope = new BlockScope(scope);
 		// Объявляем элементы тела цикла
-		if (null != blockNode) blockNode.declare(blockScope);
+		if(null!=blockNode) {
+			result&=blockNode.declare(blockScope);
+		}
 
-		return true;
+		return result;
 	}
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		cgScope = cg.enterCommand();
-		
+		boolean result = true;
+		cgScope = cg.enterLoopBlock();
+
 		// Проверка типа условия
-		if (null != condition) {
-			if(condition.postAnalyze(scope, cg)) {
-				try {
-					VarType condType = condition.getType(scope);
-					if (VarType.BOOL != condType) markError("While condition must be boolean, got: " + condType);
+		brScope = cg.enterBranch();
+		result&=condition.postAnalyze(blockScope, cg);
+
+		if(result) {
+			try {
+				ExpressionNode optimizedExpr = condition.optimizeWithScope(blockScope, cg);
+				if(null != optimizedExpr) {
+					condition = optimizedExpr;
+					result&=condition.postAnalyze(blockScope, cg);
 				}
-				catch (CompileException e) {markError(e);}
+			}
+			catch (CompileException e) {
+				markFirstError(e);
+				result = false;
 			}
 		}
 
+		if(result) {
+			try {
+				VarType condType = condition.getType(blockScope);
+				if(null==condType || VarType.BOOL!=condType) {
+					markError("Loop condition must be boolean, got: " + condType);
+					result = false;
+				}
+			}
+			catch (CompileException e) {
+				markError(e);
+				result = false;
+			}
+		}
+
+		if(result && condition instanceof LiteralExpression) {
+			if(((LiteralExpression)condition).getBooleanValue()) {
+				alwaysTrue = true;
+			}
+			else {
+				alwaysFalse = true;
+			}
+		}
+		cg.leaveBranch();
+		
 		// Анализ тела цикла
-		if (null != blockNode) {
-			blockNode.postAnalyze(blockScope, cg);
+		if(null!=blockNode) {
+			result&=blockNode.postAnalyze(blockScope, cg);
 		}
 		
 		// Проверяем бесконечный цикл с возвратом
-		if (condition instanceof LiteralExpression && Boolean.TRUE.equals(((LiteralExpression)condition).getValue()) &&	isControlFlowInterrupted(blockNode)) {
-			markWarning("Code after infinite while loop is unreachable");
-		}
+		//TODO нужно доделать isControlFlowInterrupted и добавить в другие циклы
+//		if (condition instanceof LiteralExpression && Boolean.TRUE.equals(((LiteralExpression)condition).getValue()) &&	isControlFlowInterrupted(blockNode)) {
+//			markWarning("Code after infinite loop is unreachable");
+//		}
 
-		cg.leaveCommand();
-		return true;
+		cg.leaveLoopBlock();
+		return result;
 	}
 	
 	@Override
@@ -123,20 +177,33 @@ public class WhileNode extends CommandNode {
 		if(cgDone) return null;
 		cgDone = true;
 
-		if(condition instanceof LiteralExpression) {
-			LiteralExpression le = (LiteralExpression)condition;
-			if(0x00 != le.getNumValue()) {
-				blockNode.codeGen(cg, null, false);
-				cg.eWhile(cgScope, null, blockNode.getCGScope());
+		CodegenResult result = null;
+		CGScope cgs = null == parent ? cgScope : parent;
+
+		CGLabelScope loopLbScope = new CGLabelScope(null, null, LabelNames.LOOP, true);
+		if(!alwaysFalse) {
+			brScope.append(loopLbScope);
+			if(!alwaysTrue) {
+				condition.codeGen(cg, brScope, false);
 			}
 		}
-		else {
-			condition.codeGen(cg, null, false);
-			blockNode.codeGen(cg, null, false);
-			cg.eWhile(cgScope, condition.getSymbol().getCGScope(), blockNode.getCGScope());
+
+		if(null!=blockNode && !alwaysFalse) {
+			blockNode.codeGen(cg, cgs, false);
 		}
+
+		if(!alwaysFalse) {
+			cg.jump(cgs, loopLbScope);
+		}
+		if(!alwaysFalse) {
+			cgs.append(brScope.getEnd());
+		}
+
+		cgs.append(((CGLoopBlockScope)cgScope).getEndLbScope());
 		
-		return null;
+		((CGBlockScope)cgScope).build(cg, false);
+		((CGBlockScope)cgScope).restoreRegsPool();
+		return result;
 	}
 	
 	@Override

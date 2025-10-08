@@ -49,6 +49,7 @@ import ru.vm5277.common.cg.items.CGIConstrInit;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.scopes.CGCommandScope;
 import ru.vm5277.common.cg.scopes.CGBranchScope;
+import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
@@ -141,6 +142,15 @@ public abstract class CodeGenerator extends CGScope {
 		}
 
 		if(0x00 != size) bScope.append(stackFreeAsm());*/
+		scope = scope.free();
+	}
+
+
+	public CGBlockScope enterLoopBlock() {
+		scope = new CGLoopBlockScope(this, scope, genId());
+		return (CGBlockScope)scope;
+	}
+	public void leaveLoopBlock() {
 		scope = scope.free();
 	}
 

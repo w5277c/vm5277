@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.common.cg.scopes;
 
 import java.util.ArrayList;
@@ -74,7 +75,8 @@ public class CGBlockScope extends CGScope {
 		// Регистры(если используются в качестве переменных) используемые в нативных вызовах должны быть сохранены в методе invokeNative
 		if(!isLaunchPoint) {
 			for(int i=0; i<usedRegs.size(); i++) {
-				cont.append(cg.pushRegAsm(usedRegs.get(i)));
+//TODO Не верно, факт использования регистра должна быть передан в метод, вызывающему этот метод нужно решить, сохранять регистр или нет.
+				//cont.append(cg.pushRegAsm(usedRegs.get(i)));
 			}
 		}
 			
@@ -83,7 +85,8 @@ public class CGBlockScope extends CGScope {
 		append(lbEScope);
 		if(!isLaunchPoint) {
 			for(int i=usedRegs.size()-1; i>=0; i--) {
-				append(cg.popRegAsm(usedRegs.get(i)));
+//TODO Не верно, факт использования регистра должн быть передана в метод, вызывающему этот метод нужно решить, сохранять регистр или нет.
+//				append(cg.popRegAsm(usedRegs.get(i)));
 			}
 		}
 		
@@ -108,6 +111,7 @@ public class CGBlockScope extends CGScope {
 			CodeOptimizer co = cg.getOptimizer();
 			if(null != co) {
 				co.optimizeJumpChains(this);
+				co.removeUnusedLabels(this);
 				co.optimizeBranchChains(this);
 				co.optimizePushConst(this, 'Y');
 				co.optimizePushConst(this, 'Z');

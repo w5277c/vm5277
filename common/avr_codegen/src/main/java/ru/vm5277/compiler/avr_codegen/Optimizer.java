@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.avr_codegen;
 
 import java.util.ArrayList;
@@ -24,12 +25,11 @@ import ru.vm5277.common.cg.items.CGItem;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 
-//TODO оптимизировать блок инструкций вида: 'subi zl,low(-15), sbci zh,high(-15)' через adiw/sbiw, где константа вмещается в эти инструкции
-//TODO оптимизировать блок инструкций видуа: 'mov r14,r20, mov r15,r21' через movw
+//TODO удалять двойные rjmp, но перед ними проверять прыжки вида pc+/- и инструкции порпуска типа sbrc. Прыжки лучше добавлять в специальный контейнер, внутри
+//котрого такие оптимизации не будут применяться
+
 
 public class Optimizer extends CodeOptimizer {
-	
-	
 	@Override
 	public void optimizeBranchChains(CGScope scope) {
 		ArrayList<CGItem> list = new ArrayList();
@@ -45,33 +45,22 @@ public class Optimizer extends CodeOptimizer {
 			optimizeBranchChainsLoopLabel:
 			for(int i=0; i<list.size()-2; i++) {
 				CGItem item1 = list.get(i);
-				if(item1.isDisabled() || !(item1 instanceof CGIAsmJump)) {
-					continue;
-				}
 				CGItem item2 = list.get(i+1);
-				while(item2.isDisabled() || !(item2 instanceof CGIAsmJump)) {
-					i++;
-					if(i==list.size()-1) break optimizeBranchChainsLoopLabel;
-					item2 = list.get(i+1);
-				}
 				CGItem item3 = list.get(i+2);
-				while(item3.isDisabled() || !(item3 instanceof CGLabelScope)) {
-					i++;
-					if(i==list.size()-2) break optimizeBranchChainsLoopLabel;
-					item3 = list.get(i+2);
-				}
-				CGIAsmJump j1 = (CGIAsmJump)item1;
-				CGIAsmJump j2 = (CGIAsmJump)item2;
-				String name = ((CGLabelScope)item3).getName();
+				if(item1 instanceof CGIAsmJump && item2 instanceof CGIAsmJump && item3 instanceof CGLabelScope) {
+					CGIAsmJump j1 = (CGIAsmJump)item1;
+					CGIAsmJump j2 = (CGIAsmJump)item2;
+					String name = ((CGLabelScope)item3).getName();
 
-				if(j1.getText().toLowerCase().startsWith("br") && j2.getText().equalsIgnoreCase("rjmp") && j1.getLabelName().equalsIgnoreCase(name)) {
-					j1.setText(Utils.brInstrInvert(j1.getText()));
-					j1.setLabelName(j2.getLabelName());
-					j2.disable();
-					changed = true;
+					if(j1.getText().toLowerCase().startsWith("br") && j2.getText().equalsIgnoreCase("rjmp") && j1.getLabelName().equalsIgnoreCase(name)) {
+						j1.setText(Utils.brInstrInvert(j1.getText()));
+						j1.setLabelName(j2.getLabelName());
+						j2.disable();
+						changed = true;
+					}
 				}
 			}
-		}		
+		}
 	}
 
 	@Override
@@ -85,11 +74,13 @@ public class Optimizer extends CodeOptimizer {
 				continue;
 			}
 			CGItem item2 = list.get(i+1);
-			while(item2.isDisabled() || !(item2 instanceof CGIAsm)) {
+			while(item2.isDisabled()) {
 				i++;
 				if(i==list.size()-1) break optimizeBaseInstrLoopLabel;
 				item2 = list.get(i+1);
 			}
+			if(!(item2 instanceof CGIAsm)) continue;
+			
 			String instr1 = replaceAliasToReg(((CGIAsm)item1).getText().trim().toLowerCase());
 			String instr2 = replaceAliasToReg(((CGIAsm)item2).getText().trim().toLowerCase());
 			if(instr1.startsWith("ldi r")) {

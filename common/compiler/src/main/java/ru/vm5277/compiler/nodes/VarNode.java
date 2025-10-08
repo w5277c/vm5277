@@ -109,7 +109,13 @@ public class VarNode extends AstNode implements InitNodeHolder {
 	@Override
 	public boolean preAnalyze() {
 		boolean result = true;
-		try{validateModifiers(modifiers, Keyword.STATIC, Keyword.FINAL);} catch(CompileException e) {addMessage(e);}
+		
+		try{
+			validateModifiers(modifiers, Keyword.STATIC, Keyword.FINAL);
+		}
+		catch(CompileException e) {
+			addMessage(e);
+		}
 		
 		if(Character.isUpperCase(name.charAt(0))) addMessage(new WarningMessage("Variable name should start with lowercase letter:" + name, sp));
 

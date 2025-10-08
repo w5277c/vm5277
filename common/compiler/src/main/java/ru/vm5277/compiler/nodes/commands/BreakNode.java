@@ -17,6 +17,9 @@ package ru.vm5277.compiler.nodes.commands;
 
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
+import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.common.exceptions.CompileException;
@@ -41,11 +44,6 @@ public class BreakNode extends CommandNode {
 		}
 		
 		try {consumeToken(tb, Delimiter.SEMICOLON);}catch(CompileException e) {markFirstError(e);}
-        
-		AstNode node = tb.getLoopStack().peek();
-		if (null == node || !(node instanceof ForNode || node instanceof WhileNode || node instanceof DoWhileNode)) {
-			markFirstError(parserError("'break' can only be used inside loop statements"));
-        }
     }
 
 	public String getLabel() {
@@ -64,47 +62,76 @@ public class BreakNode extends CommandNode {
 
 	@Override
 	public boolean preAnalyze() {
-		// Проверка наличия метки (если указана)
-		if (label == null) markError("Break label cannot be empty");
-
+		boolean result = true;
 		// Базовая проверка - команда break должна быть внутри цикла
-        if (tb.getLoopStack().isEmpty()) markError("'break' outside of loop");
+		if(!isInLoopNode()) {
+			markFirstError(parserError("'break' outside of loop"));
+			result = false;
+        }
 
-		return true;
+		return result;
 	}
 
 	@Override
 	public boolean declare(Scope scope) {
-		if (label != null) {
-			if (!(scope instanceof BlockScope)) markError("Labeled break must be inside block scope");
+		boolean result = true;
+		
+		if(label!=null) {
+			if (!(scope instanceof BlockScope)) {
+				markError("Labeled break must be inside block scope");
+				result = false;
+			}
 			else {
 				// Разрешаем метку
 				symbol = ((BlockScope)scope).resolveLabel(label);
-				if (null == symbol) markError("Undefined label: " + label);
+				if(null==symbol) {
+					markError("Undefined label: " + label);
+					result = false;
+				}
 
 				// Регистрируем использование метки
 				symbol.addReference(this);
 			}
 		}
-		return true;
+		
+		return result;
 	}
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		boolean result = true;
+		
 		// Проверка для break с меткой
-        if (null != symbol) {
-
+        if(null!=symbol) {
 			// Метка должна быть на цикле или switch
-            if (!isLoopOrSwitch((CommandNode)tb.getLoopStack().peek())) markError("Break label must be on loop or switch statement");
+            if(!isLoopOrSwitch((CommandNode)tb.getLoopStack().peek())) {
+				markError("Break label must be on loop or switch statement");
+				result = false;
+			}
             
             // Проверка видимости
-            if (!isLabelInCurrentMethod(symbol, scope)) markError("Cannot break to label in different method");
+            if(!isLabelInCurrentMethod(symbol, scope)) {
+				markError("Cannot break to label in different method");
+				result = false;
+			}
         }
-		return true;
+		
+		return result;
 	}
 
 	@Override
 	public List<AstNode> getChildren() {
 		return null;
+	}
+	
+	@Override
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+		CodegenResult result = null;
+		
+		CGScope cgs = null == parent ? cgScope : parent;
+		
+		cg.jump(cgs, ((CGLoopBlockScope)cgs.getScope(CGLoopBlockScope.class)).getEndLbScope());
+		
+		return result;
 	}
 }

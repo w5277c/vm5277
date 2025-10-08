@@ -362,10 +362,12 @@ public class BlockNode extends AstNode {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 		
+		CGScope cgs = null == parent ? cgScope : parent;
+		
 		for(AstNode node : children) {
 			//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
 			if(!(node instanceof VarNode)) {
-				node.codeGen(cg, null, false);
+				node.codeGen(cg, cgs, false);
 			}
 		}
 		

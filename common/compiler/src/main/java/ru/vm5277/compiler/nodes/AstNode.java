@@ -393,6 +393,16 @@ public abstract class AstNode extends SemanticAnalyzer {
 		return false;
 	}
 
+	public boolean isInLoopNode() {
+		boolean result = false;
+		for(AstNode node : tb.getLoopStack()) {
+			if(node instanceof ForNode || node instanceof WhileNode || node instanceof DoWhileNode) {
+				result = true;
+			}
+		}
+		return result;
+	}
+
 	public SourcePosition getSP() {
 		return sp;
 	}

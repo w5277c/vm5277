@@ -176,4 +176,10 @@ public abstract class CodeOptimizer {
 			}
 		}		
 	}
+	
+	public void removeDisabled(ArrayList<CGItem> list) {
+		for(CGItem item : new ArrayList<>(list)) {
+			if(item.isDisabled()) list.remove(item);
+		}
+	}
 }

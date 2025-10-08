@@ -180,6 +180,8 @@ public class UnaryExpression extends ExpressionNode {
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, boolean toAccum) throws Exception {
 		CodegenResult result = null;
 		
+		CGScope cgs = null == parent ? cgScope : parent;
+		
 		CGScope brScope = cgScope;
 		while(null != brScope && !(brScope instanceof CGBranchScope)) {
 			brScope = brScope.getParent();
@@ -196,7 +198,7 @@ public class UnaryExpression extends ExpressionNode {
 			else {
 				ve.codeGen(cg, null, false);
 				CGCellsScope cScope = (CGCellsScope)operand.getSymbol().getCGScope(CGCellsScope.class);
-				cg.eUnary(cgScope, operator, cScope.getCells(), toAccum);
+				cg.eUnary(cgs, operator, cScope.getCells(), toAccum);
 				if(toAccum)	 {
 					result = CodegenResult.RESULT_IN_ACCUM;
 				}
@@ -206,7 +208,7 @@ public class UnaryExpression extends ExpressionNode {
 			ArrayExpression ae = (ArrayExpression)operand;
 			ae.codeGen(cg, null, false);
 			CGCellsScope cScope = (CGCellsScope)operand.getSymbol().getCGScope(CGCellsScope.class);
-			cg.eUnary(cgScope, operator, cScope.getCells(), toAccum);
+			cg.eUnary(cgs, operator, cScope.getCells(), toAccum);
 			if(toAccum)	 {
 				result = CodegenResult.RESULT_IN_ACCUM;
 			}

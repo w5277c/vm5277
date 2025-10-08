@@ -1,0 +1,28 @@
+class Main {
+    public static void main() {
+        System.setParam(2, 18);
+        byte i = 3;
+        while (i<10) {
+            System.out(i);
+            i++;
+            if (i==5) {
+                break;
+            }
+        }
+        
+        while (true) {
+            System.out(i);
+        }
+        
+        while (false) {
+            System.out(i);
+        }
+        
+        while (true) {
+            //CONST final int i = 287454020;
+        }
+        
+    }
+    public Main() {
+    }
+}

@@ -187,6 +187,7 @@ public class IfNode extends CommandNode {
 		cgScope = cg.enterCommand();
 		brScope = cg.enterBranch();
 		
+		//TODO привести в соответствие как в ForNode
 		// Проверка типа условия
 		if (null != condition) {
 			if (condition.postAnalyze(scope, cg)) {
@@ -202,6 +203,7 @@ public class IfNode extends CommandNode {
 			ExpressionNode optimizedExpr = condition.optimizeWithScope(scope, cg);
 			if(null != optimizedExpr) {
 				condition = optimizedExpr;
+				condition.postAnalyze(scope, cg);
 			}
 			if(condition instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)condition;
