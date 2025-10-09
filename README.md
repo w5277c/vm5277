@@ -1,14 +1,14 @@
-# vm5277 Embedded Java like toolkit
+# vm5277 Embedded Java-like Toolkit
 **Java-like embedded toolkit for Atmel, Microchip, STM8, and other MCUs**
 
-Универсальная платформа для embedded-разработки(Java-подобный синтаксис j8b + RTOS + кросс-платформенные драйверы для 8-битных МК)
+Universal platform for embedded development (Java-like j8b syntax + RTOS + cross-platform drivers for 8-bit MCUs)
 
-## Лицензия
-Проект распространяется под **Apache License 2.0**.
-Ранние версии (до 2025-06-19) использовали GPL-3.0-or-later.
+## License
+The project is distributed under the **Apache License 2.0**.
+Earlier versions (before 2025-06-19) used GPL-3.0-or-later.
 
-[Основной сайт vm5277](https://vm5277.ru "Официальный сайт vm5277")
+[Main vm5277 website](https://vm5277.com "Official vm5277 website")
 
-## История изменений
+## Changelog
 
-Последние новости разработки смотрите в [файле новостей](NEWS.md).
+For the latest development news, see the [news file](NEWS.md).
