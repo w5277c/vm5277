@@ -103,6 +103,12 @@ public class BlockNode extends AstNode {
 				children.add(cNode);
 				continue;
 			}
+			// Обработка enum с модификаторами
+			if (tb.match(TokenType.OOP) && Keyword.ENUM == tb.current().getValue()) {
+				EnumNode eNode = new EnumNode(tb, mc, modifiers);
+				children.add(eNode);
+				continue;
+			}
 			// Обработка интерфейсов с модификаторами
 			if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
 				InterfaceNode iNode = new InterfaceNode(tb, mc, modifiers, null, null);
@@ -115,6 +121,7 @@ public class BlockNode extends AstNode {
 				// Определение типа (примитив или класс)
 				VarType type = checkPrimtiveType();
 				if(null == type) type = checkClassType();
+				if(null == type) type = checkEnumType();
 				if(null != type) type = checkArrayType(type);
 
 				if(null != type) {
@@ -156,7 +163,8 @@ public class BlockNode extends AstNode {
 				}
 			}
 			catch(CompileException e) {
-				markFirstError(e);
+				//markFirstError(e);
+				markError(e);
 			}
 
 			// Обработка остальных statement (if, while, вызовы и т.д.)

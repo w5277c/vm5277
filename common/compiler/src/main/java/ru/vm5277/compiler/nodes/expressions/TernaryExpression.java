@@ -27,8 +27,8 @@ import ru.vm5277.compiler.semantic.Scope;
 
 public class TernaryExpression extends ExpressionNode {
 	private final	ExpressionNode	condition;
-	private final	ExpressionNode	trueExpr;
-	private	final	ExpressionNode	falseExpr;
+	private			ExpressionNode	trueExpr;
+	private			ExpressionNode	falseExpr;
 	private			boolean			isUsed		= false;
 	
 	public TernaryExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode condition, ExpressionNode trueExpr, ExpressionNode falseExpr) {
@@ -75,7 +75,13 @@ public class TernaryExpression extends ExpressionNode {
 			// Проверяем условие и ветки
 			result&=condition.postAnalyze(scope, cg);
 			result&=trueExpr.postAnalyze(scope, cg);
+			if(trueExpr instanceof UnresolvedReferenceExpression) {
+				trueExpr = ((UnresolvedReferenceExpression)trueExpr).getResolvedExpr();
+			}
 			result&=falseExpr.postAnalyze(scope, cg);
+			if(falseExpr instanceof UnresolvedReferenceExpression) {
+				falseExpr = ((UnresolvedReferenceExpression)falseExpr).getResolvedExpr();
+			}
 
 			// Проверяем тип условия
 			VarType condType = condition.getType(scope);

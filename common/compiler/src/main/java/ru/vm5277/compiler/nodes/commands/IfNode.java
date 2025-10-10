@@ -33,6 +33,7 @@ import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.expressions.InstanceOfExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
+import ru.vm5277.compiler.nodes.expressions.UnresolvedReferenceExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
@@ -191,6 +192,10 @@ public class IfNode extends CommandNode {
 		// Проверка типа условия
 		if (null != condition) {
 			if (condition.postAnalyze(scope, cg)) {
+				if(condition instanceof UnresolvedReferenceExpression) {
+					condition = ((UnresolvedReferenceExpression)condition).getResolvedExpr();
+				}
+
 				try {
 					VarType condType = condition.getType(scope);
 					if (VarType.BOOL != condType) markError("If condition must be boolean, got: " + condType);

@@ -27,6 +27,7 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
+import ru.vm5277.compiler.nodes.expressions.UnresolvedReferenceExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.Scope;
 
@@ -155,8 +156,12 @@ public class SwitchNode extends CommandNode {
 		boolean allCasesReturn = true;		
 		
 		// Проверка типа выражения switch
-		if (expression != null) {
-			if (expression.postAnalyze(scope, cg)) {
+		if(null!=expression) {
+			if(expression.postAnalyze(scope, cg)) {
+				if(expression instanceof UnresolvedReferenceExpression) {
+					expression = ((UnresolvedReferenceExpression)expression).getResolvedExpr();
+				}
+
 				try {
 					VarType exprType = expression.getType(scope);
 					if (!exprType.isInteger() && VarType.BYTE != exprType && VarType.SHORT != exprType) {

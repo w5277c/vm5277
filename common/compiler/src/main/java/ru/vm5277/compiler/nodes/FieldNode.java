@@ -24,7 +24,6 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.Operator;
-import ru.vm5277.common.cg.CGArrCells;
 import ru.vm5277.common.cg.scopes.CGBranchScope;
 import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
@@ -36,10 +35,12 @@ import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.nodes.expressions.ArrayExpression;
 import ru.vm5277.compiler.nodes.expressions.BinaryExpression;
+import ru.vm5277.compiler.nodes.expressions.EnumExpression;
 import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.nodes.expressions.NewArrayExpression;
 import ru.vm5277.compiler.nodes.expressions.NewExpression;
+import ru.vm5277.compiler.nodes.expressions.UnresolvedReferenceExpression;
 import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.FieldSymbol;
@@ -180,6 +181,10 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 					cg.leaveField();
 					return false;
 				}
+				if(init instanceof UnresolvedReferenceExpression) {
+					init = ((UnresolvedReferenceExpression)init).getResolvedExpr();
+				}
+
 				// Проверка совместимости типов
 				VarType initType = init.getType(scope);
 				if(!isCompatibleWith(scope, type, initType)) {
@@ -302,6 +307,10 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 				accUsed = true;
 				cg.leaveBranch();
 				cg.setScope(oldScope);
+			}
+			else if(init instanceof EnumExpression) {
+				cg.accCast(null, VarType.BYTE);
+				cgScope.append(cg.constToCells(cgScope, ((EnumExpression)init).getIndex(), fScope.getCells(), false));
 			}
 			else {
 				init.codeGen(cg, null, true);

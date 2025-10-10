@@ -74,18 +74,20 @@ public class MethodCallExpression extends ExpressionNode {
 	public VarType getType(Scope scope) throws CompileException {
 		if(null!=type) return type;
 		//поиск метода в текущем классе
-		if(null == classNameExpr) {
+		if(null==classNameExpr) {
 			ClassScope classScope = scope.getThis();
-			if(null != classScope) {
+			if(null!=classScope) {
 				classType = VarType.fromClassName(classScope.getName());
 			}
 		}
 
 		// Проверка существования parent (если есть)
-		if (null == classType && null != classNameExpr) {
+		if(null==classType && null!=classNameExpr) {
 			classType = classNameExpr.getType(scope);
 		}
-		if (null == classType) throw new CompileException("Cannot resolve:" + classNameExpr.toString());
+		if(null==classType) {
+			throw new CompileException("Cannot resolve:" + classNameExpr.toString());
+		}
 		
 		// Получаем типы аргументов
 		argTypes = new VarType[args.size()];
@@ -177,18 +179,27 @@ public class MethodCallExpression extends ExpressionNode {
 		}
 
 		if(null != classNameExpr) {
-			if(classNameExpr instanceof UnresolvedReferenceExpression) {
-				UnresolvedReferenceExpression ure = (UnresolvedReferenceExpression)classNameExpr;
-				if("this".equals(ure.getId())) {
-					classNameExpr = new ThisExpression(tb, mc);
-				}
-				else if(null != VarType.fromClassName(ure.getId())) {
-					classNameExpr = new TypeReferenceExpression(tb, mc, ure.getId());
-				}
-				else {
-					classNameExpr =  new VarFieldExpression(tb, mc, ure.getId());
+/*			try {
+				if(classNameExpr instanceof UnresolvedReferenceExpression) {
+					UnresolvedReferenceExpression ure = (UnresolvedReferenceExpression)classNameExpr;
+					if("this".equals(ure.getId())) {
+						classNameExpr = new ThisExpression(tb, mc);
+					}
+					else if(null != VarType.fromClassName(ure.getId())) {
+						classNameExpr = new TypeReferenceExpression(tb, mc, ure.getId());
+					}
+					else if(null != VarType.fromEnumName(ure.getId())) {
+						classNameExpr = new EnumExpression(tb, mc, ure.getId());
+					}
+					else {
+						classNameExpr =  new VarFieldExpression(tb, mc, ure.getId());
+					}
 				}
 			}
+			catch(CompileException ex) {
+				markError(ex);
+				return false;
+			}*/
 
 			if(!classNameExpr.preAnalyze()) {
 				return false;
@@ -237,21 +248,14 @@ public class MethodCallExpression extends ExpressionNode {
 				classNameExpr = optimizedParentScope;
 			}
 		
-			try {
-				type = getType(scope);
-			}
-			catch(CompileException e) {
-				markError(e);
-				result = false;
-			} //TODO костыль, нужен для присваивания symbol
-
-
 			// Проверка parent (если есть)
 			if(null != classNameExpr) {
-				if (!classNameExpr.postAnalyze(scope, cg)) {
-					result = false;
-				}
-				else {
+				result&=classNameExpr.postAnalyze(scope, cg);
+				if(result) {
+					if(classNameExpr instanceof UnresolvedReferenceExpression) {
+						classNameExpr = ((UnresolvedReferenceExpression)classNameExpr).getResolvedExpr();
+					}
+
 					try {
 						VarType parentType = classNameExpr.getType(scope);
 						if(null == parentType) {
@@ -269,10 +273,13 @@ public class MethodCallExpression extends ExpressionNode {
 			// Проверка аргументов
 			for(int i=0; i<args.size(); i++) {
 				ExpressionNode arg = args.get(i);
-				if(!arg.postAnalyze(scope, cg)) {
-					result = false;
+				result&=arg.postAnalyze(scope, cg);
+				if(arg instanceof UnresolvedReferenceExpression) {
+					arg = ((UnresolvedReferenceExpression)arg).getResolvedExpr();
+					args.set(i, arg);
 				}
-				else {
+				
+				if(result) {
 					try {
 						ExpressionNode optimizedExpr = arg.optimizeWithScope(scope, cg);
 						if(null != optimizedExpr) {
@@ -285,6 +292,14 @@ public class MethodCallExpression extends ExpressionNode {
 				}
 			}
 			
+			try {
+				type = getType(scope);
+			}
+			catch(CompileException e) {
+				markError(e);
+				result = false;
+			} //TODO костыль, нужен для присваивания symbol
+
 			// Получаем типы аргументов
 			argTypes = new VarType[args.size()];
 			for(int i=0; i<args.size(); i++) {
@@ -336,42 +351,43 @@ public class MethodCallExpression extends ExpressionNode {
 							result = false;
 						}
 					}
-				}
-
-				symbol.setCGScope(cgScope);
-				
-				//Ничего не делаем с аргументами, если это нативный метод
-				if(!symbol.isNative()) {
-					//Создаем алиасы на переменные(из аргументов), которые содержат final переменные или переменные типа ссылки, массива и cstr
-					//Для остальных аргументов создаем новые переменные, которые должны быть проинициализирвоаны в кодогенерации
-					//и им должны быть присвоены значения переменных
 
 
-					//TODO не верно. Незачем задавать новые переменные, достаточно поместить значения в params метода
-/*					MethodScope mScope = ((MethodSymbol)symbol).getScope();
-					for(int i=0; i< args.size(); i++) {
-						Symbol pSymbol = ((MethodSymbol)symbol).getParameters().get(i);
-						ExpressionNode expr = args.get(i);
-						if(expr instanceof LiteralExpression) {
-							//Это константа, создаем переменную
-							mScope.addVariable(new VarSymbol(pSymbol.getName(), expr.getType(scope), pSymbol.isFinal(), false, mScope, null));
-						}
-						else if(expr instanceof VarFieldExpression) {
-							VarFieldExpression ve = (VarFieldExpression)expr;
-							VarSymbol vSymbol = (VarSymbol)ve.getSymbol();
-							if(vSymbol.isFinal() || VarType.CSTR == vSymbol.getType() || VarType.CLASS == vSymbol.getType()) {
-								mScope.addAlias(pSymbol.getName(), expr.getType(scope), vSymbol);
-							}
-							else {
+					symbol.setCGScope(cgScope);
+
+					//Ничего не делаем с аргументами, если это нативный метод
+					if(!symbol.isNative()) {
+						//Создаем алиасы на переменные(из аргументов), которые содержат final переменные или переменные типа ссылки, массива и cstr
+						//Для остальных аргументов создаем новые переменные, которые должны быть проинициализирвоаны в кодогенерации
+						//и им должны быть присвоены значения переменных
+
+
+						//TODO не верно. Незачем задавать новые переменные, достаточно поместить значения в params метода
+	/*					MethodScope mScope = ((MethodSymbol)symbol).getScope();
+						for(int i=0; i< args.size(); i++) {
+							Symbol pSymbol = ((MethodSymbol)symbol).getParameters().get(i);
+							ExpressionNode expr = args.get(i);
+							if(expr instanceof LiteralExpression) {
+								//Это константа, создаем переменную
 								mScope.addVariable(new VarSymbol(pSymbol.getName(), expr.getType(scope), pSymbol.isFinal(), false, mScope, null));
 							}
-						}
-						else {
-							markError(new CompileException("TODO Unsupported arg: " + args.get(i)));
-							cg.leaveExpression();
-							return false;
-						}
-					}*/
+							else if(expr instanceof VarFieldExpression) {
+								VarFieldExpression ve = (VarFieldExpression)expr;
+								VarSymbol vSymbol = (VarSymbol)ve.getSymbol();
+								if(vSymbol.isFinal() || VarType.CSTR == vSymbol.getType() || VarType.CLASS == vSymbol.getType()) {
+									mScope.addAlias(pSymbol.getName(), expr.getType(scope), vSymbol);
+								}
+								else {
+									mScope.addVariable(new VarSymbol(pSymbol.getName(), expr.getType(scope), pSymbol.isFinal(), false, mScope, null));
+								}
+							}
+							else {
+								markError(new CompileException("TODO Unsupported arg: " + args.get(i)));
+								cg.leaveExpression();
+								return false;
+							}
+						}*/
+					}
 				}
 			}
 		}
@@ -534,10 +550,13 @@ public class MethodCallExpression extends ExpressionNode {
 			
 			return new Operand(OperandType.ARRAY, null);
 		}
-		else if(expr instanceof ArrayPropertyExpression) {
-			ArrayPropertyExpression ape = (ArrayPropertyExpression)expr;
+		else if(expr instanceof PropertyExpression) {
+			PropertyExpression ape = (PropertyExpression)expr;
 			ape.codeGen(cg, null, true);
 			return new Operand(OperandType.ACCUM, null);
+		}
+		else if(expr instanceof EnumExpression) {
+			return new Operand(OperandType.LITERAL, ((EnumExpression)expr).getIndex());
 		}
 
 		else throw new Exception("Unexpected expression:" + expr);
@@ -598,6 +617,9 @@ public class MethodCallExpression extends ExpressionNode {
 					else if (argExpr instanceof BinaryExpression) {
 						argExpr.codeGen(cg, null, true);
 						cont.append(cg.pushAccBE(null, paramVarType.getSize()));
+					}
+					if(argExpr instanceof EnumExpression) {
+						cont.append(cg.pushConst(null, 0x01, ((EnumExpression)argExpr).getIndex(), false));
 					}
 					else {
 						throw new CompileException("Unsupported expression:" + argExpr);

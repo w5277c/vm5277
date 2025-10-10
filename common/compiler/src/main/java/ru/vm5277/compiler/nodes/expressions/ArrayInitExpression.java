@@ -144,7 +144,11 @@ public class ArrayInitExpression extends ExpressionNode {
 			for(int i=0; i<linearValues.size(); i++) {
 				ExpressionNode valueExpr = linearValues.get(i);
 				if(!(valueExpr instanceof ArrayInitExpression)) {
-					result &= valueExpr.postAnalyze(scope, cg);
+					result&=valueExpr.postAnalyze(scope, cg);
+					if(valueExpr instanceof UnresolvedReferenceExpression) {
+						valueExpr = ((UnresolvedReferenceExpression)valueExpr).getResolvedExpr();
+						linearValues.set(i, valueExpr);
+					}
 				}
 				
 				if(result) {

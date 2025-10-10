@@ -52,6 +52,12 @@ public class ClassBlockNode extends AstNode {
 				children.add(cNode);
 				continue;
 			}
+			// Обработка enum с модификаторами
+			if (tb.match(TokenType.OOP) && Keyword.ENUM == tb.current().getValue()) {
+				EnumNode eNode = new EnumNode(tb, mc, modifiers);
+				children.add(eNode);
+				continue;
+			}
 			// Обработка интерфейсов с модификаторами
 			if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
 				InterfaceNode iNode = new InterfaceNode(tb, mc, modifiers, null, null);

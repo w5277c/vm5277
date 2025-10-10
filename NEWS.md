@@ -1,5 +1,184 @@
 # Новости и история разработки
 
+## [2025-10-11] - Реализация поддержки enum типов
+
+### ✅ Статус
+Реализована полная поддержка перечисляемых типов (enum). Добавлены новые синтаксические конструкции, свойства enum и интеграция с существующей системой типов.
+
+### Цель
+Реализовать тип данных enum для создания именованных константных значений с проверкой типов на этапе компиляции и c нулевой нагрузкой на runtime. Обеспечить поддержку свойств enum и интеграцию с существующими языковыми конструкциями.
+
+### Исходный код (Java-подобный)
+```Java
+class Main {
+
+	public enum EDirection {
+		LEFT,
+		RIGHT,
+		DOWN,
+		UP;
+	}
+
+	public enum EStatus {
+		OK,
+		ERROR
+	}
+
+    public static void main() {
+		System.setParam(RTOSParam.STDOUT_PORT, 0x12);
+
+		System.out(EStatus.ERROR.index());
+		System.out(EStatus.size());
+
+		EDirection dir = EDirection.item(1);
+		if(EDirection.UP==dir) {
+			System.out(0x01);
+		}
+		else {
+			System.out(0x00);
+		}
+
+		printDirection(EDirection.UP);
+
+		EStatus st = EStatus.OK;
+		System.out(st.index());
+
+		EStatus s = EStatus.item(EStatus.ERROR.index());
+		System.out(s.index());
+
+		System.out(EStatus.item(1).index());
+
+//Приводит к ошибкам компиляции
+/*		System.out(EStatus);
+		System.out(EStatus.UP);
+		System.out(EStatus.OK.length);
+		System.out(EStatus.length);
+		System.out(EStatus.OK.size());
+		System.out(EStatus.ERROR.item(1));
+		System.out(EStatus.index());
+		EStatus es1 = EStatus.item(5);
+		EStatus es2 = EStatus.item(-1);
+		EStatus es3 = EStatus.item(0, 1);
+		System.out(es1.size(1));
+*/
+    }
+
+    public void printDirection(EDirection dir) {
+		System.out(dir.index());
+	}
+}
+```
+
+### Результат на AVR ассемблере
+
+```asm
+; vm5277.avr_codegen v0.1 at Sat Oct 11 01:40:29 VLAT 2025
+.equ stdout_port = 18
+
+.set OS_FT_STDOUT = 1
+.set OS_FT_DRAM = 1
+
+.include "devices/atmega328p.def"
+.include "core/core.asm"
+.include "dmem/dram.asm"
+.include "stdio/out_num8.asm"
+
+Main:
+	rjmp j8bCMainMmain
+_j8b_meta20:
+	.db 12,0
+
+j8bCMainMmain:
+	ldi r16,1
+	rcall os_out_num8
+	ldi r16,2
+	rcall os_out_num8
+	ldi r16,1
+	mov r20,r16
+	ldi r16,3
+	cp r16,r20
+	brne _j8b_eoc22
+	ldi r16,1
+	rcall os_out_num8
+_j8b_eob23:
+	rjmp _j8b_eob24
+_j8b_eoc22:
+	ldi r16,0
+	rcall os_out_num8
+_j8b_eob24:
+	ldi r19,3
+	push r19
+	rcall j8bC25CMainMprintDirection
+	pop j8b_atom
+	ldi r21,0
+	mov r16,r21
+	rcall os_out_num8
+	ldi r16,1
+	mov r22,r16
+	mov r16,r22
+	rcall os_out_num8
+	ldi r16,1
+	rcall os_out_num8
+_j8b_eob21:
+	ret
+
+j8bC25CMainMprintDirection:
+	push yl
+	push yh
+	lds yl,SPL
+	lds yh,SPH
+	ldd r16,y+5
+	rcall os_out_num8
+_j8b_eob26:
+	ret
+```
+
+### Ключевые изменения
+#### 1. Новая система типов для enum
+- **VarType.java**: Добавлены поддержка enum типов, методы для создания и получения enum типов
+- **Типизация**: Enum представлен как byte с автоматической нумерацией значений
+- **Свойства**: Поддержка методов .index(), item(x) и .size()
+
+#### 2. Новые AST узлы
+- **EnumNode.java**: Узел для объявления enum с модификаторами и значениями
+- **EnumExpression.java**: Выражение для доступа к значениям enum
+- **PropertyExpression.java**: Универсальное выражение для свойств (заменило ArrayPropertyExpression)
+
+#### 3. Синтаксический анализ
+- **AstNode.java**: Добавлена поддержка парсинга enum объявлений и выражений
+- **BlockNode.java, ClassBlockNode.java, InterfaceBodyNode.java**: Интеграция enum в различные контексты объявлений
+
+#### 4. Семантический анализ
+- **UnresolvedReferenceExpression.java**: Расширена логика разрешения ссылок для поддержки enum
+- **Множественные улучшения**: Добавлена обработка enum в различных выражениях и операторах
+
+#### 5. Кодогенерация
+- **Представление**: Значения enum компилируются как байтовые константы
+
+
+### Особенности реализации
+- **Безопасность типов**: Компилятор проверяет корректность использования enum значений
+- **Эффективность**: Enum значения представлены как byte в runtime
+- **Свойства**: Встроенная поддержка .index() для получения порядкового номера, .item(x) для получения элемента по порядковому номеру, и .size() для получения количества элементов
+- **Интеграция**: Полная поддержка в присваиваниях, операциях сравнения
+
+### Ограничения
+- Enum не поддерживают пользовательские методы или конструкторы
+- Значения enum должны быть уникальными идентификаторами в верхнем регистре
+- Поддержка только в классах и глобальной области видимости
+
+###Технические детали
+- **Размер типа**: 1 байт (аналогично byte)
+- **Методы**: Автоматическая генерация методов доступа к свойствам
+- **Проверки**: Разрешены только операции присваивания и сравнения(EQ/NEQ)
+
+### Следующие шаги
+- **Очередное тестирование**: Внесены множественные изменения, необходимо проверить старые примеры
+- **Операторы управления**: `continue`, `switch`
+- **Метки**: Именованные переходы для вложенных циклов
+
+
+
 ## [2025-10-08] - Реализация оператора while
 
 ### ✅ Статус

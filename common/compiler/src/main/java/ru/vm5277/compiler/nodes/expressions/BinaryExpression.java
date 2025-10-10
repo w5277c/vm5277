@@ -42,9 +42,9 @@ import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 
 public class BinaryExpression extends ExpressionNode {
-    private	final	ExpressionNode	leftExpr;
+    private			ExpressionNode	leftExpr;
     private	final	Operator		operator;
-    private	final	ExpressionNode	rightExpr;
+    private			ExpressionNode	rightExpr;
 	private			VarType			leftType;
 	private			VarType			rightType;
 	private			boolean			isUsed		= false;
@@ -117,6 +117,13 @@ public class BinaryExpression extends ExpressionNode {
 			return false; // Ошибка уже помечена в right
 		}
 
+		if((leftExpr instanceof EnumExpression || rightExpr instanceof EnumExpression) &&
+			Operator.EQ!=operator && Operator.NEQ!=operator && Operator.ASSIGN!=operator) {
+			
+			markError("Operation " + operator + " are not allowed for enum types");
+			return false;
+		}
+
 		return true;
 	}
 
@@ -156,6 +163,12 @@ public class BinaryExpression extends ExpressionNode {
 			if (!leftExpr.postAnalyze(scope, cg) || !rightExpr.postAnalyze(scope, cg)) {
 				cg.leaveExpression();
 				return false;
+			}
+			if(leftExpr instanceof UnresolvedReferenceExpression) {
+				leftExpr = ((UnresolvedReferenceExpression)leftExpr).getResolvedExpr();
+			}
+			if(rightExpr instanceof UnresolvedReferenceExpression) {
+				rightExpr = ((UnresolvedReferenceExpression)rightExpr).getResolvedExpr();
 			}
 
 			leftType = leftExpr.getType(scope);

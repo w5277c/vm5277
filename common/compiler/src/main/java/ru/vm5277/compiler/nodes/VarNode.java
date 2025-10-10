@@ -34,11 +34,13 @@ import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.nodes.expressions.ArrayExpression;
 import ru.vm5277.compiler.nodes.expressions.BinaryExpression;
+import ru.vm5277.compiler.nodes.expressions.EnumExpression;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.nodes.expressions.NewArrayExpression;
 import ru.vm5277.compiler.nodes.expressions.NewExpression;
+import ru.vm5277.compiler.nodes.expressions.UnresolvedReferenceExpression;
 import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.InterfaceScope;
@@ -193,6 +195,10 @@ public class VarNode extends AstNode implements InitNodeHolder {
 					cg.leaveLocal();
 					return false;
 				}
+				if(init instanceof UnresolvedReferenceExpression) {
+					init = ((UnresolvedReferenceExpression)init).getResolvedExpr();
+				}
+
 				// Проверка совместимости типов
 				VarType initType = init.getType(scope);
 				if(initType.isClassType() && type.isClassType()) {
@@ -347,6 +353,9 @@ public class VarNode extends AstNode implements InitNodeHolder {
 					cg.updateArrRefCount(cgScope, vScope.getCells(), true, init instanceof ArrayExpression);
 				}
 				accUsed = true;
+			}
+			else if(init instanceof EnumExpression) {
+				cgScope.append(cg.constToCells(cgScope, ((EnumExpression)init).getIndex(), vScope.getCells(), false));
 			}
 			else {
 				init.codeGen(cg, cgScope, true);

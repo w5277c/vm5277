@@ -143,6 +143,9 @@ public class InterfaceScope extends Scope {
 		}
 
 		for (int i=0; i<paramTypes.size(); i++) {
+			// Нативный метод ничего не знет о Enum, но Enum может быть представлен как byte
+			// Может быть предствален, но не стоит. Для вывода лучше использовать enum.index()
+			// if(method.isNative && argTypes[i].isEnum() && VarType.BYTE==paramTypes.get(i)) continue;
 			if (!AstNode.isCompatibleWith(this, paramTypes.get(i), argTypes[i])) {
 				return false;
 			}

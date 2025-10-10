@@ -922,7 +922,7 @@ public class ExpressionNode extends AstNode {
 			// Парсим цепочку идентификаторов через точки
 //			ExpressionNode expr = parseQualifiedName();
 			
-			if(!(expr instanceof ArrayPropertyExpression)) {
+			if(!(expr instanceof PropertyExpression)) {
 				// Если после цепочки идет '(', то это вызов метода
 				if(tb.match(Delimiter.LEFT_PAREN)) {
 					return parseMethodCall(expr);

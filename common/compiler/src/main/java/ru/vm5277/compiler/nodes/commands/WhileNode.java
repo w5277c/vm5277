@@ -34,6 +34,7 @@ import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
+import ru.vm5277.compiler.nodes.expressions.UnresolvedReferenceExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.Scope;
 
@@ -118,6 +119,9 @@ public class WhileNode extends CommandNode {
 		// Проверка типа условия
 		brScope = cg.enterBranch();
 		result&=condition.postAnalyze(blockScope, cg);
+		if(condition instanceof UnresolvedReferenceExpression) {
+			condition = ((UnresolvedReferenceExpression)condition).getResolvedExpr();
+		}
 
 		if(result) {
 			try {

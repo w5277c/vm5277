@@ -62,6 +62,9 @@ public class CastExpression extends ExpressionNode {
 		cgScope = cg.enterExpression(toString());
 		
 		result &=operand.postAnalyze(scope, cg);
+		if(operand instanceof UnresolvedReferenceExpression) {
+			operand = ((UnresolvedReferenceExpression)operand).getResolvedExpr();
+		}
 
 		try {
 			sourceType = operand.getType(scope);

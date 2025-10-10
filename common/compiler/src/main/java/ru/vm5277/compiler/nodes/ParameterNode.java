@@ -41,6 +41,7 @@ public class ParameterNode extends AstNode {
 		
 		this.type = checkPrimtiveType();
 		if(null == type) type = checkClassType();
+		if(null == type) type = checkEnumType();
 		if(null != type) type = checkArrayType(type);
 		this.name = (String)consumeToken(tb, TokenType.ID).getValue();
 	}

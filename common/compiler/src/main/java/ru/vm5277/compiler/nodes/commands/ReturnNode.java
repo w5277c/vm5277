@@ -27,6 +27,7 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
+import ru.vm5277.compiler.nodes.expressions.UnresolvedReferenceExpression;
 import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.Scope;
 
@@ -110,6 +111,10 @@ public class ReturnNode extends CommandNode {
 						cg.leaveCommand();
 						return false;
 					}
+					if(expr instanceof UnresolvedReferenceExpression) {
+						expr = ((UnresolvedReferenceExpression)expr).getResolvedExpr();
+					}
+
 					// Проверяем тип выражения
 					try {
 						VarType exprType = expr.getType(scope);

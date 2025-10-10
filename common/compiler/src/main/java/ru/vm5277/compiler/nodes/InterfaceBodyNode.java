@@ -48,11 +48,24 @@ public class InterfaceBodyNode extends AstNode {
 				children.add(iNode);
 				continue;
 			}
-
+			// Обработка enum с модификаторами
+			if (tb.match(TokenType.OOP) && Keyword.ENUM == tb.current().getValue()) {
+				markError("Enums are not allowed in interfaces");
+    			EnumNode eNode = new EnumNode(tb, mc, modifiers);
+				eNode.disable();
+				children.add(eNode);
+				continue;
+			}
 			// Обработка вложенных классов
 			if (tb.match(TokenType.OOP, Keyword.CLASS)) {
 				ClassNode cNode = new ClassNode(tb, mc, modifiers, null, null);
 				cNode.parse();
+				// Проверяем что класс статический
+				//TODO Продумать необходимость/возможность наличия статических классов в интерфейсе
+				if(!modifiers.contains(Keyword.STATIC)) {
+					markError("Inner classes in interfaces must be static");
+					cNode.disable();
+				}
 				children.add(cNode);
 				continue;
 			}

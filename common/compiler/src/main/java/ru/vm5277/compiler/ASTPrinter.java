@@ -25,6 +25,7 @@ import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.ClassBlockNode;
 import ru.vm5277.compiler.nodes.ClassNode;
+import ru.vm5277.compiler.nodes.EnumNode;
 import ru.vm5277.compiler.nodes.FieldNode;
 import ru.vm5277.compiler.nodes.InterfaceBodyNode;
 import ru.vm5277.compiler.nodes.InterfaceNode;
@@ -47,6 +48,7 @@ import ru.vm5277.compiler.nodes.expressions.ArrayExpression;
 import ru.vm5277.compiler.nodes.expressions.ArrayInitExpression;
 import ru.vm5277.compiler.nodes.expressions.BinaryExpression;
 import ru.vm5277.compiler.nodes.expressions.CastExpression;
+import ru.vm5277.compiler.nodes.expressions.EnumExpression;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
 import ru.vm5277.compiler.nodes.expressions.InstanceOfExpression;
@@ -54,6 +56,7 @@ import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.nodes.expressions.MethodCallExpression;
 import ru.vm5277.compiler.nodes.expressions.NewArrayExpression;
 import ru.vm5277.compiler.nodes.expressions.NewExpression;
+import ru.vm5277.compiler.nodes.expressions.PropertyExpression;
 import ru.vm5277.compiler.nodes.expressions.TernaryExpression;
 import ru.vm5277.compiler.nodes.expressions.ThisExpression;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
@@ -130,10 +133,34 @@ public class ASTPrinter {
 				else if(node instanceof BlockNode) {
 					printBody((BlockNode)node); out.print();
 				}
+				else if(node instanceof EnumNode) {
+					EnumNode en = (EnumNode)node;
+					printModifiers(en.getModifiers());
+					out.put("enum ");
+					out.put(en.getName());
+					out.put(" {");
+					if(!en.getValues().isEmpty()) {
+						out.print();
+						out.extend();
+						for(int i=0; i<en.getValues().size(); i++) {
+							
+							out.put(en.getValues().get(i).toUpperCase());
+							if(i!=en.getValues().size()-1) {
+								out.put(",");
+							}
+							else {
+								out.put(";");
+							}
+							out.print();
+						}
+						out.reduce();
+						out.put("}");
+					}
+					out.print();
+				}
 				else {
 					out.put("!unknown node:" + node); out.print();
 				}
-
 			}
 			out.reduce();
 			out.put("}");
@@ -199,7 +226,15 @@ public class ASTPrinter {
 	void printParameters(List<ParameterNode> parameters) {
 		if(null != parameters && !parameters.isEmpty()) {
 			for(ParameterNode parameter : parameters) {
-				out.put(parameter.getType() + " ");
+				if(parameter.getType().isArray()) {
+					out.put(parameter.getType().getElementType() + "[] ");
+				}
+				else if(parameter.getType().isEnum()) {
+					out.put(parameter.getType().getEnumName() + " ");
+				}
+				else {
+					out.put(parameter.getType() + " ");
+				}
 				out.put(parameter.getName() + ", ");
 			}
 			out.removeLast(2);
@@ -412,6 +447,9 @@ public class ASTPrinter {
 			if(node.getType().isArray()) {
 				out.put(node.getType().getElementType() + "[] ");
 			}
+			else if(node.getType().isEnum()) {
+				out.put(node.getType().getEnumName() + " ");
+			}
 			else {
 				out.put(node.getType() + " ");
 			}
@@ -435,6 +473,9 @@ public class ASTPrinter {
 				}
 				out.put(vt.getName());
 				out.put(tmp + " ");
+			}
+			else if(node.getType().isEnum()) {
+				out.put(node.getType().getEnumName() + " ");
 			}
 			else {
 				out.put(node.getType() + " ");
@@ -581,6 +622,34 @@ public class ASTPrinter {
 		}
 		else if(expr instanceof ThisExpression) {
 			out.put("this");
+		}
+		else if(expr instanceof EnumExpression) {
+			EnumExpression ee = (EnumExpression)expr;
+			out.put(ee.getName());
+		}
+		else if(expr instanceof PropertyExpression) {
+			PropertyExpression pe = (PropertyExpression)expr;
+			if(pe.getNameExpr() instanceof LiteralExpression) {
+				out.put(((LiteralExpression)pe.getNameExpr()).getStringValue());
+			}
+			else {
+				printExpr(pe.getNameExpr());
+			}
+			out.put(".");
+			out.put(pe.getProperty().toString().toLowerCase());
+			if(pe.getArguments().isEmpty()) {
+				try {
+					if(pe.getNameExpr().getType(null).isEnum()) {
+						out.put("()");
+					}
+				}
+				catch(Exception ex) {}
+			}
+			else {
+				out.put("(");
+				printArguments(pe.getArguments());
+				out.put(")");
+			}
 		}
 		else {
 			out.put("!unknown expr:" + expr); out.print();

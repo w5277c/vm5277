@@ -33,13 +33,13 @@ import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 
 public class InstanceOfExpression extends ExpressionNode {
-	private	final	ExpressionNode	leftExpr;	// Проверяемое выражение
-	private	final	ExpressionNode	rightExpr;	// Выражение, возвращающее тип
-	private			VarType			leftType;
-	private			VarType			rightType;
-	private			String			varName;
-	private			Scope			scope;
-	private			boolean			fulfillsContract;	//Флаг реализации интерфейса
+	private	ExpressionNode	leftExpr;	// Проверяемое выражение
+	private	ExpressionNode	rightExpr;	// Выражение, возвращающее тип
+	private	VarType			leftType;
+	private	VarType			rightType;
+	private	String			varName;
+	private	Scope			scope;
+	private	boolean			fulfillsContract;	//Флаг реализации интерфейса
 	
 	public InstanceOfExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode leftExpr, ExpressionNode rightExpr, String varName) {
 		super(tb, mc);
@@ -128,7 +128,14 @@ public class InstanceOfExpression extends ExpressionNode {
 
 		try {
 			result&=leftExpr.postAnalyze(scope, cg);
+			if(leftExpr instanceof UnresolvedReferenceExpression) {
+				leftExpr = ((UnresolvedReferenceExpression)leftExpr).getResolvedExpr();
+			}
+
 			result&=rightExpr.postAnalyze(scope, cg);
+			if(rightExpr instanceof UnresolvedReferenceExpression) {
+				rightExpr = ((UnresolvedReferenceExpression)rightExpr).getResolvedExpr();
+			}
 
 			if(VarType.UNKNOWN == rightType) {
 				markError("Unknown right-hand side of 'is': " + rightExpr);

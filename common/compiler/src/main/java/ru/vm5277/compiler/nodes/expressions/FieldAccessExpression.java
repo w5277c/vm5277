@@ -97,6 +97,10 @@ public class FieldAccessExpression extends ExpressionNode {
 				else if(null != VarType.fromClassName(ure.getId())) {
 					target = new TypeReferenceExpression(tb, mc, ure.getId());
 				}
+				else if(null!=VarType.fromEnumName(ure.getId())) {
+					VarType enumVarType = VarType.fromEnumName(ure.getId());
+					target = new LiteralExpression(tb, mc, 1);
+				}
 				else {
 					target =  new VarFieldExpression(tb, mc, ure.getId());
 				}
@@ -164,6 +168,9 @@ public class FieldAccessExpression extends ExpressionNode {
 		}
 
 		result&=target.postAnalyze(scope, cg);
+		if(target instanceof UnresolvedReferenceExpression) {
+			target = ((UnresolvedReferenceExpression)target).getResolvedExpr();
+		}
 
 		cg.leaveExpression();
 		return result;

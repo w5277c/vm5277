@@ -118,7 +118,11 @@ public class NewArrayExpression extends ExpressionNode {
 				constDimensions = new int[]{0, 0, 0};
 				for(int i=0; i<depth; i++) {
 					ExpressionNode expr = arrDimensions.get(i);
-					result &= expr.postAnalyze(scope, cg);
+					result&=expr.postAnalyze(scope, cg);
+					if(expr instanceof UnresolvedReferenceExpression) {
+						expr = ((UnresolvedReferenceExpression)expr).getResolvedExpr();
+						arrDimensions.set(i, expr);
+					}
 
 					if(result) {
 						// Пытаемся оптимизировать final Var/Field 

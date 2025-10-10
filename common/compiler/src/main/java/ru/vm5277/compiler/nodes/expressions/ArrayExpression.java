@@ -130,6 +130,11 @@ public class ArrayExpression extends ExpressionNode {
 					ExpressionNode expr = indexExprs[i];
 					result &= expr.postAnalyze(scope, cg);
 					if(result) {
+						if(expr instanceof UnresolvedReferenceExpression) {
+							expr = ((UnresolvedReferenceExpression)expr).getResolvedExpr();
+							indexExprs[i] = expr;
+						}
+
 						// Проверяем тип индекса
 						VarType indexType = expr.getType(scope);
 						if (!indexType.isInteger()) {

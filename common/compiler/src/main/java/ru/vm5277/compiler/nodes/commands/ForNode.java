@@ -38,11 +38,12 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
+import ru.vm5277.compiler.nodes.expressions.UnresolvedReferenceExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class ForNode extends CommandNode {
-    private	AstNode			initialization;
+    private	AstNode			init;
     private	ExpressionNode	condition;
     private	ExpressionNode	iteration;
     private	BlockNode		blockNode;
@@ -74,10 +75,10 @@ public class ForNode extends CommandNode {
 				if(null != type) {
 					String name = null;
 					try {name = consumeToken(tb, TokenType.ID).getStringValue();} catch(CompileException e) {markFirstError(e);}
-					this.initialization = new VarNode(tb, mc, new HashSet<>(), type, name);
+					this.init = new VarNode(tb, mc, new HashSet<>(), type, name);
 				}
 				else {
-					this.initialization = new ExpressionNode(tb, mc).parse();
+					this.init = new ExpressionNode(tb, mc).parse();
 					try {consumeToken(tb, Delimiter.SEMICOLON);} catch(CompileException e) {markFirstError(e);}
 				}
 			}
@@ -86,7 +87,7 @@ public class ForNode extends CommandNode {
 			}
 		}
 		else {
-			this.initialization = null;
+			this.init = null;
 			try {consumeToken(tb, Delimiter.SEMICOLON);} catch(CompileException e) {markFirstError(e);}
 		}
         
@@ -117,7 +118,7 @@ public class ForNode extends CommandNode {
     
     // Геттеры
     public AstNode getInitialization() {
-        return initialization;
+        return init;
     }
     
     public ExpressionNode getCondition() {
@@ -139,7 +140,7 @@ public class ForNode extends CommandNode {
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder("for (");
-        sb.append(initialization != null ? initialization : ";");
+        sb.append(init != null ? init : ";");
         sb.append(condition != null ? condition : ";");
         sb.append(iteration != null ? iteration : "");
         sb.append(") ");
@@ -162,8 +163,8 @@ public class ForNode extends CommandNode {
 		boolean result = true;
 
 		// Проверка блока инициализации
-		if (null != initialization) {
-			result&=initialization.preAnalyze();
+		if (null != init) {
+			result&=init.preAnalyze();
 		}
 
 		// Проверка условия цикла
@@ -199,8 +200,8 @@ public class ForNode extends CommandNode {
 		forScope = new BlockScope(scope);
 
 		// Объявление блока инициализации
-		if(null != initialization) {
-			result&=initialization.declare(forScope);
+		if(null != init) {
+			result&=init.declare(forScope);
 		}
 
 		// Объявление условия
@@ -234,8 +235,11 @@ public class ForNode extends CommandNode {
 		cgScope = cg.enterLoopBlock();
 		
 		// Анализ блока инициализации
-		if(null!=initialization) {
-			result&=initialization.postAnalyze(forScope, cg);
+		if(null!=init) {
+			result&=init.postAnalyze(forScope, cg);
+		}
+		if(init instanceof UnresolvedReferenceExpression) {
+			init = ((UnresolvedReferenceExpression)init).getResolvedExpr();
 		}
 
 		// Проверка типа условия
@@ -243,6 +247,9 @@ public class ForNode extends CommandNode {
 			brScope = cg.enterBranch();
 
 			result&=condition.postAnalyze(forScope, cg);
+			if(condition instanceof UnresolvedReferenceExpression) {
+				condition = ((UnresolvedReferenceExpression)condition).getResolvedExpr();
+			}
 
 			if(result) {
 				try {
@@ -285,7 +292,12 @@ public class ForNode extends CommandNode {
 		}
 
 		// Анализ блока итерации
-		if (null != iteration) iteration.postAnalyze(forScope, cg);
+		if (null != iteration) {
+			result&=iteration.postAnalyze(forScope, cg);
+			if(iteration instanceof UnresolvedReferenceExpression) {
+				iteration = ((UnresolvedReferenceExpression)iteration).getResolvedExpr();
+			}
+		}
 
 
 		// Анализ тела цикла
@@ -324,9 +336,9 @@ public class ForNode extends CommandNode {
 		
 		CGScope cgs = null == parent ? cgScope : parent;
 		
-		if(null!=initialization) {
+		if(null!=init) {
 			//TODO VarScope не учитывает CGScope родиеля(этот) при регистрации переменной
-			initialization.codeGen(cg, null == brScope ? cgs : brScope, false);
+			init.codeGen(cg, null == brScope ? cgs : brScope, false);
 		}
 		
 		CGLabelScope loopLbScope = new CGLabelScope(null, null, LabelNames.LOOP, true);

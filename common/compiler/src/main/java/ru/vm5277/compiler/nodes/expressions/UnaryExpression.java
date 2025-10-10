@@ -83,6 +83,9 @@ public class UnaryExpression extends ExpressionNode {
 		
 		try {
 			result&=operand.postAnalyze(scope, cg);
+			if(operand instanceof UnresolvedReferenceExpression) {
+				operand = ((UnresolvedReferenceExpression)operand).getResolvedExpr();
+			}
 
 			ExpressionNode newOperand = operand.optimizeWithScope(scope, cg);
 			if(null != newOperand) {

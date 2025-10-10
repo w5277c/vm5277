@@ -15,7 +15,9 @@
  */
 package ru.vm5277.common.compiler;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import ru.vm5277.common.exceptions.CompileException;
 
@@ -26,33 +28,35 @@ public class VarType {
 	static {
 		CLASS_TYPES.put("Object", new VarType("class:Object", "Object"));
 	}
-	// Примитивные типы	 Object имеет id 0
-	public	static	final	VarType	VOID		= new VarType(1, "void");
-	public	static	final	VarType	BOOL		= new VarType(2, "bool");
-	public	static	final	VarType	BYTE		= new VarType(3, "byte");
-	public	static	final	VarType	SHORT		= new VarType(4, "short");
-	public	static	final	VarType	INT			= new VarType(5, "int");
-	public	static	final	VarType	FIXED		= new VarType(6, "fixed") {
+	private	static	final	Map<String, VarType>	ENUM_TYPES = new HashMap<>();
+	
+	public	static	final	VarType			VOID		= new VarType(1, "void");
+	public	static	final	VarType			BOOL		= new VarType(2, "bool");
+	public	static	final	VarType			BYTE		= new VarType(3, "byte");
+	public	static	final	VarType			SHORT		= new VarType(4, "short");
+	public	static	final	VarType			INT			= new VarType(5, "int");
+	public	static	final	VarType			FIXED		= new VarType(6, "fixed") {
 		@Override
 		public boolean isFixedPoint() { return true; }
 	};
-	public	static	final	VarType	CSTR		= new VarType(7, "cstr");
+	public	static	final	VarType			CSTR		= new VarType(7, "cstr");
+	public	static	final	VarType			NULL		= new VarType(8, "null");
+	public	static	final	VarType			CLASS		= new VarType(-1, "class");
+	public	static	final	VarType			ENUM		= new VarType(3, "enum");
+	public	static	final	VarType			UNKNOWN		= new VarType(-1, "?");
+		
+	private	static			int				idCntr		= 10;
+	private					int				id;
+	private			final	String			name;
+	private					String			className; // Для классовых типов
+	private					boolean			isArray;
+    private					VarType			elementType; // Для массивов: тип элементов
+	private					int				arraySize;
+
+	private					boolean			isEnum;
+	private					List<String>	enumValues;
+	private					String			enumName;
 	
-	// Ссылочные типы
-	public	static	final	VarType	CLASS		= new VarType(-1, "class");
-
-	// Специальные типы
-	public	static	final	VarType	NULL		= new VarType(8, "null");
-	public	static	final	VarType	UNKNOWN		= new VarType(-1, "?");
-
-	private	static			int		idCntr		= 10;
-	private					int		id;
-	private			final	String	name;
-	private			final	String	className; // Для классовых типов
-	private					boolean	isArray;
-    private					VarType	elementType; // Для массивов: тип элементов
-	private					int		arraySize;
-
 	// Конструктор для ссылочных типов
 	private VarType(int id, String name) {
 		this.id = id;
@@ -66,6 +70,14 @@ public class VarType {
 		this.name = name;
 		this.className = className;
 	}
+
+	private VarType(String enumName, List<String> values) {
+		this.id = BYTE.id;
+		this.name = "enum:" + enumName;
+		this.isEnum = true;
+		this.enumValues = values;
+		this.enumName = enumName;
+	}	
 
 	// Конструктор для массивов
     public static VarType arrayOf(VarType elementType) {
@@ -106,6 +118,32 @@ public class VarType {
 		return CLASS_TYPES.get(className);
 	}
 	
+	// Создаем тип для enum
+	public static VarType addEnumName(String enumName, List<String> values) {
+		if(!ENUM_TYPES.containsKey(enumName)) {
+			VarType type = new VarType(enumName, values);
+			ENUM_TYPES.put(enumName, type);
+			return type;
+		}
+		return null;
+	}
+	
+	public static VarType fromEnumName(String enumName) {
+		return ENUM_TYPES.get(enumName);
+	}
+
+	public List<String> getEnumValues() {
+		return enumValues;
+	}
+
+	public String getEnumName() {
+		return enumName;
+	}
+
+	public int getEnumValueIndex(String valueName) {
+		return null!=enumValues ? enumValues.indexOf(valueName) : -1;
+	}
+
 	public int getId() {
 		return id;
 	}
@@ -150,6 +188,10 @@ public class VarType {
 		return this == VOID;
 	}
 	
+	public boolean isEnum() {
+		return isEnum;
+	}
+	
 	public boolean isReferenceType() {
 		return this == VarType.CLASS || this.isArray() || this == VarType.CSTR;
 	}
@@ -171,12 +213,13 @@ public class VarType {
 	}
 	
 	public int getSize() {
-		if (this == VOID) return 0;
-		if (this == BOOL) return 1;
-		if (this == BYTE) return 1;
-		if (this == SHORT) return 2;
-		if (this == FIXED) return 2;
-		if (this == INT) return 4;
+		if(this == VOID) return 0;
+		if(this == BOOL) return 1;
+		if(this == BYTE) return 1;
+		if(this.isEnum) return 1;
+		if(this == SHORT) return 2;
+		if(this == FIXED) return 2;
+		if(this == INT) return 4;
 		return -1; //TODO -1 - даем знать кодогенератору, что это ссылка, он сам должен определить используемый размер
 //		throw new CompileException("getSize() unsupported for VarType: " + toString());
 	}

@@ -53,6 +53,7 @@ public class Keyword {
 	public	static	final	Keyword					INTERFACE	= new Keyword("interface", TokenType.OOP);
 	public	static	final	Keyword					IMPLEMENTS	= new Keyword("implements", TokenType.OOP);
 	public	static	final	Keyword					THIS		= new Keyword("this", TokenType.OOP);
+	public	static	final	Keyword					ENUM		= new Keyword("enum", TokenType.OOP);
 	//Исключения
 	public	static	final	Keyword					TRY			= new Keyword("try", TokenType.COMMAND);
 	public	static	final	Keyword					CATCH		= new Keyword("catch", TokenType.KEYWORD);

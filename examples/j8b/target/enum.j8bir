@@ -1,0 +1,35 @@
+class Main {
+    public enum EDirection {
+        LEFT,
+        RIGHT,
+        DOWN,
+        UP;
+    }
+    public enum EStatus {
+        OK,
+        ERROR;
+    }
+    public static void main() {
+        System.setParam(2, 18);
+        System.out(EStatus.ERROR.index());
+        System.out(EStatus.size);
+        EDirection dir = EDirection.item(1);
+        if (EDirection.UP==dir) {
+            System.out(1);
+        }
+        else {
+            System.out(0);
+        }
+        this.printDirection(EDirection.UP);
+        EStatus st = EStatus.OK;
+        System.out(st.index());
+        EStatus s = EStatus.item(EStatus.ERROR.index());
+        System.out(s.index());
+        System.out(EStatus.item(1).index());
+    }
+    public void printDirection(EDirection dir) {
+        System.out(dir.index());
+    }
+    public Main() {
+    }
+}

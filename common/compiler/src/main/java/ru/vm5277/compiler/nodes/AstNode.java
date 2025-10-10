@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.nodes;
 
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import ru.vm5277.common.ArrayProperties;
+import ru.vm5277.common.Property;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.SourcePosition;
@@ -47,8 +48,10 @@ import ru.vm5277.compiler.TokenType;
 import ru.vm5277.compiler.nodes.commands.CommandNode.AstCase;
 import ru.vm5277.compiler.nodes.commands.ThrowNode;
 import ru.vm5277.compiler.nodes.commands.TryNode;
-import ru.vm5277.compiler.nodes.expressions.ArrayPropertyExpression;
+import ru.vm5277.compiler.nodes.expressions.PropertyExpression;
+import ru.vm5277.compiler.nodes.expressions.EnumExpression;
 import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
+import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.nodes.expressions.ThisExpression;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
 import ru.vm5277.compiler.nodes.expressions.UnresolvedReferenceExpression;
@@ -164,6 +167,17 @@ public abstract class AstNode extends SemanticAnalyzer {
 		}
 		return null;
 	}
+	protected VarType checkEnumType() throws CompileException {
+		if (tb.match(TokenType.ID)) {
+			VarType type = VarType.fromEnumName((String)tb.current().getValue());
+			if(null != type) {
+				consumeToken(tb);
+				return type;
+			}
+		}
+		return null;
+	}
+
 	//TODO Не корректно, необходимо возвращать Expression.
 	protected VarType checkArrayType(VarType type) throws CompileException {
 		// Обработка полей-массивов
@@ -224,6 +238,9 @@ public abstract class AstNode extends SemanticAnalyzer {
 				if(Keyword.THIS.getName().equals(id)) {
 					return new ThisExpression(tb, mc);
 				}
+				if(null != VarType.fromEnumName(id)) {
+					return new EnumExpression(tb, mc, id);
+				}
 				//Это имя переменной или поля
 				return new VarFieldExpression(tb, mc, id);
 			}
@@ -236,6 +253,21 @@ public abstract class AstNode extends SemanticAnalyzer {
 		else if(null != VarType.fromClassName(id)) {
 			parent = new TypeReferenceExpression(tb, mc, id);
 		}
+		else if(null != VarType.fromEnumName(id)) {
+			consumeToken(tb, Delimiter.DOT);
+			String str = tb.consume().getValue().toString();
+			if (tb.match(Delimiter.LEFT_PAREN)) {
+				List<ExpressionNode> args = parseArguments(tb);
+				Property prop = null;
+				try {prop = Property.valueOf(str.toUpperCase());} catch(Exception ex){}
+				parent = new PropertyExpression(tb, mc, new LiteralExpression(tb, mc, id), prop, args);
+			}
+			else {
+				tb.back();
+				tb.back();
+				parent = new EnumExpression(tb, mc, id);				
+			}
+		}
 		else {
 			parent = new UnresolvedReferenceExpression(tb, mc, id);
 		}
@@ -244,16 +276,34 @@ public abstract class AstNode extends SemanticAnalyzer {
 		while (tb.match(Delimiter.DOT)) {
 			consumeToken(tb);
 			String methodName = (String)AstNode.this.consumeToken(tb, TokenType.ID).getValue();
-			ArrayProperties arrProp = null;
-			try {arrProp = ArrayProperties.valueOf(methodName.toUpperCase());} catch(Exception ex){}
+			Property prop = null;
+			try {prop = Property.valueOf(methodName.toUpperCase());} catch(Exception ex){}
 			
-			if (null!=arrProp && !tb.match(Delimiter.LEFT_PAREN)) {
-				parent = new ArrayPropertyExpression(tb, mc, parent, arrProp);
+			if (null!=prop && !tb.match(Delimiter.LEFT_PAREN)) {
+				parent = new PropertyExpression(tb, mc, parent, prop);
 				break;
 			}
 			else if (tb.match(Delimiter.LEFT_PAREN)) {
-				// Это вызов метода с полным именем класса
-				parent = new MethodCallExpression(tb, mc, parent, methodName, parseArguments(tb));
+				if(parent instanceof EnumExpression) {
+					// Это свойства enum
+					try {prop = Property.valueOf(methodName.toUpperCase());} catch(Exception ex){}
+					parent = new PropertyExpression(tb, mc, parent, prop);
+				}
+				else {
+					// Неизвестно, это вызов метода или свойство массива/enum
+					if(parent instanceof UnresolvedReferenceExpression) {
+						((UnresolvedReferenceExpression)parent).set(methodName, parseArguments(tb));
+						return parent;
+					}
+					// После PropertyExpression может быть только PropertyExpression
+					if(parent instanceof PropertyExpression) {
+						prop = null;
+						try {prop = Property.valueOf(methodName.toUpperCase());} catch(Exception ex){}
+						return new PropertyExpression(tb, mc, parent, prop);
+					}
+					// Это вызов метода с полным именем класса
+					parent = new MethodCallExpression(tb, mc, parent, methodName, parseArguments(tb));
+				}
 			}
 			else {
 				parent = new FieldAccessExpression(tb, mc, parent, methodName);

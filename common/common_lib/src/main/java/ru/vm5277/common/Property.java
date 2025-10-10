@@ -15,6 +15,9 @@
  */
 package ru.vm5277.common;
 
-public enum ArrayProperties {
-	LENGTH;
+public enum Property {
+	LENGTH,	//Получить размер массива
+	INDEX,	//Получить индекс enum
+	ITEM,	//Получить элемент enum
+	SIZE;	//Получить размер элементов enum
 }

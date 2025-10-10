@@ -186,7 +186,7 @@ public class Main {
 			System.exit(0);
 		}
 
-		MessageContainer mc = new MessageContainer(8, true, false);
+		MessageContainer mc = new MessageContainer(30, true, false); //TODO добавить параметр f? для изменения максимального количества выводимых ошибок
 		
 		Path runtimePath = toolkitPath.resolve("runtime").normalize();
 		Path sourcePath = FSUtils.resolve(toolkitPath, source);
