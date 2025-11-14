@@ -17,7 +17,8 @@
 package ru.vm5277.common.compiler;
 
 public class Optimization {
-	public	static	final	int	NONE	= 0x00;
-	public	static	final	int	SIZE	= 0x01;
-	public	static	final	int	SPEED	= 0x02;
+	public	static	final	int	NONE		= 0x00;
+	public	static	final	int	FRONT	= 0x01;
+	public	static	final	int	SIZE		= 0x02;
+	public	static	final	int	SPEED	= 0x03;
 }

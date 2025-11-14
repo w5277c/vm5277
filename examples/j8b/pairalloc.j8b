@@ -26,17 +26,14 @@ class Main {
 		System.setParam(RTOSParam.STDOUT_PORT, 0x12);
 
 		bool b1 = false;
-		short s1 = 0x00;
 		int i1 = 0x00;
 		byte t1 = 0x00;
 
 		b1 = true;
-		s1 = 0x0203;
 		i1 = 0x04050607;
 		t1 = 0x08;
 
 		System.out(b1);
-		System.out(s1);
 		System.out(i1);
 		System.out(t1);
 	}

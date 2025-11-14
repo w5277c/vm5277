@@ -21,6 +21,10 @@ class Main {
     public static void main() {
 		System.setParam(RTOSParam.STDOUT_PORT, 0x12);
 
+/*		byte[] arr = new byte[4];
+		arr[1] = 8;
+		System.out(arr[1]);
+*/
 		int[] bArray1 = new int[2];
 		int[] bArray2 = new int[4];
 		System.out(bArray1[(short)bArray2[3]]);

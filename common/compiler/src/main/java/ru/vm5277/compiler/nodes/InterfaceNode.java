@@ -26,33 +26,53 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
-import ru.vm5277.compiler.semantic.ClassScope;
+import ru.vm5277.compiler.Delimiter;
+import ru.vm5277.compiler.TokenType;
+import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
 
-public class InterfaceNode extends ClassNode {
+public class InterfaceNode extends ObjectTypeNode {
 	private			InterfaceBodyNode	blockIfaceNode;
 	private			InterfaceScope		interfaceScope;
 	
-	public InterfaceNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, String parentClassName, List<ClassNode> importedClasses)
+	public InterfaceNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, String parentClassName, List<ObjectTypeNode> importedClasses)
 																																	throws CompileException {
 		super(tb, mc, modifiers, parentClassName, importedClasses);
-	}
 
-	@Override
-	public void parse() throws CompileException {
+		// Проверка на запрещенное наследование классов
+		if(tb.match(TokenType.OOP, Keyword.IMPLEMENTS)) {
+			markError("Interfaces cannot implement other interfaces. Use 'extends' for interface inheritance.");
+			tb.skip(Delimiter.RIGHT_BRACE);
+			return;
+		}
+
+		// Парсинг интерфейсов (если есть)
+		if(tb.match(TokenType.OOP, Keyword.EXTENDS)) {
+			consumeToken(tb);
+			while(true) {
+				try {
+					impl.add((String)consumeToken(tb, TokenType.ID).getValue());
+				}
+				catch(CompileException e) {
+					markFirstError(e); // встретили что-то кроме ID интерфейса
+				}
+				if(!tb.match(Delimiter.COMMA)) break;
+				consumeToken(tb);
+			}
+		}
+
 		// Парсинг тела интерфейса
 		blockIfaceNode = new InterfaceBodyNode(tb, mc, name, this);
-		int t=454;
 	}
 	
-	public InterfaceBodyNode getIfaceBody() {
+	@Override
+	public InterfaceBodyNode getBody() {
 		return blockIfaceNode;
 	}
 	
-	@Override
-	public String getNodeType() {
-		return "interface";
+	public InterfaceScope getScope() {
+		return interfaceScope;
 	}
 	
 	@Override
@@ -79,12 +99,7 @@ public class InterfaceNode extends ClassNode {
 				implTypes.add(VarType.fromClassName(ifaceName));
 			}
 			interfaceScope = new InterfaceScope(name, scope, implTypes);
-			if (scope instanceof ClassScope) {
-				((ClassScope)scope).addInterface(interfaceScope);
-			}
-			else if (scope instanceof InterfaceScope) {
-				((InterfaceScope)scope).addInterface(interfaceScope);
-			}
+			((CIScope)scope).addCI(interfaceScope, true);
 
 			blockIfaceNode.declare(interfaceScope);
 		} 
@@ -141,7 +156,7 @@ public class InterfaceNode extends ClassNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 		

@@ -19,6 +19,11 @@ package ru.vm5277.compiler.nodes.expressions;
 import java.util.Arrays;
 import java.util.List;
 import ru.vm5277.common.Property;
+import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
@@ -26,79 +31,32 @@ import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
+import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.AstHolder;
+import ru.vm5277.compiler.semantic.EnumScope;
 import ru.vm5277.compiler.semantic.InitNodeHolder;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class PropertyExpression extends ExpressionNode {
-	private			ExpressionNode			nameExpr;
+	private			ExpressionNode			targetExpr;
 	private			Property				property;
 	private			NewArrayExpression		nae;
 	private			List<ExpressionNode>	args;
-	private			VarType					exprType;
-	private			VarType					type;
+	private			EnumScope				enumScope;
 	
-	public PropertyExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode nameExpr, Property property) throws CompileException {
-		super(tb, mc);
+	public PropertyExpression(TokenBuffer tb, MessageContainer mc, SourcePosition sp, ExpressionNode targetExpr, Property property, List<ExpressionNode> args) {
+		super(tb, mc, sp);
 		
-		this.nameExpr = nameExpr;
+		this.targetExpr = targetExpr;
 		this.property = property;
 		
-		if(Property.ITEM==property || Property.INDEX==property || Property.SIZE==property) {
-			args = parseArguments(tb);
-		}
-	}
-
-	public PropertyExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode nameExpr, Property property, List<ExpressionNode> args)
-																																	throws CompileException {
-		super(tb, mc);
-		
-		this.nameExpr = nameExpr;
-		this.property = property;
 		this.args = args;
 	}
-	
-	@Override
-	public VarType getType(Scope scope) throws CompileException {
-		if(null!=type) return type;
-		
-		if(nameExpr instanceof LiteralExpression) {
-			if(Property.SIZE==property || Property.INDEX==property) {
-				return VarType.BYTE;
-			}
-			else if(Property.ITEM==property) {
-				String enumName = ((LiteralExpression)nameExpr).getStringValue();
-				return VarType.fromEnumName(enumName);
-			}
-			else {
-				throw new CompileException("Unsupported enum property: " + property);
-			}
-		}
-		else {
-			VarType varType = nameExpr.getType(scope);
-			if(varType.isArray()) {
-				if(Property.LENGTH == property) {
-					return VarType.SHORT;
-				}
-				throw new CompileException("Unsupported array property: " + property);
-			}
-			else if(varType.isEnum()) {
-				if(Property.INDEX == property || Property.SIZE == property) {
-					return VarType.BYTE;
-				}
-				else if(Property.ITEM == property) {
-					return varType;
-				}
-				throw new CompileException("Unsupported enum property: " + property);
-			}
-			throw new CompileException("Unknown property: " + property + " for expr: " + nameExpr);
-		}
-	}
-	
-	public ExpressionNode getNameExpr() {
-		return nameExpr;
+
+	public ExpressionNode getTargetExpr() {
+		return targetExpr;
 	}
 	
 	public Property getProperty() {
@@ -112,112 +70,256 @@ public class PropertyExpression extends ExpressionNode {
 	@Override
 	public boolean preAnalyze() {
 		boolean result = true;
-		result &= nameExpr.preAnalyze();
+		debugAST(this, PRE, true, getFullInfo());
+		
+		result&=targetExpr.preAnalyze();
 		
 		if(result) {
-			result &= nameExpr.preAnalyze();
+			result&=targetExpr.preAnalyze();
 			if(null!=args) {
-				if(!args.isEmpty() && (Property.INDEX==property || Property.SIZE==property)) {
+				if(!args.isEmpty() && (Property.index==property || Property.size==property)) {
 					markError("Property '" + property + "' does not accept arguments");
 					result = false;
 				}
-				if(1!=args.size() && Property.ITEM==property) {
+				if(1!=args.size() && Property.item==property) {
 					markError("Property 'item' requires index argument");
 					result = false;
 				}
 			}
 			
 			// EnumExpression - это выражение вида EStatus.OK, LiteralExpression - EStatus
-			if(nameExpr instanceof EnumExpression && Property.SIZE==property) {
-				markError("Cannot get size from enum value '" + ((EnumExpression)nameExpr).getName() + "' - use enum type instead");
+			if(targetExpr instanceof EnumExpression && Property.size==property) {
+				markError("Cannot get size from enum value '" + ((EnumExpression)targetExpr).toString() + "' - use enum type instead");
 				result = false;
 			}
-			if(nameExpr instanceof EnumExpression && Property.ITEM==property) {
-				markError("Cannot get item from enum value '" + ((EnumExpression)nameExpr).getName() + "' - use enum type instead");
+			if(targetExpr instanceof EnumExpression && Property.item==property) {
+				markError("Cannot get item from enum value '" + ((EnumExpression)targetExpr).toString() + "' - use enum type instead");
 				result = false;
 			}
-			if(nameExpr instanceof LiteralExpression && Property.INDEX==property) {
-				markError("Cannot get index from enum type '" + ((LiteralExpression)nameExpr).getStringValue() + "' - use enum value instead");
+			if(targetExpr instanceof LiteralExpression && Property.index==property) {
+				markError("Cannot get index from enum type '" + ((LiteralExpression)targetExpr).getStringValue() + "' - use enum value instead");
 				result = false;
 			}
 			
 			if(null!=args) {
 				for(int i=0; i<args.size(); i++) {
-					result &= args.get(i).preAnalyze();
+					result&=args.get(i).preAnalyze();
 				}
 			}
 		}
 		
+		debugAST(this, PRE, false, result, getFullInfo());
 		return result;
 	}
 
 	@Override
 	public boolean declare(Scope scope) {
 		boolean result = true;
+		debugAST(this, DECLARE, true, getFullInfo());
 		
-		result &= nameExpr.declare(scope);
-
+		result&=targetExpr.declare(scope);
+		
 		if(null!=args) {
 			for(int i=0; i<args.size(); i++) {
 				result&=args.get(i).declare(scope);
 			}
 		}
-
+		
+//		type = targetExpr.getType();
+		
+		debugAST(this, DECLARE, false, result, getFullInfo() + (declarationPendingNodes.containsKey(this) ? " [DP]" : ""));
 		return result;
 	}
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		boolean result = true;
+		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 		cgScope = cg.enterExpression(toString());
 
 		try {
-			type = getType(scope);
-			
-			ExpressionNode optimizedParentScope = nameExpr.optimizeWithScope(scope, cg);
-			if(null != optimizedParentScope) {
-				nameExpr = optimizedParentScope;
+			ExpressionNode optimizedParentScope = targetExpr.optimizeWithScope(scope, cg);
+			if(null!=optimizedParentScope) {
+				targetExpr = optimizedParentScope;
 			}
-			
-			result &= nameExpr.postAnalyze(scope, cg);
-			
-			if(nameExpr instanceof LiteralExpression) {
-				String enumName = ((LiteralExpression)nameExpr).getStringValue();
-				exprType = VarType.fromEnumName(enumName);
-			}
-			else {
-				exprType = nameExpr.getType(scope);
-			}
-			if(!exprType.isArray() && !exprType.isEnum()) {
-				markError("Unsupported expr: " + nameExpr);
-				result = false;
-			}
+			result&=targetExpr.postAnalyze(scope, cg);
 
-			if(exprType.isArray() && Property.LENGTH != property) {
-				markError("Unsupported array property: " + property);
-				result = false;
+			for(int i=0; i<args.size(); i++) {
+				ExpressionNode arg = args.get(i);
+				result&=arg.postAnalyze(scope, cg);
+				if(result) {
+					ExpressionNode optimizedExpr = arg.optimizeWithScope(scope, cg);
+					if(null!=optimizedExpr) {
+						args.set(i, optimizedExpr);
+						arg = optimizedExpr;
+					}
+				}
 			}
-			else if(exprType.isEnum() && Property.INDEX!=property && Property.SIZE!=property && Property.ITEM!=property) {
-				markError("Unsupported enum property: " + property);
-				result = false;
-			}
-
-			if(Property.ITEM==property && exprType.isEnum()) {
-				if(VarType.BYTE!=args.get(0).getType(scope)) {
-					markError("Enum index must be byte value, but found: " + args.get(0).getType(scope));
+			
+			if(targetExpr instanceof TypeReferenceExpression) {
+				TypeReferenceExpression tre = (TypeReferenceExpression)targetExpr;
+				enumScope = (EnumScope)((TypeReferenceExpression)targetExpr).getScope();
+				if(args.isEmpty() && Property.size==property) {
+					type = VarType.BYTE;
+				}
+				else if(0x01==args.size() && Property.item==property) {
+					type = tre.getType();
+					ExpressionNode argExpr = args.get(0);
+					if(VarType.BYTE!=argExpr.getType()) {
+						markError("Enum index must be byte value, but found: " + argExpr.getType());
+						result = false;
+					}
+					
+					if(argExpr instanceof LiteralExpression) {
+						LiteralExpression le = (LiteralExpression)argExpr;
+						long index = le.getNumValue();
+						int size = enumScope.getSize();
+						if(0>index || index>=size) {
+							markError("Enum index out of bounds: " + index + ", valid range: 0-" + (size-1));
+							result = false;
+						}
+					}
+				}
+				else {
+					if(args.isEmpty()) {
+						markError("Unsupported enum property:" + property.name() + "()");
+					}
+					else {
+						markError("Unsupported enum property:" + property.name() + "(" + StrUtils.toString(args) + ")");
+					}
 					result = false;
 				}
 			}
-
-			
-			if(nameExpr.getSymbol() instanceof AstHolder) {
-				AstHolder ah = (AstHolder)nameExpr.getSymbol();
-				if(ah.getNode() instanceof InitNodeHolder) {
-					InitNodeHolder inh = (InitNodeHolder)ah.getNode();
-					if(inh.getInitNode() instanceof NewArrayExpression) {
-						nae = (NewArrayExpression)inh.getInitNode();
+			else if(targetExpr instanceof EnumExpression) {
+				EnumExpression ee = (EnumExpression)targetExpr;
+				enumScope = (EnumScope)ee.getTargetScope();
+				if(args.isEmpty() && Property.index==property) {
+					type = VarType.BYTE;
+				}
+				else {
+					if(args.isEmpty()) {
+						markError("Unsupported enum property:" + property.name() + "()");
+					}
+					else {
+						markError("Unsupported enum property:" + property.name() + "(" + StrUtils.toString(args) + ")");
+					}
+					result = false;
+				}
+			}
+			else if(targetExpr instanceof ArrayExpression) {
+				type = targetExpr.getType();
+				if(args.isEmpty() && Property.length==property) {
+					if(targetExpr.getSymbol() instanceof AstHolder) {
+						AstHolder ah = (AstHolder)targetExpr.getSymbol();
+						if(ah.getNode() instanceof InitNodeHolder) {
+							InitNodeHolder inh = (InitNodeHolder)ah.getNode();
+							if(inh.getInitNode() instanceof NewArrayExpression) {
+								nae = (NewArrayExpression)inh.getInitNode();
+							}
+						}
+					}
+					
+					if(null==nae && Property.length == property) {
+						markError("Cannot determine array length: array initialization not found");
+						result = false;
 					}
 				}
+				else {
+					if(args.isEmpty()) {
+						markError("Unsupported array property:" + property.name() + "()");
+					}
+					else {
+						markError("Unsupported array property:" + property.name() + "(" + StrUtils.toString(args) + ")");
+					}
+					result = false;
+				}
+			}
+			else if(targetExpr instanceof VarFieldExpression) {
+				if(targetExpr.getType().isEnum()) {
+					if(args.isEmpty() && Property.index==property) {
+						type = VarType.BYTE;
+					}
+					else {
+						if(args.isEmpty()) {
+							markError("Unsupported enum property:" + property.name() + "()");
+						}
+						else {
+							markError("Unsupported enum property:" + property.name() + "(" + StrUtils.toString(args) + ")");
+						}
+						result = false;
+					}
+				}
+				else if(targetExpr.getType().isClassType()) {
+					if(args.isEmpty()) {
+						if(Property.instanceId==property) {
+							type = VarType.SHORT;
+						}
+						else if(Property.typeId==property) {
+							//TODO для refsize = 1
+							type = VarType.BYTE;
+						}
+						else {
+							markError("Unsupported class property:" + property.name() + "()");
+							result = false;
+						}
+					}
+					else {
+						markError("Unsupported class property:" + property.name() + "(" + StrUtils.toString(args) + ")");
+						result = false;
+					}
+				}
+				else if(targetExpr.getType().isArray()) {
+					if(args.isEmpty()) {
+						if(Property.length==property) {
+							type = VarType.SHORT;
+
+							if(targetExpr.getSymbol() instanceof AstHolder) {
+								AstHolder ah = (AstHolder)targetExpr.getSymbol();
+								if(ah.getNode() instanceof InitNodeHolder) {
+									InitNodeHolder inh = (InitNodeHolder)ah.getNode();
+									if(inh.getInitNode() instanceof NewArrayExpression) {
+										nae = (NewArrayExpression)inh.getInitNode();
+									}
+								}
+							}
+						}
+						else {
+							markError("Unsupported array property:" + property.name() + "()");
+							result = false;
+						}
+					}
+					else {
+						markError("Unsupported array property:" + property.name() + "(" + StrUtils.toString(args) + ")");
+						result = false;
+					}
+				}
+				else {
+					markError("Unsupported init expr in var/field: " + targetExpr);
+					result = false;
+				}
+			}
+			else if(targetExpr instanceof PropertyExpression) {
+				if(targetExpr.getType().isEnum()) {
+					if(args.isEmpty() && Property.index==property) {
+						type = VarType.BYTE;
+					}
+					else {
+						if(args.isEmpty()) {
+							markError("Unsupported enum property:" + property.name() + "()");
+						}
+						else {
+							markError("Unsupported enum property:" + property.name() + "(" + StrUtils.toString(args) + ")");
+						}
+						result = false;
+					}
+				}
+				else {
+					markError("Unsupported init expr in var/field: " + targetExpr);
+				}
+			}
+			else {
+				markError("Unsupported property target expr: " + targetExpr);
+				result = false;
 			}
 		}
 		catch (CompileException e) {
@@ -225,33 +327,8 @@ public class PropertyExpression extends ExpressionNode {
             result = false;
         }
 		
-		if(null==nae && Property.LENGTH == property) {
-			markError("Cannot determine array length: array initialization not found");
-			result = false;
-		}
-		
-		if(null!=args) {
-			for(int i=0; i<args.size(); i++) {
-				result &= args.get(i).postAnalyze(scope, cg);
-			}
-			
-			if(Property.ITEM==property && args.get(0) instanceof LiteralExpression) {
-				LiteralExpression le = (LiteralExpression)args.get(0);
-				if(!le.isInteger()) {
-					markError("Enum index must be integer value");
-					result = false;
-				}
-				else {
-					long index = le.getNumValue();
-					if(0>index || index>=exprType.getEnumValues().size()) {
-						markError("Enum index out of bounds: " + index + ", valid range: 0-" + (exprType.getEnumValues().size()-1));
-						result = false;
-					}
-				}
-			}
-		}
-		
 		cg.leaveExpression();
+		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 	
@@ -262,17 +339,17 @@ public class PropertyExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		CodegenResult result = null;
 		
 		CGScope cgs = (null==parent ? cgScope : parent);
 		
-		nameExpr.codeGen(cg, null, false);
+		targetExpr.codeGen(cg, null, false);
 		
-		if(exprType.isArray()) {
+		if(null==enumScope && !targetExpr.getType().isEnum() && !targetExpr.getType().isClassType()) {
 			//TODO нужно проверить!
 			boolean isView = false;
-			AstHolder ah = (AstHolder)nameExpr.getSymbol();
+			AstHolder ah = (AstHolder)targetExpr.getSymbol();
 			if(ah.getNode() instanceof InitNodeHolder) {
 				InitNodeHolder inh = (InitNodeHolder)ah.getNode();
 				if(inh.getInitNode() instanceof ArrayExpression) {
@@ -281,36 +358,49 @@ public class PropertyExpression extends ExpressionNode {
 			}
 
 			if(toAccum) {
-				if(Property.LENGTH == property) {
+				if(Property.length == property) {
 					if(!isView && null!=nae.getConstDimensions()) {
 						cg.constToAcc(cgs, 0x02, nae.getConstDimensions()[0x00], false);
 					}
 					else {
-						CGCellsScope cScope = (CGCellsScope)nameExpr.getSymbol().getCGScope();
+						CGCellsScope cScope = (CGCellsScope)targetExpr.getSymbol().getCGScope();
 						cg.cellsToArrReg(cgs, cScope.getCells());
 						cg.arrSizetoAcc(cgs, isView);
 					}
 				}
-				return CodegenResult.RESULT_IN_ACCUM;
+				result = CodegenResult.RESULT_IN_ACCUM;
 			}
 		}
-		else if(exprType.isEnum()) {
+		else if(targetExpr.getType().isClassType() && !targetExpr.getType().isEnum()) {
+			if(Property.instanceId==property) {
+				cg.cellsToAcc(cgs, (CGCellsScope)targetExpr.getSymbol().getCGScope());
+				result = CodegenResult.RESULT_IN_ACCUM;
+			}
+			else if(Property.typeId==property) {
+				cg.constToAcc(cgs, 0x01, targetExpr.getType().getId(), false);
+				result = CodegenResult.RESULT_IN_ACCUM;
+			}
+			else {
+				throw new CompileException("Unsupported propert:'" + property + "' for '" + targetExpr + "'");
+			}
+		}
+		else {
 			if(toAccum) {
-				if(Property.SIZE == property) {
-					cg.constToAcc(cgs, 0x01, exprType.getEnumValues().size(), false);
+				if(Property.size==property) {
+					cg.constToAcc(cgs, 0x01, enumScope.getSize(), false);
 				}
-				else if(Property.INDEX == property) {
-					if(nameExpr instanceof EnumExpression) {
-						cg.constToAcc(cgs, 0x01, ((EnumExpression)nameExpr).getIndex(), false);
+				else if(Property.index == property) {
+					if(targetExpr instanceof EnumExpression) {
+						cg.constToAcc(cgs, 0x01, ((EnumExpression)targetExpr).getIndex(), false);
 					}
 					else {
-						nameExpr.codeGen(cg, cgs, true);
+						targetExpr.codeGen(cg, cgs, true);
 					}
 				}
 				else { //ITEM
 					args.get(0).codeGen(cg, cgs, true);
 				}
-				return CodegenResult.RESULT_IN_ACCUM;
+				result = CodegenResult.RESULT_IN_ACCUM;
 			}
 		}
 
@@ -319,6 +409,10 @@ public class PropertyExpression extends ExpressionNode {
 	
 	@Override
 	public String toString() {
-		return getClass().getSimpleName() + " " + nameExpr.toString() + "." + property;
+		return targetExpr + "." + property;
+	}
+	
+	public String getFullInfo() {
+		return getClass().getSimpleName() + " " + toString();
 	}
 }

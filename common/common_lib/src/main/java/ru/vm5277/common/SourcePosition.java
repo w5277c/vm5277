@@ -16,6 +16,7 @@
 package ru.vm5277.common;
 
 import java.io.File;
+import java.util.Objects;
 
 public class SourcePosition implements Cloneable {
 	private		String	macroName	= null;
@@ -65,5 +66,21 @@ public class SourcePosition implements Cloneable {
 		sb.append("\t");
 		return sb.toString();
 		
+	}
+
+	@Override
+	public int hashCode() {
+		return Objects.hash(sourceFile, line, column);
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		if(obj instanceof SourcePosition) {
+			SourcePosition sp = (SourcePosition)obj;
+			if(Objects.equals(sourceFile, sp.getSourceFile())) {
+				return line==sp.getLine() && column==sp.getColumn();
+			}
+		}
+		return false;
 	}
 }

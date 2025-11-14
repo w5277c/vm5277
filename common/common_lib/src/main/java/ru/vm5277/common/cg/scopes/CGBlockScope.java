@@ -90,12 +90,20 @@ public class CGBlockScope extends CGScope {
 			}
 		}
 		
-/*		if(0!=stackOffset || 0!=varSize) {
-			append(cg.stackFree(null, stackOffset+varSize));
-		}*/
-
-		if(0!=stackOffset) {
+		//Декрементируем счетчики ссылок
+		for(CGVarScope vScope : locals.values()) {
+			if(vScope.getType().isClassType() && !vScope.getType().isEnum()) {
+				cg.updateClassRefCount(this, vScope.getCells(), false);
+			}
+			else if(vScope.getType().isArray()) {
+				cg.updateArrRefCount(this, vScope.getCells(), false, vScope.isArrayView());
+			}
+		}
+		if(!isFirstBlock && 0!=stackOffset) {
 			append(cg.blockFree(stackOffset));
+		}
+
+		if(0!=mScope.getArgsStackSize() || 0!=stackOffset) {
 //			cg.jump(cg.getScope(), new CGLabelScope(null, -1, "j8bproc_vars_free", true));
 		}
 		
@@ -103,11 +111,16 @@ public class CGBlockScope extends CGScope {
 			cg.moveIReg(cg.getScope(), 'y', (stackOffset+mScope.getVarSize())*(-1));
 		}*/
 
-		if(isFirstBlock) {
-			append(cg.eReturn(null, mScope.getStackSize(), stackOffset, mScope.getType()));
-		}
 		
-		if(Optimization.NONE != cg.getOptLevel()) {
+		if(isFirstBlock) {
+			append(cg.finMethod(mScope.getType(), mScope.getArgStackSize(), stackOffset, mScope.getLastStackOffset()));
+		}
+		//if(isFirstBlock && 0!=stackOffset) {
+			//append(cg.eReturn(null, mScope.getStackSize(), stackOffset, mScope.getType()));
+		//	append(cg.popStackReg(null));
+		//}
+		
+		if(Optimization.FRONT<cg.getOptLevel()) {
 			CodeOptimizer co = cg.getOptimizer();
 			if(null != co) {
 				co.optimizeJumpChains(this);
@@ -127,11 +140,10 @@ public class CGBlockScope extends CGScope {
 	}
 	public CGVarScope getVar(int resId) {
 		CGVarScope vScope = locals.get(resId);
-		if(null != vScope) return vScope;
+		if(null!=vScope) return vScope;
 
-		if(null != parent) {
+		if(null!=parent) {
 			CGScope scope = parent;
-			while(scope instanceof CGBranchScope) scope = scope.getParent();
 		
 			if(scope instanceof CGMethodScope) return ((CGMethodScope)scope).getArg(resId);
 			if(scope instanceof CGBlockScope) return ((CGBlockScope)scope).getVar(resId);

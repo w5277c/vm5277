@@ -17,10 +17,10 @@
 package ru.vm5277.compiler.nodes;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import ru.vm5277.common.Property;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.SourcePosition;
@@ -28,7 +28,6 @@ import ru.vm5277.compiler.nodes.commands.IfNode;
 import ru.vm5277.compiler.nodes.commands.ReturnNode;
 import ru.vm5277.compiler.nodes.commands.WhileNode;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.compiler.nodes.expressions.MethodCallExpression;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.cg.scopes.CGScope;
@@ -48,35 +47,46 @@ import ru.vm5277.compiler.TokenType;
 import ru.vm5277.compiler.nodes.commands.CommandNode.AstCase;
 import ru.vm5277.compiler.nodes.commands.ThrowNode;
 import ru.vm5277.compiler.nodes.commands.TryNode;
-import ru.vm5277.compiler.nodes.expressions.PropertyExpression;
-import ru.vm5277.compiler.nodes.expressions.EnumExpression;
-import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
-import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
-import ru.vm5277.compiler.nodes.expressions.ThisExpression;
+import ru.vm5277.compiler.nodes.expressions.QualifiedPathExpression;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
-import ru.vm5277.compiler.nodes.expressions.UnresolvedReferenceExpression;
-import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
 import ru.vm5277.compiler.semantic.AstHolder;
+import ru.vm5277.compiler.semantic.CIScope;
+import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 import ru.vm5277.compiler.tokens.Token;
 
 public abstract class AstNode extends SemanticAnalyzer {
-	protected			TokenBuffer				tb;
-	protected			SourcePosition			sp;
-	private				ErrorMessage			error;
-	protected			MessageContainer		mc;
-	protected			Symbol					symbol;
-	protected			boolean					cgDone;
-	protected			boolean					disabled;
-	protected			CGScope					cgScope;
+    private				static	int						globalCntr	= 0;
+    protected					int						sn;
+	protected					TokenBuffer				tb;
+	protected					SourcePosition			sp;
+	private						ErrorMessage			error;
+	protected					MessageContainer		mc;
+	protected					Symbol					symbol;
+	protected					boolean					cgDone;
+	protected					Boolean					postResult;
+	protected					boolean					disabled;
+	protected					CGScope					cgScope;
+	protected			static	HashMap<AstNode, Scope>	declarationPendingNodes	= new HashMap<>();
 	
 	protected AstNode() {
+		sn = globalCntr++;
 	}
 	
 	protected AstNode(TokenBuffer tb, MessageContainer mc) {
-        this.tb = tb;
-		this.sp = null == tb ? null : tb.current().getSP();
+		sn = globalCntr++;
+		
+		this.tb = tb;
+		this.sp = (null==tb ? null : tb.current().getSP());
+		this.mc = mc;
+    }
+
+	protected AstNode(TokenBuffer tb, MessageContainer mc, SourcePosition sp) {
+		sn = globalCntr++;
+		
+		this.tb = tb;
+		this.sp = sp;
 		this.mc = mc;
     }
 
@@ -104,7 +114,13 @@ public abstract class AstNode extends SemanticAnalyzer {
 		else if (tb.match(TokenType.ID) || tb.match(TokenType.OPERATOR) || tb.match(TokenType.OOP, Keyword.THIS)) {
 			// Делегируем всю работу парсеру выражений
 			ExpressionNode expr = new ExpressionNode(tb, mc).parse();
-			consumeToken(tb, Delimiter.SEMICOLON);
+			if(!tb.match(Delimiter.SEMICOLON)) {
+				markError("Invalid expression statement - unexpected content after '" + expr + "'");
+				tb.skip(Delimiter.SEMICOLON);
+			}
+			else {
+				consumeToken(tb, Delimiter.SEMICOLON);
+			}
 			return expr;
 		}
 		else if (tb.match(Delimiter.LEFT_BRACE)) {
@@ -128,7 +144,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 			typeName.append(".").append(token.getValue().toString());
 		}
 
-		return new TypeReferenceExpression(tb, mc, typeName.toString());
+		return new TypeReferenceExpression(tb, mc, null, typeName.toString());
 	}
 
 	protected VarType checkPrimtiveType() throws CompileException {
@@ -167,16 +183,6 @@ public abstract class AstNode extends SemanticAnalyzer {
 		}
 		return null;
 	}
-	protected VarType checkEnumType() throws CompileException {
-		if (tb.match(TokenType.ID)) {
-			VarType type = VarType.fromEnumName((String)tb.current().getValue());
-			if(null != type) {
-				consumeToken(tb);
-				return type;
-			}
-		}
-		return null;
-	}
 
 	//TODO Не корректно, необходимо возвращать Expression.
 	protected VarType checkArrayType(VarType type) throws CompileException {
@@ -206,9 +212,10 @@ public abstract class AstNode extends SemanticAnalyzer {
 	}
 
 	protected List<ExpressionNode> parseArrayDimensions() throws CompileException {
-		List<ExpressionNode> result = new ArrayList<>();
+		List<ExpressionNode> result = null;
 		
 		if (tb.match(Delimiter.LEFT_BRACKET)) { //'['
+			result = new ArrayList<>();
 			while (tb.match(Delimiter.LEFT_BRACKET)) { //'['
 				consumeToken(tb); // Потребляем '['
 
@@ -227,90 +234,120 @@ public abstract class AstNode extends SemanticAnalyzer {
 		return result;
 	}
 
-	protected ExpressionNode parseFullQualifiedExpression(TokenBuffer tb) throws CompileException {
-		String id = tb.consume().getValue().toString();
-		if(!tb.match(Delimiter.DOT)) {
-			if (tb.match(Delimiter.LEFT_PAREN)) {			
-				//Вызов метода текущего класса
-				return new MethodCallExpression(tb, mc, new ThisExpression(tb, mc), id, parseArguments(tb));
+/*	protected ExpressionNode parseFullQualifiedExpression(TokenBuffer tb) throws CompileException {
+		List<Object> ids = new ArrayList<>();
+		while(true) {
+			ids.add(consumeToken(tb, TokenType.ID).getStringValue());
+			if(tb.match(Delimiter.LEFT_PAREN)) {
+				ids.add(parseArguments(tb));
 			}
-			else {
-				if(Keyword.THIS.getName().equals(id)) {
-					return new ThisExpression(tb, mc);
-				}
-				if(null != VarType.fromEnumName(id)) {
-					return new EnumExpression(tb, mc, id);
-				}
-				//Это имя переменной или поля
-				return new VarFieldExpression(tb, mc, id);
-			}
-		}
-
-		ExpressionNode parent;
-		if("this".equals(id)) {
-			parent = new ThisExpression(tb, mc);
-		}
-		else if(null != VarType.fromClassName(id)) {
-			parent = new TypeReferenceExpression(tb, mc, id);
-		}
-		else if(null != VarType.fromEnumName(id)) {
-			consumeToken(tb, Delimiter.DOT);
-			String str = tb.consume().getValue().toString();
-			if (tb.match(Delimiter.LEFT_PAREN)) {
-				List<ExpressionNode> args = parseArguments(tb);
-				Property prop = null;
-				try {prop = Property.valueOf(str.toUpperCase());} catch(Exception ex){}
-				parent = new PropertyExpression(tb, mc, new LiteralExpression(tb, mc, id), prop, args);
-			}
-			else {
-				tb.back();
-				tb.back();
-				parent = new EnumExpression(tb, mc, id);				
-			}
-		}
-		else {
-			parent = new UnresolvedReferenceExpression(tb, mc, id);
-		}
-		
-		// Обрабатываем цепочки вызовов через точку
-		while (tb.match(Delimiter.DOT)) {
-			consumeToken(tb);
-			String methodName = (String)AstNode.this.consumeToken(tb, TokenType.ID).getValue();
-			Property prop = null;
-			try {prop = Property.valueOf(methodName.toUpperCase());} catch(Exception ex){}
-			
-			if (null!=prop && !tb.match(Delimiter.LEFT_PAREN)) {
-				parent = new PropertyExpression(tb, mc, parent, prop);
+			if(!tb.match(Delimiter.DOT)) {
 				break;
 			}
-			else if (tb.match(Delimiter.LEFT_PAREN)) {
-				if(parent instanceof EnumExpression) {
-					// Это свойства enum
-					try {prop = Property.valueOf(methodName.toUpperCase());} catch(Exception ex){}
-					parent = new PropertyExpression(tb, mc, parent, prop);
+			tb.consume();
+		}
+		
+		if(0x01==ids.size() && Keyword.THIS.getName().equals(ids.get(0))) {
+			return new ThisExpression(tb, mc);
+		}
+		if(0x02==ids.size() || 0x03==ids.size() || 0x04==ids.size()) {
+			VarType enumVarType = VarType.fromEnumName((String)ids.get(0));
+			if(null!=enumVarType) {
+				if(ids.get(1) instanceof List) {
+					throw new CompileException("TODO invalid statement");
+				}
+				EnumExpression ee = new EnumExpression(tb, mc, enumVarType, (String)ids.get(1));
+				if(0x02==ids.size()) {
+					return ee;
 				}
 				else {
-					// Неизвестно, это вызов метода или свойство массива/enum
-					if(parent instanceof UnresolvedReferenceExpression) {
-						((UnresolvedReferenceExpression)parent).set(methodName, parseArguments(tb));
-						return parent;
+					if(0x04==ids.size() && !(ids.get(3) instanceof List)) {
+						throw new CompileException("TODO invalid statement");
 					}
-					// После PropertyExpression может быть только PropertyExpression
-					if(parent instanceof PropertyExpression) {
-						prop = null;
-						try {prop = Property.valueOf(methodName.toUpperCase());} catch(Exception ex){}
-						return new PropertyExpression(tb, mc, parent, prop);
-					}
-					// Это вызов метода с полным именем класса
-					parent = new MethodCallExpression(tb, mc, parent, methodName, parseArguments(tb));
+					Property prop = null;
+					try {prop = Property.valueOf(((String)ids.get(2)).toUpperCase());} catch(Exception ex){}
+					return new PropertyExpression(tb, mc, ee, prop, 0x03==ids.size() ? null : (List<ExpressionNode>)ids.get(3));
 				}
 			}
+		}
+		
+		UnresolvedReferenceExpression ure = null;
+		for(int i=0; i<ids.size(); i++) {
+			String id = (String)ids.get(i);
+			List<ExpressionNode> args = null;
+			if(i!=ids.size()-1) {
+				if(ids.get(i+1) instanceof List) {
+					args = (List<ExpressionNode>)ids.get(++i);
+				}
+			}
+			ure = new UnresolvedReferenceExpression(tb, mc, ure, id,  args);
+		}
+
+		if(tb.match(Delimiter.LEFT_BRACKET)) {
+			return new ArrayExpression(tb, mc, ure);
+		}
+		return ure;
+	}*/
+	
+/*	protected ExpressionNode parseFullQualifiedExpression(TokenBuffer tb) throws CompileException {
+		QualifiedPathExpression qpe = new QualifiedPathExpression(tb, mc, null);
+		QualifiedPathExpression result = qpe;
+		
+		qpe.add(consumeToken(tb, TokenType.ID).getStringValue());
+		
+		while(true) {
+			if (tb.match(Delimiter.LEFT_PAREN)) {
+				qpe.setTarget(new MethodCallExpression(tb, mc, qpe.getBase(), qpe.getLast()));
+				qpe = new QualifiedPathExpression(tb, mc, qpe.getTarget());
+			} 
+			else if(tb.match(Delimiter.LEFT_BRACKET)) {
+				qpe.setTarget(new ArrayExpression(tb, mc, qpe));
+				qpe = new QualifiedPathExpression(tb, mc, qpe.getTarget());
+			}
+			else if(tb.match(Delimiter.DOT)) {
+				consumeToken(tb, Delimiter.DOT);
+				qpe.add(consumeToken(tb, TokenType.ID).getStringValue());
+			}
 			else {
-				parent = new FieldAccessExpression(tb, mc, parent, methodName);
+				break;
+			}
+		}
+		
+		return result;
+	}*/
+	
+	protected QualifiedPathExpression parseFullQualifiedExpression(TokenBuffer tb) throws CompileException {
+		QualifiedPathExpression path = new QualifiedPathExpression(tb, mc);
+
+		// Первый идентификатор
+		if(tb.match(TokenType.OOP, Keyword.THIS)) {
+			consumeToken(tb);
+			path.addSegment(new QualifiedPathExpression.ThisSegment());
+		}
+		else {
+			String name = consumeToken(tb, TokenType.ID).getStringValue();
+			path.addSegment(new QualifiedPathExpression.QualifiedSegment(name));
+		}
+
+		// Парсим остальную цепочку
+		while(true) {
+			if(tb.match(Delimiter.LEFT_PAREN)) {
+				path.addSegment(new QualifiedPathExpression.MethodSegment(parseArguments(tb)));
+			}
+			else if (tb.match(Delimiter.LEFT_BRACKET)) {
+				path.addSegment(new QualifiedPathExpression.ArraySegment(parseIndices(tb)));
+			}
+			else if (tb.match(Delimiter.DOT)) {
+				consumeToken(tb, Delimiter.DOT);
+				String nextName = consumeToken(tb, TokenType.ID).getStringValue();
+				path.addSegment(new QualifiedPathExpression.QualifiedSegment(nextName));
+			}
+			else {
+				break;
 			}
 		}
 
-		return parent;
+		return path;
 	}
 	public List<ExpressionNode> parseArguments(TokenBuffer tb) throws CompileException {
 		List<ExpressionNode> args = new ArrayList<>();
@@ -333,6 +370,18 @@ public abstract class AstNode extends SemanticAnalyzer {
 
 		AstNode.this.consumeToken(tb, Delimiter.RIGHT_PAREN);
 		return args;
+	}
+	public List<ExpressionNode> parseIndices(TokenBuffer tb) throws CompileException {
+		List<ExpressionNode> indices = new ArrayList<>();
+		while(true) {
+			consumeToken(tb, Delimiter.LEFT_BRACKET);
+			indices.add(new ExpressionNode(tb, mc).parse());
+			consumeToken(tb, Delimiter.RIGHT_BRACKET);
+			if(!tb.match(Delimiter.LEFT_BRACKET)) {
+				break;
+			}
+		}
+		return indices;
 	}
 	
 	public final Set<Keyword> collectModifiers(TokenBuffer tb) {
@@ -392,7 +441,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		return thenReturns && elseReturns;
 	}
 
-	public static boolean canCast(VarType source, VarType target) throws CompileException {
+	public static boolean canCast(Scope scope, VarType source, VarType target) throws CompileException {
 		// Приведение к тому же типу
 		if (source == target) return true;
 		
@@ -405,10 +454,18 @@ public abstract class AstNode extends SemanticAnalyzer {
 		// Object -> что угодно (проверка в runtime)
 		if("Object".equals(source.getClassName())) return true;
 		
+			// Проверка классовых типов
+		if (source.isClassType() && target.isClassType()) {
+			if(null == source.getClassName()) return false;
+			if(source.getClassName().equals(target.getClassName())) return true;
+			CIScope cis = scope.getThis().resolveCI(target.getName(), false);
+			return null!=cis && cis instanceof InterfaceScope;
+		}
+
 		return false;
 	}
 	
-	public static boolean isCompatibleWith(Scope scope, VarType left, VarType right) throws CompileException {
+	public static boolean isCompatibleWith(Scope scope, VarType left, VarType right) {
 		// Проверка одинаковых типов
 		if (left == right) return true;
 
@@ -421,6 +478,10 @@ public abstract class AstNode extends SemanticAnalyzer {
 		// Большинство типов можно объединить со строковой константой
 		if(VarType.CSTR == left && VarType.VOID != right) return true;
 
+		if (left.isNumeric() && right.isBoolean()) {
+			return true;
+		}
+		
 		// Проверка числовых типов
 		if (left.isNumeric() && right.isNumeric()) {
 			// FIXED совместим только с FIXED
@@ -434,7 +495,8 @@ public abstract class AstNode extends SemanticAnalyzer {
 		if (left.isClassType() && right.isClassType()) {
 			if(null == left.getClassName()) return false;
 			if(left.getClassName().equals(right.getClassName())) return true;
-			return null != scope.getThis().resolveInterface(right.getName());
+			CIScope cis = scope.getThis().resolveCI(right.getName(), false);
+			return null!=cis && cis instanceof InterfaceScope;
 		}
 		
 		// Проверка массивов
@@ -442,7 +504,7 @@ public abstract class AstNode extends SemanticAnalyzer {
     
 		return false;
 	}
-
+	
 	public boolean isInLoopNode() {
 		boolean result = false;
 		for(AstNode node : tb.getLoopStack()) {
@@ -457,15 +519,17 @@ public abstract class AstNode extends SemanticAnalyzer {
 		return sp;
 	}
 	
-	public abstract String getNodeType();
-	
 	public Token consumeToken(TokenBuffer tb) {
 		markFirstError(tb.current().getError());
 		return tb.consume();
     }
 	public Token consumeToken(TokenBuffer tb, TokenType expectedType) throws CompileException {
-		if (tb.current().getType() == expectedType) return consumeToken(tb);
-		else throw parserError("Expected " + expectedType + ", but got " + tb.current().getType());
+		if (tb.current().getType() == expectedType) {
+			return consumeToken(tb);
+		}
+		else {
+			throw parserError("Expected " + expectedType + ", but got " + tb.current().getType());
+		}
     }
 	public Token consumeToken(TokenBuffer tb, Operator op) throws CompileException {
 		if (TokenType.OPERATOR == tb.current().getType()) {
@@ -555,18 +619,21 @@ public abstract class AstNode extends SemanticAnalyzer {
 	
 	// Формирует код AST ноды единожды(см. cgDone), загружает результат в аккумулятор, если включен toAccum
 	// Код записываем в parentCgScope, но если null, то записываем в cg.getScope() он содержит текущий cgScope AST ноды
-	public Object codeGen(CodeGenerator cg, CGScope parentCgScope, boolean toAccum) throws Exception { 
+	public Object codeGen(CodeGenerator cg, CGScope parentCgScope, boolean toAccum) throws CompileException { 
 		throw new UnsupportedOperationException(this.toString());
 	}
 	
-	public CGScope depCodeGen(CodeGenerator cg) throws Exception {
+	public CGScope depCodeGen(CodeGenerator cg) throws CompileException {
 		return depCodeGen(cg, symbol);
 	}
-	protected CGScope depCodeGen(CodeGenerator cg, Symbol symbol) throws Exception {
+	protected CGScope depCodeGen(CodeGenerator cg, Symbol symbol) throws CompileException {
 		if(null != symbol && symbol instanceof AstHolder) {
 			AstNode node = ((AstHolder)symbol).getNode();
 			if(null != node) {
+				// Генерация кода зависимостей не должна влиять на текущий размер аккумулятора
+				int accSize = cg.getAccumSize();
 				Object obj = node.codeGen(cg, null, false);
+				cg.setAccumSize(accSize);
 				if(null != obj) return symbol.getCGScope();
 			}
 		}
@@ -586,5 +653,13 @@ public abstract class AstNode extends SemanticAnalyzer {
 	}
 	public boolean isDisabled() {
 		return disabled;
+	}
+	
+	public int getSN() {
+		return sn;
+	}
+	
+	public static HashMap<AstNode, Scope> getDeclarationPendingNodes() {
+		return declarationPendingNodes;
 	}
 }

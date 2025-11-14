@@ -19,7 +19,7 @@ import rtos.RTOSParam;
 
 class Main {
 
-	public bool test(bool _b1, bool _b2) {
+	public static bool test(bool _b1, bool _b2) {
 		return _b1 && _b2;
 	}
 

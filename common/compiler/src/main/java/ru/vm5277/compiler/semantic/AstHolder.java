@@ -16,9 +16,23 @@
 
 package ru.vm5277.compiler.semantic;
 
+import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.compiler.nodes.AstNode;
 
-public interface AstHolder {
-	public void setNode(AstNode node);
-	public AstNode getNode();
+public abstract class AstHolder extends Symbol {
+	protected	int	accessCntr	= 0;
+	
+	public AstHolder(String name, VarType type, boolean isFinal, boolean isStatic, boolean isNative) {
+		super(name, type, isFinal, isStatic, isNative);
+	}
+	
+	public abstract void setNode(AstNode node);
+	public abstract AstNode getNode();
+	
+	public void markUsed() {
+		accessCntr++;
+	}
+	public int getAccessCntr() {
+		return accessCntr;
+	}
 }

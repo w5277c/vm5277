@@ -24,6 +24,7 @@ import ru.vm5277.common.cg.items.CGIAsmJump;
 import ru.vm5277.common.cg.items.CGItem;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.exceptions.CompileException;
 
 //TODO удалять двойные rjmp, но перед ними проверять прыжки вида pc+/- и инструкции порпуска типа sbrc. Прыжки лучше добавлять в специальный контейнер, внутри
 //котрого такие оптимизации не будут применяться
@@ -31,7 +32,7 @@ import ru.vm5277.common.cg.scopes.CGScope;
 
 public class Optimizer extends CodeOptimizer {
 	@Override
-	public void optimizeBranchChains(CGScope scope) {
+	public void optimizeBranchChains(CGScope scope) throws CompileException {
 		ArrayList<CGItem> list = new ArrayList();
 
 		boolean changed = true;
@@ -64,7 +65,7 @@ public class Optimizer extends CodeOptimizer {
 	}
 
 	@Override
-	public void optimizeBaseInstr(CGScope scope) {
+	public void optimizeBaseInstr(CGScope scope) throws CompileException {
 		ArrayList<CGItem> list = new ArrayList();
 		CodeGenerator.treeToList(scope, list);
 		optimizeBaseInstrLoopLabel:

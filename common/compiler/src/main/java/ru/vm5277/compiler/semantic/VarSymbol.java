@@ -18,13 +18,12 @@ package ru.vm5277.compiler.semantic;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.compiler.nodes.AstNode;
 
-public class VarSymbol extends Symbol implements AstHolder {
+public class VarSymbol extends AstHolder {
 	private	final	Scope	scope;
 	private			AstNode	astNode;
-	private			int		accessCntr		= 0;
 	
 	public VarSymbol(String name, VarType returnType, boolean isFinal, boolean isStatic, Scope scope, AstNode astNode) {
-		super(name, returnType, isFinal, isStatic);
+		super(name, returnType, isFinal, isStatic, false);
 		
 		this.scope = scope;	//Нужен только для toString();
 		this.astNode = astNode;
@@ -41,13 +40,6 @@ public class VarSymbol extends Symbol implements AstHolder {
 	@Override
 	public AstNode getNode() {
 		return astNode;
-	}
-
-	public void markUsed() {
-		accessCntr++;
-	}
-	public int getAccessCntr() {
-		return accessCntr;
 	}
 /*	
 	@Override

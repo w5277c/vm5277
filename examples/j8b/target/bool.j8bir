@@ -1,5 +1,5 @@
 class Main {
-    public bool test(bool _b1, bool _b2) {
+    static public bool test(bool _b1, bool _b2) {
         return _b1&&_b2;
     }
     static public void main() {
@@ -38,14 +38,12 @@ class Main {
         if (b1&&b2) {
             System.out('5');
         }
-        System.out(this.test(b1, b2));
+        System.out(test(b1, b2));
         bool b4 = b1||b2||b10;
         System.out(b4);
         bool b5 = b1&&b2;
         System.out(b5);
         bool b6 = !b1;
         System.out(b6);
-    }
-    public Main() {
     }
 }

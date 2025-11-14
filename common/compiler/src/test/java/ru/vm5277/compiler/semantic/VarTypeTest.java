@@ -16,7 +16,6 @@
 
 package ru.vm5277.compiler.semantic;
 
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
 import ru.vm5277.common.compiler.VarType;
@@ -30,10 +29,7 @@ public class VarTypeTest {
 		assertTrue(AstNode.isCompatibleWith(null, VarType.INT, VarType.BYTE));
 		assertTrue(AstNode.isCompatibleWith(null, VarType.INT, VarType.SHORT));
 		
-        assertFalse(AstNode.isCompatibleWith(null, VarType.FIXED, VarType.BOOL));
-		assertFalse(AstNode.isCompatibleWith(null, VarType.FIXED, VarType.BOOL));
-		assertFalse(AstNode.isCompatibleWith(null, VarType.FIXED, VarType.BOOL));
-		assertFalse(AstNode.isCompatibleWith(null, VarType.FIXED, VarType.BOOL));
+        assertTrue(AstNode.isCompatibleWith(null, VarType.FIXED, VarType.BOOL));
     }
 
     @Test

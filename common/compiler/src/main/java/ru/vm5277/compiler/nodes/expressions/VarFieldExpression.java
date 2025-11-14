@@ -13,112 +13,195 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.nodes.expressions;
 
+import java.util.Objects;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.cg.scopes.CGBranchScope;
+import ru.vm5277.common.cg.CGBranch;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.CodegenResult;
-import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
+import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.TokenBuffer;
-import ru.vm5277.compiler.semantic.AliasSymbol;
-import ru.vm5277.compiler.semantic.ClassSymbol;
-import ru.vm5277.compiler.semantic.FieldSymbol;
-import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
-import ru.vm5277.compiler.semantic.Symbol;
 import ru.vm5277.compiler.semantic.VarSymbol;
+import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.cg.CGCells;
+import ru.vm5277.common.cg.scopes.CGClassScope;
+import ru.vm5277.common.cg.scopes.CGFieldScope;
+import ru.vm5277.compiler.nodes.FieldNode;
+import ru.vm5277.compiler.semantic.AstHolder;
+import ru.vm5277.compiler.semantic.CIScope;
+import ru.vm5277.compiler.semantic.FieldSymbol;
+import ru.vm5277.compiler.semantic.MethodScope;
 
 public class VarFieldExpression extends ExpressionNode {
-    private final	String	value;
-	private			Scope	scope;
+    private	final	ExpressionNode	targetExpr;
+	private final	String			name;
+	private			CIScope			targetScope;
+	private			boolean			isInliningMode;
 	
-    public VarFieldExpression(TokenBuffer tb, MessageContainer mc, String value) {
-        super(tb, mc);
-        
-		this.value = value;
+    public VarFieldExpression(TokenBuffer tb, MessageContainer mc, SourcePosition sp, Integer sn, ExpressionNode pathExpr, String name) {
+		this(tb, mc, sp, sn, pathExpr, name, false);
+	}
+	public VarFieldExpression(	TokenBuffer tb, MessageContainer mc, SourcePosition sp, Integer sn, ExpressionNode pathExpr, String name,
+								boolean isInliningMode) {
+        super(tb, mc, sp);
+         
+		if(null!=sn) {
+			this.sn=sn;
+		}
+		this.targetExpr = pathExpr;
+		this.name = name;
+		this.isInliningMode = isInliningMode;
     }
     
-	public String getValue() {
-		return value;
+	public ExpressionNode getTargetExpr() {
+		return targetExpr;
 	}
 	
-	@Override
-	public VarType getType(Scope scope) throws CompileException {
-		if (symbol == null) {
-			symbol = scope.resolveSymbol(value);
-			if(null != symbol) {
-				return symbol.getType();
-			}
-			else {
-				InterfaceScope iScope = scope.getThis().resolveScope(value);
-				if(null != iScope) {
-					//symbol = new Symbol(value, VarType.fromClassName(value), false, false);
-					symbol = new ClassSymbol(value, VarType.fromClassName(value), false, false, iScope);
-				}
-			}
-        }
-        if(null == symbol) throw new CompileException("Can't resolve: " + value);
-		return symbol.getType();
+	public CIScope getTargetScope() {
+		return targetScope;
+	}
+	
+	public boolean isSameVarFiled(VarFieldExpression vfe) {
+		if(!Objects.equals(name, vfe.getName())) {
+			return false;
+		}
+		if(symbol.getClass()!=vfe.getSymbol().getClass()) {
+			return  false;
+		}
+		return Objects.equals(targetScope, vfe.getTargetScope());
+	}
+
+	public String getName() {
+		return name;
 	}
 	
 	@Override
 	public boolean preAnalyze() {
-		if (null == value || value.isEmpty()) {
-			markError("Variable name cannot be empty");
-			return false;
-		}
-		return true;
+		boolean result = true;
+		debugAST(this, PRE, true, getFullInfo());
+		
+		debugAST(this, PRE, false, result, getFullInfo());
+		return result;
 	}
 	
 	@Override
 	public boolean declare(Scope scope) {
 		boolean result = true;
-		//После оптимизации теряем symbol, попробую пеенести в postAnalyze
-		symbol = scope.resolveSymbol(value);
-		if(null==symbol) {
-			markError("Variable '" + value + "' is not declared");
+		debugAST(this, DECLARE, true, getFullInfo());
+		
+		try {
+			if(null==targetExpr) {
+				symbol = scope.resolveVar(name);
+				if(null==symbol) {
+					symbol = scope.resolveField(name, false);
+				}
+				targetScope = scope.getThis();
+				if(null!=symbol) type = symbol.getType();
+			}
+			else {
+				result&=targetExpr.declare(scope);
+			}
+		}
+		catch(CompileException ex) {
+			markError(ex);
 			result = false;
 		}
+
+		debugAST(this, DECLARE, false, result, getFullInfo() + (declarationPendingNodes.containsKey(this) ? " [DP]" : ""));
 		return result;
 	}
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		boolean result = true;
-		this.scope = scope;
+		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 		cgScope = cg.enterExpression(toString());
 
-		symbol = scope.resolveSymbol(value);
-		if(null == symbol) {
-			InterfaceScope iScope = scope.getThis().resolveScope(value);
-			if(null != iScope) {
-				// TODO что здесь делает ClassSymbol? 
-				symbol = new ClassSymbol(value, VarType.fromClassName(value), false, false, iScope);
-			}
-		}
+		if(null==symbol && null!=targetExpr) {
+			try {
+				if(targetExpr instanceof ThisExpression) {
+					targetScope = scope.getThis();
+				}
+				else if(targetExpr instanceof VarFieldExpression) {
+					VarFieldExpression vfe = (VarFieldExpression)targetExpr;
+					CIScope parentTargetScope = vfe.getTargetScope();
+					targetScope = parentTargetScope.resolveCI(vfe.getSymbol().getType().getClassName(), true);
+				}
+				else {
+					targetScope = ((TypeReferenceExpression)targetExpr).getScope();
+				}
 
-		if(null==symbol) {
-			markError("Variable '" + value + "' is not declared");
-			result = false;
-		}
-		else {
-//			symbol.setCGScope(cg.enterExpression());
-			if(symbol instanceof VarSymbol) {
-				((VarSymbol)symbol).markUsed();
+				//TODO реализовать в Scope'ах проверки доступов к классам и полям импортируемых файлов
+				
+				if(null!=targetScope) {
+					symbol = targetScope.resolveField(name, true);
+					if(null!=symbol) {
+						type = symbol.getType();
+						// Режим AST инлайнинга
+						if(isInliningMode) {
+							// Обращение к внешнему полю
+							CGFieldScope oldCgFS = (CGFieldScope)symbol.getCGScope();
+							// Не трогаем статические поля
+							if(!oldCgFS.isStatic()) {
+								// symbol - элемент FieldNode, а не текущего выражения, его нельзя менять. Создаем локальную копию.
+								symbol = new FieldSymbol(	symbol.getName(), symbol.getType(), symbol.isFinal(), symbol.isStatic(),
+															((FieldSymbol)symbol).isPrivate(), ((FieldSymbol)symbol).getScope(),
+															(FieldNode)((FieldSymbol)symbol).getNode());
+								// Также создаем scope кодогенератора
+								CGFieldScope newCgFS = new CGFieldScope((CGClassScope)oldCgFS.getParent(), oldCgFS.getResId(), oldCgFS.getType(),
+																		oldCgFS.getSize(), oldCgFS.isStatic(), oldCgFS.getName());
+								// Задаем альтернативный механизм обращения к HEAP(чтобы не оборачивыать текущий регистр HEAP инструкциями PUSH/POP)
+								newCgFS.setCells(new CGCells(CGCells.Type.HEAP_ALT, oldCgFS.getSize()));
+								symbol.setCGScope(newCgFS);
+							}
+						}
+					}
+				}
+			}
+			catch(CompileException ex) {
+				markError(ex);
+				result = false;
 			}
 		}
 		
+		if(result && null!=symbol && symbol instanceof VarSymbol) {
+			if(getSN()<((AstHolder)symbol).getNode().getSN()) {
+				markError("Var '" + symbol.getName() + "' cannot be used before declaration");
+				result = false;
+			}
+		}
+		
+		if(result && null!=symbol && symbol instanceof FieldSymbol) {
+			FieldSymbol fSymbol = (FieldSymbol)symbol;
+			MethodScope mScope = scope.getMethod();
+			if(!isInliningMode && mScope.getSymbol().isStatic() && !fSymbol.isStatic()) {
+				//TODO не корректный номер строки в сообщении
+				markError("Non-static field '" + fSymbol.getName() + "' cannot be referenced from a static context");
+				result = false;
+			}
+
+			// Проверка приватного доступа
+			if(fSymbol.isPrivate() && scope.getThis() == targetScope.getThis()) {
+				
+			}
+		}
+
 		cg.leaveExpression();
+		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 	
-	@Override
+/*	@Override
 	public Symbol getSymbol() {
 		// Переменная/поле могут быть переданы в вызываемый метод(в котором данное выражение), но на этапе семантики мы получаем Symbol построенный на
 		// параметрах метода(которые по понятным причинам не содержат значение)
@@ -131,44 +214,62 @@ public class VarFieldExpression extends ExpressionNode {
 		if(null != scope) { //TODO вероятно всегда null
 			//TODO вообще сомнительная логика, нужно перепроверить
 			//CGScope cgScope = symbol.getCGScope();
-			symbol = scope.resolveSymbol(value);
+			symbol = scope.resolveVFSymbol(value);
 			//symbol.setCGScope(cgScope);
 		}
 		return symbol;
 	}
-
+*/
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
-		if(disabled) return null;
+	public void codeOptimization(Scope scope, CodeGenerator cg) {
+		CGScope oldScope = cg.setScope(cgScope);
 		
+		if(!symbol.isReassigned()) {
+			symbol.setFinal(true);
+		}
+		
+		cg.setScope(oldScope);
+	}
+	
+	@Override
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+		if(disabled) return null;
 		CGScope cgs = null == parent ? cgScope : parent;
 		
 		// Актуализируем symbol
-		getSymbol();
+		//getSymbol();
 		
 		// Выполняет запись значения в аккумулятор. Но зачастую это не требуется, достаточно вызвать depCodeGen
-		if(null == depCodeGen(cg)) {
-			if(symbol instanceof AliasSymbol) {
-				Symbol  vSymbol = scope.resolveSymbol(value);
-				while(vSymbol instanceof AliasSymbol) {
-					symbol = ((AliasSymbol)vSymbol).getSymbol();
-					vSymbol = scope.resolveSymbol(symbol.getName());
-					if(null != vSymbol && null != vSymbol.getCGScope()) {
+		if(null==depCodeGen(cg)) {
+/*			if(symbol instanceof AliasSymbol) {
+				Symbol vfSymbol = scope.resolveVFSymbol(value);
+				while(vfSymbol instanceof AliasSymbol) {
+					symbol = ((AliasSymbol)vfSymbol).getSymbol();
+					vfSymbol = scope.resolveVFSymbol(symbol.getName());
+					if(null != vfSymbol && null != vfSymbol.getCGScope()) {
 						depCodeGen(cg);
-						if(toAccum) {
-							CGVarScope vScope = (CGVarScope)vSymbol.getCGScope();
+		if(toAccum) {
+							CGVarScope vScope = (CGVarScope)vfSymbol.getCGScope();
 							cg.cellsToAcc(cgs, vScope);
 							//Назначаем алиас ссылающийся на реальную переменную
 						}
-						symbol = vSymbol;
+						symbol = vfSymbol;
 						break;
 					}
 				}
 			}
-			else {
+			else {*/
 //				CGCellsScope cScope = (CGCellsScope)symbol.getCGScope(CGCellsScope.class);
 //				if(null!=cScope) {
+					
+					if(null!=targetExpr) {
+						targetExpr.codeGen(cg, parent, false);
+					}
+					if(null!=targetExpr && targetExpr instanceof VarFieldExpression) { //Не смотрим на isInliningMode
+						cg.cellsToArrReg(cgs, ((CGCellsScope)((VarFieldExpression)targetExpr).getSymbol().getCGScope()).getCells());
+					}
+
 					if(toAccum) {
 						cg.cellsToAcc(cgs, (CGCellsScope)symbol.getCGScope());
 					}
@@ -177,22 +278,40 @@ public class VarFieldExpression extends ExpressionNode {
 //					throw new CompileException("Unsupported scope: " + symbol.getCGScope());
 //				}
 			}
-		}
+//		}
 
 		return (toAccum ? CodegenResult.RESULT_IN_ACCUM : null);
 	}
 	
-	public void codeGen(CodeGenerator cg, boolean isInvert, boolean opOr, CGBranchScope brScope) throws Exception {
+	public void codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, CGBranch brScope) throws CompileException {
 		depCodeGen(cg);
 		
-		if(null != brScope) {
+		CGScope cgs = null == parent ? cgScope : parent;
+		
+		if(null!=brScope) {
 			CGCellsScope cScope = (CGCellsScope)symbol.getCGScope();
-			cg.constCond(cgScope, cScope.getCells(), Operator.NEQ, 0, isInvert, opOr, brScope); // NEQ, так как проверяем на 0
+			cg.constCond(cgs, cScope.getCells(), Operator.NEQ, 0, isInvert, opOr, brScope); // NEQ, так как проверяем на 0
+		}
+	}
+
+	public void postCodeGen(CodeGenerator cg, CGScope parent) throws CompileException {
+		if(!disabled) {;
+			CGScope cgs = null == parent ? cgScope : parent;
+
+			if(null!=targetExpr && targetExpr instanceof VarFieldExpression) { //Не смотрим на isInliningMode
+				if(!isInliningMode) {
+					cg.popHeapReg(cgs);
+				}
+			}
 		}
 	}
 	
 	@Override
 	public String toString() {
-		return getClass().getSimpleName() + ": " + value;
+		return name;
+	}
+	
+	public String getFullInfo() {
+		return getClass().getSimpleName() + ": " + name;
 	}
 }

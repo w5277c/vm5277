@@ -16,10 +16,13 @@
 
 import rtos.System;
 import rtos.RTOSParam;
+import hal.GPIO;
 
 class Main {
     public static void main() {
-		System.setParam(RTOSParam.STDOUT_PORT, 0x12);
+		System.setParam(RTOSParam.CORE_FREQ, 16);
+		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
+		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
 
 		short s1;
 		s1 = 10;
@@ -28,16 +31,20 @@ class Main {
 		fixed f2;
 		f2 = 1.5;
 
+/*		short s1 = 10;
+		fixed f1 = 6;
+		fixed f2 = 1.5;
+*/		
 		System.out(s1 + 2);
 		System.out(s1 + 1.5);
 		System.out(f1 + 1.5);
 		System.out(s1 - 2);
 		System.out(s1 - 1.5);
 		System.out(f1 - 1.5);
-		System.out(s1 * 2);
+		System.out(s1 * 8);
 		System.out(s1 * 1.5);
 		System.out(f1 * 1.5);
-		System.out(s1 / 2);
+		System.out(s1 / 8);
 		System.out(s1 / 1.5);
 		System.out(f1 / 1.5);
 		System.out(s1 % 2);

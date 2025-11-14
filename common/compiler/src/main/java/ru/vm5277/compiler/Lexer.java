@@ -39,7 +39,7 @@ public class Lexer {
 	protected	final	MessageContainer	mc;
 	protected			SourceBuffer		sb;
 	protected	final	List<Token>			tokens	= new ArrayList<>();
-
+	
 	public Lexer(File sourceFile, MessageContainer mc) throws IOException {
 		try (InputStreamReader isr = new InputStreamReader(new FileInputStream(sourceFile))) {
 			StringBuilder stringBuilder = new StringBuilder();
@@ -164,10 +164,16 @@ public class Lexer {
 	public static boolean skipWhiteSpaces(SourceBuffer sb) {
 		char ch = sb.getChar();
 		if (Character.isWhitespace(ch)) {
-			if ('\n'==ch) {
+			//Пропускаем табуляцию с корректным счетом позиции
+			if('\t'==ch) {
+				sb.nextTab(Main.tabSize);
+				return true;
+			}
+			
+			if('\n'==ch) {
 				sb.incLine();
 			}
-			else if ('\r'==ch) {
+			else if('\r'==ch) {
 				if (sb.hasNext(1) && '\n'==sb.getChar(1)) {
 					sb.next();
 				}

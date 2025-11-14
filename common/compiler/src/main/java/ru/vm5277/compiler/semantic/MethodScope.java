@@ -13,13 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.semantic;
 
-public class MethodScope extends BlockScope {
+import ru.vm5277.common.exceptions.CompileException;
+
+public class MethodScope extends Scope {
 	private	MethodSymbol	mSymbol;
 	
 	public MethodScope(MethodSymbol mSymbol, Scope parent) {
 		super(parent);
+		
 		this.mSymbol = mSymbol;
 	}
 
@@ -30,26 +34,48 @@ public class MethodScope extends BlockScope {
 		this.mSymbol = mSymbol;
 	}
 
-//	Убрал, так как отличается от BlockScope только поиском в параметрах, что не верно, параметры не имеют прямого отношения к переданным переменным
+	
 	@Override
-	public Symbol resolveSymbol(String name) {
-		// 1. Проверяем локальные переменные
-		Symbol symbol = variables.get(name);
-		if (symbol != null) return symbol;
+	public CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess) {
+		if(isQualifiedAccess) {
+			return internal.get(name);
+		}
+		
+		CIScope cis = internal.get(name);
+		if(null!=cis) return cis;
+		
+		if(null!=parent) {
+			return parent.resolveCI(null==caller ? this : caller, name, false);
+		}
+		return null;
+	}
 
-		// 2. Проверяем параметры метода (через MethodSymbol)
-		for (Symbol param : mSymbol.getParameters()) {
-			if (param.getName().equals(name)) {
+	@Override
+	public Symbol resolveField(Scope caller, String name, boolean isQualifiedAccess) throws CompileException {
+		if(isQualifiedAccess) {
+			throw new CompileException("COMPILER BUG: Qualified field access in method scope");
+		}
+		return parent.resolveField(null==caller ? this : caller, name, false);
+	}
+	
+	@Override
+	public Symbol resolveVar(String name) throws CompileException {
+		// Проверяем параметры метода
+		for(Symbol param : mSymbol.getParameters()) {
+			if(param.getName().equals(name)) {
 				return param;
 			}
 		}
-
-		// 3. Делегируем в родительскую область видимости
-		return parent != null ? parent.resolveSymbol(name) : null;
+		return null;
 	}
 	
 	@Override
 	public String toString() {
 		return mSymbol.toString();
+	}
+
+	@Override
+	public Scope getParent() {
+		return parent;
 	}
 }

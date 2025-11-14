@@ -25,6 +25,7 @@ public abstract class CGCellsScope extends CGScope {
 	protected	final	int			size;
 	protected			DataSymbol	dataSymbol;
 	protected			boolean		isConstant;
+	protected			boolean		isArrayView;
 	
 	public CGCellsScope(CGScope parent, int resId, VarType type, int size, String name) {
 		super(parent, resId, name);
@@ -51,5 +52,12 @@ public abstract class CGCellsScope extends CGScope {
 	
 	public boolean isConstant() {
 		return isConstant;
+	}
+	
+	public void setArrayView(boolean isArrayView) {
+		this.isArrayView = isArrayView;
+	}
+	public boolean isArrayView() {
+		return isArrayView;
 	}
 }

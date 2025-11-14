@@ -13,10 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.Arrays;
 import java.util.List;
+import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
@@ -25,10 +29,11 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
+import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.BlockScope;
-import ru.vm5277.compiler.semantic.InterfaceScope;
+import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 
@@ -38,20 +43,17 @@ public class InstanceOfExpression extends ExpressionNode {
 	private	VarType			leftType;
 	private	VarType			rightType;
 	private	String			varName;
+	private	Symbol			varSymbol;
 	private	Scope			scope;
 	private	boolean			fulfillsContract;	//Флаг реализации интерфейса
 	
 	public InstanceOfExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode leftExpr, ExpressionNode rightExpr, String varName) {
 		super(tb, mc);
+		
 		this.leftExpr = leftExpr;
 		this.rightExpr = rightExpr;
 		this.varName = varName;
-	}
-
-	@Override
-	public VarType getType(Scope scope) throws CompileException {
-		// Результат instanceof всегда boolean
-		return VarType.BOOL;
+		this.type = VarType.BOOL;
 	}
 
 	public ExpressionNode getLeft() {
@@ -64,115 +66,146 @@ public class InstanceOfExpression extends ExpressionNode {
 
 	@Override
 	public boolean preAnalyze() {
-		if (leftExpr == null || rightExpr == null) {
+		boolean result = true;
+		debugAST(this, PRE, true, getFullInfo());
+
+		if(null==leftExpr || null==rightExpr) {
 			markError("Both operands of 'is' must be non-null");
-			return false;
+			result = false;
+		}
+
+		if(result) {
+			if(null != varName && Character.isUpperCase(varName.charAt(0))) {
+				addMessage(new WarningMessage("Variable name should start with lowercase letter:" + varName, sp));
+			}
+
+			result&=leftExpr.preAnalyze();
+			result&=rightExpr.preAnalyze();
 		}
 		
-		if(null != varName && Character.isUpperCase(varName.charAt(0))) {
-			addMessage(new WarningMessage("Variable name should start with lowercase letter:" + varName, sp));
-		}
-		
-		return leftExpr.preAnalyze() && rightExpr.preAnalyze();
+		debugAST(this, PRE, false, result, getFullInfo());
+		return result;
 	}
 	
 	@Override
 	public boolean declare(Scope scope) {
+		boolean result = true;
+		debugAST(this, DECLARE, true, getFullInfo());
+
 		try {
-			if(!leftExpr.declare(scope) || !rightExpr.declare(scope)) {
-				return false;
-			}
-			
-			if(rightExpr instanceof LiteralExpression && ((LiteralExpression)rightExpr).getValue() instanceof VarType) {
-				rightType = (VarType)((LiteralExpression)rightExpr).getValue();
-			}
-			else {
-				rightType = rightExpr.getType(scope);
-			}
-			
-			if(null != varName) {
-				if(scope instanceof BlockScope) {
-					BlockScope bScope = (BlockScope)scope;
-					
-					if(leftExpr instanceof VarFieldExpression) {
-						VarFieldExpression ve = (VarFieldExpression)leftExpr;
-						Symbol vSymbol = scope.resolveSymbol(ve.getValue());
-						if(null == vSymbol) {
-							markError(new CompileException("var '" + ve.getValue() + "' not found"));
-							return false;
-						}
-						//Добавляем просто символ, большего мы здесь не знаем
-						bScope.addAlias(varName, rightType, vSymbol);
-					}
-					//TODO а что если другое выражение или вызов метода?
+			result&=leftExpr.declare(scope);
+			result&=rightExpr.declare(scope);
+
+			if(result) {
+				if(rightExpr instanceof LiteralExpression && ((LiteralExpression)rightExpr).getValue() instanceof VarType) {
+					rightType = (VarType)((LiteralExpression)rightExpr).getValue();
 				}
 				else {
-					markError(new CompileException("Unexpected scope '" + scope + "'"));
-					return false;
+					rightType = rightExpr.getType();//TODO должно быть в post
+				}
+			
+				if(null!=varName) {
+					// Создаем final alias, в post установим CGScope от leftExpression
+					varSymbol = new Symbol(varName, rightType, true, false);
+					if(scope instanceof BlockScope) {
+						((BlockScope)scope).addVariable(varSymbol);
+
+
+						// Этот код был рассчитан только на VarFieldExpression
+						/*
+						if(leftExpr instanceof VarFieldExpression) {
+							VarFieldExpression ve = (VarFieldExpression)leftExpr;
+							Symbol vfs = scope.resolveVar(ve.getName());
+							if(null==vfs) {
+								vfs = scope.resolveField(ve.getName(), false);
+							}
+							if(null == vfs) {
+								markError(new CompileException("var '" + ve.getName() + "' not found"));
+								result = false;
+							}
+							else {
+								//Добавляем просто символ, большего мы здесь не знаем
+								bScope.addAlias(varName, rightType, vfs);
+							}
+						}
+						//TODO а что если другое выражение или вызов метода?
+						*/
+					}
+					else {
+						markError(new CompileException("Unexpected scope '" + scope + "'"));
+						result = false;
+					}
 				}
 			}
 		}
 		catch(CompileException e) {
 			markError(e);
-			return false;
+			result = false;
 		}
 
-		return true;
+		debugAST(this, DECLARE, false, result, getFullInfo() + (declarationPendingNodes.containsKey(this) ? " [DP]" : ""));
+		return result;
 	}
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		boolean result = true;
+		debugAST(this, POST, true, getFullInfo() + " type:" + type);
+		
 		this.scope = scope;
 		cgScope = cg.enterExpression(toString());
 
-		try {
-			result&=leftExpr.postAnalyze(scope, cg);
-			if(leftExpr instanceof UnresolvedReferenceExpression) {
-				leftExpr = ((UnresolvedReferenceExpression)leftExpr).getResolvedExpr();
+		result&=leftExpr.postAnalyze(scope, cg);
+		if(result) {
+			try {
+				ExpressionNode optimizedExpr = leftExpr.optimizeWithScope(scope, cg);
+				if(null!=optimizedExpr) {
+					leftExpr = optimizedExpr;
+				}
 			}
-
-			result&=rightExpr.postAnalyze(scope, cg);
-			if(rightExpr instanceof UnresolvedReferenceExpression) {
-				rightExpr = ((UnresolvedReferenceExpression)rightExpr).getResolvedExpr();
-			}
-
-			if(VarType.UNKNOWN == rightType) {
-				markError("Unknown right-hand side of 'is': " + rightExpr);
+			catch(CompileException ex) {
+				markError(ex);
 				result = false;
 			}
-			if(VarType.VOID == rightType) {
-				markError("Right-hand side of 'is' cant be void");
-				result = false;
-			}
+		}
 
-			leftType = leftExpr.getType(scope);
-			if (leftExpr instanceof LiteralExpression) {
-				markError("Cannot check type of literals at runtime");
-				result = false;
-			}
-			
+		result&=rightExpr.postAnalyze(scope, cg);
+
+		if(VarType.UNKNOWN==rightType) {
+			markError("Unknown right-hand side of 'is': " + rightExpr);
+			result = false;
+		}
+		if(VarType.VOID==rightType) {
+			markError("Right-hand side of 'is' cant be void");
+			result = false;
+		}
+
+		leftType=leftExpr.getType();
+		if(leftExpr instanceof LiteralExpression) {
+			markError("Cannot check type of literals at runtime");
+			result = false;
+		}
+
+		if(result) {
 			// Проверка реализации интерфейса
-			if (leftType.isClassType()) {
+			if(leftType.isClassType()) {
 				if(leftType.getClassName().equals(rightType.getClassName())) {
 					fulfillsContract = true;
 				}
 				else {
-					InterfaceScope leftIScope = scope.getThis().resolveScope(leftType.getClassName());
-					InterfaceScope rightIScope = scope.getThis().resolveInterface(rightType.getClassName());
-					
-					if (null != leftIScope && null != rightIScope) {
-						fulfillsContract = leftIScope.getInterfaces().containsKey(rightIScope.getName());
-					}
+					CIScope leftCIS = scope.getThis().resolveCI(leftType.getClassName(), false);
+					fulfillsContract = leftCIS.isImplements(rightType);
 				}
 			}
-		}
-		catch (CompileException e) {
-			markError(e.getMessage());
-			result = false;
-		}
 
+			
+			// Просто копирую CGScope из оригинала
+			// Инкремент/декремент счетчика ссылок не нужен, так как используем один CGCells
+			varSymbol.setCGScope(getSrcSymbol().getCGScope());
+		}
+		
 		cg.leaveExpression();
+		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 
@@ -192,28 +225,37 @@ public class InstanceOfExpression extends ExpressionNode {
 		return varName;
 	}
 	
+	private Symbol getSrcSymbol() {
+		if(leftExpr instanceof CastExpression) {
+			return ((CastExpression)leftExpr).getOperand().getSymbol();
+		}
+		return leftExpr.getSymbol();
+	}
+	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		//Обходимся без рантайма, пока в левой части примитив или это константа
 		//Но нужно вызывать рантайм, если встречаем объект, так как только в рантайм данных есть информация о типе переменной
 		
-		Symbol varSymbol = leftExpr.getSymbol();
+		CGScope cgs = null == parent ? cgScope : parent;
+
+		Symbol varSymbol = getSrcSymbol();
 		if(varSymbol.isFinal()) return (isCompatibleWith(scope, varSymbol.getType(), rightType) ? CodegenResult.TRUE : CodegenResult.FALSE);
 
-		leftExpr.codeGen(cg, null, false);
+		leftExpr.codeGen(cg, cgs, false);
 
 		// TODO весь код можно вынести в RTOS j8b утилиты и просто вызывать как функцию
 		boolean heapSaved=false;
 		if(leftExpr instanceof VarFieldExpression) {
 			CGCellsScope cScope = (CGCellsScope)((VarFieldExpression)leftExpr).getSymbol().getCGScope();
-			cg.pushHeapReg(cgScope, false);
+			cg.pushHeapReg(cgs);
 			heapSaved = true;
-			cg.setHeapReg(cgScope, cScope.getCells());
+			cg.setHeapReg(cgs, cScope.getCells());
 		}
 
-		cg.eInstanceof(cgScope, rightType);
+		cg.eInstanceof(cgs, rightType);
 
-		if(heapSaved) cg.popHeapReg(cgScope, false);
+		if(heapSaved) cg.popHeapReg(cgs);
 
 		return CodegenResult.RESULT_IN_ACCUM;
 	}
@@ -225,6 +267,10 @@ public class InstanceOfExpression extends ExpressionNode {
 	
 	@Override
 	public String toString() {
-		return getClass().getSimpleName() + " " + leftExpr + " is " + rightExpr + (null != varName ? " as " + varName : "");
+		return leftExpr + " is " + rightExpr + (null != varName ? " as " + varName : "");
+	}
+    
+	public String getFullInfo() {
+		return getClass().getSimpleName() + " " + toString();
 	}
 }

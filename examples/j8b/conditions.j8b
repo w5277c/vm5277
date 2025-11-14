@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 import rtos.System;
 import rtos.RTOSParam;
 import hal.GPIO;
@@ -68,5 +69,15 @@ class Main {
 		else {
 			System.outChar('G'); //71
 		}
+		
+		System.out(i>j ? 'Y' : 'N');
+		System.out(true ? 'Y' : 'N');
+		System.out(false ? 'Y' : 'N');
+		System.out(method(false) ? 'Y' : 'N');
+		System.out(method(false) ? method(true) : method(false));
+	}
+	
+	static bool method(bool flag) {
+		return !flag;
 	}
 }

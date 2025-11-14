@@ -64,11 +64,6 @@ public abstract class CommandNode extends AstNode {
 		}
 
 		@Override
-		public String getNodeType() {
-			return null;
-		}
-
-		@Override
 		public List<AstNode> getChildren() {
 			return Arrays.asList(blockNode);
 		}

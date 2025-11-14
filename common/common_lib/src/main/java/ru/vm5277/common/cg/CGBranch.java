@@ -13,19 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package ru.vm5277.common.cg.scopes;
+package ru.vm5277.common.cg;
 
 import java.util.Stack;
 import ru.vm5277.common.LabelNames;
-import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGLabelScope;
 
-public class CGBranchScope extends CGScope {
+public class CGBranch {
 	private Stack<CGLabelScope>	lbEndScopes	= new Stack<>();	// Выход из текущего подвыражения
 	private	boolean				isUsed		= false;
 	
-	public CGBranchScope(CodeGenerator cg, CGScope parent) {
-		super(parent, -1, null);
-		
+	public CGBranch() {
 		lbEndScopes.add(new CGLabelScope(null, null, LabelNames.COMPARE_END, true));
 	}
 	

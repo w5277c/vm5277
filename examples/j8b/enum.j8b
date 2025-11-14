@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 import rtos.System;
 import rtos.RTOSParam;
 
@@ -70,7 +71,7 @@ class Main {
 */
     }
 
-    public void printDirection(EDirection dir) {
+    public static void printDirection(EDirection dir) {
 		System.out(dir.index());
 	}
 }

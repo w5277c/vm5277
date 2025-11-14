@@ -18,46 +18,57 @@ package ru.vm5277.compiler.nodes.expressions;
 import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.RTOSFeature;
+import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.Delimiter;
+import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class NewArrayExpression extends ExpressionNode {
-	private	VarType					type;
 	private	int						depth;
 	private	List<ExpressionNode>	arrDimensions;
 	private	ArrayInitExpression		aiExpr;
 	private	int[]					constDimensions		= null;
-	
-	public NewArrayExpression(TokenBuffer tb, MessageContainer mc, VarType type, List<ExpressionNode> arrDimensions, ArrayInitExpression aiExpr) {
-        super(tb, mc);
-		
+
+	public NewArrayExpression(	TokenBuffer tb, MessageContainer mc, SourcePosition sp, VarType type, List<ExpressionNode> arrDimensions,
+								ArrayInitExpression aiExpr) {
+		super(tb, mc, sp);
+
 		this.type = type;
 		this.depth = type.getArrayDepth();
 		this.arrDimensions = arrDimensions;
 		this.aiExpr = aiExpr;
-		
-		if(null != aiExpr) {
+
+		if(null!=aiExpr) {
 			constDimensions = aiExpr.getDimensions();
 		}
-		
+
 		CodeGenerator.setArraysUsage();
-    }
-	
-	@Override
-	public VarType getType(Scope scope) throws CompileException {
-		return type;
 	}
-	
+
+	public NewArrayExpression(TokenBuffer tb, MessageContainer mc, SourcePosition sp, List<String> path) throws CompileException {
+		super(tb, mc, sp);
+		
+		arrDimensions = parseArrayDimensions();
+		if(tb.match(Delimiter.LEFT_BRACE)) {
+			aiExpr = new ArrayInitExpression(tb, mc, sp, type);
+		}
+	}
+
 	@Override
 	public boolean preAnalyze() {
 		boolean result = true;
-		
+		debugAST(this, PRE, true, getFullInfo());
+
 		for(ExpressionNode expr : arrDimensions) {
 			if(null!=expr) {
 				if(null!=constDimensions) {
@@ -65,7 +76,7 @@ public class NewArrayExpression extends ExpressionNode {
 					result = false;
 					break;
 				}
-				result &= expr.preAnalyze();
+				result&=expr.preAnalyze();
 			}
 			else if(null==constDimensions) {
 				markError("Invalid array initialization: missing dimension size or initializer");
@@ -77,57 +88,58 @@ public class NewArrayExpression extends ExpressionNode {
 		if(null!=constDimensions) {
 			// Определяю вложенность
 			int constDepth=-1;
-			if(0 != constDimensions[0x02]) constDepth=3;
-			else if(0 != constDimensions[0x01]) constDepth=2;
-			else if(0 != constDimensions[0x00]) constDepth=1;
+			if(0!=constDimensions[0x02]) constDepth=3;
+			else if(0!=constDimensions[0x01]) constDepth=2;
+			else if(0!=constDimensions[0x00]) constDepth=1;
 
 			if(depth!=constDepth) {
 				markError("Invalid array initialization: different dimension size");
 				result = false;
 			}
 		}
-		
-		if(null != aiExpr) {
-			result &= aiExpr.preAnalyze();
+
+		if(null!=aiExpr) {
+			result&=aiExpr.preAnalyze();
 		}
+
+		debugAST(this, PRE, false, result, getFullInfo());
 		return result;
 	}
 
 	@Override
 	public boolean declare(Scope scope) {
 		boolean result = true;
-		
+		debugAST(this, DECLARE, true, getFullInfo());
+
 		for(ExpressionNode expr : arrDimensions) {
 			if(null!=expr) {
-				result &= expr.declare(scope);
+				result&=expr.declare(scope);
 			}
 		}
-		if(null != aiExpr) {
-			result &= aiExpr.declare(scope);
+		if(null!=aiExpr) {
+			result&=aiExpr.declare(scope);
 		}
+
+		debugAST(this, DECLARE, false, result, getFullInfo() + (declarationPendingNodes.containsKey(this) ? " [DP]" : ""));
 		return result;
 	}
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		boolean result = true;
+		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 		cgScope = cg.enterExpression(toString());
-		
+
 		try {
 			if(null==constDimensions) {
 				constDimensions = new int[]{0, 0, 0};
 				for(int i=0; i<depth; i++) {
 					ExpressionNode expr = arrDimensions.get(i);
 					result&=expr.postAnalyze(scope, cg);
-					if(expr instanceof UnresolvedReferenceExpression) {
-						expr = ((UnresolvedReferenceExpression)expr).getResolvedExpr();
-						arrDimensions.set(i, expr);
-					}
-
 					if(result) {
 						// Пытаемся оптимизировать final Var/Field 
 						ExpressionNode optimizedExpr = expr.optimizeWithScope(scope, cg);
-						if(null != optimizedExpr) {
+						if(null!=optimizedExpr) {
 							optimizedExpr.postAnalyze(scope, cg);
 							expr = optimizedExpr;
 							arrDimensions.set(i, expr);
@@ -144,7 +156,7 @@ public class NewArrayExpression extends ExpressionNode {
 					}
 				}
 			}
-			
+
 			if(null==constDimensions) {
 				cg.setRTOSFeature(RTOSFeature.OS_ARRAY_3D);
 			}
@@ -160,19 +172,20 @@ public class NewArrayExpression extends ExpressionNode {
 						cg.setRTOSFeature(RTOSFeature.OS_ARRAY_3D);
 				}
 			}
-			
-			if(null != aiExpr) {
-				result &= aiExpr.postAnalyze(scope, cg);
+
+			if(null!=aiExpr) {
+				result&=aiExpr.postAnalyze(scope, cg);
 			}
 		}
 		catch (CompileException e) {
 			markError(e.getMessage());
 		}
-		
+
 		cg.leaveExpression();
+		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
-	
+
 	public List<ExpressionNode> getDimensions() {
 		if(null==constDimensions) {
 			return arrDimensions;
@@ -184,32 +197,32 @@ public class NewArrayExpression extends ExpressionNode {
 		}
 		return result;
 	}
-	
+
 	public ArrayInitExpression getInitializer() {
 		return aiExpr;
 	}
-	
+
 	public int[] getConstDimensions() {
 		return constDimensions;
 	}
-	
+
 	public Integer getConstSize() {
 		if(null==constDimensions) return null;
-		int result = 1;
+		int result=1;
 		for(int i=0; i<depth; i++) {
-			result *= constDimensions[i];
+			result*=constDimensions[i];
 		}
 		return result;
 	}
-	
+
 	public int getDepth() {
 		return depth;
 	}
-	
+
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		CodegenResult result = null;
-		
+
 		if(null==constDimensions) {
 			cg.pushStackReg(cgScope);
 			for(int i=arrDimensions.size()-1; i>=0; i--) {
@@ -230,17 +243,32 @@ public class NewArrayExpression extends ExpressionNode {
 		if(null==constDimensions) {
 			cg.popStackReg(cgScope);
 		}
-		if(null != aiExpr) {
+		if(null!=aiExpr) {
 			cg.pushAccBE(cgScope, 0x02);
 			aiExpr.codeGen(cg, cgScope, false);
 			cg.popAccBE(cgScope, 0x02);
 		}
-	
+
 		return CodegenResult.RESULT_IN_ACCUM;
 	}
-	
+
 	@Override
 	public String toString() {
-		return getClass().getSimpleName();
+		StringBuilder sb = new StringBuilder();
+		if(null!=constDimensions) {
+			sb.append("[").append(constDimensions[0]).append("]");
+			if(0<constDimensions[1]) sb.append("[").append(constDimensions[1]).append("]");
+			if(0<constDimensions[2]) sb.append("[").append(constDimensions[2]).append("]");
+		}
+		else {
+			sb.append("[").append(arrDimensions.get(0)).append("]");
+			if(1<arrDimensions.size() && null!=arrDimensions.get(1)) sb.append("[").append(arrDimensions.get(1)).append("]");
+			if(2<arrDimensions.size() && null!=arrDimensions.get(2)) sb.append("[").append(arrDimensions.get(2)).append("]");
+		}
+		return "new " + type + sb.toString();
+	}
+
+	public String getFullInfo() {
+		return getClass().getSimpleName() + " " + toString();
 	}
 }

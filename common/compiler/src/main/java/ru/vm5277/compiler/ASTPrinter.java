@@ -46,22 +46,24 @@ import ru.vm5277.compiler.nodes.commands.TryNode;
 import ru.vm5277.compiler.nodes.commands.WhileNode;
 import ru.vm5277.compiler.nodes.expressions.ArrayExpression;
 import ru.vm5277.compiler.nodes.expressions.ArrayInitExpression;
-import ru.vm5277.compiler.nodes.expressions.BinaryExpression;
 import ru.vm5277.compiler.nodes.expressions.CastExpression;
 import ru.vm5277.compiler.nodes.expressions.EnumExpression;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
+import ru.vm5277.compiler.nodes.expressions.ExpressionsContainer;
 import ru.vm5277.compiler.nodes.expressions.InstanceOfExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.nodes.expressions.MethodCallExpression;
 import ru.vm5277.compiler.nodes.expressions.NewArrayExpression;
 import ru.vm5277.compiler.nodes.expressions.NewExpression;
 import ru.vm5277.compiler.nodes.expressions.PropertyExpression;
+import ru.vm5277.compiler.nodes.expressions.QualifiedPathExpression;
 import ru.vm5277.compiler.nodes.expressions.TernaryExpression;
 import ru.vm5277.compiler.nodes.expressions.ThisExpression;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
 import ru.vm5277.compiler.nodes.expressions.UnaryExpression;
 import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
+import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
+import ru.vm5277.compiler.semantic.FieldSymbol;
 import ru.vm5277.compiler.tokens.Token;
 
 public class ASTPrinter {
@@ -125,6 +127,15 @@ public class ASTPrinter {
 					printMethod((MethodNode)node);
 				}
 				else if(node instanceof FieldNode) {
+					FieldNode fNode = (FieldNode)node;
+					if(null!=fNode.getSymbol()) {
+						if(null==fNode.getSymbol().getLastAccessedSN()) {
+							out.put("//AST>UNUSED ");
+						}
+						else if(fNode.isFinal() && !fNode.getSymbol().isReassigned()) {
+							out.put("//AST>CONST ");
+						}
+					}
 					printField((FieldNode)node); out.put(";");out.print();
 				}
 				else if(node instanceof VarNode) {
@@ -171,7 +182,7 @@ public class ASTPrinter {
 	void printInterface(InterfaceNode iface) {
 		printModifiers(iface.getModifiers());
 		out.put("interface " + iface.getName() + " ");
-		InterfaceBodyNode ibn = iface.getIfaceBody();
+		InterfaceBodyNode ibn = iface.getBody();
 		if(null != ibn) {
 			out.put("{"); out.print(); out.extend();
 			for(AstNode node : ibn.getDeclarations()) {
@@ -228,9 +239,6 @@ public class ASTPrinter {
 			for(ParameterNode parameter : parameters) {
 				if(parameter.getType().isArray()) {
 					out.put(parameter.getType().getElementType() + "[] ");
-				}
-				else if(parameter.getType().isEnum()) {
-					out.put(parameter.getType().getEnumName() + " ");
 				}
 				else {
 					out.put(parameter.getType() + " ");
@@ -297,7 +305,19 @@ public class ASTPrinter {
 						printExpr(fn.getIteration());
 					}
 					out.put(") ");
-					printBody(fn.getBody());
+					if(fn.isAlwaysFalse()) {
+						out.put("{");
+						out.print();
+						out.extend();
+						out.put("//AST>REMOVED");
+						out.print();
+						out.reduce();
+						out.put("}");
+						out.print();
+					}
+					else {
+						printBody(fn.getBody());
+					}
 					if(null!=fn.getElseBlock()) {
 						out.put("else");
 						printBody(fn.getElseBlock());
@@ -360,8 +380,20 @@ public class ASTPrinter {
 					out.put("while (");
 					printExpr(wn.getCondition());
 					out.put(") ");
-					printBody(wn.getBody());
-					out.print();
+					if(wn.isAlwaysFalse()) {
+						out.put("{");
+						out.print();
+						out.extend();
+						out.put("//AST>REMOVED");
+						out.print();
+						out.reduce();
+						out.put("}");
+						out.print();
+					}
+					else {
+						printBody(wn.getBody());
+						out.print();
+					}
 				}
 				else if(node instanceof ClassNode) {
 					printClass((ClassNode)node);
@@ -375,8 +407,8 @@ public class ASTPrinter {
 				}
 				else if(node instanceof VarNode) {
 					VarNode vNode = (VarNode)node; //TODO повотрить для остальных
-					if(vNode.isFinal() && null != vNode.getSymbol() && !vNode.getSymbol().isReassigned()) {
-						out.put("//CONST ");
+					if(vNode.isFinal() && null!=vNode.getSymbol() && !vNode.getSymbol().isReassigned()) {
+						out.put("//AST>CONST ");
 					}
 					printVar((VarNode)node);
 					out.put(";");
@@ -447,9 +479,6 @@ public class ASTPrinter {
 			if(node.getType().isArray()) {
 				out.put(node.getType().getElementType() + "[] ");
 			}
-			else if(node.getType().isEnum()) {
-				out.put(node.getType().getEnumName() + " ");
-			}
 			else {
 				out.put(node.getType() + " ");
 			}
@@ -474,9 +503,6 @@ public class ASTPrinter {
 				out.put(vt.getName());
 				out.put(tmp + " ");
 			}
-			else if(node.getType().isEnum()) {
-				out.put(node.getType().getEnumName() + " ");
-			}
 			else {
 				out.put(node.getType() + " ");
 			}
@@ -499,12 +525,12 @@ public class ASTPrinter {
 		}
 		else if (expr instanceof LiteralExpression) {
 			LiteralExpression le = (LiteralExpression)expr;
-			out.put(VarType.CSTR == le.getType(null) ? "\"" + Token.toStringValue(le.getValue()) + "\"" : Token.toStringValue(le.getValue()));
+			out.put(VarType.CSTR == le.getType() ? "\"" + Token.toStringValue(le.getValue()) + "\"" : Token.toStringValue(le.getValue()));
 		}
 		else if(expr instanceof MethodCallExpression) {
 			MethodCallExpression mce = (MethodCallExpression)expr;
-			if(null != mce.getClassName()) {
-				printExpr(mce.getClassName());
+			if(null!=mce.getPathExpr()) {
+				printExpr(mce.getPathExpr());
 				out.put(".");
 			}
 			out.put(mce.getMethodName() + "(");
@@ -512,7 +538,12 @@ public class ASTPrinter {
 			out.put(")");
 		}
 		else if(expr instanceof VarFieldExpression) {
-			out.put(((VarFieldExpression)expr).getValue());
+			VarFieldExpression vfe = (VarFieldExpression)expr;
+			if(null!=vfe.getTargetExpr()) {
+				printExpr(vfe.getTargetExpr());
+				out.put(".");
+			}
+			out.put(((VarFieldExpression)expr).getName());
 		}
 		else if(expr instanceof UnaryExpression) {
 			UnaryExpression ue = (UnaryExpression)expr;
@@ -540,11 +571,7 @@ public class ASTPrinter {
 		}
 		else if(expr instanceof NewExpression) {
 			NewExpression ne = (NewExpression)expr;
-			out.put("new ");
-			out.put(ne.getMethodName());
-			out.put("(");
-			printArguments(ne.getArguments());
-			out.put(")");
+			out.put(ne.toString());
 		}
 		else if(expr instanceof InstanceOfExpression) {
 			InstanceOfExpression ie = (InstanceOfExpression)expr;
@@ -557,15 +584,11 @@ public class ASTPrinter {
 		}
 		else if(expr instanceof TypeReferenceExpression) {
 			TypeReferenceExpression te = (TypeReferenceExpression)expr;
-			out.put(te.getClassName());
-		}
-		else if(expr instanceof FieldAccessExpression) {
-			FieldAccessExpression fae = (FieldAccessExpression)expr;
-			out.put(fae.getClassName() + "." + fae.getFieldName());
+			out.put(te.getClassPath());
 		}
 		else if(expr instanceof CastExpression) {
 			CastExpression ce = (CastExpression)expr;
-			out.put("(" + ce.getTargetType() + ")");
+			out.put("(" + ce.getType() + ")");
 			if (!(ce.getOperand() instanceof VarFieldExpression || ce.getOperand() instanceof LiteralExpression)) {
 				out.put("(");
 				printExpr(ce.getOperand());
@@ -580,7 +603,7 @@ public class ASTPrinter {
 			out.put("new ");
 			VarType vt = null;
 			try {
-				vt = nae.getType(null);
+				vt = nae.getType();
 				while(vt.isArray()) {
 					vt = vt.getElementType();
 				}
@@ -601,10 +624,10 @@ public class ASTPrinter {
 		}
 		else if(expr instanceof ArrayExpression) {
 			ArrayExpression ae = (ArrayExpression)expr;
-			printExpr(ae.getTargetExpr());
+			printExpr(ae.getPathExpr());
 			for(int i=0; i<ae.getDepth(); i++) {
 				out.put("[");
-				printExpr(ae.getIndexesExpr()[i]);
+				printExpr(ae.getIndexesExpr().get(i));
 				out.put("]");
 			}
 		}
@@ -625,30 +648,39 @@ public class ASTPrinter {
 		}
 		else if(expr instanceof EnumExpression) {
 			EnumExpression ee = (EnumExpression)expr;
-			out.put(ee.getName());
+			out.put(ee.toString());
 		}
 		else if(expr instanceof PropertyExpression) {
 			PropertyExpression pe = (PropertyExpression)expr;
-			if(pe.getNameExpr() instanceof LiteralExpression) {
-				out.put(((LiteralExpression)pe.getNameExpr()).getStringValue());
+			if(pe.getTargetExpr() instanceof LiteralExpression) {
+				out.put(((LiteralExpression)pe.getTargetExpr()).getStringValue());
 			}
 			else {
-				printExpr(pe.getNameExpr());
+				printExpr(pe.getTargetExpr());
 			}
 			out.put(".");
 			out.put(pe.getProperty().toString().toLowerCase());
-			if(pe.getArguments().isEmpty()) {
-				try {
-					if(pe.getNameExpr().getType(null).isEnum()) {
-						out.put("()");
-					}
-				}
-				catch(Exception ex) {}
+			if(null==pe.getArguments() || pe.getArguments().isEmpty()) {
+				out.put("()");
 			}
 			else {
 				out.put("(");
 				printArguments(pe.getArguments());
 				out.put(")");
+			}
+		}
+		else if(expr instanceof QualifiedPathExpression) {
+			out.put(((QualifiedPathExpression)expr).toString());
+		}
+		else if(expr instanceof ExpressionsContainer) {
+			ExpressionsContainer ec = (ExpressionsContainer)expr;
+			for(int i=0; i<ec.getExprs().size(); i++) {
+				ExpressionNode _expr = ec.getExprs().get(i);
+				printExpr(_expr);
+				if(i!=ec.getExprs().size()-1) {
+					out.put(";");
+					out.print();
+				}
 			}
 		}
 		else {

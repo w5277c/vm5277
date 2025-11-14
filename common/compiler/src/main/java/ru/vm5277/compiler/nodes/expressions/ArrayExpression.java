@@ -13,19 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.nodes.expressions;
 
+import java.util.List;
+import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.cg.CGArrCells;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.CodegenResult;
-import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
+import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.AstHolder;
 import ru.vm5277.compiler.semantic.Scope;
@@ -33,150 +38,123 @@ import ru.vm5277.compiler.semantic.Symbol;
 import ru.vm5277.compiler.semantic.InitNodeHolder;
 
 public class ArrayExpression extends ExpressionNode {
-	private			ExpressionNode		targetExpr;
-    private			ExpressionNode[]	indexExprs	= new ExpressionNode[0x03];
-	private			int[]				constIndexes= new int[]{-1, -1, -1};
-	private			VarType				type;
-	private			int					depth		= 0;
-	private	final	CGArrCells			arrCells;
+	private			ExpressionNode			targetExpr;
+	private			List<ExpressionNode>	indexExprs;
+	private			int[]					constIndexes= new int[]{-1, -1, -1};
+	private	final	CGArrCells				arrCells;
 
-	public ArrayExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode targetExpr) {
-		super(tb, mc);
-
-		this.targetExpr = targetExpr;
+	public ArrayExpression(TokenBuffer tb, MessageContainer mc, SourcePosition sp, ExpressionNode targetExpr, List<ExpressionNode> indexExprs)
+																																	throws CompileException {
+		super(tb, mc, sp);
 	
-		for(int i=0; i<3; i++) {
-			try {consumeToken(tb, Delimiter.LEFT_BRACKET);} catch(CompileException e){markFirstError(e);} // Потребляем '['
-			try {indexExprs[i] = new ExpressionNode(tb, mc).parse();} catch(CompileException e) {markFirstError(e);} // Парсим выражение-индекс
-			try {consumeToken(tb, Delimiter.RIGHT_BRACKET);} catch(CompileException e){markFirstError(e);} // Потребляем ']'
-			depth++;
-			if(!tb.match(Delimiter.LEFT_BRACKET)) {
-				break;
-			}
+		this.targetExpr = targetExpr;
+		
+		if(0>=indexExprs.size() || 3<indexExprs.size()) {
+			throw new CompileException("Invalid array dimensions - expected 1 to 3 dimensions, but got " + indexExprs.size());
 		}
-		arrCells = new CGArrCells(depth);
-	}
 
-   @Override
-	public VarType getType(Scope scope) throws CompileException {
-		if(null!=type) return type;
-
-		VarType vt = targetExpr.getType(scope);
-		for(int i=0;i<depth; i++) {
-			vt = vt.getElementType();
-		}
-		type = vt;
-		return type;
+		this.indexExprs = indexExprs;
+		
+		arrCells = new CGArrCells(indexExprs.size());
 	}
 
 	@Override
 	public boolean preAnalyze() {
 		boolean result = true;
+		debugAST(this, PRE, true, getFullInfo());
 		
-		if (null == targetExpr) {
-			markError("Array expression is missing");
-			return false;
+		for(ExpressionNode indexExpr : indexExprs) {
+			result&=indexExpr.preAnalyze();
 		}
-
-		if (0==depth) {
-			markError("Index expression is missing");
-			return false;
-		}
-
-		result &= targetExpr.preAnalyze();
 		
-		for(int i=0; i<depth; i++) {
-			result &= indexExprs[i].preAnalyze();
-		}
+		debugAST(this, PRE, false, result, getFullInfo());
 		return result;
 	}
 	
 	@Override
 	public boolean declare(Scope scope) {
 		boolean result = true;
+		debugAST(this, DECLARE, true, getFullInfo());
 		
-		result &= targetExpr.declare(scope);
-
-		symbol = new Symbol("arrayAccess", type);
-
-		for(int i=0; i<depth; i++) {
-			ExpressionNode expr = indexExprs[i];
-			result &= expr.declare(scope);
+		for(ExpressionNode indexExpr : indexExprs) {
+			result&=indexExpr.declare(scope);
 		}
 
+		debugAST(this, DECLARE, false, result, getFullInfo());
 		return result;
 	}
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		boolean result = true;
-		try {
-			// Проверяем подвыражения
-			result &= targetExpr.postAnalyze(scope, cg);
-			if(result) {
-				getType(scope);
+		debugAST(this, POST, true, getFullInfo());
 
-				cgScope = cg.enterArrayExpression(type, (-1==type.getSize() ? cg.getResId() : type.getSize()), arrCells);
-				symbol.setCGScope(cgScope);
+		VarType vt = targetExpr.getType();
+		for(int i=0;i<indexExprs.size(); i++) {
+			vt = vt.getElementType();
+		}
+		type = vt;
+		int cellSize = (-1==type.getSize() ? cg.getResId() : type.getSize());
+		cgScope = cg.enterArrayExpression(type, cellSize, arrCells);
+		
+		result&=targetExpr.postAnalyze(scope, cg);
 
-				VarType vt = type;
-				while(vt.isArray()) {
-					vt=vt.getElementType();
-				}
-				arrCells.setSize(-1==vt.getSize() ? cg.getResId() : vt.getSize());
-
-
-				for(int i=0; i<depth; i++) {
-					ExpressionNode expr = indexExprs[i];
-					result &= expr.postAnalyze(scope, cg);
-					if(result) {
-						if(expr instanceof UnresolvedReferenceExpression) {
-							expr = ((UnresolvedReferenceExpression)expr).getResolvedExpr();
-							indexExprs[i] = expr;
-						}
-
-						// Проверяем тип индекса
-						VarType indexType = expr.getType(scope);
-						if (!indexType.isInteger()) {
-							markError("Array index must be integer, got " + indexType);
-							result = false;
-						}
-						else if(0x02<indexType.getSize()) {
-							markError("Array index type too large, got " + indexType);
-							result = false;
-						}
-					}
-					if(result) {
-						// Пытаемся оптимизировать final Var/Field 
-						ExpressionNode optimizedExpr = expr.optimizeWithScope(scope, cg);
-						if(null != optimizedExpr) {
-							optimizedExpr.postAnalyze(scope, cg);
-							indexExprs[i] = optimizedExpr;
-						}
-					}
+		if(result) {
+			try {
+				ExpressionNode optimizedExpr = targetExpr.optimizeWithScope(scope, cg);
+				if(null!=optimizedExpr) {
+					targetExpr = optimizedExpr;
 				}
 
 				// Проверяем тип массива
-				VarType arrayType = targetExpr.getType(scope);
-				if (!arrayType.isArray()) {
-					markError("Cannot index non-array type: " + arrayType);
+				if(!targetExpr.getType().isArray()) {
+					markError("Cannot index non-array type: " + vt);
 					result = false;
 				}
-
-
 				if(result) {
-					if(targetExpr.getSymbol() instanceof AstHolder) {
-						int[] dimensions = getTargetDimensions();
-						if(null != dimensions) {
-							for(int i=0; i<depth; i++) {
-								ExpressionNode indexExpr = indexExprs[i];
-								if(indexExpr instanceof LiteralExpression) {
-									int index = (int)((LiteralExpression)indexExpr).getNumValue();
-									if(0>index) {
-										markError("Array index is negative:" + index);
-									}
-									else if(0!=dimensions[i] &&  index>(dimensions[i]-0x01)) {
-										markError("Array index " + index + " out of bounds [0.." + (dimensions[i]-0x01) + "]");
+					symbol = new Symbol("arrayAccess", type);
+					symbol.setCGScope(cgScope);
+					arrCells.setSize(cellSize);
+
+					for(int i=0; i<indexExprs.size(); i++) {
+						ExpressionNode expr = indexExprs.get(i);
+						result&=expr.postAnalyze(scope, cg);
+						if(result) {
+							optimizedExpr = expr.optimizeWithScope(scope, cg);
+							if(null != optimizedExpr) {
+								optimizedExpr.postAnalyze(scope, cg);
+								expr = optimizedExpr;
+								indexExprs.set(i, optimizedExpr);
+							}
+
+							// Проверяем тип индекса
+							VarType indexType = expr.getType();
+							if (!indexType.isInteger()) {
+								markError("Array index must be integer, got " + indexType);
+								result = false;
+							}
+							else if(0x02<indexType.getSize()) {
+								markError("Array index type too large, got " + indexType);
+								result = false;
+							}
+						}
+					}
+
+
+					if(result) {
+						if(targetExpr.getSymbol() instanceof AstHolder) {
+							int[] dimensions = getTargetDimensions();
+							if(null != dimensions) {
+								for(int i=0; i<indexExprs.size(); i++) {
+									ExpressionNode indexExpr = indexExprs.get(i);
+									if(indexExpr instanceof LiteralExpression) {
+										int index = (int)((LiteralExpression)indexExpr).getNumValue();
+										if(0>index) {
+											markError("Array index is negative:" + index);
+										}
+										else if(0!=dimensions[i] &&  index>(dimensions[i]-0x01)) {
+											markError("Array index " + index + " out of bounds [0.." + (dimensions[i]-0x01) + "]");
+										}
 									}
 								}
 							}
@@ -184,27 +162,28 @@ public class ArrayExpression extends ExpressionNode {
 					}
 				}
 			}
-		}
-		catch (CompileException e) {
-			cg.leaveExpression();
-			markError(e.getMessage());
-			result = false;
+			catch (CompileException e) {
+				cg.leaveExpression();
+				markError(e.getMessage());
+				result = false;
+			}
 		}
 		
 		cg.leaveExpression();
+		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 	
-	public ExpressionNode getTargetExpr() {
+	public ExpressionNode getPathExpr() {
 		return targetExpr;
 	}
 
-	public ExpressionNode[] getIndexesExpr() {
+	public List<ExpressionNode> getIndexesExpr() {
 		return indexExprs;
 	}
 	
 	public int getDepth() {
-		return depth;
+		return indexExprs.size();
 	}
 	
 //	public int[] getIndexesConst() {
@@ -212,7 +191,7 @@ public class ArrayExpression extends ExpressionNode {
 //	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		CodegenResult result = null;
 
 		CGScope cgs = (null==parent ? cgScope : parent);
@@ -220,12 +199,12 @@ public class ArrayExpression extends ExpressionNode {
 		// Как минимум необходим если targetExpr instanceof MethodCallExpr(MethodCallExpr на toAccum не смотрит, здесь главный тип метода(возвращаемое значение в accum))
 		targetExpr.codeGen(cg, cgs, false);
 
-		CGCellsScope cScope = (CGCellsScope)targetExpr.getSymbol().getCGScope();
-		int accSize = cg.getAccumSize();
+		CGCellsScope cScope = (CGCellsScope)targetExpr.getSymbol().getCGScope(CGCellsScope.class);
+//		int accSize = cg.getAccumSize();
 
 		boolean makeView = (null!=parent && parent instanceof CGCellsScope && ((CGCellsScope)parent).getType().isArray());
 		boolean isView = false;
-		if(targetExpr instanceof AstHolder) {
+		if(targetExpr.getSymbol() instanceof AstHolder) {
 			AstHolder ah = (AstHolder)targetExpr.getSymbol();
 			if(ah.getNode() instanceof InitNodeHolder) {
 				InitNodeHolder inh = (InitNodeHolder)ah.getNode();
@@ -238,8 +217,8 @@ public class ArrayExpression extends ExpressionNode {
 		if(!isView) {
 			arrCells.setDimensionsConst(getTargetDimensions());
 			
-			for(int i=0; i<depth; i++) {
-				ExpressionNode indexExpr = indexExprs[i];
+			for(int i=0; i<indexExprs.size(); i++) {
+				ExpressionNode indexExpr = indexExprs.get(i);
 				if(indexExpr instanceof LiteralExpression) {
 					arrCells.setIndexConst(i, (int)((LiteralExpression)indexExpr).getNumValue());
 				}
@@ -253,8 +232,8 @@ public class ArrayExpression extends ExpressionNode {
 			if(!toAccum && !makeView) {
 				//Похоже вообшще не нужно cg.pushAccBE(cgs, accSize);
 			}
-			for(int i=0; i<depth; i++) {
-				ExpressionNode indexExpr = indexExprs[i];
+			for(int i=0; i<indexExprs.size(); i++) {
+				ExpressionNode indexExpr = indexExprs.get(i);
 				if(indexExpr instanceof LiteralExpression && ((LiteralExpression)indexExpr).isInteger()) {
 					int index = (int)((LiteralExpression)indexExpr).getNumValue();
 					cg.pushConst(cgs, 0x02, index, false);
@@ -263,7 +242,7 @@ public class ArrayExpression extends ExpressionNode {
 					if(indexExpr instanceof ArrayExpression) {
 						indexExpr.codeGen(cg, cgs, false);
 						cg.pushCells(cgs, 0x02, new CGCells(CGCells.Type.ARRAY,
-															(-1==indexExpr.getType(null).getSize() ? cg.getRefSize() : indexExpr.getType(null).getSize())));
+															(-1==indexExpr.getType().getSize() ? cg.getRefSize() : indexExpr.getType().getSize())));
 //						cgs.append(cg.accCast(null, VarType.SHORT));
 						//0x02 - количество байт под индекс массива
 //						cg.pushArrReg(cgs);
@@ -276,23 +255,29 @@ public class ArrayExpression extends ExpressionNode {
 						}
 						else {
 							cg.pushCells(cgs, 0x02, new CGCells(CGCells.Type.ARRAY,
-																(-1==indexExpr.getType(null).getSize() ? cg.getRefSize() : indexExpr.getType(null).getSize())));
+																(-1==indexExpr.getType().getSize() ? cg.getRefSize() : indexExpr.getType().getSize())));
 						}
 					}
 				}
 			}
 		}
 
-		//TODO это точно нужно после targetExpr.depCodeGen(cg);?
+		//TODO это точно нужно после targetExpr.depCodeGen(cg);? Для массива не нужно, он возвращает ArrReg
 //		targetExpr.codeGen(cg, cgs, false);
 		
-		cg.cellsToArrReg(cgs, cScope.getCells());
+		// Если target - MethodCallExpression то результат расположен в аккумуляторе, иначе ожидаем в ArrReg
+		if(targetExpr instanceof MethodCallExpression) {
+			cg.accToArrReg(cgs);
+		}
+		else {
+			cg.cellsToArrReg(cgs, cScope.getCells());
+		}
 
 		// Формируем код для View
 		if(makeView) {
 //			cg.arrRegToCells(cgs, new CGCells(CGCells.Type.ACC, 0x02));
 //			cg.computeArrCellAddr(cgs, null, arrCells);
-			cgs.append(cg.eNewArrView(depth-1));
+			cgs.append(cg.eNewArrView(indexExprs.size()-1));
 		}
 		else {
 			cg.computeArrCellAddr(cgs, null, arrCells);
@@ -309,7 +294,7 @@ public class ArrayExpression extends ExpressionNode {
 	}
 	
 	private int[] getTargetDimensions() {
-		if(targetExpr instanceof AstHolder) {
+		if(targetExpr.getSymbol() instanceof AstHolder) {
 			AstHolder ah = (AstHolder)targetExpr.getSymbol();
 			if(ah.getNode() instanceof InitNodeHolder) {
 				InitNodeHolder inh = (InitNodeHolder)ah.getNode();
@@ -327,9 +312,14 @@ public class ArrayExpression extends ExpressionNode {
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
-		for(int i=0; i<depth; i++) {
-			sb.append("[").append(indexExprs[i]).append("]");
+		for(int i=0; i<indexExprs.size(); i++) {
+			sb.append("[").append(indexExprs.get(i)).append("]");
 		}
-		return getClass().getSimpleName() + " " + targetExpr.toString() + sb.toString();
+		return targetExpr.toString() + sb.toString();
 	}
+	
+	public String getFullInfo() {
+		return getClass().getSimpleName() + " " + toString();
+	}
+
 }

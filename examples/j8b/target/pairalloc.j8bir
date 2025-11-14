@@ -2,18 +2,13 @@ class Main {
     static public void main() {
         System.setParam(2, 18);
         bool b1 = false;
-        short s1 = 0;
         int i1 = 0;
         byte t1 = 0;
         b1=true;
-        s1=515;
         i1=67438087;
         t1=8;
         System.out(b1);
-        System.out(s1);
         System.out(i1);
         System.out(t1);
-    }
-    public Main() {
     }
 }

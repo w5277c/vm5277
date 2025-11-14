@@ -33,6 +33,4 @@ class Main {
         h=70;
         System.out(a+g+h);
     }
-    public Main() {
-    }
 }

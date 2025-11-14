@@ -28,6 +28,7 @@ import static ru.vm5277.common.AssemblerInterface.STRICT_LIGHT;
 import static ru.vm5277.common.AssemblerInterface.STRICT_NONE;
 import static ru.vm5277.common.AssemblerInterface.STRICT_STRONG;
 import ru.vm5277.common.FSUtils;
+import ru.vm5277.common.SemanticAnalyzePhase;
 import ru.vm5277.common.SourceType;
 import ru.vm5277.common.SystemParam;
 import ru.vm5277.common.cg.CodeGenerator;
@@ -40,15 +41,18 @@ import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.ClassBlockNode;
 import ru.vm5277.compiler.nodes.ClassNode;
 import ru.vm5277.compiler.nodes.MethodNode;
-import ru.vm5277.compiler.semantic.ClassScope;
 
 public class Main {
-    public	final	static	String	VERSION				= "0.1.0";
-	public			static	boolean	isWindows;
-	public			static	Path	toolkitPath;
-	public			static	String	launchMethodName	= "main";
-	private			static	int		stirctLevel			= STRICT_LIGHT;
-	private			static	int		optLevel			= Optimization.SIZE;
+    public	final	static	String					VERSION				= "0.3.0";
+	public			static	boolean					isWindows;
+	public			static	Path					toolkitPath;
+	public			static	String					launchMethodName	= "main";
+	public			static	int						tabSize				= 4;
+	private			static	int						stirctLevel			= STRICT_LIGHT;
+	private			static	int						optLevel				= Optimization.SIZE;
+	public	final	static	boolean					DEBUG_AST			= false;
+	private	final	static	Map<Object, Integer>	DEBUG_AST_CNTR_MAP	= new HashMap<>();
+	public					String					aaa					= new String("ssds");
 	
 	public static void main(String[] args) throws IOException, Exception {
 		long startTimestamp = System.currentTimeMillis();
@@ -125,6 +129,7 @@ public class Main {
 					else if(arg.equals("-o") || arg.equals("--opt")) {
 						String optStr = args[++i];
 						if(optStr.equalsIgnoreCase("none")) optLevel = Optimization.NONE;
+						else if(optStr.equalsIgnoreCase("front")) optLevel = Optimization.FRONT;
 						else if(optStr.equalsIgnoreCase("speed")) optLevel = Optimization.SPEED;
 						else if(!optStr.equalsIgnoreCase("size")) {
 							showInvalidOptLevel(optStr);
@@ -151,6 +156,9 @@ public class Main {
 				
 				if(arg.equals("--dump-ir")) {
 					dumpIR = true;
+				}
+				else if(arg.equals("-t") || arg.equals("--tabsize")) {
+					tabSize = Integer.parseInt(args[i]);
 				}
 				else if(arg.equalsIgnoreCase("-am") || arg.equals("--asm-map")) {
 					asmMap = true;
@@ -191,9 +199,7 @@ public class Main {
 		Path runtimePath = toolkitPath.resolve("runtime").normalize();
 		Path sourcePath = FSUtils.resolve(toolkitPath, source);
 		Path basePath = sourcePath.getParent();
-		Lexer lexer = new Lexer(sourcePath.toFile(), mc);
 		
-		ClassScope globalScope = new ClassScope();
 		File libDir = toolkitPath.resolve("bin").resolve("libs").normalize().toFile();
 		NativeBindingsReader nbr = new NativeBindingsReader(runtimePath, mc);
 
@@ -206,9 +212,10 @@ public class Main {
 		CodeGenerator.verbose = cgVerbose;
 		
 		long timestamp = System.currentTimeMillis();
-		System.out.println("Parsing...");
+		System.out.println("Parsing " + sourcePath.toString()  + " ...");
+		Lexer lexer = new Lexer(sourcePath.toFile(), mc);
 		ASTParser parser = new ASTParser(runtimePath, basePath, lexer.getTokens(), mc);
-		ClassNode clazz = parser.getClazz();
+		ClassNode clazz = (ClassNode)parser.getClazz();
 		float time = (System.currentTimeMillis() - timestamp) / 1000f;
 		System.out.println("Parsing done, time:" + String.format(Locale.US, "%.2f", time) + " s");
 		timestamp = System.currentTimeMillis();
@@ -217,11 +224,11 @@ public class Main {
 		}
 		else {
 			System.out.println("Semantic...");
-			SemanticAnalyzer.analyze(globalScope, clazz, cg);
+			SemanticAnalyzer.analyze(clazz, cg);
 			time = (System.currentTimeMillis() - timestamp) / 1000f;
 			System.out.println("Semantic done, time:" + String.format(Locale.US, "%.2f", time) + " s");
 
-			//ReachableAnalyzer.analyze(parser.getClazz(), launchMethodName, mc);
+			//ReachableAnalyzer.analyze(mc, (ClassNode)parser.getClazz(), cg);
 
 			Path targetPath = basePath.resolve("target").normalize();
 			targetPath.toFile().mkdirs();
@@ -260,6 +267,7 @@ public class Main {
 						System.out.println("Codegen...");
 
 						clazz.firstCodeGen(cg, launchNode);
+						ReachableAnalyzer.analyze(mc, (ClassNode)parser.getClazz(), cg);
 						cg.build(VarType.fromClassName(clazz.getName()), 0);
 						//System.out.println("\n" + cg.getAsm());
 
@@ -333,28 +341,30 @@ public class Main {
 		System.out.println("Usage: j8bc" + (isWindows ? ".exe" : "") + " <platform>:<mcu> <input.j8b> [options]");
 		System.out.println();
 		System.out.println("Options:");
-		System.out.println("  -o, --output <file>\tOutput HEX file (default: <input>.hex)");
-		System.out.println("  -F, --freq <MHz>\tMCU clock frequency in MHz (default: platform specific)");
-		System.out.println("  -P, --path <dir>\tCustom toolkit directory path");
-		System.out.println("  -I, --include <dir>\tAdditional include path(s)");
-		System.out.println("      --dump-ir\t\t\tOutput intermediate representation after frontend processing");
-		System.out.println("      --cg-verbose 0-2\t\tGenerate detailed codegen info");
-		System.out.println("  -s, --strict      <strong|light|none> Ambiguity handling level");
-		System.out.println("                     strong  - Treat as error");
-		System.out.println("                     light   - Show warning (default)");
-		System.out.println("                     none    - Silent mode");
-		System.out.println("  -o, --opt         <none|size|speed> Optimization high language(j8b) level");
-		System.out.println("                     none    - No optimization");
-		System.out.println("                     size    - Size(Flash) optimization (default)");
-		System.out.println("                     speed   - Execution speed optimization");
-		System.out.println("  -ao, --asm-output <file> Output HEX file (default: <input>.hex)"); //TODO
-		System.out.println("  -af, --asm-format <fmt>  Output format (hex, bin)"); //TODO
-		System.out.println("                     hex     - Intel HEX (default)");
-		System.out.println("                     bin     - Raw binary");
-		System.out.println("  -am, --asm-map			Generate asm memory map file");
-		System.out.println("  -al, --asm-list			Generate asm listing file");
-		System.out.println("  -v, --version\t\tDisplay version");
-		System.out.println("  -h, --help\t\tShow this help");
+		System.out.println("  -o,  --output <file>  Output HEX file (default: <input>.hex)");
+		System.out.println("  -F,  --freq <MHz>     MCU clock frequency in MHz (default: platform specific)");
+		System.out.println("  -P,  --path <dir>     Custom toolkit directory path");
+		System.out.println("  -I,  --include <dir>  Additional include path(s)");
+		System.out.println("  -t,  --tabsize <num>  Tab size in spaces (default: 4)");
+		System.out.println("       --dump-ir        Output intermediate representation after frontend processing");
+		System.out.println("       --cg-verbose 0-2 Generate detailed codegen info");
+		System.out.println("  -s,  --strict         <strong|light|none> Ambiguity handling level");
+		System.out.println("                        strong  - Treat as error");
+		System.out.println("                        light   - Show warning (default)");
+		System.out.println("                        none    - Silent mode");
+		System.out.println("  -o,  --opt            <none|front|size|speed> Optimization high language(j8b) level");
+		System.out.println("                        none    - No optimization");
+		System.out.println("                        front   - Frontend optimization only");
+		System.out.println("                        size    - Size(Flash) optimization (default)");
+		System.out.println("                        speed   - Execution speed optimization");
+		System.out.println("  -ao, --asm-output     <file> Output HEX file (default: <input>.hex)"); //TODO
+		System.out.println("  -af, --asm-format     <fmt>  Output format (hex, bin)"); //TODO
+		System.out.println("                        hex     - Intel HEX (default)");
+		System.out.println("                        bin     - Raw binary");
+		System.out.println("  -am, --asm-map        Generate asm memory map file");
+		System.out.println("  -al, --asm-list       Generate asm listing file");
+		System.out.println("  -v,  --version        Display version");
+		System.out.println("  -h,  --help           Show this help");
 		System.out.println();
 		System.out.println("Example:");
 		System.out.println("  j8bc avr:atmega328p main.j8b -f 8 -o firmware.hex -I ./libs");
@@ -396,5 +406,23 @@ public class Main {
 	
 	public static int getOptLevel() {
 		return optLevel;
+	}
+	
+	public static void debugAST(Object obj, SemanticAnalyzePhase phase, boolean isIn, String info) {
+		debugAST(obj, phase, isIn, false, info);
+	}
+	public static void debugAST(Object obj, SemanticAnalyzePhase phase, boolean isIn, boolean result, String info) {
+		if(DEBUG_AST) {
+			Integer cntr = null;
+			if(isIn && SemanticAnalyzePhase.POST==phase) {
+				cntr = DEBUG_AST_CNTR_MAP.get(obj);
+				if(null==cntr) cntr = 0;
+				cntr++;
+				DEBUG_AST_CNTR_MAP.put(obj, cntr);
+			}
+			
+			System.out.println(	"ASTDEBUG " + (null==obj ? "" : String.format("%8X", obj.hashCode())) + "\t" + phase + "\t" +
+								(isIn ? "I " + (null!=cntr ? "x" + cntr : "") : "O " + result) + "\t" + info);
+		}
 	}
 }

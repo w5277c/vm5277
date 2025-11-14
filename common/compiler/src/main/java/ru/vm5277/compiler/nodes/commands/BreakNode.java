@@ -16,6 +16,9 @@
 package ru.vm5277.compiler.nodes.commands;
 
 import java.util.List;
+import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
@@ -26,6 +29,7 @@ import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.messages.MessageContainer;
+import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.LabelSymbol;
 import ru.vm5277.compiler.semantic.Scope;
@@ -40,10 +44,20 @@ public class BreakNode extends CommandNode {
         consumeToken(tb);
         
 		if(tb.match(TokenType.ID)) {
-			try {label = consumeToken(tb, TokenType.ID).toString();}catch(CompileException e) {markFirstError(e);};
+			try {
+				label = consumeToken(tb, TokenType.ID).toString();
+			}
+			catch(CompileException e) {
+				markFirstError(e);
+			}
 		}
 		
-		try {consumeToken(tb, Delimiter.SEMICOLON);}catch(CompileException e) {markFirstError(e);}
+		try {
+			consumeToken(tb, Delimiter.SEMICOLON);
+		}
+		catch(CompileException e) {
+			markFirstError(e);
+		}
     }
 
 	public String getLabel() {
@@ -51,33 +65,35 @@ public class BreakNode extends CommandNode {
 	}
 
 	@Override
-	public String getNodeType() {
-		return "break command";
-	}
-	
-	@Override
     public String toString() {
-        return "break" + (null != label ? " " + label : "");
+        return (null!=label ? label : "");
     }
+	public String getFullInfo() {
+		return getClass().getSimpleName() + " " + toString();
+	}
 
 	@Override
 	public boolean preAnalyze() {
 		boolean result = true;
+		debugAST(this, PRE, true, getFullInfo());
+
 		// Базовая проверка - команда break должна быть внутри цикла
 		if(!isInLoopNode()) {
-			markFirstError(parserError("'break' outside of loop"));
+			markError("'break' outside of loop");
 			result = false;
         }
 
+		debugAST(this, PRE, false, result, getFullInfo());
 		return result;
 	}
 
 	@Override
 	public boolean declare(Scope scope) {
 		boolean result = true;
+		debugAST(this, DECLARE, true, getFullInfo());
 		
 		if(label!=null) {
-			if (!(scope instanceof BlockScope)) {
+			if(!(scope instanceof BlockScope)) {
 				markError("Labeled break must be inside block scope");
 				result = false;
 			}
@@ -89,17 +105,22 @@ public class BreakNode extends CommandNode {
 					result = false;
 				}
 
-				// Регистрируем использование метки
-				symbol.addReference(this);
+				if(result) {
+					// Регистрируем использование метки
+					symbol.addReference(this);
+				}
 			}
 		}
 		
+		debugAST(this, DECLARE, false, result, getFullInfo());
 		return result;
 	}
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		boolean result = true;
+		debugAST(this, POST, true, getFullInfo());
+		cgScope = cg.enterCommand();
 		
 		// Проверка для break с меткой
         if(null!=symbol) {
@@ -116,6 +137,8 @@ public class BreakNode extends CommandNode {
 			}
         }
 		
+		cg.leaveCommand();
+		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 
@@ -125,7 +148,7 @@ public class BreakNode extends CommandNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		CodegenResult result = null;
 		
 		CGScope cgs = null == parent ? cgScope : parent;

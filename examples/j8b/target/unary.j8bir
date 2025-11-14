@@ -21,11 +21,11 @@ class Main {
         s2=-s1;
         s1=!b1;
         f1=!b1;
-        f1=-s1;
-        f1=++s1;
-        f1=--s1;
-        f1=s1++;
-        f1=s1--;
+        f1=((fixed)(-s1));
+        f1=((fixed)(++s1));
+        f1=((fixed)(--s1));
+        f1=((fixed)(s1++));
+        f1=((fixed)(s1--));
         
         
         s1=++s1;
@@ -35,7 +35,5 @@ class Main {
         System.out(s2);
         System.out(f1);
         System.out(b2);
-    }
-    public Main() {
     }
 }

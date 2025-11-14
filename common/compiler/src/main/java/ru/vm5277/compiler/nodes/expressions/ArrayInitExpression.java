@@ -19,6 +19,7 @@ package ru.vm5277.compiler.nodes.expressions;
 import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.Pair;
+import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.DataSymbol;
 import ru.vm5277.common.compiler.VarType;
@@ -27,10 +28,10 @@ import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.compiler.nodes.TokenBuffer;
-import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.cg.CGArrCells;
 import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.compiler.semantic.CIScope;
 
 public class ArrayInitExpression extends ExpressionNode {
 	public static class ConstRange {
@@ -58,20 +59,19 @@ public class ArrayInitExpression extends ExpressionNode {
 	}
 	
 	private			VarType					basedType;
-	private	final	VarType					type;
 	private			List<ExpressionNode>	valueExprs	= new ArrayList<>();
 	private			int[]					dimensions	= new int[]{0, 0, 0};
 	private			List<ExpressionNode>	linearValues= new ArrayList<>();
 	private			List<ConstRange>		constRanges	= new ArrayList<>();
 	
-	public ArrayInitExpression(TokenBuffer tb, MessageContainer mc, VarType type) {
-        super(tb, mc);
+	public ArrayInitExpression(TokenBuffer tb, MessageContainer mc, SourcePosition sp, VarType type) {
+        super(tb, mc, sp);
 	
 		try {
 			consumeToken(tb, Delimiter.LEFT_BRACE); // Потребляем '{'
 			while(!tb.match(TokenType.EOF)) {
 				if(tb.match(Delimiter.LEFT_BRACE)) { // Проверяем на '{'
-					valueExprs.add(new ArrayInitExpression(tb, mc, type));
+					valueExprs.add(new ArrayInitExpression(tb, mc, sp, type));
 				}
 				else {
 					valueExprs.add(new ExpressionNode(tb, mc).parse());
@@ -101,11 +101,6 @@ public class ArrayInitExpression extends ExpressionNode {
 		this.type = type;
     }
 
-	@Override
-	public VarType getType(Scope scope) throws CompileException {
-		return type;
-	}	
-	
 	@Override
 	public boolean preAnalyze() {
 		boolean result = true;
@@ -145,10 +140,6 @@ public class ArrayInitExpression extends ExpressionNode {
 				ExpressionNode valueExpr = linearValues.get(i);
 				if(!(valueExpr instanceof ArrayInitExpression)) {
 					result&=valueExpr.postAnalyze(scope, cg);
-					if(valueExpr instanceof UnresolvedReferenceExpression) {
-						valueExpr = ((UnresolvedReferenceExpression)valueExpr).getResolvedExpr();
-						linearValues.set(i, valueExpr);
-					}
 				}
 				
 				if(result) {
@@ -163,11 +154,11 @@ public class ArrayInitExpression extends ExpressionNode {
 					}
 
 					// Проверка совместимости типов (аналогично VarNode.postAnalyze)
-					VarType valueType = valueExpr.getType(scope);
+					VarType valueType = valueExpr.getType();
 					if(valueType.isClassType() && basedType.isClassType()) {
 						if(valueType != basedType) {
-							InterfaceScope iScope = scope.getThis().resolveScope(valueType.getClassName());
-							if(!iScope.isImplements(basedType)) {
+							CIScope cis = scope.getThis().resolveCI(valueType.getClassName(), false);
+							if(!cis.isImplements(basedType)) {
 								markError("Type mismatch: cannot assign " + valueType + " to " + basedType);
 								result = false;
 							}
@@ -303,7 +294,7 @@ public class ArrayInitExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		int size = (-1==basedType.getSize() ? cg.getRefSize() : basedType.getSize());
 		int rangeId=0;
 		for(int i=0; i<linearValues.size(); i++) {

@@ -68,9 +68,7 @@ public class CGClassScope extends CGScope {
 	
 	public CGCells memAllocate(int size, boolean isStatic) {
 		if(isStatic) {
-			CGCells cells = new CGCells(CGCells.Type.STAT, size, statOffset);
-			statOffset+=size;
-			return cells;
+			return new CGCells(CGCells.Type.STAT, size, cg.getAndAddStatPoolSize(size));
 		}
 		CGCells cells = new CGCells(CGCells.Type.HEAP, size, fieldsOffset);
 		fieldsOffset+=size;

@@ -15,13 +15,17 @@
  */
 package ru.vm5277.compiler;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Set;
+import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.compiler.Optimization;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.compiler.nodes.ClassNode;
-import ru.vm5277.compiler.semantic.ClassScope;
+import static ru.vm5277.compiler.Main.debugAST;
+import ru.vm5277.compiler.nodes.AstNode;
+import ru.vm5277.compiler.nodes.ObjectTypeNode;
 import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.Scope;
 
@@ -29,23 +33,67 @@ public class SemanticAnalyzer {
 	protected SemanticAnalyzer() {
 	}
 
-	public static void analyze(ClassScope globalScope, ClassNode clazz, CodeGenerator cg) {
+	public static void analyze(ObjectTypeNode clazz, CodeGenerator cg) {
 		if(clazz.preAnalyze()) {
-			if(clazz.declare(globalScope)) {
-				clazz.postAnalyze(globalScope, cg);
+			if(clazz.declare(null)) {
+				// Выполняем если все declare отработали и никаких отложенных.
+				if(AstNode.getDeclarationPendingNodes().isEmpty()) {
+					if(clazz.postAnalyze(null, cg)) {
+						if(Optimization.NONE!=Main.getOptLevel()) {
+							clazz.codeOptimization(null, cg);
+						}
+					}
+				}
+			}
+		}
+		
+		// Пытаемся выполнить отложенные
+		if(!AstNode.getDeclarationPendingNodes().isEmpty()) {
+			debugAST(null, DECLARE, true, "---Try to resolve declaration pending nodes---");
+			
+			boolean result = true;
+			int pendingsQnt = AstNode.getDeclarationPendingNodes().size();
+			while(0!=pendingsQnt) {
+				for(AstNode declarationPendingNode : new ArrayList<AstNode>(AstNode.getDeclarationPendingNodes().keySet())) {
+					Scope scope = AstNode.getDeclarationPendingNodes().get(declarationPendingNode);
+					// Ноды могут вызвать declare у вложенных, поэтому можем получить null
+					if(null!=scope) {
+						result&=declarationPendingNode.declare(scope);
+					}
+				}
+				// Никаких изменений? Значит повторять нет смысла
+				if(pendingsQnt==AstNode.getDeclarationPendingNodes().size()) break;
+				pendingsQnt = AstNode.getDeclarationPendingNodes().size();
+			}
+
+			if(AstNode.getDeclarationPendingNodes().isEmpty()) {
+				// Все отложенные выполнены и ошибок не было
+				if(result) {
+					if(clazz.postAnalyze(null, cg)) {
+						if(Optimization.NONE!=Main.getOptLevel()) {
+							clazz.codeOptimization(null, cg);
+						}
+					}
+				}
+			}
+			else {
+				// Остались отложенные, выдаем ошибки
+				for(AstNode pendingNode : AstNode.getDeclarationPendingNodes().keySet()) {
+					pendingNode.declare(AstNode.getDeclarationPendingNodes().get(pendingNode));
+					pendingNode.markError("Unresolved forward reference: " + pendingNode);
+				}
 			}
 		}
 	}
 	
-	
 	public boolean preAnalyze() {return false;}
 	public boolean declare(Scope scope)  {return false;}
 	public boolean postAnalyze(Scope scope, CodeGenerator cg)  {return false;}
-	
+	public void codeOptimization(Scope scope, CodeGenerator cg) {};
 	
 	public void validateName(String name) throws CompileException {
-        if (name == null || name.isEmpty()) throw new CompileException("Name cannot be empty");
-        if (null != Keyword.fromString(name)) throw new CompileException("Name cannot be a keyword");
+        if(name==null || name.isEmpty()) throw new CompileException("Name cannot be empty");
+        if(null!=Keyword.fromString(name)) throw new CompileException("Name cannot be a keyword");
     }
 	
 	protected void validateModifiers(Set<Keyword> modifiers, Keyword... allowedModifiers) throws CompileException {

@@ -27,14 +27,15 @@ import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.ClassNode;
 import ru.vm5277.compiler.nodes.ImportNode;
 import ru.vm5277.compiler.nodes.InterfaceNode;
+import ru.vm5277.compiler.nodes.ObjectTypeNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.tokens.Token;
 
 public class ASTParser extends AstNode {
 	private	final	FileImporter		fileImporter;
 	private			List<AstNode>		imports			= new ArrayList<>();
-	private			List<ClassNode>		importedClasses	= new ArrayList<>();
-	private			ClassNode			classNode;
+	private			List<ObjectTypeNode>importedClasses	= new ArrayList<>();
+	private			ObjectTypeNode		objTypeNode;
 
 	public ASTParser(Path runtimePath, Path basePath, List<Token> tokens, MessageContainer mc) throws IOException {
 		this.fileImporter = new FileImporter(runtimePath, basePath, mc);
@@ -62,9 +63,7 @@ public class ASTParser extends AstNode {
 		Set<Keyword> modifiers = collectModifiers(tb);
 		if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
 			try {
-				InterfaceNode iNode = new InterfaceNode(tb, mc, modifiers, null, importedClasses);
-				iNode.parse();
-				classNode = iNode;
+				objTypeNode = new InterfaceNode(tb, mc, modifiers, null, importedClasses);
 			}
 			catch(CompileException e) {
 				// Парсинг прерван (дальнейший парсинг файла бессмыслен)
@@ -72,9 +71,7 @@ public class ASTParser extends AstNode {
 		}
 		else if(tb.match(TokenType.OOP, Keyword.CLASS)) {
 			try {
-				ClassNode cNode = new ClassNode(tb, mc, modifiers, null, importedClasses);
-				cNode.parse();
-				classNode = cNode;
+				objTypeNode = new ClassNode(tb, mc, modifiers, false, importedClasses);
 			}
 			catch(CompileException e) {
 				// Парсинг прерван (дальнейший парсинг файла бессмыслен)
@@ -86,22 +83,17 @@ public class ASTParser extends AstNode {
 		return imports;
 	}
 
-	public ClassNode getClazz() {
-		return classNode;
+	public ObjectTypeNode getClazz() {
+		return objTypeNode;
 	}
 
-	@Override
-	public String getNodeType() {
-		return "root";
-	}
-	
 	public TokenBuffer getTB() {
 		return tb;
 	}
 
 	@Override
 	public List<AstNode> getChildren() {
-		return Arrays.asList(classNode);
+		return Arrays.asList(objTypeNode);
 	}
 }
 

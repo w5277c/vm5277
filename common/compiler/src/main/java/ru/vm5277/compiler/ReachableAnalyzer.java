@@ -15,63 +15,38 @@
  */
 package ru.vm5277.compiler;
 
-import java.util.List;
-import ru.vm5277.common.messages.InfoMessage;
+import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
-import ru.vm5277.compiler.nodes.ClassBlockNode;
-import ru.vm5277.compiler.nodes.ClassNode;
-import ru.vm5277.compiler.nodes.MethodNode;
-import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
-import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
-import ru.vm5277.compiler.semantic.FieldSymbol;
-import ru.vm5277.compiler.semantic.VarSymbol;
+import ru.vm5277.compiler.nodes.FieldNode;
+import ru.vm5277.compiler.nodes.ObjectTypeNode;
+import ru.vm5277.compiler.semantic.Symbol;
 
 class ReachableAnalyzer {
-	public static void analyze(ClassNode clazz, String launchMethod, MessageContainer mc) {
-/*		ClassBlockNode classBlockNode = clazz.getBody();
+
+	// Ищем static FieldNode со включенным флагом reassigned, и выполняем кодогенерацию в нем(что скорее всего уже выполнено) и в его классе/интерфейсе
+	public static void analyze(MessageContainer mc, ObjectTypeNode objectTypeNode, CodeGenerator cg) {
+		AstNode classBlockNode = objectTypeNode.getBody();
 		for(AstNode node : classBlockNode.getChildren()) {
-			if(node instanceof MethodNode) {
-				MethodNode mNode = (MethodNode)node;
-				if(mNode.isPublic() && mNode.isStatic() && mNode.getParameters().isEmpty() && mNode.getName().equals(launchMethod)) {
-					//mNode.setUsed();
-					visit(mNode, mc, false);
-					break;
+			if(node instanceof FieldNode) {
+				FieldNode fNode = (FieldNode)node;
+				if(fNode.isStatic()) {
+					try {
+						Symbol symbol = fNode.getSymbol();
+						if(null!=symbol && symbol.isReassigned()) {
+							fNode.getObjectTypeNode().codeGen(cg, cg, false);
+							fNode.codeGen(cg, null, false);
+						}
+					}
+					catch(CompileException ex) {
+						mc.add(ex.getErrorMessage());
+					}
 				}
 			}
-		}*/
-	}
-	
-	private static void visit(AstNode parentNode, MessageContainer mc, boolean mustUsed) {
-/*		//TODO статические блоки и методы должны быть с включенным флагом isUsed
-		if(null != parentNode.getChildren()) {
-			for(AstNode node : parentNode.getChildren()) {
-				visit(node, mc, mustUsed);
+			else if(node instanceof ObjectTypeNode) {
+				analyze(mc, (ObjectTypeNode)node, cg);
 			}
 		}
-
-		if(mustUsed || parentNode instanceof FieldAccessExpression || parentNode instanceof VarExpression) {
-			Boolean isUsed = parentNode.isUsed();
-			if(null != isUsed && !isUsed.booleanValue()) {
-				parentNode.setUsed();
-				mc.add(new InfoMessage("Mark as used: " + parentNode.getSymbol(), null));
-				if(parentNode.getSymbol() instanceof FieldSymbol) {
-					List<AstNode> fieldNodes = ((FieldSymbol)parentNode.getSymbol()).getFieldNode().getChildren();
-					if(null != fieldNodes) {
-						for(AstNode node : fieldNodes) {
-							visit(node, mc, true);
-						}
-					}
-				}
-				if(parentNode.getSymbol() instanceof VarSymbol) {
-					List<AstNode> varNodes = ((VarSymbol)parentNode.getSymbol()).getVarNode().getChildren();
-					if(null != varNodes) {
-						for(AstNode node : varNodes) {
-							visit(node, mc, true);
-						}
-					}
-				}
-			}
-		}*/
 	}
 }

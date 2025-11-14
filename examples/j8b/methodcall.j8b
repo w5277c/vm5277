@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 import rtos.System;
 import rtos.RTOSParam;
 import hal.GPIO;
@@ -27,7 +28,7 @@ class Main {
 		System.out(add(a+b, add(c, 8)));
 	}
 
-	private byte add(byte b1, byte b2) {
+	private static byte add(byte b1, byte b2) {
 		return b1+b2;
 	}
 }

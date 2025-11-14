@@ -67,11 +67,6 @@ public class ArrayDeclarationNode extends AstNode {
 	}
 
 	@Override
-	public String getNodeType() {
-		return "array declaration";
-	}
-	
-	@Override
 	public boolean preAnalyze() {
 		if(Character.isUpperCase(name.charAt(0))) addMessage(new WarningMessage("Array name should start with lowercase letter:" + name, sp));
 		
@@ -113,10 +108,10 @@ public class ArrayDeclarationNode extends AstNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		// Проверка размера массива (если указан)
 		Integer declaredSize = null;
-		if (size != null) {
+		if(null!=size) {
 			if (size.postAnalyze(scope, cg)) {
 				// Проверяем, что размер - целочисленная константа
-				if (!(size instanceof LiteralExpression) || VarType.INT != ((LiteralExpression)size).getType(scope)) {
+				if (!(size instanceof LiteralExpression) || VarType.INT != ((LiteralExpression)size).getType()) {
 					markError("Array size must be a constant expression");
 				}
 				else {
@@ -137,36 +132,33 @@ public class ArrayDeclarationNode extends AstNode {
 		if (initializer != null) {
 			if (initializer.postAnalyze(scope, cg)) {
 				// Проверка совместимости типов
-				try {
-					VarType initType = initializer.getType(scope);
-					if (!initType.isArray()) markError("Array initializer must be an array");
-					else if (!isCompatibleWith(scope, initType.getElementType(), elementType)) {
-						markError(String.format("Type mismatch: cannot initialize %s[] with %s[]", elementType, initType.getElementType()));
-					}
-					// Дополнительная проверка на сужающее преобразование
-					else if (elementType.isNumeric() && initType.isNumeric() && elementType.getSize() < initType.getSize()) {
-						markError("Narrowing conversion from " + initType + " to " + elementType + " requires explicit cast");
-					}
-					// Проверка размера, если массив с фиксированным размером
-					else if (declaredSize != null) {
-						// Для литеральных массивов
-						if (initializer instanceof LiteralExpression) {
-							Object value = ((LiteralExpression)initializer).getValue();
-							if (value instanceof Object[]) {
-								int actualSize = ((Object[])value).length;
-								if (actualSize != declaredSize) {
-									markError("Array size mismatch: declared " + declaredSize + ", initializer has " + actualSize);
-								}
+				VarType initType = initializer.getType();
+				if (!initType.isArray()) markError("Array initializer must be an array");
+				else if (!isCompatibleWith(scope, initType.getElementType(), elementType)) {
+					markError(String.format("Type mismatch: cannot initialize %s[] with %s[]", elementType, initType.getElementType()));
+				}
+				// Дополнительная проверка на сужающее преобразование
+				else if (elementType.isNumeric() && initType.isNumeric() && elementType.getSize() < initType.getSize()) {
+					markError("Narrowing conversion from " + initType + " to " + elementType + " requires explicit cast");
+				}
+				// Проверка размера, если массив с фиксированным размером
+				else if (declaredSize != null) {
+					// Для литеральных массивов
+					if (initializer instanceof LiteralExpression) {
+						Object value = ((LiteralExpression)initializer).getValue();
+						if (value instanceof Object[]) {
+							int actualSize = ((Object[])value).length;
+							if (actualSize != declaredSize) {
+								markError("Array size mismatch: declared " + declaredSize + ", initializer has " + actualSize);
 							}
 						}
-						// Для других выражений (например, вызовов методов, возвращающих массивы)
-						// Можно добавить дополнительную проверку во время выполнения
-						else {
-							markWarning("Array size will be checked at runtime");
-						}
+					}
+					// Для других выражений (например, вызовов методов, возвращающих массивы)
+					// Можно добавить дополнительную проверку во время выполнения
+					else {
+						markWarning("Array size will be checked at runtime");
 					}
 				}
-				catch (CompileException e) {markError(e);}
 			}
 		}
 

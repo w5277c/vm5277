@@ -3,7 +3,7 @@ class Main {
         System.setParam(0, 16);
         System.setParam(2, 18);
         System.setParam(3, 1);
-        //CONST final byte num = 32;
+        //AST>CONST final byte num = 32;
         byte ch = 'A';
         System.outChar(ch);
         ch++;
@@ -14,7 +14,5 @@ class Main {
         ch=ch+32;
         System.outChar(ch);
         System.stop();
-    }
-    public Main() {
     }
 }

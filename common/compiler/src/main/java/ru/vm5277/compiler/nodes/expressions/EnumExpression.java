@@ -19,31 +19,37 @@ package ru.vm5277.compiler.nodes.expressions;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
-import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.compiler.Delimiter;
+import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
+import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.compiler.semantic.CIScope;
+import ru.vm5277.compiler.semantic.EnumScope;
 
 public class EnumExpression extends ExpressionNode {
-	private	String	id;
-	private	String	value;
-	
-	private	int		index;
-	private	VarType type;
+	private	TypeReferenceExpression	targetExpr;
+	private	String					value;
+	private	int						index		= -1;
+	private	EnumScope				targetScope;
 
-	public EnumExpression(TokenBuffer tb, MessageContainer mc, String id) throws CompileException {
+	public EnumExpression(TokenBuffer tb, MessageContainer mc, TypeReferenceExpression targetExpr, String value) throws CompileException {
 		super(tb, mc);
 		
-		this.id = id;
-		consumeToken(tb, Delimiter.DOT);
-		value = tb.consume().getValue().toString();
+		this.targetExpr = targetExpr;
+		this.value = value;
 	}
 	
-	@Override
-	public VarType getType(Scope scope) {
-		return type;
+	public ExpressionNode getTargetExpr() {
+		return targetExpr;
+	}
+	
+	public CIScope getTargetScope() {
+		return targetScope;
 	}
 	
 	public int getIndex() {
@@ -53,43 +59,60 @@ public class EnumExpression extends ExpressionNode {
 	@Override
 	public boolean preAnalyze() {
 		boolean result = true;
-		
-		type = VarType.fromEnumName(id);
-		index = type.getEnumValueIndex(value);
-
-		if(0>index) {
-			markError("Invalid enum value '" + value + "' for enum " + id);
+		debugAST(this, PRE, true, getFullInfo());
+		if(null==targetExpr) {
+			markError("Null-target in enum expression");
 			result = false;
 		}
-		if(255<index) {
-			markError("Enum value index out of range (0-255): " + index);
-			result = false;
-		}
-
+		debugAST(this, PRE, false, result, getFullInfo());
 		return result;
 	}
 	
 	@Override
 	public boolean declare(Scope scope) {
-		return true;
+		boolean result = true;
+		debugAST(this, DECLARE, true, getFullInfo());
+		
+		result&=targetExpr.declare(scope);
+		
+		debugAST(this, DECLARE, false, result, getFullInfo() + (declarationPendingNodes.containsKey(this) ? " [DP]" : ""));
+		return result;
 	}
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		return true;
+		boolean result = true;
+		debugAST(this, POST, true, getFullInfo() + " type:" + type);
+		
+		targetScope = (EnumScope)targetExpr.getScope();
+		index = targetScope.getValueIndex(value);
+		type = targetExpr.getType();
+		
+		if(0>index) {
+			markError("Invalid enum value '" + value + "' for enum " + targetExpr.toString());
+			result = false;
+		}
+
+		debugAST(this, POST, false, result, getFullInfo());
+		return result;
 	}
 
-	public String getName() {
-		return id + "." + value;
-	}
-	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		if(toAccum) {
 			cg.constToAcc(parent, 0x01, index, false);
 			return CodegenResult.RESULT_IN_ACCUM;
 		}
 		
 		return null;
+	}
+	
+	@Override
+	public String toString() {
+		return targetExpr.toString() + "." + value;
+	}
+	
+	public String getFullInfo() {
+		return getClass().getSimpleName() + " " + toString();
 	}
 }

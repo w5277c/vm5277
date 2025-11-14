@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.nodes;
 
 import java.util.ArrayList;
@@ -41,16 +42,14 @@ import ru.vm5277.compiler.nodes.commands.SwitchNode;
 import ru.vm5277.compiler.nodes.commands.TryNode;
 import ru.vm5277.compiler.nodes.commands.WhileNode;
 import ru.vm5277.compiler.nodes.expressions.ArrayInitExpression;
-import ru.vm5277.compiler.nodes.expressions.BinaryExpression;
 import ru.vm5277.compiler.nodes.expressions.CastExpression;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.InstanceOfExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.nodes.expressions.MethodCallExpression;
 import ru.vm5277.compiler.nodes.expressions.TernaryExpression;
-import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
 import ru.vm5277.compiler.nodes.expressions.UnaryExpression;
-import ru.vm5277.compiler.nodes.expressions.UnresolvedReferenceExpression;
+import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
@@ -98,8 +97,7 @@ public class BlockNode extends AstNode {
 
 			// Обработка классов с модификаторами
 			if (tb.match(TokenType.OOP) && Keyword.CLASS == tb.current().getValue()) {
-				ClassNode cNode = new ClassNode(tb, mc, modifiers, null, null);
-				cNode.parse();
+				ClassNode cNode = new ClassNode(tb, mc, modifiers, true, null);
 				children.add(cNode);
 				continue;
 			}
@@ -112,7 +110,6 @@ public class BlockNode extends AstNode {
 			// Обработка интерфейсов с модификаторами
 			if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
 				InterfaceNode iNode = new InterfaceNode(tb, mc, modifiers, null, null);
-				iNode.parse();
 				children.add(iNode);
 				continue;
 			}
@@ -120,28 +117,15 @@ public class BlockNode extends AstNode {
 			try {
 				// Определение типа (примитив или класс)
 				VarType type = checkPrimtiveType();
-				if(null == type) type = checkClassType();
-				if(null == type) type = checkEnumType();
-				if(null != type) type = checkArrayType(type);
+				if(null==type) type = checkClassType();
+				if(null!=type) type = checkArrayType(type);
 
-				if(null != type) {
+				if(null!=type) {
 					if(tb.match(Delimiter.DOT)) {
-						while (tb.match(Delimiter.DOT)) {
-							tb.consume();
-							
-							String methodName = (String)consumeToken(tb, TokenType.ID).getValue();
-							if (tb.match(Delimiter.LEFT_PAREN)) {
-								// Это вызов метода
-								children.add(	new MethodCallExpression(tb, mc, new TypeReferenceExpression(tb, mc, type.getClassName()), methodName,
-													parseArguments(tb)));
-								consumeToken(tb, Delimiter.SEMICOLON);
-								break;
-							}
-							else {
-								// Доступ к полю (можно добавить FieldAccessNode)
-								throw new CompileException("Field access not implemented yet", tb.current().getSP());
-							}
-						}
+						tb.back();
+						ExpressionNode expr = new ExpressionNode(tb, mc).parse();
+						consumeToken(tb, Delimiter.SEMICOLON);
+						children.add(expr);
 						continue;
 					}
 					else {
@@ -156,7 +140,7 @@ public class BlockNode extends AstNode {
 						}
 						else { // Переменная
 							VarNode varNode = new VarNode(tb, mc, modifiers, type, name);
-							if(null != name) children.add(varNode);
+							if(null!=name) children.add(varNode);
 						}
 						continue;
 					}
@@ -173,6 +157,7 @@ public class BlockNode extends AstNode {
 			}
 			catch(CompileException e) {
 				markFirstError(e);
+				tb.skip(Delimiter.SEMICOLON, Delimiter.RIGHT_BRACE);
 			}
 		}
 		consumeToken(tb, Delimiter.RIGHT_BRACE);
@@ -229,18 +214,13 @@ public class BlockNode extends AstNode {
 	}
 	
 	@Override
-	public String getNodeType() {
-		return "code block";
-	}
-	
-	@Override
 	public boolean preAnalyze() {
 		boolean result = true;
 		
 		// Проверка всех объявлений в блоке
 		for (AstNode node : children) {
 			if(node instanceof ExpressionNode) {
-				boolean noEffect =	node instanceof CastExpression || node instanceof InstanceOfExpression || node instanceof UnresolvedReferenceExpression ||
+				boolean noEffect =	node instanceof CastExpression || node instanceof InstanceOfExpression ||
 									node instanceof ArrayInitExpression || node instanceof LiteralExpression || node instanceof TernaryExpression;
 				if(!noEffect && node instanceof UnaryExpression) {
 					Operator op = ((UnaryExpression)node).getOperator();
@@ -274,9 +254,9 @@ public class BlockNode extends AstNode {
 		blockScope = new BlockScope(scope);
 
 		// Объявляем все элементы в блоке
-		for (AstNode node : children) {
+		for(AstNode node : children) {
 			if(!node.isDisabled()) {
-				result &= node.declare(blockScope);
+				result&=node.declare(blockScope);
 			}
 		}
 
@@ -299,46 +279,47 @@ public class BlockNode extends AstNode {
 			
 			// Анализируем текущую ноду
 			result&=node.postAnalyze(blockScope, cg);
+			if(result) {
+				if(node instanceof ExpressionNode) {
+					try {
+						ExpressionNode optimizedNode = ((ExpressionNode)node).optimizeWithScope(blockScope, cg);
+						if(null != optimizedNode) {
+							node = optimizedNode;
+							node.postAnalyze(blockScope, cg);
+							children.set(i, node);
+						}
+					}
+					catch(Exception ex) {}
+				}
 
-			if(node instanceof ExpressionNode) {
-				try {
-					ExpressionNode optimizedNode = ((ExpressionNode)node).optimizeWithScope(blockScope, cg);
-					if(null != optimizedNode) {
-						node = optimizedNode;
-						node.postAnalyze(blockScope, cg);
-						children.set(i, node);
+				// Если нашли try-block, отмечаем начало зоны обработки исключений
+				if(node instanceof TryNode) {
+					currentTryNode = (TryNode)node;
+					inTryBlock = true;
+				}
+
+				// Проверка вызовов методов
+				if(node instanceof MethodCallExpression) {
+					MethodCallExpression call = (MethodCallExpression)node;
+					MethodSymbol methodSymbol = (MethodSymbol)call.getSymbol();
+
+					if (null != methodSymbol && methodSymbol.canThrow() && !inTryBlock) {
+						markWarning("Call to throwing method '" + methodSymbol.getName() + "' without try-catch at line " + call.getSP());
 					}
 				}
-				catch(Exception ex) {}
-			}
-			
-			// Если нашли try-block, отмечаем начало зоны обработки исключений
-			if(node instanceof TryNode) {
-				currentTryNode = (TryNode)node;
-				inTryBlock = true;
-			}
 
-			// Проверка вызовов методов
-			if(node instanceof MethodCallExpression) {
-				MethodCallExpression call = (MethodCallExpression)node;
-				MethodSymbol methodSymbol = (MethodSymbol)call.getSymbol();
-
-				if (null != methodSymbol && methodSymbol.canThrow() && !inTryBlock) {
-					markWarning("Call to throwing method '" + methodSymbol.getName() + "' without try-catch at line " + call.getSP());
+				// Если это конец try-block, сбрасываем флаг
+				if(inTryBlock && node == currentTryNode.getEndNode()) {
+					inTryBlock = false;
+					currentTryNode = null;
 				}
-			}
 
-			// Если это конец try-block, сбрасываем флаг
-			if(inTryBlock && node == currentTryNode.getEndNode()) {
-				inTryBlock = false;
-				currentTryNode = null;
-			}
-
-			// Проверяем недостижимый код после прерывающих инструкций
-			if(i > 0 && isControlFlowInterrupted(children.get(i - 1))) {
-				markError("Unreachable code after " + children.get(i - 1).getClass().getSimpleName());
-				// Можно пропустить анализ остального кода, так как он недостижим
-				break;
+				// Проверяем недостижимый код после прерывающих инструкций
+				if(i > 0 && isControlFlowInterrupted(children.get(i - 1))) {
+					markError("Unreachable code after " + children.get(i - 1).getClass().getSimpleName());
+					// Можно пропустить анализ остального кода, так как он недостижим
+					break;
+				}
 			}
 		}
 		
@@ -346,8 +327,18 @@ public class BlockNode extends AstNode {
 		return result;
 	}
 
-	
-	public void firstCodeGen(CodeGenerator cg) throws Exception {
+	@Override
+	public void codeOptimization(Scope scope, CodeGenerator cg) {
+		CGScope oldScope = cg.setScope(cgScope);
+		for(AstNode node : children) {
+			if(!node.isDisabled()) {
+				node.codeOptimization(blockScope, cg);
+			}
+		}
+		cg.setScope(oldScope);
+	}
+
+	public void firstCodeGen(CodeGenerator cg) throws CompileException {
 		cgDone = true;
 		
 		for(AstNode node : children) {
@@ -366,7 +357,7 @@ public class BlockNode extends AstNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 		

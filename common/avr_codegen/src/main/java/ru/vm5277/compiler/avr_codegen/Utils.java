@@ -15,6 +15,8 @@
  */
 package ru.vm5277.compiler.avr_codegen;
 
+import ru.vm5277.common.exceptions.CompileException;
+
 public class Utils {
 
 	/**
@@ -22,7 +24,7 @@ public class Utils {
 	 * @param branchInstr - оригинальная br инструкция
 	 * @return - инвертированная br инструкция, null если инструкции нет
 	 */
-	public static String brInstrInvert(String branchInstr) {
+	public static String brInstrInvert(String branchInstr) throws CompileException {
 		switch(branchInstr.toLowerCase()) {
 			case "brbc": return "brbs";
 			case "brbs": return "brbc";
@@ -44,7 +46,8 @@ public class Utils {
 			case "brts": return "brtc";
 			case "brvc": return "brvs";
 			case "brvs": return "brvc";
-			default: return null;
+			default: 
+				throw new CompileException("Unknown branch instruction: " + branchInstr);
 		}
 	}
 }

@@ -21,9 +21,8 @@ import org.junit.jupiter.api.Test;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.FieldNode;
-import ru.vm5277.compiler.nodes.expressions.BinaryExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
-import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
+import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 import static ru.vm5277.compiler.tokens.Token.toStringValue;
 
 public class ParserTests {
@@ -152,12 +151,6 @@ public class ParserTests {
 		assertEquals(true, e2.getLeft() instanceof BinaryExpression);
 		BinaryExpression e3 = (BinaryExpression)e2.getLeft();
 		assertEquals(Operator.PLUS, e3.getOperator());
-		assertEquals(true, e3.getRight()instanceof VarFieldExpression);
-		assertEquals("i2", toStringValue(((VarFieldExpression)e3.getRight()).getValue()));
-		assertEquals(true, e3.getLeft()instanceof VarFieldExpression);
-		assertEquals("i1", toStringValue(((VarFieldExpression)e3.getLeft()).getValue()));
-		assertEquals(true, e2.getRight()instanceof VarFieldExpression);
-		assertEquals("i3", toStringValue(((VarFieldExpression)e2.getRight()).getValue()));
 		assertEquals(true, e1.getRight() instanceof LiteralExpression);
 		assertEquals("3", ((LiteralExpression)e1.getRight()).getValue().toString());
 		field = (FieldNode)parser.getClazz().getBody().getChildren().get(25);

@@ -48,6 +48,8 @@
 	.EQU	OSR_OK									= 0x00	;Успешно выполнено
 	.EQU	OSR_ALLOC_FAIL							= 0x01	;Ошибка выделения памяти
 
+
+	.SET	OS_STAT_POOL_SIZE						= 0x0000;Размер статических данных(статические поля классов)
 .IFNDEF CORE_FREQ
 	.EQU	CORE_FREQ								= 8
 .ENDIF

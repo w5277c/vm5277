@@ -46,11 +46,6 @@ public class LabelNode extends AstNode {
 	}
 
 	@Override
-	public String getNodeType() {
-		return "label";
-	}
-
-	@Override
 	public boolean preAnalyze() {
 		return true;
 	}

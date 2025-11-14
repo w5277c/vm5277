@@ -22,4 +22,9 @@ public class NumUtils {
 		if(num<65536) return 2;
 		return 4;
 	}
+	
+	public static int getPowerOfTwo(long value) {
+		if(value==0 || (value&(value-1))!=0) return -1;
+		return Long.numberOfTrailingZeros(value);
+	}
 }

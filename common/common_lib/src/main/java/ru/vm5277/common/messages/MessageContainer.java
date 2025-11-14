@@ -17,18 +17,24 @@ package ru.vm5277.common.messages;
 
 import ru.vm5277.common.exceptions.MessageContainerIsFullException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.exceptions.CompilationAbortedException;
 
 public class MessageContainer {
 	
-	private	final	List<Message>	messages		= new ArrayList<>();
-	private			int				maxErrorQnt		= 8;
-	private			int				errorCntr		= 0;
-	private			int				warningCntr		= 0;
-	private			int				lineQnt			= 0;
-	private			boolean			showImmeditly	= false;
-	private			boolean			stopImmeditly	= false;
+	private	final	List<Message>		messages		= new ArrayList<>();
+	private	final	HashMap<SourcePosition, Set<Message>>
+										duplicateMap	= new HashMap<>();
+	private			int					maxErrorQnt		= 8;
+	private			int					errorCntr		= 0;
+	private			int					warningCntr		= 0;
+	private			int					lineQnt			= 0;
+	private			boolean				showImmeditly	= false;
+	private			boolean				stopImmeditly	= false;
 	
 	public MessageContainer() {
 	}
@@ -44,6 +50,21 @@ public class MessageContainer {
 	}
 
 	public void add(Message message) {
+		if(null!=message.getSP()) {
+			// Игнорируем дубликаты (бывает повторный postAnalyze после оптимизации выражений)
+			Set<Message> dupMessages = duplicateMap.get(message.getSP());
+			if(null!=dupMessages) {
+				if(dupMessages.contains(message)) {
+					return;
+				}
+			}
+			else {
+				dupMessages = new HashSet<>();
+				duplicateMap.put(message.getSP(), dupMessages);
+			}
+			dupMessages.add(message);
+		}
+		
 		if(showImmeditly) {
 			System.out.println(message.toStrig());
 		}

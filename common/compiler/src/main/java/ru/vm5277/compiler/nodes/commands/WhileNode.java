@@ -20,7 +20,7 @@ import java.util.List;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
-import ru.vm5277.common.cg.scopes.CGBranchScope;
+import ru.vm5277.common.cg.CGBranch;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
@@ -34,7 +34,6 @@ import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
-import ru.vm5277.compiler.nodes.expressions.UnresolvedReferenceExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.Scope;
 
@@ -42,7 +41,7 @@ public class WhileNode extends CommandNode {
 	private	ExpressionNode	condition;
 	private	BlockNode		blockNode;
 	private	BlockScope		blockScope;
-	private	CGBranchScope	brScope;
+	private	CGBranch		branch		= new CGBranch();
 	private	boolean			alwaysTrue;
 	private	boolean			alwaysFalse;
 		
@@ -67,10 +66,9 @@ public class WhileNode extends CommandNode {
 	public BlockNode getBody() {
 		return blockNode;
 	}
-
-	@Override
-	public String getNodeType() {
-		return "while loop";
+	
+	public boolean isAlwaysFalse() {
+		return alwaysFalse;
 	}
 
 	@Override
@@ -116,13 +114,7 @@ public class WhileNode extends CommandNode {
 		boolean result = true;
 		cgScope = cg.enterLoopBlock();
 
-		// Проверка типа условия
-		brScope = cg.enterBranch();
 		result&=condition.postAnalyze(blockScope, cg);
-		if(condition instanceof UnresolvedReferenceExpression) {
-			condition = ((UnresolvedReferenceExpression)condition).getResolvedExpr();
-		}
-
 		if(result) {
 			try {
 				ExpressionNode optimizedExpr = condition.optimizeWithScope(blockScope, cg);
@@ -138,15 +130,9 @@ public class WhileNode extends CommandNode {
 		}
 
 		if(result) {
-			try {
-				VarType condType = condition.getType(blockScope);
-				if(null==condType || VarType.BOOL!=condType) {
-					markError("Loop condition must be boolean, got: " + condType);
-					result = false;
-				}
-			}
-			catch (CompileException e) {
-				markError(e);
+			VarType condType = condition.getType();
+			if(null==condType || VarType.BOOL!=condType) {
+				markError("Loop condition must be boolean, got: " + condType);
 				result = false;
 			}
 		}
@@ -159,7 +145,6 @@ public class WhileNode extends CommandNode {
 				alwaysFalse = true;
 			}
 		}
-		cg.leaveBranch();
 		
 		// Анализ тела цикла
 		if(null!=blockNode) {
@@ -177,18 +162,31 @@ public class WhileNode extends CommandNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public void codeOptimization(Scope scope, CodeGenerator cg) {
+		CGScope oldScope = cg.setScope(cgScope);
+		
+		condition.codeOptimization(scope, cg);
+		if(null!=blockNode) {
+			blockNode.codeOptimization(scope, cg);
+		}
+		
+		cg.setScope(oldScope);
+	}
+
+	@Override
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
 
 		CodegenResult result = null;
 		CGScope cgs = null == parent ? cgScope : parent;
-
+		cgs.setBranch(branch);
+		
 		CGLabelScope loopLbScope = new CGLabelScope(null, null, LabelNames.LOOP, true);
 		if(!alwaysFalse) {
-			brScope.append(loopLbScope);
+			cgs.append(loopLbScope);
 			if(!alwaysTrue) {
-				condition.codeGen(cg, brScope, false);
+				condition.codeGen(cg, cgs, false);
 			}
 		}
 
@@ -200,7 +198,7 @@ public class WhileNode extends CommandNode {
 			cg.jump(cgs, loopLbScope);
 		}
 		if(!alwaysFalse) {
-			cgs.append(brScope.getEnd());
+			cgs.append(branch.getEnd());
 		}
 
 		cgs.append(((CGLoopBlockScope)cgScope).getEndLbScope());

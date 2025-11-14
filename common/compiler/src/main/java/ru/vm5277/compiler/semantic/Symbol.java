@@ -26,7 +26,8 @@ public class Symbol {
 	protected			boolean				isFinal;
 	protected			boolean				isNative;
 	private				CGScope				cgScope;
-	private				boolean				reassigned = false;
+	private				boolean				reassigned		= false;
+	private				Integer				lastAccessedSN	= null;
 	
 	protected Symbol(String name) {
 		this.name = name;
@@ -103,5 +104,15 @@ public class Symbol {
 	}
 	public boolean isReassigned() {
 		return reassigned;
+	}
+	
+	public void setAccessed(int sn) {
+		if(null==lastAccessedSN || lastAccessedSN<sn) {
+			lastAccessedSN = sn;
+		}
+	}
+	
+	public Integer getLastAccessedSN() {
+		return lastAccessedSN;
 	}
 }

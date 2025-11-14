@@ -18,34 +18,38 @@ package ru.vm5277.compiler.nodes.expressions;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
+import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.TokenBuffer;
-import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.ClassSymbol;
 import ru.vm5277.compiler.semantic.Scope;
+import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
+import ru.vm5277.common.compiler.CodegenResult;
+import ru.vm5277.compiler.semantic.CIScope;
 
-public class ThisExpression extends ExpressionNode {
-	private	ClassScope	scope;
-	
-	public ThisExpression(TokenBuffer tb, MessageContainer mc) {
-		super(tb, mc);
+public class ThisExpression extends TypeReferenceExpression {
+	public ThisExpression(TokenBuffer tb, MessageContainer mc, CIScope cis) {
+		super(tb, mc, null, "this", cis);
 	}
 	
 	@Override
 	public boolean preAnalyze() {
-		return true;
-	}
-	
-	@Override
-	public VarType getType(Scope scope) {
-		return VarType.fromClassName(scope.getThis().getName());
+		boolean result = true;
+		return result;
 	}
 	
 	@Override
 	public boolean declare(Scope scope) {
-		this.scope = scope.getThis();
-		symbol = new ClassSymbol(this.scope.getName(), VarType.fromClassName(this.scope.getName()), true, false, this.scope);
-		return true;
+		boolean result = true;
+		debugAST(this, DECLARE, true, getFullInfo());
+		cis = scope.getThis();
+		
+		type = VarType.fromClassName(cis.getName());
+		symbol = new ClassSymbol(cis.getName(), type, true, false, cis);
+		
+		debugAST(this, DECLARE, false, result, getFullInfo() + (declarationPendingNodes.containsKey(this) ? " [DP]" : ""));
+		return result;
 	}
 	
 	@Override
@@ -54,12 +58,23 @@ public class ThisExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+		CGScope cgs = null == parent ? cgScope : parent;
+		
+		if(toAccum) {
+			cg.thisToAcc(cgs);
+			return CodegenResult.RESULT_IN_ACCUM;
+		}
+		
 		return null;
 	}
 	
 	@Override
 	public String toString() {
+		return "this";
+	}
+	
+	public String getFullInfo() {
 		return getClass().getSimpleName();
 	}
 }

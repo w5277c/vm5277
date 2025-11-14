@@ -20,8 +20,8 @@ import ru.vm5277.common.compiler.VarType;
 public class ClassSymbol extends Symbol {
 	private	final	Scope	scope;
 	
-	public ClassSymbol(String name, VarType returnType, boolean isFinal, boolean isStatic, Scope scope) {
-		super(name, returnType, isFinal, isStatic);
+	public ClassSymbol(String name, VarType type, boolean isFinal, boolean isStatic, Scope scope) {
+		super(name, type, isFinal, isStatic);
 		
 		this.scope = scope;
 	}

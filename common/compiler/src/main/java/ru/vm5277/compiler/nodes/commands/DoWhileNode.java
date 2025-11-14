@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.nodes.commands;
 
 import java.util.Arrays;
@@ -29,7 +30,6 @@ import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
-import ru.vm5277.compiler.nodes.expressions.UnresolvedReferenceExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.Scope;
 
@@ -82,11 +82,6 @@ public class DoWhileNode extends CommandNode {
 	}
 
 	@Override
-	public String getNodeType() {
-		return "do-while loop";
-	}
-
-	@Override
 	public boolean preAnalyze() {
 		// Проверка тела цикла (выполняется всегда хотя бы один раз)
 		if (null != getBody()) getBody().preAnalyze();
@@ -121,15 +116,10 @@ public class DoWhileNode extends CommandNode {
 		// Проверка типа условия
 		if (null != condition) {
 			if(condition.postAnalyze(scope, cg)) {
-				if(condition instanceof UnresolvedReferenceExpression) {
-					condition = ((UnresolvedReferenceExpression)condition).getResolvedExpr();
+				VarType condType = condition.getType();
+				if(VarType.BOOL!=condType) {
+					markError("While condition must be boolean, got: " + condType);
 				}
-
-				try {
-					VarType condType = condition.getType(scope);
-					if (VarType.BOOL != condType) markError("While condition must be boolean, got: " + condType);
-				}
-				catch (CompileException e) {markError(e);}
 			}
 			
 			// Проверяем бесконечный цикл с возвратом

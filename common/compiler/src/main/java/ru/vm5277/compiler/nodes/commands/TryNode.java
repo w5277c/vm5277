@@ -121,11 +121,6 @@ public class TryNode extends CommandNode {
 		return catchDefaultBlock;
 	}
 	
-	@Override
-	public String getNodeType() {
-		return "try-catch block";
-	}
-	
 	public AstNode getEndNode() {
 		if (null != catchDefaultBlock) return catchDefaultBlock;
 		if (!catchCases.isEmpty()) return catchCases.get(catchCases.size()-1).getBlock();
@@ -213,7 +208,7 @@ public class TryNode extends CommandNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
 

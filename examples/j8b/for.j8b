@@ -13,8 +13,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 import rtos.System;
 import rtos.RTOSParam;
+
+// Пример различных циклов, в том числе с else условием
+// Частичный анализ live ranges, будет доделан позже
 
 class Main {
     public static void main() {
@@ -30,6 +34,9 @@ class Main {
 
 		for(byte i=7; 4>8; i++) {
 			System.out(i);
+		}
+		else {
+			System.out('@');
 		}
 
 		for(byte i=8; 4<8; i++) {

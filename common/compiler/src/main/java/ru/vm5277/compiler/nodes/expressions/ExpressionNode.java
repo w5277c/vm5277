@@ -15,19 +15,24 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
+import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 import java.util.ArrayList;
 import java.util.List;
+import ru.vm5277.common.NumUtils;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.Operator;
 import static ru.vm5277.common.Operator.MINUS;
 import static ru.vm5277.common.Operator.PLUS;
+import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
+import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
+import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.FieldNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -39,11 +44,17 @@ import ru.vm5277.compiler.semantic.VarSymbol;
 import ru.vm5277.compiler.tokens.Token;
 
 public class ExpressionNode extends AstNode {
+	protected	VarType type;
+	
 	public ExpressionNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
 	}
 	
-    public ExpressionNode parse() throws CompileException {
+	public ExpressionNode(TokenBuffer tb, MessageContainer mc, SourcePosition sp) {
+		super(tb, mc, sp);
+	}
+
+	public ExpressionNode parse() throws CompileException {
         return parseAssignment();
     }
    
@@ -54,7 +65,7 @@ public class ExpressionNode extends AstNode {
 			Operator operator = ((Operator)consumeToken(tb).getValue());
 			ExpressionNode right = parseAssignment();
 
-			return optimizeExpression(new BinaryExpression(tb, mc, left, operator, right));
+			return optimizeExpression(BinaryExpression.create(tb, mc, tb.getSP(), left, operator, right));
 		}
 
 		return optimizeExpression(left);
@@ -64,11 +75,11 @@ public class ExpressionNode extends AstNode {
 	private ExpressionNode parseBinary(int minPrecedence) throws CompileException {
         ExpressionNode left = parseUnary();
 
-		while (tb.match(TokenType.OPERATOR)) {
+		while(tb.match(TokenType.OPERATOR)) {
             Operator operator = ((Operator)tb.current().getValue());
 
-			if (operator == Operator.TERNARY) {
-				if (minPrecedence > Operator.PRECEDENCE.get(operator)) {
+			if(operator==Operator.TERNARY) {
+				if(minPrecedence>Operator.PRECEDENCE.get(operator)) {
 					break;
 				}
 				consumeToken(tb);
@@ -78,20 +89,22 @@ public class ExpressionNode extends AstNode {
 				ExpressionNode falseExpr = parseBinary(Operator.PRECEDENCE.get(operator));
 				if(left instanceof LiteralExpression) {
 					Object val = ((LiteralExpression)left).getValue();
-					if (val instanceof Boolean) {
+					if(val instanceof Boolean) {
 						return (Boolean)val ? trueExpr : falseExpr;
 					}
 				}
-				return new TernaryExpression(tb, mc, left, trueExpr, falseExpr);
+				return new TernaryExpression(tb, mc, sp, left, trueExpr, falseExpr);
 			}
 
-			if (operator == Operator.IS) {
+			if(operator==Operator.IS) {
 				consumeToken(tb); // Пропускаем 'is'
 
 				// Запрещаем литералы слева
-				if (left instanceof LiteralExpression) throw new CompileException("Literals cannot be used with 'instanceof'", left.getSP());
+				if(left instanceof LiteralExpression) {
+					throw new CompileException("Literals cannot be used with 'instanceof'", left.getSP());
+				}
 
-				if (minPrecedence > Operator.PRECEDENCE.get(operator)) {
+				if(minPrecedence>Operator.PRECEDENCE.get(operator)) {
 					break;
 				}
 				
@@ -106,10 +119,10 @@ public class ExpressionNode extends AstNode {
 					typeExpr = parseTypeReference(); // Разбираем выражение типа
 				}
 				String varName = null;
-				if (tb.match(Keyword.AS)) {
+				if(tb.match(Keyword.AS)) {
 					tb.consume(); // Потребляем "as"
 					// Проверяем, что после типа идет идентификатор
-					if (tb.match(TokenType.ID)) {
+					if(tb.match(TokenType.ID)) {
 						varName = consumeToken(tb).getStringValue();
 					}
 					else {
@@ -120,7 +133,7 @@ public class ExpressionNode extends AstNode {
 			}
 			
 			Integer precedence = Operator.PRECEDENCE.get(operator);
-            if (precedence == null || precedence<minPrecedence) {
+            if(precedence == null || precedence<minPrecedence) {
 				break;
 			}
             consumeToken(tb);
@@ -137,7 +150,7 @@ public class ExpressionNode extends AstNode {
 		// Оптимизация унарных операций (если левая часть - унарный оператор)
 		if (right instanceof UnaryExpression) {
 			UnaryExpression unary = (UnaryExpression)right;
-			right = optimizeUnary(unary.getOperator(), unary.getOperand());
+			right = optimizeUnary(unary);
 		}
 		
 		if (left instanceof LiteralExpression && right instanceof LiteralExpression) {
@@ -150,7 +163,8 @@ public class ExpressionNode extends AstNode {
 					case OR:	return new LiteralExpression(tb, mc, ((Boolean)leftVal) || ((Boolean)rightVal));
 					case EQ:	return new LiteralExpression(tb, mc, ((Boolean)leftVal) == ((Boolean)rightVal));
 					case NEQ:	return new LiteralExpression(tb, mc, ((Boolean)leftVal) != ((Boolean)rightVal));
-					default:	return new BinaryExpression(tb, mc, new LiteralExpression(tb, mc, left), op, new LiteralExpression(tb, mc, right));
+					default:	return BinaryExpression.create(	tb, mc, left.getSP(), new LiteralExpression(tb, mc, left), op,
+																new LiteralExpression(tb, mc, right));
 				}
 			}
 			else if (op.isComparison() && leftVal instanceof Number && rightVal instanceof Number) {
@@ -184,10 +198,11 @@ public class ExpressionNode extends AstNode {
 					
 					VarFieldExpression ve = (VarFieldExpression)(bRight.getLeft() instanceof VarFieldExpression ? bRight.getLeft() : bRight.getRight());
 					LiteralExpression le = (LiteralExpression)(bRight.getLeft() instanceof VarFieldExpression ? bRight.getRight(): bRight.getLeft());
-					if(	ve.getValue().equals(((VarFieldExpression)left).getValue()) && le.isInteger()) {
+					if(	ve.getName().equals(((VarFieldExpression)left).getName()) && le.isInteger()) {
 						long num = le.getNumValue();
 						if(-1 == num || 1 == num) {
-							return new UnaryExpression(tb, mc, (Operator.PLUS==bRight.getOperator()^(-1==num)) ? Operator.PRE_INC : Operator.PRE_DEC, left);
+							return new UnaryExpression(	tb, mc, left.getSP(),
+														(Operator.PLUS==bRight.getOperator()^(-1==num)) ? Operator.PRE_INC : Operator.PRE_DEC, left);
 						}					
 					}
 				}
@@ -208,8 +223,9 @@ public class ExpressionNode extends AstNode {
 				return optimizeBitwiseChain(left, op, right);
 
 			default:
-				return new BinaryExpression(tb, mc, left, op, right);
+				return BinaryExpression.create(tb, mc, left.getSP(), left, op, right);
 		}
+		
 	}
 
 	private ExpressionNode optimizeAdditiveChain(ExpressionNode left, Operator op, ExpressionNode right) {
@@ -289,17 +305,17 @@ public class ExpressionNode extends AstNode {
 				result = varTerm;
 			}
 			else {
-				result = new BinaryExpression(tb, mc, result, Operator.PLUS, varTerm);
+				result = BinaryExpression.create(tb, mc, left.getSP(), result, Operator.PLUS, varTerm);
 			}
 		}
 		
 		// Добавляем отрицательные переменные слагаемые
 		for(ExpressionNode varTerm : varNegativeTerms) {
 			if(result == null) {
-				result = new UnaryExpression(tb, mc, Operator.MINUS, varTerm);
+				result = new UnaryExpression(tb, mc, left.getSP(), Operator.MINUS, varTerm);
 			}
 			else {
-				result = new BinaryExpression(tb, mc, result, Operator.MINUS, varTerm);
+				result = BinaryExpression.create(tb, mc, left.getSP(), result, Operator.MINUS, varTerm);
 			}
 		}
 
@@ -310,11 +326,11 @@ public class ExpressionNode extends AstNode {
 				result = constantNode;
 			}
 			else if(totalConstant > 0) {
-				result = new BinaryExpression(tb, mc, result, Operator.PLUS, constantNode);
+				result = BinaryExpression.create(tb, mc, left.getSP(), result, Operator.PLUS, constantNode);
 			}
 			else {
 				// Для отрицательных констант используем вычитание положительного значения
-				result = new BinaryExpression(tb, mc, result, Operator.MINUS, createOptimalConstantNode(-totalConstant));
+				result = BinaryExpression.create(tb, mc, left.getSP(), result, Operator.MINUS, createOptimalConstantNode(-totalConstant));
 			}
 		}
 
@@ -367,7 +383,7 @@ public class ExpressionNode extends AstNode {
 			CastExpression leftCast = (CastExpression)node;
 			// Если операнд - тоже приведение типа
 			ExpressionNode operand = optimizeExpression(leftCast.getOperand());
-			CastExpression result = new CastExpression(tb, mc, leftCast.getType(), operand);
+			CastExpression result = new CastExpression(tb, mc, node.getSP(), leftCast.getType(), operand);
 			
 			if(operand instanceof CastExpression) {
 				CastExpression rightCast = (CastExpression)operand;
@@ -375,7 +391,7 @@ public class ExpressionNode extends AstNode {
 				if (leftCast.getType().isPrimitive() && rightCast.getType().isPrimitive()) {
 					// Если внутреннее приведение - расширяющее, его можно убрать
 					if (leftCast.getType().getSize() <= rightCast.getType().getSize()) {
-						return optimizeExpression(new CastExpression(tb, mc, leftCast.getType(), rightCast.getOperand()));
+						return optimizeExpression(new CastExpression(tb, mc, node.getSP(), leftCast.getType(), rightCast.getOperand()));
 					}
 				}
 			}
@@ -414,8 +430,7 @@ public class ExpressionNode extends AstNode {
 		
 		// Оптимизация унарных операций
 		if (node instanceof UnaryExpression) {
-			UnaryExpression ue = (UnaryExpression)node;
-			return optimizeUnary(ue.getOperator(), ue.getOperand());
+			return optimizeUnary((UnaryExpression)node);
 		}
 
 		// Оптимизация бинарных операций
@@ -433,6 +448,20 @@ public class ExpressionNode extends AstNode {
 	// Оптимизация выражения с использованием Scope (поздний этап).
 	// Осторожно с новыми инстансами выражений, теряем проинициализированные при семантическом анализе поля.
 	public ExpressionNode optimizeWithScope(Scope scope, CodeGenerator cg) throws CompileException {
+		if(this instanceof QualifiedPathExpression) {
+			QualifiedPathExpression qpe = (QualifiedPathExpression)this;
+			if(null!=qpe.getResolvedExpr()) {
+				ExpressionNode result = qpe.getResolvedExpr();
+				ExpressionNode optimizedExpr = result.optimizeWithScope(scope, cg);
+				if(null!=optimizedExpr) {
+					return optimizedExpr;
+				}
+				else {
+					return result;
+				}
+			}
+		}
+		
 		if (this instanceof CastExpression) {
 			CastExpression cast = (CastExpression)this;
 			ExpressionNode operand = cast.getOperand();
@@ -442,7 +471,7 @@ public class ExpressionNode extends AstNode {
 				operand.postAnalyze(scope, cg);
 			}
 
-			VarType operandType = operand.getType(scope);
+			VarType operandType = operand.getType();
 			
 			// Если внутреннее приведение - расширяющее, его можно убрать
 			if (null != operandType && cast.getType().isPrimitive() && operandType.isPrimitive()) {
@@ -509,11 +538,11 @@ public class ExpressionNode extends AstNode {
 						AstNode node = ((VarSymbol)varSymbol).getNode();
 						if(node instanceof VarNode) {
 							ExpressionNode expr = ((VarNode)node).getInitializer();
-							if(null != expr) leftType = expr.getType(scope);
+							if(null != expr) leftType = expr.getType();
 						}
 						else if(node instanceof FieldNode) {
 							ExpressionNode expr = ((FieldNode)node).getInitializer();
-							if(null != expr) leftType = expr.getType(scope);
+							if(null != expr) leftType = expr.getType();
 						}
 					}
 
@@ -557,27 +586,19 @@ public class ExpressionNode extends AstNode {
 			return ioe;
 		}
 
-		if (this instanceof FieldAccessExpression) {
-			FieldAccessExpression fae = (FieldAccessExpression)this;
-			FieldNode fNode = (FieldNode)((AstHolder)fae.getSymbol()).getNode();
-			if (fNode.isStatic() && fNode.isFinal() && fNode.getInitializer() instanceof LiteralExpression) {
-				return fNode.getInitializer();
-			}
-		}
-		
 		if (this instanceof BinaryExpression) {
 			BinaryExpression bin = (BinaryExpression) this;
 			ExpressionNode _left = bin.getLeft().optimizeWithScope(scope, cg);
 			ExpressionNode _right = bin.getRight().optimizeWithScope(scope, cg);
 			//TODO всегда возвращало значение, даже если результат не оптимизирован
-			if(null != _left || null != _right) {
+//			if(null != _left || null != _right) {
 				ExpressionNode result = optimizeOperationChain(	null == _left ? bin.getLeft() : _left, bin.getOperator(),
 																null == _right ? bin.getRight(): _right);
 				result.postAnalyze(scope, cg);
 				
 				return result;
-			}
-			return null;
+//			}
+//			return null;
 		}
 		
 		if(this instanceof UnaryExpression) {
@@ -619,8 +640,30 @@ public class ExpressionNode extends AstNode {
 			}
 		}
 
+		// Замена умножения/деления на степени двойки сдвигами
+		if(op==Operator.MULT || op==Operator.DIV) {
+			ExpressionNode expr1 = left;
+			ExpressionNode expr2 = right;
+			if(expr1 instanceof LiteralExpression && op.isCommutative()) {
+				expr1 = right;
+				expr2 = left;
+			}
+			if(null!=expr1.getType() && expr1.getType().isInteger() && expr2 instanceof LiteralExpression) {
+				if(((LiteralExpression)expr2).isInteger()) {
+					int shift = NumUtils.getPowerOfTwo(((LiteralExpression)expr2).getNumValue());
+					if(0==shift) {
+						return expr1;
+					}
+					if(0<shift && 64>shift) {
+						return BinaryExpression.create(	tb, mc, left.getSP(), expr1, op==Operator.MULT ? Operator.SHL : Operator.SHR,
+														new LiteralExpression(tb, mc, shift));
+					}
+				}
+			}
+		}
+
 		if (Operator.MOD == op) {
-			return new BinaryExpression(tb, mc, left, op, right);
+			return BinaryExpression.create(tb, mc, left.getSP(), left, op, right);
 		}
 		
 		// Собираем все термы multiplicative цепочки
@@ -654,7 +697,7 @@ public class ExpressionNode extends AstNode {
 				Number num = (Number)((LiteralExpression)term).getValue();
 				double value = num.doubleValue();
 				if(0.0 == value) {
-					return new BinaryExpression(tb, mc, left, op, right);
+					return BinaryExpression.create(tb, mc, left.getSP(), left, op, right);
 				}
 				else {
 					totalConstant /= value;
@@ -675,7 +718,7 @@ public class ExpressionNode extends AstNode {
 		ExpressionNode result = null;
 		// Добавляем переменные числители
 		for (ExpressionNode varTerm : varNumerators) {
-			result = (result == null ? varTerm : new BinaryExpression(tb, mc, result, Operator.MULT, varTerm));
+			result = (result==null ? varTerm : BinaryExpression.create(tb, mc, left.getSP(), result, Operator.MULT, varTerm));
 		}
 		
 		// Добавляем константу (умножение или деление)
@@ -683,21 +726,21 @@ public class ExpressionNode extends AstNode {
 			if (reciprocalValue >= 1.0 && countDecimalDigits(reciprocalValue) < countDecimalDigits(totalConstant)) {
 				ExpressionNode divisorNode = createOptimalConstantNode(reciprocalValue);
 				result = (result == null ? 
-						new BinaryExpression(tb, mc, createOptimalConstantNode(1), Operator.DIV, divisorNode) :
-						new BinaryExpression(tb, mc, result, Operator.DIV, divisorNode));
+						BinaryExpression.create(tb, mc, left.getSP(), createOptimalConstantNode(1), Operator.DIV, divisorNode) :
+						BinaryExpression.create(tb, mc, left.getSP(), result, Operator.DIV, divisorNode));
 			}
 			else {
 				// Оставляем как есть (не точное значение)
 				ExpressionNode constantNode = createOptimalConstantNode(totalConstant);
-				result = (result == null) ? constantNode : new BinaryExpression(tb, mc, result, Operator.MULT, constantNode);
+				result = (result==null ? constantNode : BinaryExpression.create(tb, mc, left.getSP(), result, Operator.MULT, constantNode));
 			}
 		}
 		
 		// Добавляем деление на переменные
 		for (ExpressionNode denominator : varDenominators) {
 			result = (result == null ?
-					new BinaryExpression(tb, mc, createOptimalConstantNode(1), Operator.DIV, denominator) :
-					new BinaryExpression(tb, mc, result, Operator.DIV, denominator));
+					BinaryExpression.create(tb, mc, left.getSP(), createOptimalConstantNode(1), Operator.DIV, denominator) :
+					BinaryExpression.create(tb, mc, left.getSP(), result, Operator.DIV, denominator));
 		}
 
 		return result != null ? result : createOptimalConstantNode(totalConstant);
@@ -757,7 +800,7 @@ public class ExpressionNode extends AstNode {
 				return new LiteralExpression(tb, mc, result);
 			}
 		}
-		return new BinaryExpression(tb, mc, left, op, right);
+		return BinaryExpression.create(tb, mc, left.getSP(), left, op, right);
 	}
 	
 	private ExpressionNode optimizeStringConcat(ExpressionNode left, ExpressionNode right) {
@@ -775,7 +818,7 @@ public class ExpressionNode extends AstNode {
 				Object rightVal = ((LiteralExpression)right).getValue();
 				return new LiteralExpression(tb, mc, leftStr + rightVal.toString());
 			}
-			return new BinaryExpression(tb, mc, left, Operator.PLUS, right);
+			return BinaryExpression.create(tb, mc, left.getSP(), left, Operator.PLUS, right);
 		}
 		if (right instanceof LiteralExpression && ((LiteralExpression)right).getValue() instanceof String) {
 			String rightStr = (String)((LiteralExpression)right).getValue();
@@ -784,11 +827,14 @@ public class ExpressionNode extends AstNode {
 				return new LiteralExpression(tb, mc, leftVal.toString() + rightStr);
 			}
 		}
-		return new BinaryExpression(tb, mc, left, Operator.PLUS, right);
+		return BinaryExpression.create(tb, mc, left.getSP(), left, Operator.PLUS, right);
 	}	
 	
-	ExpressionNode optimizeUnary(Operator op, ExpressionNode operand) {
-		if (operand instanceof LiteralExpression) {
+	ExpressionNode optimizeUnary(UnaryExpression ue) {
+		Operator op = ue.getOperator();
+		ExpressionNode operand = ue.getOperand();
+		
+		if(operand instanceof LiteralExpression) {
 			Object value = ((LiteralExpression)operand).getValue();
 			if (Operator.MINUS == op  && value instanceof Number) {
 				if(value instanceof Integer) return new LiteralExpression(tb, mc, -(Integer)value);
@@ -802,7 +848,7 @@ public class ExpressionNode extends AstNode {
 				return operand;
 			}
 		}
-		return new UnaryExpression(tb, mc, op, operand);
+		return new UnaryExpression(tb, mc, ue.getSP(), op, operand);
 	}
 	
 	private ExpressionNode parseUnary() throws CompileException {
@@ -816,7 +862,7 @@ public class ExpressionNode extends AstNode {
 			if(type != null) {
 				consumeToken(tb, Delimiter.RIGHT_PAREN);
 				ExpressionNode expr = parse();
-				return new CastExpression(tb, mc, type, expr);
+				return new CastExpression(tb, mc, sp, type, expr);
 			}
 			else {
 				tb.back();
@@ -828,7 +874,7 @@ public class ExpressionNode extends AstNode {
 			
 			if(operator.isUnary()) {
 				consumeToken(tb);
-				return new UnaryExpression(tb, mc, operator, parseUnary());
+				return new UnaryExpression(tb, mc, tb.getSP(), operator, parseUnary());
 			}
 			else if (operator == Operator.MINUS && tb.match(TokenType.NUMBER)) {
 				// Схлопываем "-число" в LiteralExpression с отрицательным значением
@@ -847,7 +893,7 @@ public class ExpressionNode extends AstNode {
 			else if (operator == Operator.INC || operator == Operator.DEC) {
 				consumeToken(tb);
 				Operator realOp = (operator == Operator.INC) ? Operator.PRE_INC : Operator.PRE_DEC;
-				return new UnaryExpression(tb, mc, realOp, parseUnary());
+				return new UnaryExpression(tb, mc, tb.getSP(), realOp, parseUnary());
 			}
 		}
 		return parsePostfix();
@@ -857,15 +903,12 @@ public class ExpressionNode extends AstNode {
 		ExpressionNode expr = parsePrimary();
         
 		while (true) {
-			if (tb.match(Delimiter.LEFT_BRACKET)) {
-				expr = new ArrayExpression(tb, mc, expr);
-			}
-			else if (tb.match(TokenType.OPERATOR)) { // Обработка постфиксных операторов ++ и --
+			if (tb.match(TokenType.OPERATOR)) { // Обработка постфиксных операторов ++ и --
 				Operator operator = (Operator)tb.current().getValue();
 				if (operator == Operator.INC || operator == Operator.DEC) {
 					consumeToken(tb);
 					Operator realOp = (operator == Operator.INC) ? Operator.POST_INC : Operator.POST_DEC;
-					expr = new UnaryExpression(tb, mc, realOp, expr);
+					expr = new UnaryExpression(tb, mc, tb.getSP(), realOp, expr);
 					continue;
 				}
 				break;
@@ -886,6 +929,41 @@ public class ExpressionNode extends AstNode {
 			consumeToken(tb); // Потребляем 'new'
 
 			VarType type = checkPrimtiveType();
+			if(null!=type) {
+				List<ExpressionNode> arrDimensions = parseArrayDimensions();
+				if(null!=arrDimensions) {
+					for(int i=0; i<arrDimensions.size(); i++) {
+						type = VarType.arrayOf(type);
+					}
+
+					ArrayInitExpression aie = null;
+					if(tb.match(Delimiter.LEFT_BRACE)) {
+						aie = new ArrayInitExpression(tb, mc, tb.getSP(), type);
+					}
+					return new NewArrayExpression(tb, mc, tb.getSP(), type, arrDimensions, aie);
+				}
+				else {
+					throw new CompileException("Invalid 'new' expression - expected array dimensions after primitive type");
+				}
+			}
+			else {
+				List<String> ids = new ArrayList<>();
+				while(true) {
+					if(tb.match(TokenType.ID)) {
+						ids.add(tb.consume().getStringValue());
+					}
+					else if(tb.match(Delimiter.LEFT_PAREN)) {
+						return new NewExpression(tb, mc, sp, ids);
+					}
+					else if(tb.match(Delimiter.LEFT_BRACKET)) {
+						return new NewArrayExpression(tb, mc, tb.getSP(), ids);
+					}
+					else {
+						throw new CompileException("Invalid 'new' expression - expected constructor parentheses or array brackets");
+					}
+				}
+			}
+/*			VarType type = checkPrimtiveType();
 			if(null != type) {
 				List<ExpressionNode> arrDimensions = parseArrayDimensions(); //TODO
 				for(int i=0; i<arrDimensions.size(); i++) {
@@ -899,12 +977,10 @@ public class ExpressionNode extends AstNode {
 				return new NewArrayExpression(tb, mc, type, arrDimensions, aie);
 			}
 			else {
-			// Парсим имя класса
+				// Парсим имя класса
 				TypeReferenceExpression expr = parseTypeReference();
-				// Парсим аргументы конструктора
-				List<ExpressionNode> args = parseArguments(tb);
-				return new NewExpression(tb, mc, expr, args);
-			}
+				return new NewExpression(tb, mc, expr, parseIndices(tb));
+			}*/
 		}
 		if(tb.match(TokenType.NUMBER) || tb.match(TokenType.STRING) || tb.match(TokenType.CHAR) || tb.match(TokenType.LITERAL)) {
 			consumeToken(tb);
@@ -917,25 +993,14 @@ public class ExpressionNode extends AstNode {
 			return expr;
 		}
 		else if(tb.match(TokenType.ID) || tb.match(TokenType.OOP, Keyword.THIS)) {
-			ExpressionNode expr = parseFullQualifiedExpression(tb);
-
-			// Парсим цепочку идентификаторов через точки
-//			ExpressionNode expr = parseQualifiedName();
-			
-			if(!(expr instanceof PropertyExpression)) {
-				// Если после цепочки идет '(', то это вызов метода
-				if(tb.match(Delimiter.LEFT_PAREN)) {
-					return parseMethodCall(expr);
-				}
-			}
-			return expr;
+			return parseFullQualifiedExpression(tb);
 		}
 		else {
 			throw new CompileException("Unexpected token in expression: " + token, tb.current().getSP());
         }
     }
 	
-	private ExpressionNode parseMethodCall(ExpressionNode target) throws CompileException {
+/*	private ExpressionNode parseMethodCall(ExpressionNode target) throws CompileException {
 		// Проверяем, является ли target MemberAccessExpression или VariableExpression
 		String methodName;
 		if(target instanceof FieldAccessExpression) {
@@ -952,7 +1017,7 @@ public class ExpressionNode extends AstNode {
 
 		List<ExpressionNode> args = parseArguments(tb);
 		return new MethodCallExpression(tb, mc, target, methodName, args);
-	}
+	}*/
 	
 	protected boolean isUnaryOperationValid(VarType type, Operator op) {
 		switch (op) {
@@ -964,15 +1029,11 @@ public class ExpressionNode extends AstNode {
 		}
 	}
 
-	@Override
-	public String getNodeType() {
-		return "expression";
+	public VarType getType() {
+		if(null!=type) return type;
+		debugAST(this, DECLARE, true, "type is null");
+		return null;
 	}
-	
-	public VarType getType(Scope scope) throws CompileException {
-		throw new CompileException("Not supported here.");
-	}
-//	public abstract VarType getType(Scope scope) throws CompileException;
 	
 	@Override
 	public boolean preAnalyze() {
@@ -990,7 +1051,7 @@ public class ExpressionNode extends AstNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		throw new CompileException("Not supported here.");
 	}
 

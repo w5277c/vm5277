@@ -24,10 +24,16 @@ public enum RTOSLibs {
 	CLEAR_FIELDS("j8b/clear_fields.asm"),
 	DISPATCHER("core/dispatcher.asm"),
 	INVOKE_METHOD("j8b/invoke_method.asm"),
+	MATH_MUL8P2("math/mul8p2.asm"),
+	MATH_MUL16P2("math/mul16p2.asm"),
+	MATH_MUL32P2("math/mul32p2.asm"),
 	MATH_MUL8("math/mul8.asm"),
 	MATH_MUL16("math/mul16.asm"),
 	MATH_MULQ7N8("math/mulq7n8.asm"),
 	MATH_MUL32("math/mul32.asm"),
+	MATH_DIV8P2("math/div8p2.asm"),
+	MATH_DIV16P2("math/div16p2.asm"),
+	MATH_DIV32P2("math/div32p2.asm"),
 	MATH_DIV8("math/div8.asm"),
 	MATH_DIV16("math/div16.asm"),
 	MATH_DIVQ7N8("math/divq7n8.asm"),
@@ -37,8 +43,10 @@ public enum RTOSLibs {
 	ARR_REFCOUNT("j8b/arr_refcount.asm"),
 	ARRVIEW_MAKE("j8b/arrview_make.asm"),
 	ARRVIEW_ARRADDR("j8b/arrview_arraddr.asm"),
-	ROM_READ16("mem/rom_read16.asm");
-	
+	ROM_READ16("mem/rom_read16.asm"),
+	METHOD_FIN("j8b/mfin.asm"), //Без STACKFRAME IReg в стеке
+	METHOD_FIN_SF("j8b/mfin_sf.asm"); //С STACKFRAME IReg в стеке
+
 	private	final	String	path;
 	private			boolean	required;
 	

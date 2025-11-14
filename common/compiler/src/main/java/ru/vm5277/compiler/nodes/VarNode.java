@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.nodes;
 
 import java.util.Arrays;
@@ -23,27 +24,30 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.Operator;
+import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGCells;
-import ru.vm5277.common.cg.scopes.CGBranchScope;
+import ru.vm5277.common.cg.CGBranch;
+import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.common.messages.WarningMessage;
+import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.expressions.ArrayExpression;
-import ru.vm5277.compiler.nodes.expressions.BinaryExpression;
 import ru.vm5277.compiler.nodes.expressions.EnumExpression;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.compiler.nodes.expressions.FieldAccessExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.nodes.expressions.NewArrayExpression;
 import ru.vm5277.compiler.nodes.expressions.NewExpression;
-import ru.vm5277.compiler.nodes.expressions.UnresolvedReferenceExpression;
 import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
+import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
-import ru.vm5277.compiler.semantic.InterfaceScope;
+import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.VarSymbol;
 import ru.vm5277.compiler.semantic.InitNodeHolder;
@@ -99,156 +103,148 @@ public class VarNode extends AstNode implements InitNodeHolder {
 	}
 	
 	@Override
-	public String getNodeType() {
-		return "var";
-	}
-
-	@Override
-	public String toString() {
-		return getClass().getSimpleName() + ": " + modifiers + ", " + type + ", " + name;
-	}
-
-	@Override
 	public boolean preAnalyze() {
 		boolean result = true;
+		debugAST(this, PRE, true, getFullInfo());
 		
 		try{
 			validateModifiers(modifiers, Keyword.STATIC, Keyword.FINAL);
 		}
 		catch(CompileException e) {
 			addMessage(e);
+			result = false;
 		}
 		
-		if(Character.isUpperCase(name.charAt(0))) addMessage(new WarningMessage("Variable name should start with lowercase letter:" + name, sp));
+		if(Character.isUpperCase(name.charAt(0))) {
+			markWarning("Variable name should start with lowercase letter:" + name);
+		}
 
-		if(null != init) {
-			result &= init.preAnalyze();
+		if(null!=init) {
+			result&=init.preAnalyze();
 			
 			if(init instanceof VarFieldExpression) {
-				if(name.equals(((VarFieldExpression)init).getValue())) {
-					markError("Self-assignment for '" + ((VarFieldExpression)init).getValue() + "' has no effect");
+				if(name.equals(((VarFieldExpression)init).getName())) {
+					markError("Self-assignment for '" + ((VarFieldExpression)init).getName() + "' has no effect");
 					result = false;
 				}
 			}
 		}
+		
+		debugAST(this, PRE, false, result, getFullInfo());
 		return result;
 	}
 
 	
 	@Override
 	public boolean declare(Scope scope) {
-		if(null != init) {
+		boolean result = true;
+		debugAST(this, DECLARE, true, getFullInfo());
+
+		if(null!=init) {
 			if(init instanceof NewArrayExpression) {
 				try {
 					NewArrayExpression nae = (NewArrayExpression)init;
-					if(null != nae.getType(scope)) {
-						if(type.getArrayDepth() != nae.getType(scope).getArrayDepth()) {
-							markError("Array dimension mismatch, expected:" + type.getArrayDepth() + ", found:" + nae.getType(scope).getArrayDepth());
-							return false;
+					if(null != nae.getType()) {
+						if(type.getArrayDepth() != nae.getType().getArrayDepth()) {
+							markError("Array dimension mismatch, expected:" + type.getArrayDepth() + ", found:" + nae.getType().getArrayDepth());
+							result = false;
 						}
-						type = nae.getType(scope);
-						// Проверяем вложенность массивов
-						if (type.getArrayDepth() > 3) {
-							markError("Array nesting depth exceeds maximum allowed (3)");
-							return false;
+						else {
+							type = nae.getType();
+							// Проверяем вложенность массивов
+							if(type.getArrayDepth()>3) {
+								markError("Array nesting depth exceeds maximum allowed (3)");
+								result = false;
+							}
 						}
 					}
 				}
 				catch(Exception ex){}
 			}
-			if(!init.declare(scope)) {	
-				return false;
-			}
+			
+			result&=init.declare(scope);
 		}
 		
-		if(scope instanceof BlockScope) {
-			BlockScope blockScope = (BlockScope)scope;
-			symbol = new VarSymbol(name, type, isFinal() || VarType.CSTR == type, isStatic(), scope, this);
+		if(result) {
+			if(scope instanceof BlockScope) {
+				BlockScope blockScope = (BlockScope)scope;
+				symbol = new VarSymbol(name, type, isFinal() || VarType.CSTR == type, isStatic(), scope, this);
 
-			try {blockScope.addVariable(symbol);}
-			catch(CompileException e) {markError(e);}
-			
-//			if(init instanceof NewArrayExpression) {
-//				((VarSymbol)symbol).setArrayDimensions(((NewArrayExpression)init).getConsDimensions());
-//			}
-		}
-		else {
-			markError("Unexpected scope:" + scope.getClass().getSimpleName() + " in var:" + name);
+				try {blockScope.addVariable(symbol);}
+				catch(CompileException e) {markError(e);}
+
+	//			if(init instanceof NewArrayExpression) {
+	//				((VarSymbol)symbol).setArrayDimensions(((NewArrayExpression)init).getConsDimensions());
+	//			}
+			}
+			else {
+				markError("Unexpected scope:" + scope.getClass().getSimpleName() + " in var:" + name);
+			}
 		}
 
-		return true;
+		debugAST(this, DECLARE, false, result, getFullInfo() + (declarationPendingNodes.containsKey(this) ? " [DP]" : ""));
+		return result;
 	}
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		try {
+		boolean result = true;
+		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 
+		try {
 			cgScope = cg.enterLocal(type, (-1 == type.getSize() ? cg.getRefSize() : type.getSize()), VarType.CSTR == type, name);
 			symbol.setCGScope(cgScope);
 			
 			// Проверка инициализации final-полей
-			if (isFinal() && init == null) markError("Final variable  '" + name + "' must be initialized");
+			if(isFinal() && init==null) {
+				markError("Final variable  '" + name + "' must be initialized");
+				result = false;
+			}
 
 			// Анализ инициализатора, если есть
-			if (init != null) {
+			if(null!=init) {
 				if(!init.postAnalyze(scope, cg)) {
-					cg.leaveLocal();
-					return false;
-				}
-				if(init instanceof UnresolvedReferenceExpression) {
-					init = ((UnresolvedReferenceExpression)init).getResolvedExpr();
-				}
-
-				// Проверка совместимости типов
-				VarType initType = init.getType(scope);
-				if(initType.isClassType() && type.isClassType()) {
-					if(initType != type) {
-						InterfaceScope iScope = scope.getThis().resolveScope(initType.getClassName());
-						if(!iScope.isImplements(type)) {
-							markError("Type mismatch: cannot assign " + initType + " to " + type);
-							cg.leaveLocal();
-							return false;
-						}
-					}
-				}
-				else if (!isCompatibleWith(scope, type, initType)) {
-					// Дополнительная проверка автоматического привдения целочисленной константы к fixed.
-					if(VarType.FIXED == type && init instanceof LiteralExpression && initType.isInteger()) {
-						long num = ((LiteralExpression)init).getNumValue();
-						if(num<VarType.FIXED_MIN || num>VarType.FIXED_MAX) {
-							markError("Type mismatch: cannot assign " + initType + " to " + type);
-							cg.leaveLocal();
-							return false;
-						}
-					}
-					else {
-						markError("Type mismatch: cannot assign " + initType + " to " + type);
-						cg.leaveLocal();
-						return false;
-					}
-				}
-
-				// Дополнительная проверка на сужающее преобразование
-				if (type.isNumeric() && initType.isNumeric() && type.getSize() < initType.getSize()) { //TODO верятно нужно и в других местах
-					markError("Narrowing conversion from " + initType + " to " + type + " requires explicit cast"); 
-					cg.leaveLocal();
-					return false;
+					result = false;
 				}
 
 				ExpressionNode optimizedExpr = init.optimizeWithScope(scope, cg);
 				if(null != optimizedExpr) {
-					init = optimizedExpr; //TODO не передаю созданный Symbol?
+					init = optimizedExpr;
 				}
+				
+				if(result) {
+					((CGCellsScope)cgScope).setArrayView(init instanceof ArrayExpression);
+					// Проверка совместимости типов
+					VarType initType = init.getType();
+					if(initType.isClassType() && type.isClassType()) {
+						if(initType!=type) {
+							CIScope cis = scope.getThis().resolveCI(initType.getClassName(), false);
+							if(!cis.isImplements(type)) {
+								markError("Type mismatch: cannot assign " + initType + " to " + type);
+								result = false;
+							}
+						}
+					}
+					else if(!isCompatibleWith(scope, type, initType)) {
+						// Дополнительная проверка автоматического привдения целочисленной константы к fixed.
+						if(VarType.FIXED == type && init instanceof LiteralExpression && initType.isInteger()) {
+							long num = ((LiteralExpression)init).getNumValue();
+							if(num<VarType.FIXED_MIN || num>VarType.FIXED_MAX) {
+								markError("Type mismatch: cannot assign " + initType + " to " + type);
+								result = false;
+							}
+						}
+						else {
+							markError("Type mismatch: cannot assign " + initType + " to " + type);
+							result = false;
+						}
+					}
 
-				if(!symbol.isReassigned()) {
-					if(	init instanceof LiteralExpression ||
-						(init instanceof VarFieldExpression && null!=((VarFieldExpression)init).getSymbol() &&
-						((VarFieldExpression)init).getSymbol().isFinal())) {
-
-						modifiers.add(Keyword.FINAL);
-						symbol.setFinal(true);
-						if(type.isArray() || VarType.CSTR==type) {
-							symbol.setReassigned();
+					if(result) {
+						// Дополнительная проверка на сужающее преобразование
+						if(type.isNumeric() && initType.isNumeric() && type.getSize() < initType.getSize()) {
+							markError("Narrowing conversion from " + initType + " to " + type + " requires explicit cast");
+							result = false;
 						}
 					}
 				}
@@ -256,16 +252,59 @@ public class VarNode extends AstNode implements InitNodeHolder {
 		}
 		catch (CompileException e) {
 			markError(e);
-			cg.leaveLocal();
-			return false;
 		}
 		
 		cg.leaveLocal();
-		return true;
+		debugAST(this, POST, false, result, getFullInfo());
+		return result;
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public void codeOptimization(Scope scope, CodeGenerator cg) {
+		CGScope oldScope = cg.setScope(cgScope);
+		
+		if(null!=init) {
+			init.codeOptimization(scope, cg);
+		
+			try {
+				ExpressionNode optimizedExpr = init.optimizeWithScope(scope, cg);
+				if(null != optimizedExpr) {
+					init = optimizedExpr;
+				}
+			}
+			catch(CompileException ex) {
+				markError(ex);
+			}
+
+			if(!symbol.isReassigned()) {
+				// Возможно упростить?
+				if(	init instanceof LiteralExpression ||
+					(init instanceof VarFieldExpression && null!=((VarFieldExpression)init).getSymbol() &&
+					((VarFieldExpression)init).getSymbol().isFinal())) {
+
+					modifiers.add(Keyword.FINAL);
+					symbol.setFinal(true);
+					if(type.isArray() || VarType.CSTR==type) {
+						symbol.setReassigned();
+					}
+				}
+			}
+			try {
+				ExpressionNode optimizedExpr = init.optimizeWithScope(scope, cg);
+				if(null != optimizedExpr) {
+					init = optimizedExpr;
+				}
+			}
+			catch(CompileException ex) {
+				markError(ex);
+			}
+		}
+		
+		cg.setScope(oldScope);
+	}
+	
+	@Override
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 
@@ -276,27 +315,21 @@ public class VarNode extends AstNode implements InitNodeHolder {
 		if(VarType.CSTR == type) {
 			if(init instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)init;
-				if(VarType.CSTR == le.getType(null)) {
-					vScope.setDataSymbol(cg.defineData(vScope.getResId(), -1, (String)le.getValue()));
-					//TODO рудимент?
-					//symbol.getConstantOperand().setValue(cgScope.getResId());
+				if(VarType.CSTR == le.getType()) {
+					vScope.setCells(new CGCells(cg.defineData(vScope.getResId(), -1, (String)le.getValue()).getLabel()));
 				}
 			}
-			else throw new Exception("unexpected expression:" + init + " for constant");
+			else throw new CompileException("unexpected expression:" + init + " for constant");
 		}
 		else {
 			// Инициализация(заполнение нулями необходима только регистрам, остальные проинициализированы вместе с HEAP/STACK)
-			if(null == init) {
+			if(null==init) {
 				if(CGCells.Type.REG==vScope.getCells().getType()) cgScope.append(cg.constToCells(cgScope, 0, vScope.getCells(), false));
 			}
 			else if(init instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
 				LiteralExpression le = (LiteralExpression)init;
 				boolean isFixed = le.isFixed() || VarType.FIXED == vScope.getType();
 				cgScope.append(cg.constToCells(cgScope, isFixed ? le.getFixedValue() : le.getNumValue(), vScope.getCells(), isFixed));
-			}
-			else if(init instanceof FieldAccessExpression) {
-				cgScope.append(cg.constToCells(cgScope, 0, vScope.getCells(), false));
-				accUsed = true;
 			}
 			else if(init instanceof NewExpression) {
 				init.codeGen(cg, null, true);
@@ -319,38 +352,43 @@ public class VarNode extends AstNode implements InitNodeHolder {
 //			}
 			else if(init instanceof BinaryExpression) {
 				CGScope oldScope = cg.setScope(cgScope);
-				CGScope brScope = cg.enterBranch();
-				init.codeGen(cg, brScope, true);
+				CGBranch branch = new CGBranch();
+				cgScope.setBranch(branch);
+				
+				init.codeGen(cg, cgScope, true);
 				//TODO проверить на объекты и на массивы(передача ref)
-				VarType initType = init.getType(null);
+				VarType initType = init.getType();
 				if(VarType.CLASS == initType) {
-					cg.updateClassRefCount(brScope, vScope.getCells(), true);
+					cg.pushHeapReg(cgScope);
+					cg.updateClassRefCount(cgScope, vScope.getCells(), true);
+					cg.popHeapReg(cgScope);
 				}
 				else if(initType.isArray()) {
-					cg.updateArrRefCount(brScope, vScope.getCells(), true, init instanceof ArrayExpression);
+					cg.updateArrRefCount(cgScope, vScope.getCells(), true, ((CGCellsScope)cgScope).isArrayView());
 				}
-				if(((CGBranchScope)brScope).isUsed()) {
-					cg.constToAcc(brScope, 1, 1, false);
+				if(branch.isUsed()) {
+					cg.constToAcc(cgScope, 1, 1, false);
 					CGLabelScope lbScope = new CGLabelScope(null, null, LabelNames.LOCGIC_END, true);
-					cg.jump(brScope, lbScope);
-					brScope.append(((CGBranchScope)brScope).getEnd());
-					cg.constToAcc(brScope, 1, 0, false);
-					brScope.append(lbScope);
-					cg.accToCells(brScope, vScope);
+					cg.jump(cgScope, lbScope);
+					cgScope.append(((CGBranch)branch).getEnd());
+					cg.constToAcc(cgScope, 1, 0, false);
+					cgScope.append(lbScope);
+					cg.accToCells(cgScope, vScope);
 				}
 				accUsed = true;
-				cg.leaveBranch();
 				cg.setScope(oldScope);
 			}
 			else if(init instanceof ArrayExpression) {
 				init.codeGen(cg, cgScope, false);
 				cg.accToCells(cgScope, vScope);
-				VarType initType = init.getType(null);
+				VarType initType = init.getType();
 				if(VarType.CLASS == initType) {
+					cg.pushHeapReg(cgScope);
 					cg.updateClassRefCount(cgScope, vScope.getCells(), true);
+					cg.popHeapReg(cgScope);
 				}
 				else if(initType.isArray()) {
-					cg.updateArrRefCount(cgScope, vScope.getCells(), true, init instanceof ArrayExpression);
+					cg.updateArrRefCount(cgScope, vScope.getCells(), true, ((CGCellsScope)cgScope).isArrayView());
 				}
 				accUsed = true;
 			}
@@ -359,13 +397,16 @@ public class VarNode extends AstNode implements InitNodeHolder {
 			}
 			else {
 				init.codeGen(cg, cgScope, true);
+				cg.accResize(type);
 				cg.accToCells(cgScope, vScope);
-				VarType initType = init.getType(null);
+				VarType initType = init.getType();
 				if(VarType.CLASS == initType) {
+					cg.pushHeapReg(cgScope);
 					cg.updateClassRefCount(cgScope, vScope.getCells(), true);
+					cg.popHeapReg(cgScope);
 				}
 				else if(initType.isArray()) {
-					cg.updateArrRefCount(cgScope, vScope.getCells(), true, init instanceof ArrayExpression);
+					cg.updateArrRefCount(cgScope, vScope.getCells(), true, ((CGCellsScope)cgScope).isArrayView());
 				}
 
 				accUsed = true;
@@ -384,5 +425,14 @@ public class VarNode extends AstNode implements InitNodeHolder {
 	@Override
 	public ExpressionNode getInitNode() {
 		return init;
+	}
+	
+	@Override
+	public String toString() {
+		return (StrUtils.toString(modifiers) + " " + type + " " + name).trim();
+	}
+
+	public String getFullInfo() {
+		return getClass().getSimpleName() + " " + toString();
 	}
 }

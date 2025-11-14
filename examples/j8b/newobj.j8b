@@ -16,7 +16,7 @@
 
 import rtos.System;
 import rtos.RTOSParam;
-//import hal.GPIO;
+import hal.GPIO;
 
 class Main {
 	public interface Number {
@@ -34,26 +34,33 @@ class Main {
 			return value;
 		}
 
-		public void finalize() {
-		}
+//		public void finalize() {
+//		}
 	}
 
     public static void main() {
-//		System.setParam(RTOSParam.CORE_FREQ, 16);
-		System.setParam(RTOSParam.STDOUT_PORT, 0x12);//GPIO.PB2);
-//		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
+		System.setParam(RTOSParam.CORE_FREQ, 16);
+		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
+		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
 
 		Byte b1 = new Byte(0x01);
 		System.out(b1.toByte());
+		
+		Byte b2 = new Byte(0x02);
+		System.out(b2.toByte());
 		b1 = null;
 
-		Byte b2 = new Byte(0x01);
-		System.out(b2.toByte());
-		System.out(b2.getClassTypeId());
-		System.out(b2.getClassId());
-
-		if(this is Main) {
-			System.out(33);
+		Byte b3 = new Byte(0x01);
+		System.out(b3.toByte());
+		System.out(b3.typeId());
+		System.out(b3.instanceId());
+		
+		Byte b4 = b1;
+		if(b1==b2) {
+			System.out(1);
+		}
+		if(b1==b4) {
+			System.out(2);
 		}
     }
 }

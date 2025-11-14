@@ -13,46 +13,39 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 import rtos.System;
 import rtos.RTOSParam;
-import hal.GPIO;
-
-//NOT SUPPORTED YET
 
 class Main {
-//	int t1 = 0x11223344;
-//	int t2 = 0x0001ffff;
-//	int t9 = 1;
-//	int t5 = t1+t2;
+	public static byte b1 = 123;
+	public static short s1 = 32768;
+	public static int i1 = 0x01020304;
+	public static byte b2 = 52;
+	
+    public static void main() {
+		System.setParam(RTOSParam.STDOUT_PORT, 0x12);
+		s1++;
+		System.out(s1);
+		Test1.Test2.test=110;
+		byte ttt = Test1.Test2.test;
+		System.out(ttt);
+		System.out(b2);
+    }
 
-	static class A {
-		public static byte x() {
-			return 5*2;
+	class Test1 {
+		static class Test2 {
+			public static byte test	= 2;
+			int g=1;
+
+			public Test2() {
+				test=5;
+			}
+
+			public int getG() {
+				return g;
+			}
 		}
 	}
 
-//	static class B {
-//		public static void yep() {
-//			byte hi=1;
-//		}
-//		public static void nop() {
-//			byte hi=0;
-//		}
-//	}
-
-    public static void main() {
-		System.setParam(RTOSParam.CORE_FREQ, 16);
-		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
-		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
-
-//		B.yep();
-//		int t3 = t5+A.x();
-//		int t=0x01000000;
-//		int t3 = t1+t5;
-//		int t4 = t5+t1;
-		//byte g=A.x();
-		System.out(A.x());
-
-		System.stop();
-    }
 }

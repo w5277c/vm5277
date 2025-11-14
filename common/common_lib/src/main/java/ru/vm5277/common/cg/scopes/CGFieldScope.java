@@ -40,6 +40,9 @@ public class CGFieldScope extends CGCellsScope {
 	public CGCells getCells() {
 		return cells;
 	}
+	public void setCells(CGCells cells) {
+		this.cells = cells;
+	}
 	
 	public boolean isStatic() {
 		return isStatic;

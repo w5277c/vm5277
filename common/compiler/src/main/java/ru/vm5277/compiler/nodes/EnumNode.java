@@ -17,26 +17,29 @@
 package ru.vm5277.compiler.nodes;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
-import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.compiler.semantic.ClassScope;
+import static ru.vm5277.compiler.Main.debugAST;
+import ru.vm5277.compiler.semantic.EnumScope;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class EnumNode extends AstNode {
 	protected	final	Set<Keyword>	modifiers;
 	protected			String			name;
 	protected			List<String>	values;
-	private				ClassScope		enumScope;
+	private				EnumScope		enumScope;
 	
 	public EnumNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers) throws CompileException {
 		super(tb, mc);
@@ -60,8 +63,8 @@ public class EnumNode extends AstNode {
 			}
 			if(tb.match(Delimiter.SEMICOLON)) consumeToken(tb, Delimiter.SEMICOLON);
 			consumeToken(tb, Delimiter.RIGHT_BRACE);
-
-			VarType.addEnumName(this.name, values);
+			
+			VarType.addClassName(this.name, true);
 		}
 		catch(CompileException e) {markFirstError(e);} // ошибка в имени, оставляем null
 	}
@@ -69,6 +72,7 @@ public class EnumNode extends AstNode {
 	@Override
 	public boolean preAnalyze() {
 		boolean result = true;
+		debugAST(this, PRE, true, getFullInfo());
 		
 		try {
 			validateName(name);
@@ -110,34 +114,42 @@ public class EnumNode extends AstNode {
 			}
 		}
 
+		debugAST(this, PRE, false, result, getFullInfo());
 		return result;
 	}
 	
 	@Override
-	public boolean declare(Scope parentScope) {
+	public boolean declare(Scope scope) {
 		boolean result = true;
+		debugAST(this, DECLARE, true, getFullInfo());
 		
 		try {
-			enumScope = new ClassScope(name, parentScope, Collections.emptyList());
-			if(null!=parentScope) {
-				((ClassScope)parentScope).addClass(enumScope);
-			}
+			enumScope = new EnumScope(name, scope, values);
+			scope.addInternal(enumScope);
 		}
 		catch(CompileException ex) {
 			markError(ex);
 			result = false;
 		}
+		
+		debugAST(this, DECLARE, false, result, getFullInfo() + (declarationPendingNodes.containsKey(this) ? " [DP]" : ""));
 		return result;
 	}
 
 	@Override  
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		// Кодогенерация не нужна, значения будут обрабатываться через FieldAccessExpression -> LiteralExpression
-	    return true;
+		boolean result = true;
+		debugAST(this, POST, true, getFullInfo());
+		debugAST(this, POST, false, result, getFullInfo());
+		return result;
 	}
 	
 	public String getName() {
 		return name;
+	}
+	
+	public EnumScope getScope() {
+		return enumScope;
 	}
 	
 	public Set<Keyword> getModifiers() {
@@ -149,17 +161,16 @@ public class EnumNode extends AstNode {
 	}
 	
 	@Override
-	public String getNodeType() {
-		return "enum";
-	}
-	
-	@Override
 	public String toString() {
-		return getClass().getSimpleName() + ": " + modifiers + ", " + name;
+		return modifiers + " " + name;
+	}
+
+	public String getFullInfo() {
+		return getClass().getSimpleName() + " " + toString();
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		return null;
 	}
 	

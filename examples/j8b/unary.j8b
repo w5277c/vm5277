@@ -47,11 +47,11 @@ class Main {
 
 		s1 = !b1;
 		f1 = !b1;
-		f1 = -s1;
-		f1 = ++s1;
-		f1 = --s1;
-		f1 = s1++;//err
-		f1 = s1--;//err
+		f1 = (fixed)-s1;
+		f1 = (fixed)++s1;
+		f1 = (fixed)--s1;
+		f1 = (fixed)s1++;
+		f1 = (fixed)s1--;
 
 		s1=s1++;
 		s1=s1--;

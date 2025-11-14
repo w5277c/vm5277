@@ -12,7 +12,7 @@
             <properties>
                 <exec.vmArgs></exec.vmArgs>
                 <exec.args>${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}</exec.args>
-                <exec.appArgs>avr:atmega328p examples/j8b/enum.j8b -am -al --cg-verbose 0 --dump-ir --opt none</exec.appArgs>
+                <exec.appArgs>avr:atmega328p examples/j8b/conditions.j8b -am -al --cg-verbose 0 --dump-ir --opt size</exec.appArgs>
                 <exec.mainClass>${packageClassName}</exec.mainClass>
                 <exec.executable>java</exec.executable>
             </properties>
@@ -29,7 +29,7 @@
             <properties>
                 <exec.vmArgs>-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address}</exec.vmArgs>
                 <exec.args>${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}</exec.args>
-                <exec.appArgs>avr:atmega328p examples/j8b/enum.j8b -am -al --cg-verbose 0 --dump-ir --opt none</exec.appArgs>
+                <exec.appArgs>avr:atmega328p examples/j8b/conditions.j8b -am -al --cg-verbose 0 --dump-ir --opt size</exec.appArgs>
                 <exec.mainClass>${packageClassName}</exec.mainClass>
                 <exec.executable>java</exec.executable>
                 <jpda.listen>true</jpda.listen>
@@ -49,7 +49,7 @@
                 <exec.args>${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}</exec.args>
                 <exec.mainClass>${packageClassName}</exec.mainClass>
                 <exec.executable>java</exec.executable>
-                <exec.appArgs>avr:atmega328p examples/j8b/enum.j8b -am -al --cg-verbose 0 --dump-ir --opt none</exec.appArgs>
+                <exec.appArgs>avr:atmega328p examples/j8b/conditions.j8b -am -al --cg-verbose 0 --dump-ir --opt size</exec.appArgs>
             </properties>
         </action>
     </actions>

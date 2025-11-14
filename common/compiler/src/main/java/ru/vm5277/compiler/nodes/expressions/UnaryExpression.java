@@ -20,103 +20,124 @@ import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.Operator;
-import ru.vm5277.common.cg.scopes.CGBranchScope;
+import ru.vm5277.common.cg.CGBranch;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.messages.MessageContainer;
+import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
-import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
-import ru.vm5277.compiler.semantic.Symbol;
+import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import ru.vm5277.common.SourcePosition;
+import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 
 public class UnaryExpression extends ExpressionNode {
     private	final	Operator		operator;
     private			ExpressionNode	operand;
     private			boolean			isUsed		= false;
 	
-    public UnaryExpression(TokenBuffer tb, MessageContainer mc, Operator operator, ExpressionNode operand) {
-        super(tb, mc);
+    public UnaryExpression(TokenBuffer tb, MessageContainer mc, SourcePosition sp, Operator operator, ExpressionNode operand) {
+        super(tb, mc, sp);
         
 		this.operator = operator;
         this.operand = operand;
     }
     
-	@Override
-	public VarType getType(Scope scope) throws CompileException {
-		return operand.getType(scope);
+	private boolean isFinalVariable(VarFieldExpression var, Scope scope) {
+/*		Symbol symbol = scope.resolveVFSymbol(var.getValue());
+		if(null == symbol) {
+			InterfaceScope iScope = scope.getThis().resolveScope(var.getValue());
+			if(null != iScope) {
+				symbol = new Symbol(var.getValue(), VarType.CLASS, false, false);
+			}
+		}
+		return symbol != null && symbol.isFinal();*/
+		return var.getSymbol().isFinal();
 	}
 	
+	
+	public Operator getOperator() {
+		return operator;
+	}
+	
+	public ExpressionNode getOperand() {
+		return operand;
+	}
+	public void setOperand(ExpressionNode operand) {
+		this.operand = operand;
+	}
+
 	@Override
 	public boolean preAnalyze() {
 		boolean result = true;
+		debugAST(this, PRE, true, getFullInfo());
 		
 		result &= operand.preAnalyze();
 		
+		debugAST(this, PRE, false, result, getFullInfo());
 		return result;
 	}
 
 	@Override
 	public boolean declare(Scope scope) {
 		boolean result = true;
+		debugAST(this, DECLARE, true, getFullInfo());
 		
 		result&=operand.declare(scope);
-		
-		if((operator.isPostfix() || Operator.PRE_DEC == operator || Operator.PRE_INC == operator) && operand instanceof VarFieldExpression) {
-			VarFieldExpression vfe = (VarFieldExpression)operand;
-			symbol = scope.resolveSymbol(vfe.getValue());
-			if(null != symbol) {
-				symbol.setReassigned();
-			}
+
+		if((operator.isPostfix() || Operator.PRE_DEC == operator || Operator.PRE_INC == operator) && operand instanceof QualifiedPathExpression) {
+			((QualifiedPathExpression)operand).setReassigned();
 		}
+		
+		debugAST(this, DECLARE, false, result, getFullInfo() + (declarationPendingNodes.containsKey(this) ? " [DP]" : ""));
 		return result;
 	}
-
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		boolean result = true;
+		debugAST(this, POST, true, getFullInfo() + " type:" + type);
+		
 		cgScope = cg.enterExpression(toString());
 		//if(null != symbol) symbol.setCGScope(cgScope);
 		
 		try {
 			result&=operand.postAnalyze(scope, cg);
-			if(operand instanceof UnresolvedReferenceExpression) {
-				operand = ((UnresolvedReferenceExpression)operand).getResolvedExpr();
+			
+			ExpressionNode optimizedExpr = operand.optimizeWithScope(scope, cg);
+			if(null != optimizedExpr) {
+				operand = optimizedExpr;
 			}
 
-			ExpressionNode newOperand = operand.optimizeWithScope(scope, cg);
-			if(null != newOperand) {
-				operand = newOperand;
-				newOperand.postAnalyze(scope, cg);
-			}
-
-			VarType operandType = operand.getType(scope);
-
+			type = operand.getType();
+			
 			// Проверяем допустимость оператора для типа
 			switch (operator) {
 				case PLUS:
-					if(!operandType.isNumeric() && VarType.CSTR != operandType) {
+					if(!type.isNumeric() && VarType.CSTR != type) {
 						markError("Unary " + operator + " requires numeric or string type");
 						result = false;
 					}
 					break;
 				case MINUS:
-					if(!operandType.isNumeric()) {
+					if(!type.isNumeric()) {
 						markError("Unary " + operator + " requires numeric type");
 						result = false;
 					}
 					break;
 				case BIT_NOT:
-					if(!operandType.isInteger()) {
+					if(!type.isInteger()) {
 						markError("Bitwise ~ requires integer type");
 						result = false;
 					}
 					break;
 				case NOT:
-					if(operandType != VarType.BOOL) {
+					if(type != VarType.BOOL) {
 						markError("Logical ! requires boolean type");
 						result = false;
 					}
@@ -125,7 +146,7 @@ public class UnaryExpression extends ExpressionNode {
 				case PRE_DEC:
 				case POST_INC:
 				case POST_DEC:
-					if(!operandType.isNumeric()) {
+					if(!type.isNumeric()) {
 						markError("Increment/decrement requires numeric type");
 						result = false;
 					}
@@ -134,7 +155,9 @@ public class UnaryExpression extends ExpressionNode {
 						result = false;
 					}
 					// Дополнительная проверка на изменяемость переменной
-					if(!(operand instanceof ArrayExpression) && isFinalVariable((VarFieldExpression)operand, scope)) {
+					if(	result && !(operand instanceof ArrayExpression) &&
+						(operand instanceof LiteralExpression || isFinalVariable((VarFieldExpression)operand, scope))) {
+						
 						markError("Cannot modify final variable");
 						result = false;
 					}
@@ -150,44 +173,44 @@ public class UnaryExpression extends ExpressionNode {
 		}
 			
 		cg.leaveExpression();
+		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 	
-	private boolean isFinalVariable(VarFieldExpression var, Scope scope) {
-		Symbol symbol = scope.resolveSymbol(var.getValue());
-		if(null == symbol) {
-			InterfaceScope iScope = scope.getThis().resolveScope(var.getValue());
-			if(null != iScope) {
-				symbol = new Symbol(var.getValue(), VarType.CLASS, false, false);
+	@Override
+	public void codeOptimization(Scope scope, CodeGenerator cg) {
+		CGScope oldScope = cg.setScope(cgScope);
+		
+		operand.codeOptimization(scope, cg);
+		
+		try {
+			ExpressionNode optimizedExpr = operand.optimizeWithScope(scope, cg);
+			if(null != optimizedExpr) {
+				operand = optimizedExpr;
 			}
 		}
-		return symbol != null && symbol.isFinal();
+		catch(CompileException ex) {
+			markError(ex);
+		}
+		
+		cg.setScope(oldScope);
 	}
-	
-	
-	public Operator getOperator() {
-		return operator;
-	}
-	
-	public ExpressionNode getOperand() {
-		return operand;
-	}
-	public void setOperand(ExpressionNode operand) {
-		this.operand = operand;
-	}
-	
+
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean accumStore) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean accumStore) throws CompileException {
 		return codeGen(cg, parent, false, false, accumStore);
 	}
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, boolean toAccum) throws CompileException {
 		CodegenResult result = null;
 		
 		CGScope cgs = null == parent ? cgScope : parent;
 		
-		CGScope brScope = cgScope;
-		while(null != brScope && !(brScope instanceof CGBranchScope)) {
-			brScope = brScope.getParent();
+		CGBranch branch = null;
+		CGScope _scope = cgScope;
+		while(null!=_scope) {
+			branch = _scope.getBranch();
+			if(null!=branch) break;
+			_scope = _scope.getParent();
 		}
 
 		if(operand instanceof BinaryExpression) {
@@ -195,11 +218,11 @@ public class UnaryExpression extends ExpressionNode {
 		}
 		else if(operand instanceof VarFieldExpression) {
 			VarFieldExpression ve = (VarFieldExpression)operand;
-			if(null != brScope && Operator.NOT == operator) { //TODO вероятно не корректно проверять по brScope(но без блока условий нужен именно emitUnary
-				ve.codeGen(cg, !isInvert, !opOr, (CGBranchScope)brScope);
+			if(null!=branch && Operator.NOT==operator) { //TODO вероятно не корректно проверять по brScope(но без блока условий нужен именно emitUnary
+				ve.codeGen(cg, cgs, !isInvert, !opOr, branch);
 			}
 			else {
-				ve.codeGen(cg, null, false);
+				ve.codeGen(cg, cgs, false);
 				CGCellsScope cScope = (CGCellsScope)operand.getSymbol().getCGScope(CGCellsScope.class);
 				cg.eUnary(cgs, operator, cScope.getCells(), toAccum);
 				if(toAccum)	 {
@@ -233,6 +256,10 @@ public class UnaryExpression extends ExpressionNode {
 
 	@Override
 	public String toString() {
-		return getClass().getSimpleName() + " " + operator + " " + operand;
+		return operator.toString() + operand;
+	}
+	
+	public String getFullInfo() {
+		return getClass().getSimpleName() + " " + toString();
 	}
 }

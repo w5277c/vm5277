@@ -19,7 +19,6 @@ import rtos.RTOSParam;
 import rtos.Thread;
 import hal.GPIO;
 
-
 class Main {
     public static void main() {
 		System.setParam(RTOSParam.CORE_FREQ, 16);

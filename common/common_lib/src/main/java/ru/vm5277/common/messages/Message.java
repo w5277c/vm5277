@@ -15,6 +15,7 @@
  */
 package ru.vm5277.common.messages;
 
+import java.util.Objects;
 import ru.vm5277.common.SourcePosition;
 
 public class Message {
@@ -36,7 +37,29 @@ public class Message {
 		return sp;
 	}
 	
+	public String getType() {
+		return type;
+	}
+	
 	public String toStrig() {
 		return type.toUpperCase() + "|" + (null == sp ? "" : sp) + "\t"  + text;
+	}
+	
+	@Override
+	public int hashCode() {
+		return Objects.hash(sp, type, text);
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		if(obj instanceof Message) {
+			Message message = (Message)obj;
+			if(Objects.equals(sp, message.getSP())) {
+				if(Objects.equals(type, message.getType())) {
+					return Objects.equals(text, message.getText());
+				}
+			}
+		}
+		return false;
 	}
 }

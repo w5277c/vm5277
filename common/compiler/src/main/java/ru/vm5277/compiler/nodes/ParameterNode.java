@@ -16,6 +16,9 @@
 package ru.vm5277.compiler.nodes;
 
 import java.util.List;
+import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.Keyword;
@@ -23,27 +26,28 @@ import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
+import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class ParameterNode extends AstNode {
 	private			VarType	type;
     private	final	String	name;
-	private	final	boolean	isFinal;
+	private			boolean	isFinal;
 	
 	public ParameterNode(TokenBuffer tb, MessageContainer mc) throws CompileException {
 		super(tb, mc);
 		
-		this.isFinal = tb.match(TokenType.MODIFIER, Keyword.FINAL);
-		if (this.isFinal) {
+		if(tb.match(TokenType.MODIFIER, Keyword.FINAL)) {
             consumeToken(tb); // Потребляем 'final'
+			isFinal = true;
 		}
 		
-		this.type = checkPrimtiveType();
-		if(null == type) type = checkClassType();
-		if(null == type) type = checkEnumType();
-		if(null != type) type = checkArrayType(type);
-		this.name = (String)consumeToken(tb, TokenType.ID).getValue();
+		type = checkPrimtiveType();
+		if(null==type) type = checkClassType();
+		if(null!=type) type = checkArrayType(type);
+		
+		name = (String)consumeToken(tb, TokenType.ID).getValue();
 	}
 
 	public ParameterNode(MessageContainer mc, boolean isFinal, VarType type, String name) throws CompileException {
@@ -67,77 +71,83 @@ public class ParameterNode extends AstNode {
 	}
 
 	@Override
-	public String getNodeType() {
-		return "parameter";
-	}
-
-	@Override
-	public String toString() {
-		return getClass().getSimpleName() + ": " + type + ", " + name;
-	}
-
-	@Override
 	public boolean preAnalyze() {
+		boolean result = true;
+		debugAST(this, PRE, true, getFullInfo());
+
 		// Проверка имени параметра (должно начинаться с маленькой буквы)
-		if (Character.isUpperCase(name.charAt(0))) {
+		if(Character.isUpperCase(name.charAt(0))) {
 			markWarning("Parameter name '" + name + "' should start with lowercase letter");
 		}
 
 		// Проверка корректности типа
-		if (null == type || VarType.UNKNOWN == type) {
+		if(null==type || VarType.UNKNOWN==type) {
 			markError("Invalid parameter type: " + type);
-			return false;
+			result = false;
 		}
 
-		return true;
+		debugAST(this, PRE, false, result, getFullInfo());
+		return result;
 	}
 
 	@Override
 	public boolean declare(Scope scope) {
+		boolean result = true;
+		debugAST(this, DECLARE, true, getFullInfo());
+
 		if (!(scope instanceof MethodScope)) {
-			markError("Parameters can only be declared in method scope");
-			return false;
+			markError("COMPILER BUG: Parameters can only be declared in method scope");
+			result = false;
 		}
 
-		return true;
+		debugAST(this, DECLARE, false, result, getFullInfo());
+		return result;
 	}
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		// Проверка типа параметра
-		if (VarType.UNKNOWN == type || VarType.NULL == type) {
-			markError("Invalid parameter type: " + type);
-		}
-		
+		boolean result = true;
+		debugAST(this, POST, true, getFullInfo());
+
 		// Дополнительные проверки для массивов
-		if (type.isArray()) {
+		if(type.isArray()) {
 			// Проверяем тип элементов массива
 			VarType elementType = type.getElementType();
-			if (VarType.UNKNOWN == elementType || VarType.NULL == elementType) {
+			if(VarType.UNKNOWN==elementType || VarType.NULL==elementType) {
 				markError("Array element type cannot be UNKNOWN or NULL");
 			}
 
 			// Проверяем вложенность массивов
-			if (type.getArrayDepth() > 3) {
+			if(type.getArrayDepth()>3) {
 				markError("Array nesting depth exceeds maximum allowed (3)");
 			}
 
 			// Проверяем размер массива не должен быть указан
-			if (null != type.getArraySize() && 0 != type.getArraySize()) {
+			if(null!=type.getArraySize() && 0!=type.getArraySize()) {
 				markError("Array size cannot be specified in parameter declaration");
 			}
 		}
 
-		return true;
+		debugAST(this, POST, false, result, getFullInfo());
+		return result;
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		return null;
 	}
 	
 	@Override
 	public List<AstNode> getChildren() {
 		return null;
+	}
+	
+	@Override
+	public String toString() {
+		return getClass().getSimpleName() + ": " + type + ", " + name;
+	}
+	
+	public String getFullInfo() {
+		return getClass().getSimpleName() + " " + toString();
 	}
 }

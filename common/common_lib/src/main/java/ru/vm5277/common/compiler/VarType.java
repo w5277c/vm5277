@@ -15,9 +15,7 @@
  */
 package ru.vm5277.common.compiler;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import ru.vm5277.common.exceptions.CompileException;
 
@@ -26,9 +24,8 @@ public class VarType {
 	public	static	final	double					FIXED_MAX	= 127.99609375d;
 	private	static	final	Map<String, VarType>	CLASS_TYPES = new HashMap<>();
 	static {
-		CLASS_TYPES.put("Object", new VarType("class:Object", "Object"));
+		CLASS_TYPES.put("Object", new VarType("class:Object", "Object", false));
 	}
-	private	static	final	Map<String, VarType>	ENUM_TYPES = new HashMap<>();
 	
 	public	static	final	VarType			VOID		= new VarType(1, "void");
 	public	static	final	VarType			BOOL		= new VarType(2, "bool");
@@ -42,7 +39,6 @@ public class VarType {
 	public	static	final	VarType			CSTR		= new VarType(7, "cstr");
 	public	static	final	VarType			NULL		= new VarType(8, "null");
 	public	static	final	VarType			CLASS		= new VarType(-1, "class");
-	public	static	final	VarType			ENUM		= new VarType(3, "enum");
 	public	static	final	VarType			UNKNOWN		= new VarType(-1, "?");
 		
 	private	static			int				idCntr		= 10;
@@ -54,8 +50,6 @@ public class VarType {
 	private					int				arraySize;
 
 	private					boolean			isEnum;
-	private					List<String>	enumValues;
-	private					String			enumName;
 	
 	// Конструктор для ссылочных типов
 	private VarType(int id, String name) {
@@ -65,19 +59,12 @@ public class VarType {
 	}
 
 	// Конструктор для классовых типов
-	private VarType(String name, String className) {
+	private VarType(String name, String className, boolean isEnum) {
 		this.id = idCntr++;
 		this.name = name;
 		this.className = className;
+		this.isEnum = isEnum;
 	}
-
-	private VarType(String enumName, List<String> values) {
-		this.id = BYTE.id;
-		this.name = "enum:" + enumName;
-		this.isEnum = true;
-		this.enumValues = values;
-		this.enumName = enumName;
-	}	
 
 	// Конструктор для массивов
     public static VarType arrayOf(VarType elementType) {
@@ -106,9 +93,9 @@ public class VarType {
 	}
 	
 	// Создаем тип для конкретного класса.
-	public static VarType addClassName(String className) {
+	public static VarType addClassName(String className, boolean isEnum) {
 		if(!CLASS_TYPES.containsKey(className)) {
-			VarType type = new VarType("class:" + className, className);
+			VarType type = new VarType("class:" + className, className, isEnum);
 			CLASS_TYPES.put(className, type);
 			return type;
 		}
@@ -118,32 +105,6 @@ public class VarType {
 		return CLASS_TYPES.get(className);
 	}
 	
-	// Создаем тип для enum
-	public static VarType addEnumName(String enumName, List<String> values) {
-		if(!ENUM_TYPES.containsKey(enumName)) {
-			VarType type = new VarType(enumName, values);
-			ENUM_TYPES.put(enumName, type);
-			return type;
-		}
-		return null;
-	}
-	
-	public static VarType fromEnumName(String enumName) {
-		return ENUM_TYPES.get(enumName);
-	}
-
-	public List<String> getEnumValues() {
-		return enumValues;
-	}
-
-	public String getEnumName() {
-		return enumName;
-	}
-
-	public int getEnumValueIndex(String valueName) {
-		return null!=enumValues ? enumValues.indexOf(valueName) : -1;
-	}
-
 	public int getId() {
 		return id;
 	}
@@ -193,7 +154,7 @@ public class VarType {
 	}
 	
 	public boolean isReferenceType() {
-		return this == VarType.CLASS || this.isArray() || this == VarType.CSTR;
+		return this.isClassType() || this.isArray();
 	}
 
 	public void checkRange(Number num) throws CompileException {

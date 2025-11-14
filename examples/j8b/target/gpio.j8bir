@@ -3,14 +3,12 @@ class Main {
         System.setParam(0, 16);
         System.setParam(2, 18);
         System.setParam(3, 1);
-        //CONST final byte port = 17;
+        //AST>CONST final byte port = 17;
         GPIO.modeOut(17);
         while (true) {
             Thread.waitMS(250);
             GPIO.invert(17);
         }
         
-    }
-    public Main() {
     }
 }

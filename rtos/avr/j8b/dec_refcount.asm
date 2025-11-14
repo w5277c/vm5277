@@ -20,13 +20,13 @@
 ;-----------------------------------------------------------
 J8BPROC_DEC_REFCOUNT:
 ;-----------------------------------------------------------
-;Декремент количества ссылок объекта
+;Декремент счетчика ссылок объекта
 ;IN: Z-адрес HEAP
 ;-----------------------------------------------------------
 	PUSH ACCUM_EL
 	LDD ACCUM_EL,Z+0x02
-	CPI ACCUM_EL,0xff
-    BREQ _J8BPROC_DEC_REFCOUNT__SKIP2
+	CPI ACCUM_EL,0x00
+	BREQ _J8BPROC_DEC_REFCOUNT__SKIP2
 	DEC ACCUM_EL
 	BRNE _J8BPROC_DEC_REFCOUNT__SKIP1
     PUSH ACCUM_L

@@ -1,0 +1,55 @@
+/*
+ * Copyright 2025 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+public class Main implements TimerHandler, KeysHandler {
+	public static fnal Coord screenSize = new Coord(15, 15);
+	private	Snake snake;
+	private	Apple apple;
+	private	bool gameStopped = true;
+	public static final byte maxSize = 28;
+	private byte score;
+	private Game game;
+
+	public Main() {
+		game = new Game(this, screenSize);
+
+		createGame();
+	}
+
+	public static void main() {
+		new Main();
+	}
+
+	private createGame() {
+		score = 0;
+		showScore();
+
+		snake = new Snake(screenSzie.getX()/2, screenSize.getY()/2);
+		createApple();
+		drawScene();
+
+		gameStopped = false;
+		game.startTimer(this, 300);
+	}
+
+	public void onKeyPressed(byte keyChar) {
+		//TODO
+	}
+
+	public void onTurn(short turnNumber) {
+		//TODO
+	}
+}

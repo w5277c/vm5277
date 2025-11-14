@@ -14,37 +14,28 @@
  * limitations under the License.
  */
 
-import rtos.System;
-import rtos.RTOSParam;
+public class Apple implements GameObject {
+	private static final byte SIGN = '@';
+	private bool isAlive = true;
+	private Coord coord;
 
-class Main {
-    public static void main() {
-		System.setParam(RTOSParam.STDOUT_PORT, 0x12);
+	public Apple(Coord coord) {
+		this.coord = coord;
+	}
 
-		short s1;
-		s1 = 10;
-		fixed f1;
-		f1 = 6;
-		fixed f2;
-		f2 = 1.5;
+	public void draw(Game game) {
+		game.setCell(coord, isAlive ? SIGN : ' ', Color.GREEN);
+	}
 
-		System.out(s1 + 2);
-		System.out(s1 + 1.5);
-		System.out(f1 + 1.5);
-		System.out(s1 - 2);
-		System.out(s1 - 1.5);
-		System.out(f1 - 1.5);
-		System.out(s1 * 2);
-		System.out(s1 * 1.5);
-		System.out(f1 * 1.5);
-		System.out(s1 / 2);
-		System.out(s1 / 1.5);
-		System.out(f1 / 1.5);
-		System.out(s1 % 2);
 
-		System.out(f1 + f2);
-		System.out(f1 - f2);
-		System.out(f1 * f2);
-		System.out(f1 / f2);
+	public Coord getCoord() {
+		return coord;
+	}
+
+	public bool isAlive() {
+		return isAlive;
+	}
+	public void setAlive(bool isAlive) {
+		this.isAlive = isAlive;
 	}
 }

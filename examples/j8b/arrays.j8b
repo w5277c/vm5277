@@ -37,7 +37,7 @@ class Main {
 			System.out(arr2[3]);
 		}
 
-		arr[0][0] = arr2[1];
+		arr[0][0] = (fixed)arr2[1];
 		arr = null;
 		arr2 = null;
 	}

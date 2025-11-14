@@ -3,19 +3,19 @@ class Main {
         System.setParam(0, 16);
         System.setParam(2, 18);
         System.setParam(3, 1);
-        //CONST final byte i1 = 1;
-        //CONST final byte i2 = 2;
-        //CONST final byte sum = 3;
+        //AST>CONST final byte i1 = 1;
+        //AST>CONST final byte i2 = 2;
+        //AST>CONST final byte sum = 3;
         System.out(1);
         System.out(2);
         System.out(3);
         final cstr text = "Hello world!";
         System.outCStr(text);
-        //CONST final byte newLine = '\n';
+        //AST>CONST final byte newLine = '\n';
         System.outChar('\n');
-        //CONST final int a = 1;
-        //CONST final int b = 2;
-        //CONST final int c = 3;
+        //AST>CONST final int a = 1;
+        //AST>CONST final int b = 2;
+        //AST>CONST final int c = 3;
         byte num = 'A';
         num++;
         System.outChar(num);
@@ -25,7 +25,5 @@ class Main {
         i++;
         System.out(i);
         System.stop();
-    }
-    public Main() {
     }
 }

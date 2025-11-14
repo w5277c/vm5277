@@ -36,7 +36,13 @@ class Main {
         else {
             System.outChar('G');
         }
+        System.out(i>j ? 'Y' : 'N');
+        System.out('Y');
+        System.out('N');
+        System.out(method(false) ? 'Y' : 'N');
+        System.out(method(false) ? method(true) : method(false));
     }
-    public Main() {
+    static bool method(bool flag) {
+        return !flag;
     }
 }

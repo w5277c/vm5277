@@ -98,11 +98,6 @@ public class ImportNode extends AstNode {
     }
 
 	@Override
-	public String getNodeType() {
-		return "import";
-	}
-
-	@Override
 	public String toString() {
 		return getClass().getSimpleName() + ": " + importStr;
 	}
@@ -143,16 +138,17 @@ public class ImportNode extends AstNode {
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		if (scope instanceof ClassScope) {
+		if(scope instanceof ClassScope) {
 			ClassScope classScope = (ClassScope)scope;
-			if (isStatic) {
+			if(isStatic) {
 				// Проверяем существование статического члена
-				if (!classScope.checkStaticImportExists(importStr)) {
+				if(!classScope.checkStaticImportExists(importStr)) {
 					markError("Static import not found: " + importStr);
 				}
-			} else {
+			}
+			else {
 				// Проверяем существование класса
-				if (classScope.resolveScope(importStr) == null) {
+				if(null==classScope.resolveCI(importStr, false)) {
 					markError("Imported class not found: " + importStr);
 				}
 			}

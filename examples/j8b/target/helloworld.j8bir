@@ -7,6 +7,4 @@ class Main {
         System.outCStr(text);
         System.stop();
     }
-    public Main() {
-    }
 }

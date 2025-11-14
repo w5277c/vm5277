@@ -47,11 +47,6 @@ public class ContinueNode extends CommandNode {
 	}
 	
 	@Override
-	public String getNodeType() {
-		return "continue command";
-	}
-
-	@Override
     public String toString() {
 		return "continue";
 	}

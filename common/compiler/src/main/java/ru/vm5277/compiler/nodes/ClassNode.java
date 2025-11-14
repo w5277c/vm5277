@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.nodes;
 
 import java.util.ArrayList;
@@ -32,77 +33,59 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
+import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 
-public class ClassNode extends AstNode {
-	private		final	List<ClassNode>	importedClasses;
-	protected	final	Set<Keyword>	modifiers;
-	protected			String			name;
-	private				String			parentClassName;
-	protected			List<String>	impl			= new ArrayList<>();
-	private				ClassBlockNode	blockNode;
-	private				ClassScope		classScope;
+public class ClassNode extends ObjectTypeNode {
+	private	ClassBlockNode	blockNode;
+	private	ClassScope		classScope;
+	private	boolean			isInner;
 	
-	public ClassNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, String parentClassName, List<ClassNode> importedClasses)
+	public ClassNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, boolean isInner, List<ObjectTypeNode> importedClasses)
 																																	throws CompileException {
-		super(tb, mc);
+		super(tb, mc, modifiers, null, importedClasses);
 		
-		this.importedClasses = importedClasses;
-		this.modifiers = modifiers;
-		this.parentClassName = parentClassName;
+		this.isInner = isInner;
 		
-		// Парсинг заголовка класса
-        consumeToken(tb);	// Пропуск class токена
-		try {
-			this.name = (String)consumeToken(tb, TokenType.ID).getValue();
-			VarType.addClassName(this.name);
+		// Проверка на запрещенное наследование классов
+		if(tb.match(TokenType.OOP, Keyword.EXTENDS)) {
+			markError("Class inheritance is not supported. Use composition instead of extends.");
+			tb.skip(Delimiter.RIGHT_BRACE);
+			return;
 		}
-		catch(CompileException e) {markFirstError(e);} // ошибка в имени, оставляем null
-		
-        // Парсинг интерфейсов (если есть)
-		if (tb.match(TokenType.OOP, Keyword.IMPLEMENTS)) {
+
+		// Парсинг интерфейсов (если есть)
+		if(tb.match(TokenType.OOP, Keyword.IMPLEMENTS)) {
 			consumeToken(tb);
 			while(true) {
 				try {
 					impl.add((String)consumeToken(tb, TokenType.ID).getValue());
 				}
-				catch(CompileException e) {markFirstError(e);} // встретили не ID интерфейса, пропускаем
-				if (!tb.match(Delimiter.COMMA)) break;
+				catch(CompileException e) {
+					markFirstError(e); // встретили что-то кроме ID интерфейса
+				}
+				if(!tb.match(Delimiter.COMMA)) break;
 				consumeToken(tb);
 			}
 		}
-	}
-	
-	public void parse() throws CompileException {
+
 		// Парсинг тела класса
 		blockNode = new ClassBlockNode(tb, mc, this);
 	}
 	
-	public String getName() {
-		return name;
+	public ClassScope getScope() {
+		return classScope;
 	}
 	
-	public String getFullName() {
-		return null == parentClassName ? name : parentClassName + "." + name;
-	}
-	
+	@Override
 	public ClassBlockNode getBody() {
 		return blockNode;
 	}
 	public void setBody(ClassBlockNode body) {
 		blockNode = body;
-	}
-	
-	public Set<Keyword> getModifiers() {
-		return modifiers;
-	}
-	
-	@Override
-	public String getNodeType() {
-		return "class";
 	}
 	
 	@Override
@@ -120,8 +103,8 @@ public class ClassNode extends AstNode {
 		
 		try{validateModifiers(modifiers, Keyword.PUBLIC, Keyword.PRIVATE, Keyword.STATIC);} catch(CompileException e) {addMessage(e);}
 
-		if(null != importedClasses) {
-			for (ClassNode imported : importedClasses) {
+		if(null!=importedClasses) {
+			for (ObjectTypeNode imported : importedClasses) {
 				imported.preAnalyze();
 			}
 		}
@@ -137,9 +120,9 @@ public class ClassNode extends AstNode {
 	public boolean declare(Scope parentScope) {
 		boolean result = true;
 		
-		if(null != importedClasses) {
-			for (ClassNode imported : importedClasses) {
-				result &= imported.declare(parentScope);
+		if(null!=importedClasses) {
+			for(ObjectTypeNode imported : importedClasses) {
+				result&=imported.declare(null);
 			}
 		}
 		
@@ -149,9 +132,28 @@ public class ClassNode extends AstNode {
 				implTypes.add(VarType.fromClassName(ifaceName));
 			}
 			classScope = new ClassScope(name, parentScope, implTypes);
-			if(null != parentScope) ((ClassScope)parentScope).addClass(classScope);
-			
-			result &= blockNode.declare(classScope);
+			if(null!=parentScope) {
+				((ClassScope)parentScope).addCI(classScope, true);
+			}
+
+			if(null!=importedClasses) {			
+				for(ObjectTypeNode imported : importedClasses) {
+					try {
+						if(imported instanceof InterfaceNode) {
+							classScope.addCI(((InterfaceNode)imported).getScope(), false);
+						}
+						else {
+							classScope.addCI(((ClassNode)imported).getScope(), false);
+						}
+					}
+					catch(CompileException ex) {
+						markError(ex);
+						result = false;
+					}
+				}
+			}
+
+			result&=blockNode.declare(classScope);
 		}
 		catch(CompileException e) {markError(e); return false;}
 
@@ -162,7 +164,7 @@ public class ClassNode extends AstNode {
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		if(null != importedClasses) {
-			for (ClassNode imported : importedClasses) {
+			for (ObjectTypeNode imported : importedClasses) {
 				imported.postAnalyze(classScope, cg); // Заменил scope на classScope, надо проверить
 			}
 		}
@@ -198,15 +200,24 @@ public class ClassNode extends AstNode {
 		return true;
 	}
 	
+	@Override
+	public void codeOptimization(Scope scope, CodeGenerator cg) {
+		CGScope oldScope = cg.setScope(cgScope);
+		
+		blockNode.codeOptimization(classScope, cg);
+		
+		cg.setScope(oldScope);
+	}
+	
 	private void fillInterfaces(List<InterfaceScope> iScopes, String ifaceName) {
-		InterfaceScope iScope = classScope.resolveInterface(ifaceName);
-		if(null == iScope) {
+		CIScope cis = classScope.resolveCI(ifaceName, false);
+		if(null==cis || !(cis instanceof InterfaceScope)) {
 			markError("Interface not found: " + ifaceName);
 		}
-		else if(!iScopes.contains(iScope)) {
-			checkInterfaceImplementation(classScope, iScope);
-			iScopes.add(iScope);
-			for(VarType type : iScope.getImpl()) {
+		else if(!iScopes.contains((InterfaceScope)cis)) {
+			checkInterfaceImplementation(classScope, (InterfaceScope)cis);
+			iScopes.add((InterfaceScope)cis);
+			for(VarType type : cis.getImpl()) {
 				fillInterfaces(iScopes, type.getClassName());
 			}
 		}
@@ -240,7 +251,7 @@ public class ClassNode extends AstNode {
 		return allMethodsImplemented;
 	}
 	
-	public void firstCodeGen(CodeGenerator cg, MethodNode methodNode) throws Exception {
+	public void firstCodeGen(CodeGenerator cg, MethodNode methodNode) throws CompileException {
 		cgDone = true;
 
 		methodNode.firstCodeGen(cg);
@@ -249,7 +260,7 @@ public class ClassNode extends AstNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 
@@ -261,6 +272,23 @@ public class ClassNode extends AstNode {
 		}
 */
 		return null;
+	}
+	
+	public boolean isStatic() {
+		return modifiers.contains(Keyword.STATIC);
+	}
+	public boolean isFinal() {
+		return modifiers.contains(Keyword.FINAL);
+	}
+	public boolean isPublic() {
+		return modifiers.contains(Keyword.PUBLIC);
+	}
+	public boolean isPrivate() {
+		return modifiers.contains(Keyword.PRIVATE);
+	}
+
+	public boolean isInner() {
+		return isInner;
 	}
 	
 	@Override

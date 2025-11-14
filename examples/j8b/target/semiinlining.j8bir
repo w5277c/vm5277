@@ -1,0 +1,33 @@
+class Main {
+    static public class Clazz {
+        private byte a = 0;
+        public void set(byte val) {
+            a=val;
+        }
+        public byte get() {
+            return a;
+        }
+        public Clazz() {
+        }
+    }
+    static public byte b = 1;
+    static public short s = 2;
+    static public void set(short val2, byte val1) {
+        b=val1;
+        s=val2;
+    }
+    static public short get() {
+        return s;
+    }
+    static public void main() {
+        System.setParam(0, 16);
+        System.setParam(2, 18);
+        System.setParam(3, 1);
+        b=15;
+        s=14;
+        System.out(s);
+        Clazz c = new Clazz();
+        c.a=16;
+        System.out(c.a);
+    }
+}

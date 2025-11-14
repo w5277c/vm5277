@@ -27,7 +27,6 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
-import ru.vm5277.compiler.nodes.expressions.UnresolvedReferenceExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.Scope;
 
@@ -104,11 +103,6 @@ public class SwitchNode extends CommandNode {
 	}
 	
 	@Override
-	public String getNodeType() {
-		return "switch command";
-	}
-
-	@Override
 	public boolean preAnalyze() {
 		// Проверка выражения switch
 		if (null != expression) expression.preAnalyze();
@@ -158,17 +152,10 @@ public class SwitchNode extends CommandNode {
 		// Проверка типа выражения switch
 		if(null!=expression) {
 			if(expression.postAnalyze(scope, cg)) {
-				if(expression instanceof UnresolvedReferenceExpression) {
-					expression = ((UnresolvedReferenceExpression)expression).getResolvedExpr();
+				VarType exprType = expression.getType();
+				if (!exprType.isInteger() && VarType.BYTE != exprType && VarType.SHORT != exprType) {
+					markError("Switch expression must be integer type, got: " + exprType);
 				}
-
-				try {
-					VarType exprType = expression.getType(scope);
-					if (!exprType.isInteger() && VarType.BYTE != exprType && VarType.SHORT != exprType) {
-						markError("Switch expression must be integer type, got: " + exprType);
-					}
-				}
-				catch (CompileException e) {markError(e);}
 			}
 		}
 

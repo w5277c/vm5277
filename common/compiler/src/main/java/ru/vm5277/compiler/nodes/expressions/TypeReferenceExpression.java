@@ -21,73 +21,151 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
-import ru.vm5277.compiler.semantic.InterfaceScope;
+import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.Scope;
+import static ru.vm5277.compiler.Main.debugAST;
+import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import ru.vm5277.common.SourcePosition;
+import ru.vm5277.compiler.semantic.CIScope;
+import ru.vm5277.compiler.semantic.EnumScope;
 
+//Выражение описывающее доступ к типу которое может состоять из других типпов (по аналогии с FS: путь к файлу, без имени саммого файла, только директории)
 public class TypeReferenceExpression extends ExpressionNode {
-	private final	String	className;
-	private			VarType	varType;
+	private		final	TypeReferenceExpression	parentExpr;
+	private				String					lastId;
+	protected			CIScope					cis;
 	
-	public TypeReferenceExpression(TokenBuffer tb, MessageContainer mc, String className) {
+	public TypeReferenceExpression(TokenBuffer tb, MessageContainer mc, TypeReferenceExpression parentExpr, String lastId) {
 		super(tb, mc);
 		
-		this.className = className;
+		this.parentExpr = parentExpr;
+		this.lastId = lastId;
 	}
 
-	public String getClassName() {
-		return className;
-	}
-
-	@Override
-	public VarType getType(Scope scope) throws CompileException {
-		// Возвращаем тип-класс, если он существует
-		VarType type = VarType.fromClassName("this".equals(className) ? scope.getThis().getName() : className);
-		if (null != type && !type.isClassType()) throw new CompileException("Type '" + className + "' not found");
-
-		if(null == type) {
-			// Затем проверяем, является ли это интерфейсом
-			InterfaceScope interfaceSymbol = scope.getThis().resolveInterface(className);
-			if (null != interfaceSymbol) {
-				type = VarType.addClassName(className);
-			}
-		}
+	// Для Enum
+	public TypeReferenceExpression(TokenBuffer tb, MessageContainer mc, TypeReferenceExpression parentExpr, String lastId, VarType type) {
+		super(tb, mc);
 		
-		return type;
+		this.parentExpr = parentExpr;
+		this.lastId = lastId;
+		this.type = type;
+	}
+
+	public TypeReferenceExpression(TokenBuffer tb, MessageContainer mc, TypeReferenceExpression parentExpr, String lastId, CIScope cis) {
+		super(tb, mc);
+		
+		this.parentExpr = parentExpr;
+		this.lastId = lastId;
+		this.cis = cis;
+		this.type = VarType.fromClassName(cis.getName());
+	}
+
+	public String getClassPath() {
+		return lastId;
 	}
 
 	@Override
 	public boolean preAnalyze() {
-		if (null == className || className.isEmpty()) {
-			markError("Classname cannot be empty");
-			return false;
+		boolean result = true;
+		debugAST(this, PRE, true, getFullInfo());
+		
+		if(null==lastId || lastId.isEmpty()) {
+			markError("TODO Empty last part");
+			result = false;
 		}
-		return true;
+		else {
+			if(null!=parentExpr) {
+				result&=parentExpr.preAnalyze();
+			}
+		}
+		
+		debugAST(this, PRE, false, result, getFullInfo());
+		return result;
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		try {
-			varType = getType(scope); // Проверяем существование типа
-			return true;
-		}
-		catch (CompileException e) {
-			markError(e.getMessage());
-			return false;
-		}
-	}
+	public boolean declare(Scope scope) {
+		boolean result = true;
+		debugAST(this, DECLARE, true, getFullInfo());
 
-	public String getName() {
-		return className;
+		if(null!=parentExpr) {
+			result&=parentExpr.declare(scope);
+			if(null!=parentExpr.getScope()) {
+				cis = parentExpr.getScope().resolveCI(lastId, true);
+			}
+		}
+		else {
+			cis = scope.getThis().resolveCI(lastId, false);
+		}
+
+		if(null==cis) {
+			declarationPendingNodes.put(this, scope);
+		}
+		else {
+			declarationPendingNodes.remove(this);
+
+			if(!(cis instanceof ClassScope) && !(cis instanceof EnumScope)) {
+				markError("Unexpected scope:" + cis + ", for:" + lastId);
+				result = false;
+			}
+			else {
+				type = VarType.fromClassName((((CIScope)cis).getName()));
+			}
+		}
+
+		debugAST(this, DECLARE, false, result, getFullInfo() + (declarationPendingNodes.containsKey(this) ? " [DP]" : ""));
+		return result;
+	}
+	
+	public CIScope getScope() {
+		return cis;
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		boolean result = true;
+		debugAST(this, POST, true, getFullInfo() + " type:" + type);
+		
+		// Находим тип-класс, если он существует
+		if(null!=type && !type.isClassType()) {
+			markError("Type '" + lastId + "' not found");
+			result = false;
+		}
+
+/*		if(null==type) {
+			// Затем проверяем, является ли это интерфейсом
+			InterfaceScope interfaceSymbol = scope.getThis().resolveInterface(lastId);
+			if (null != interfaceSymbol) {
+				type = VarType.addClassName(lastId);
+			}
+		}
+*/		
+		if(null!=parentExpr) {
+			result&=parentExpr.postAnalyze(scope, cg);
+		}
+		
+		debugAST(this, POST, false, result, getFullInfo());
+		return result;
+	}
+
+	public String getLastId() {
+		return lastId;
+	}
+	
+	@Override
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		//cg.setAcc(new Operand(VarType.CLASS, OperandType.TYPE, varType.getId()));
 		return null;
 	}
 	
 	@Override
 	public String toString() {
-		return getClass().getSimpleName() + " " + className;
+		return (null==parentExpr ? "" : parentExpr + ".") + lastId;
+	}
+	
+	public String getFullInfo() {
+		return getClass().getSimpleName() + " " + (null==parentExpr ? "" : parentExpr + ".") + lastId;
 	}
 }

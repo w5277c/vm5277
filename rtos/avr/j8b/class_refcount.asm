@@ -1,0 +1,2 @@
+j8bproc_class_refcount_dec:
+ret

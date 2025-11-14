@@ -21,12 +21,23 @@ import java.util.Arrays;
 import ru.vm5277.common.compiler.VarType;
 
 public class NativeBinding {
-	private	String			methodName;
-	private	VarType[]		methodParams;
+	private	String			signature;
+	private	String			path;
+	private	VarType[]		paramTypes;
 	private	String			rtosFilePath;
 	private	String			rtosFunction;
 	private	byte[][]		regs;
 	private	RTOSFeature[]	rtosFeatures;
+	
+	public NativeBinding(NativeBinding nb, VarType[] paramTypes) {
+		this.path = nb.getPath();
+		this.paramTypes = paramTypes;
+		this.rtosFilePath = nb.getRTOSFilePath();
+		this.rtosFunction = nb.getRTOSFunction();
+		this.regs = nb.getRegs();
+		this.rtosFeatures = nb.getRTOSFeatures();
+		signature = path + " " + (null==paramTypes ? "[]" : Arrays.toString(paramTypes));
+	}
 	
 	public NativeBinding(String line) throws ParseException {
 		String parts[] = line.trim().split("\\s+");
@@ -43,21 +54,21 @@ public class NativeBinding {
 		if(paramsPos2<=paramsPos || !methodPart.endsWith(")")) {
 			throw new ParseException("Invalid method declaration in: " + line, 0);
 		}
-		methodName = methodPart.substring(0, paramsPos);
+		path = methodPart.substring(0, paramsPos);
 
 		String params = methodPart.substring(paramsPos+1, paramsPos2).trim();
 		if(!params.isEmpty()) {
 			String[] paramsParts = params.split(",");
 			if(0 != paramsParts.length) {
-				methodParams = new VarType[paramsParts.length];
+				paramTypes = new VarType[paramsParts.length];
 				for(int i=0; i<paramsParts.length; i++) {
 					switch(paramsParts[i].trim().toLowerCase()) {
-						case "bool": methodParams[i] = VarType.BOOL; break;
-						case "byte": methodParams[i] = VarType.BYTE; break;
-						case "short": methodParams[i] = VarType.SHORT; break;
-						case "int": methodParams[i] = VarType.INT; break;
-						case "fixed": methodParams[i] = VarType.FIXED; break;
-						case "cstr": methodParams[i] = VarType.CSTR; break;
+						case "bool": paramTypes[i] = VarType.BOOL; break;
+						case "byte": paramTypes[i] = VarType.BYTE; break;
+						case "short": paramTypes[i] = VarType.SHORT; break;
+						case "int": paramTypes[i] = VarType.INT; break;
+						case "fixed": paramTypes[i] = VarType.FIXED; break;
+						case "cstr": paramTypes[i] = VarType.CSTR; break;
 						default:
 							throw new ParseException("Invalid method parameter type " + paramsParts[i].trim() + "in: " + line, 0);
 					}
@@ -101,6 +112,7 @@ public class NativeBinding {
 				rtosFeatures[i] = feature;
 			}
 		}
+		signature = path + " " + (null==paramTypes ? "[]" : Arrays.toString(paramTypes));
 	}
 	
 	private byte[] getSeparated(String str) {
@@ -117,15 +129,15 @@ public class NativeBinding {
 		return result;
 	}
 
-	public String getMethod() {
-		return methodName + (null == methodParams ? "" : " " + Arrays.toString(methodParams));
+	public String getSignature() {
+		return signature;
 	}
-	public String getMethodPath() {
-		return methodName;
+	public String getPath() {
+		return path;
 	}
 	
 	public VarType[] getMethodParams() {
-		return methodParams;
+		return paramTypes;
 	}
 	
 	public String getRTOSFilePath() {
@@ -142,5 +154,10 @@ public class NativeBinding {
 	
 	public RTOSFeature[] getRTOSFeatures() {
 		return rtosFeatures;
+	}
+	
+	@Override
+	public String toString() {
+		return signature;
 	}
 }

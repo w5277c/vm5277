@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGCells;
@@ -32,32 +33,52 @@ import ru.vm5277.common.compiler.Optimization;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
-// STACK(reg Y) - Необходимо выделять память в стеке для значений параметров, так-же сохранять старый Y и устанавливать новый на выделенный блок
-// при завершении необходимо восстанавливать Y
+/*TODO 
+	1.	В статических методах HeapIReg не задействован, можно использовать в пуле свободных регистров
+	2.	Похоже в методе без переменных и без аргументов также не задействован stackIReg(нужно убедиться), можно использовать в пуле свободных регистров
+		Но нужно убедтиться, что в блоках также нет локальных переменных.
+	3.	Критично! AST inlining использует IReg для массивов, похоже нужно пересмотреть его зону применения как общую, без константного смещения(X регистр в AVR)
+*/
 
 public class CGMethodScope extends CGCellsScope {
-	private	final	CGLabelScope				lbScope;
+	private			CodeGenerator				cg;
+	private			CGLabelScope				lbScope;
 	private			CGLabelScope				lbCIScope;
-	private	final	List<CGBlockScope>			blockScopes = new ArrayList<>();
-	private	final	Map<Integer, CGVarScope>	args		= new HashMap<>();
-	private	final	VarType[]					types;
-	private	final	String						signature;
+	private	final	List<CGBlockScope>			blockScopes			= new ArrayList<>();
+	private	final	Map<Integer, CGVarScope>	args				= new HashMap<>();
+	private			VarType[]					types;
+	private			String						signature;
 	private			int							argsStackSize;
-	private			int							stackOffset	= 0;
+	private			int							stackOffset			= 0;
 	private	final	ArrayList<RegPair>			regsPool;	// Свободные регистры, true = cвободен
 	private			boolean						isUsed;
 	private			CGIContainer				fieldsInitCallCont;
 	private			CGCells						cells;
+
+	private			boolean						heapIRegModified;
+	private			AtomicInteger				lastHeapOffset		= new AtomicInteger();
+	private			AtomicInteger				lastStackOffset		= new AtomicInteger();
 	
-	public CGMethodScope(CodeGenerator cg, CGClassScope parent, int resId, VarType type, int size, VarType[] types, String name, ArrayList<RegPair> regsPool) {
+	public CGMethodScope(CodeGenerator cg, CGClassScope parent, int resId, VarType type, int size, String name, ArrayList<RegPair> regsPool) {
 		super(parent, resId, type, size, name);
 		
-		this.types = types;
+		this.cg = cg;
 		this.regsPool = regsPool;
 	
 		if(null!=type) {
 			this.cells = new CGCells(CGCells.Type.ACC, size);
 		}
+		
+	//	cg.addLabel(lbScope);
+		
+		if(null == type) {
+			lbCIScope = new CGLabelScope(null, null, LabelNames.CONSTR_INIT, true);
+	//		cg.addLabel(lbCIScope);
+		}
+	}
+	
+	public void setTypes(VarType[] types) {
+		this.types = types;
 		
 		StringBuilder sb = new StringBuilder();
 		sb.append(name).append("(");
@@ -80,12 +101,6 @@ public class CGMethodScope extends CGCellsScope {
 		else {
 			lbScope = new CGLabelScope(this, null, "C", true);
 		}
-	//	cg.addLabel(lbScope);
-		
-		if(null == type) {
-			lbCIScope = new CGLabelScope(null, null, LabelNames.CONSTR_INIT, true);
-	//		cg.addLabel(lbCIScope);
-		}
 	}
 	
 	public void build(CodeGenerator cg) throws CompileException {
@@ -96,6 +111,9 @@ public class CGMethodScope extends CGCellsScope {
 		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";build " + toString()));
 		cont.append(lbScope);
 
+		heapIRegModified = cg.normalizeIRegConst(this, 'z', lastHeapOffset);
+//FOR TEST heapIRegModified = true;
+		cg.normalizeIRegConst(this, 'y', lastStackOffset);
 		
 		CGClassScope cScope = (CGClassScope)parent;
 		if(null == type) {
@@ -109,15 +127,16 @@ public class CGMethodScope extends CGCellsScope {
 		}
 		prepend(cont);
 		
-		cg.normalizeIRegConst(this);
-		
 //		append(cg.eReturn(null, null == type ? 0x00 : type.getSize(), stackOffset));
-		if(Optimization.NONE != cg.getOptLevel()) {
+		if(Optimization.FRONT<cg.getOptLevel()) {
 			CodeOptimizer co = cg.getOptimizer();
 			if(null != co) {
 				co.removeUnusedLabels(this, lbScope, lbCIScope);
 			}
 		}
+
+		
+		//append(cg.eReturn(null, stackOffset, -1, type));
 
 		if(VERBOSE_LO <= verbose) append(new CGIText(";method end"));
 	}
@@ -136,16 +155,16 @@ public class CGMethodScope extends CGCellsScope {
 		stackOffset=0;
 	}
 	public void addArg(CGVarScope local) {
+		//TODO рудимент?
 		args.put(local.getResId(), local);
 	}
 	public CGVarScope getArg(int resId) {
 		CGVarScope lScope = args.get(resId);
-		if(null != lScope) return lScope;
+		if(null!=lScope) return lScope;
 
-		if(null != parent) {
+		if(null!=parent) {
 			CGScope scope = parent;
-			while(scope instanceof CGBranchScope) scope = scope.getParent();
-		
+				
 			if(scope instanceof CGMethodScope) return ((CGMethodScope)scope).getArg(resId);
 			if(scope instanceof CGBlockScope) return ((CGBlockScope)scope).getVar(resId);
 			if(scope instanceof CGCommandScope) return ((CGBlockScope)scope.getScope(CGBlockScope.class)).getVar(resId);
@@ -238,8 +257,8 @@ public class CGMethodScope extends CGCellsScope {
 		return signature;
 	}
 	
-	public int getStackSize() {
-		return stackOffset;
+	public int getArgStackSize() {
+		return argsStackSize;
 	}
 	
 	public VarType[] getTypes() {
@@ -278,5 +297,17 @@ public class CGMethodScope extends CGCellsScope {
 	@Override
 	public CGCells getCells() {
 		return cells;
+	}
+	
+	public boolean isHeapIRegModified() {
+		return heapIRegModified;
+	}
+	
+	public int getLastHeapOffset() {
+		return lastHeapOffset.get();
+	}
+	
+	public int getLastStackOffset() {
+		return lastStackOffset.get();
 	}
 }

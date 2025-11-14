@@ -16,27 +16,28 @@
 package ru.vm5277.common.cg.items;
 
 import ru.vm5277.common.cg.scopes.CGLabelScope;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class CGIAsmLdLabel extends CGIAsm {
 	private	String	labelName;
 	private	String	postfix;
 	
-	public CGIAsmLdLabel(String instr, CGLabelScope lbScope, String postfix) {
+	public CGIAsmLdLabel(String instr, CGLabelScope lbScope, String postfix) throws CompileException {
 		super(instr);
 		this.labelName = lbScope.getName();
 		this.postfix = postfix;
 	}
-	public CGIAsmLdLabel(String instr, CGLabelScope lbScope) {
+	public CGIAsmLdLabel(String instr, CGLabelScope lbScope) throws CompileException {
 		super(instr);
 		this.labelName = lbScope.getName();
 	}
 
-	public CGIAsmLdLabel(String instr, String labelName, String postfix) {
+	public CGIAsmLdLabel(String instr, String labelName, String postfix) throws CompileException {
 		super(instr);
 		this.labelName = labelName;
 		this.postfix = postfix;
 	}
-	public CGIAsmLdLabel(String instr, String labelName) {
+	public CGIAsmLdLabel(String instr, String labelName) throws CompileException {
 		super(instr);
 		this.labelName = labelName;
 	}

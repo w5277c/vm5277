@@ -21,12 +21,11 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class BlockScope extends Scope {
-	protected	final	Scope						parent;
 	protected	final	Map<String, Symbol>			variables	= new HashMap<>();
 	private		final	Map<String, LabelSymbol>	labels		= new HashMap<>();
 	
 	public BlockScope(Scope parent) {
-		this.parent = parent;
+		super(parent);
 	}
 
 	public void addVariable(Symbol symbol) throws CompileException {
@@ -37,14 +36,43 @@ public class BlockScope extends Scope {
 		variables.put(name, symbol);
 	}
 
+	
 	@Override
-	public Symbol resolveSymbol(String name) {
-		// 1. Ищем в локальных переменных
+	public CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess) {
+		// Проверка модфификаторов доступа ненужна, все классы внутри блока доступны
+		if(isQualifiedAccess) {
+			return internal.get(name);
+		}
+		
+		// Проверка модфификаторов доступа ненужна, все классы внутри блока доступны
+		CIScope cis = internal.get(name);
+		if(null!=cis) return cis;
+		
+		if(null!=parent) {
+			return parent.resolveCI(null==caller ? this : caller, name, false);
+		}
+		return null;
+	}
+	
+	@Override
+	public Symbol resolveField(Scope caller, String name, boolean isQualifiedAccess) throws CompileException {
+		if(isQualifiedAccess) {
+			throw new CompileException("Qualified field access in block scope");
+		}
+		return parent.resolveField(null==caller ? this : caller, name, false);
+	}
+	
+	@Override
+	public Symbol resolveVar(String name) throws CompileException {
+		// Ищем в локальных переменных
 		Symbol symbol = variables.get(name);
-		if (symbol != null) return symbol;
+		if(null!=symbol) return symbol;
 
-		// 2. Делегируем в родительскую область
-		return parent != null ? parent.resolveSymbol(name) : null;
+		// 2. Делегируем в родительскую область(переменные для block и параметры для method)
+		if(null!=parent) {
+			return parent.resolveVar(name);
+		}
+		return null;
 	}
 	
 	public void addLabel(LabelSymbol label) throws CompileException {
@@ -70,19 +98,6 @@ public class BlockScope extends Scope {
 			current = (current.getParent() instanceof BlockScope) ? (BlockScope)current.getParent() : null;
 		}
 		return null;
-	}
-	
-	@Override
-	public ClassScope getThis() {
-		if(parent instanceof ClassScope) {
-			return (ClassScope)parent;
-		}
-		return null == parent ? null : parent.getThis();
-	}
-	
-	@Override
-	public Scope getParent() {
-		return parent;
 	}
 	
 	@Override

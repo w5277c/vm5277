@@ -20,21 +20,23 @@ import java.util.List;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.compiler.nodes.AstNode;
 
-public class MethodSymbol extends Symbol implements AstHolder {
+public class MethodSymbol extends AstHolder {
 	private	final	List<Symbol>	parameters;
 	private			boolean			canThrow;
 	private			String			signature;
 	private	final	MethodScope		scope;
 	private			AstNode			astNode;
+	private			boolean			isPredefined;
 	
 	public MethodSymbol(String name, VarType returnType, List<Symbol> parameters, boolean isFinal, boolean isStatic, boolean isNative, boolean canThrow,
-						MethodScope scope, AstNode astNode) {
+						boolean isPredefined, MethodScope scope, AstNode astNode) {
 		super(name, returnType, isFinal, isStatic, isNative);
 		
 		this.parameters = parameters;
 		this.canThrow = canThrow;
 		this.scope = scope;
 		this.astNode = astNode;
+		this.isPredefined = isPredefined;
 	}
 
 	public MethodScope getScope() {
@@ -84,6 +86,10 @@ public class MethodSymbol extends Symbol implements AstHolder {
 	@Override
 	public AstNode getNode() {
 		return astNode;
+	}
+	
+	public boolean isPredefined() {
+		return isPredefined;
 	}
 	
 	@Override

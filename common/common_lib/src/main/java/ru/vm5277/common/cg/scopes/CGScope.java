@@ -15,6 +15,7 @@
  */
 package ru.vm5277.common.cg.scopes;
 
+import ru.vm5277.common.cg.CGBranch;
 import java.util.HashMap;
 import java.util.Map;
 import ru.vm5277.common.cg.items.CGIContainer;
@@ -27,7 +28,8 @@ public class CGScope extends CGIContainer {
 	protected					String					name;
 	protected					CGScope					parent;
 	protected	final	static	Map<Integer, CGScope>	scopesMap	= new HashMap<>();
-	protected			static	int						statOffset	= 0; // Блок для хранения статических полей классов
+
+	protected					CGBranch				branch		= null;
 	
 	protected					int						resId;
 	private						int						sbPos		= 0;
@@ -124,6 +126,13 @@ public class CGScope extends CGIContainer {
 	@Override
 	public String toString() {
 		return getClass().getSimpleName() + ":" + name;
+	}
+	
+	public void setBranch(CGBranch branch) {
+		this.branch = branch;
+	}
+	public CGBranch getBranch() {
+		return branch;
 	}
 	
 	@Override

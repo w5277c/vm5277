@@ -50,8 +50,9 @@ public class Keyword {
 	public	static	final	Keyword					ATOMIC		= new Keyword("atomic", TokenType.MODIFIER);
 	// Ключевые слова ООП
 	public	static	final	Keyword					CLASS		= new Keyword("class", TokenType.OOP);
-	public	static	final	Keyword					INTERFACE	= new Keyword("interface", TokenType.OOP);
 	public	static	final	Keyword					IMPLEMENTS	= new Keyword("implements", TokenType.OOP);
+	public	static	final	Keyword					INTERFACE	= new Keyword("interface", TokenType.OOP);
+	public	static	final	Keyword					EXTENDS		= new Keyword("extends", TokenType.OOP);
 	public	static	final	Keyword					THIS		= new Keyword("this", TokenType.OOP);
 	public	static	final	Keyword					ENUM		= new Keyword("enum", TokenType.OOP);
 	//Исключения

@@ -47,11 +47,6 @@ public class ThrowNode extends CommandNode {
 	}
 
 	@Override
-	public String getNodeType() {
-		return "throw command";
-	}
-
-	@Override
 	public boolean preAnalyze() {
 		if (null != exceptionExpr) {exceptionExpr.preAnalyze();}
 		else markError("Exception expression cannot be null");
@@ -70,19 +65,18 @@ public class ThrowNode extends CommandNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		if (null != exceptionExpr) {
 			if (exceptionExpr.postAnalyze(scope, cg)) {
-				try {
-					VarType exprType = exceptionExpr.getType(scope);
-					// Проверяем, что выражение имеет тип byte (код ошибки)
-					if (VarType.BYTE != exprType) markError("Throw expression must be of type byte, got: " + exprType);
+				VarType exprType = exceptionExpr.getType();
+				// Проверяем, что выражение имеет тип byte (код ошибки)
+				if (VarType.BYTE != exprType) {
+					markError("Throw expression must be of type byte, got: " + exprType);
 				}
-				catch (CompileException e) {markError(e);}
 			}
 		}
 		return true;
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
 

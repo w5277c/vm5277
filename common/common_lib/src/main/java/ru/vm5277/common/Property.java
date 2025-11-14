@@ -16,8 +16,10 @@
 package ru.vm5277.common;
 
 public enum Property {
-	LENGTH,	//Получить размер массива
-	INDEX,	//Получить индекс enum
-	ITEM,	//Получить элемент enum
-	SIZE;	//Получить размер элементов enum
+	length,		//Получить размер массива
+	index,		//Получить индекс enum
+	item,		//Получить элемент enum
+	size,		//Получить размер элементов enum
+	instanceId,	//Получить ид экземпляра класса
+	typeId;		//Получить ид типа класса
 }

@@ -33,7 +33,7 @@ import ru.vm5277.compiler.semantic.Scope;
 public class InterfaceBodyNode extends AstNode {
 	protected List<AstNode> children = new ArrayList<>();
 	
-	public InterfaceBodyNode(TokenBuffer tb, MessageContainer mc, String className, ClassNode classNode) throws CompileException {
+	public InterfaceBodyNode(TokenBuffer tb, MessageContainer mc, String className, ObjectTypeNode ifaceNode) throws CompileException {
 		super(tb, mc);
 
 		consumeToken(tb, Delimiter.LEFT_BRACE);
@@ -44,7 +44,6 @@ public class InterfaceBodyNode extends AstNode {
 			// Обработка вложенных интерфейсов
 			if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
 				InterfaceNode iNode = new InterfaceNode(tb, mc, modifiers, null, null);
-				iNode.parse();
 				children.add(iNode);
 				continue;
 			}
@@ -58,8 +57,7 @@ public class InterfaceBodyNode extends AstNode {
 			}
 			// Обработка вложенных классов
 			if (tb.match(TokenType.OOP, Keyword.CLASS)) {
-				ClassNode cNode = new ClassNode(tb, mc, modifiers, null, null);
-				cNode.parse();
+				ClassNode cNode = new ClassNode(tb, mc, modifiers, true, null);
 				// Проверяем что класс статический
 				//TODO Продумать необходимость/возможность наличия статических классов в интерфейсе
 				if(!modifiers.contains(Keyword.STATIC)) {
@@ -82,12 +80,12 @@ public class InterfaceBodyNode extends AstNode {
 			}
 
 			if (tb.match(Delimiter.LEFT_PAREN)) { // Это метод
-				children.add(new MethodNode(tb, mc, modifiers, type, name, classNode));
+				children.add(new MethodNode(tb, mc, modifiers, type, name, ifaceNode));
 				continue;
 			}
 
 			if (null != type) { // Это поле
-				children.add(new FieldNode(tb, mc, modifiers, type, name));
+				children.add(new FieldNode(tb, mc, ifaceNode, modifiers, type, name));
 				continue;
 			}
 
@@ -105,11 +103,6 @@ public class InterfaceBodyNode extends AstNode {
 	
 	public List<AstNode> getDeclarations() {
 		return children;
-	}
-	
-	@Override
-	public String getNodeType() {
-		return "interface body";
 	}
 	
 	@Override
@@ -136,7 +129,8 @@ public class InterfaceBodyNode extends AstNode {
 				node.preAnalyze();
 			}
 			else {
-				markError("Interface cannot contain " + node.getNodeType() + " declarations. Only methods, constants and nested types are allowed");
+				markError(	"Interface cannot contain " + node.getClass().getSimpleName() +
+							" declarations. Only methods, constants and nested types are allowed");
 			}
 		}
 		
@@ -214,7 +208,7 @@ public class InterfaceBodyNode extends AstNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 		

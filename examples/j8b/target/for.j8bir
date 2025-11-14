@@ -1,5 +1,5 @@
 class Main {
-    public static void main() {
+    static public void main() {
         System.setParam(2, 18);
         for(byte i = 0; i<10; i++) {
             if (1==i) {
@@ -10,7 +10,10 @@ class Main {
             System.out('!');
         }
         for(byte i = 7; false; i++) {
-            System.out(i);
+            //AST>REMOVED
+        }
+        else{
+            System.out('@');
         }
         for(byte i = 8; true; i++) {
             System.out(i);
@@ -25,10 +28,8 @@ class Main {
         for(i=0; i<10; i++) {
             System.out(i);
         }
-        for(final byte i = 0; true; ) {
-            System.out(0);
+        for(byte i = 0; i<10; ) {
+            System.out(i);
         }
-    }
-    public Main() {
     }
 }

@@ -13,9 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.nodes.commands;
 
 import java.util.List;
+import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
@@ -26,25 +30,37 @@ import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
+import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
-import ru.vm5277.compiler.nodes.expressions.UnresolvedReferenceExpression;
 import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class ReturnNode extends CommandNode {
 	private	ExpressionNode	expr;
-	private	VarType			returnType;
+	private	VarType			type;
 	
 	public ReturnNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
 		
 		consumeToken(tb); // Потребляем "return"
 		
-		try {this.expr = tb.match(Delimiter.SEMICOLON) ? null : new ExpressionNode(tb, mc).parse();} catch(CompileException e) {markFirstError(e);}
+		try {
+			this.expr = (tb.match(Delimiter.SEMICOLON) ? null : new ExpressionNode(tb, mc).parse());
+		}
+		catch(CompileException e) {markFirstError(e);}
         
         // Обязательно потребляем точку с запятой
-        try {consumeToken(tb, Delimiter.SEMICOLON);}catch(CompileException e) {markFirstError(e);}
+        try {
+			consumeToken(tb, Delimiter.SEMICOLON);
+		}
+		catch(CompileException e) {
+			markFirstError(e);
+		}
     }
+	
+	public CommandNode getThis() {
+		return this;
+	}
 
 	public ReturnNode(MessageContainer mc, ExpressionNode expr) {
 		super(null, mc);
@@ -57,103 +73,121 @@ public class ReturnNode extends CommandNode {
     }
 
     public boolean returnsValue() {
-        return null != expr;
+        return null!=expr;
     }
 	
 	@Override
-	public String getNodeType() {
-		return "return command";
-	}
-
-	@Override
 	public boolean preAnalyze() {
-		if (expr != null) {
-			if(!expr.preAnalyze()) {
-				return false;
-			}
+		boolean result = true;
+		debugAST(this, PRE, true, getFullInfo());
+
+		if(expr!=null) {
+			result&=expr.preAnalyze();
 		}
-		return true;
+		
+		debugAST(this, PRE, false, result, getFullInfo());
+		return result;
 	}
 
 	@Override
 	public boolean declare(Scope scope) {
-		if(null != expr) {
-			if(!expr.declare(scope)) {
-				return false;
-			}
+		boolean result = true;
+		debugAST(this, DECLARE, true, getFullInfo());
+
+		if(null!=expr) {
+			result&=expr.declare(scope);
 		}
-		return true;
+		
+		debugAST(this, DECLARE, false, result, getFullInfo() + (declarationPendingNodes.containsKey(this) ? " [DP]" : ""));
+		return result;
 	}
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+		boolean result = true;
+		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 		cgScope = cg.enterCommand();
 	
 		// Находим ближайший MethodScope
 		MethodScope methodScope = findEnclosingMethodScope(scope);
-		if (null == methodScope) {
+		if(null==methodScope) {
 			markError("'return' outside of method");
+			result = false;
 		}
-		else {
+
+		if(result) {
 			// Получаем тип возвращаемого значения метода
-			returnType = methodScope.getSymbol().getType();
+			type = methodScope.getSymbol().getType();
 
 			// Проверяем соответствие возвращаемого значения
-			if (null == expr) { // return без значения
-				if (!returnType.isVoid()) markError("Void method cannot return a value");
+			if(null==expr) { // return без значения
+				if(!type.isVoid()) {
+					markError("Void method cannot return a value");
+					result = false;
+				}
 			}
 			else { // return с выражением
-				if(returnType.isVoid()) {
+				if(type.isVoid()) {
 					markError("Non-void method must return a value");
+					result = false;
 				}
 				else {
-					if(!expr.postAnalyze(scope, cg)) {
-						cg.leaveCommand();
-						return false;
-					}
-					if(expr instanceof UnresolvedReferenceExpression) {
-						expr = ((UnresolvedReferenceExpression)expr).getResolvedExpr();
-					}
+					result&=expr.postAnalyze(scope, cg);
 
-					// Проверяем тип выражения
-					try {
-						VarType exprType = expr.getType(scope);
-						if(null == exprType) {
-							markError(String.format("TODO Can't resolve expression: " + expr));
+					if(result) {
+						try {
+							ExpressionNode optimizedExpr = expr.optimizeWithScope(scope, cg);
+							if(null != optimizedExpr) {
+								expr = optimizedExpr;
+							}
 						}
-						else {
-							if (!isCompatibleWith(scope, returnType, exprType)) {
-								markError(String.format("Return type mismatch: expected " + returnType + ", got " + exprType));
+						catch(CompileException ex) {
+							markError(ex);
+							result = false;
+						}
+
+						if(result) {
+							// Проверяем тип выражения
+							VarType exprType = expr.getType();
+							if(null==exprType) {
+								markError("Cannot determine type of expression: " + expr.toString());
+								result = false;
+							}
+							else {
+								if(!isCompatibleWith(scope, exprType, type)) {
+									markError("Return type mismatch: expected " + type + ", got " + exprType);
+									result = false;
+								}
 							}
 						}
 					}
-					catch (CompileException e) {markError(e);}
 				}
 			}
 		}
 		
 		cg.leaveCommand();
-		return true;
+		debugAST(this, POST, false, result, getFullInfo());
+		return result;
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
 
 		CGScope cgs = (null == parent ? cgScope : parent);
 		
-		if(null != expr) {
-			if (CodegenResult.RESULT_IN_ACCUM != expr.codeGen(cg, cgs, true)) {
+		if(null!=expr) {
+			if(CodegenResult.RESULT_IN_ACCUM!=expr.codeGen(cg, cgs, true)) {
 				throw new CompileException("Accum not used for operand:" + expr);
 			}
 		}
 		// Можно было бы вызвать cg.eReturn(cgScope, returnType.getSize());, но в блоке мог быть выделен STACK_FRAME и возможно что-то еще, поэтому переходим
 		// на завершение блока. Оптимизатор в будущем почистит лишние JMP(например если после JMP сразу следует метка.
 		CGBlockScope bScope = (CGBlockScope)cgScope.getParent();
-		cg.jump(cgScope, bScope.getELabel());
+		cg.jump(cgs, bScope.getELabel());
 		
-		if(null != expr) {
+		if(null!=expr) {
 			return CodegenResult.RESULT_IN_ACCUM;
 		}
 		return null;
@@ -162,5 +196,14 @@ public class ReturnNode extends CommandNode {
 	@Override
 	public List<AstNode> getChildren() {
 		return null;
+	}
+	
+	@Override
+	public String toString() {
+		return expr.toString();
+	}
+
+	public String getFullInfo() {
+		return getClass().getSimpleName() + " " + toString();
 	}
 }

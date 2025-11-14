@@ -19,17 +19,20 @@ public class LabelNames {
 	public	static	String	PREFIX				= "_j8b_";
 	public	static	String	MAIN				= "j8bCMainMmain";
 	public	static	String	RET_POINT			= PREFIX + "rp";
-	public	static	String	MULTIBYTE_CP_END	= PREFIX + "mcpe";
-	public	static	String	LOOP				= PREFIX + "loop";
-	public	static	String	LOOP_END			= PREFIX + "eol";
+	public	static	String	MULTIBYTE_CP_END		= PREFIX + "mcpe";
+	public	static	String	LOOP					= PREFIX + "loop";
+	public	static	String	LOOP_END				= PREFIX + "eol";
 	public	static	String	BLOCK_END			= PREFIX + "eob";
+	public	static	String	COMPARE_THEN		= PREFIX + "eoct";
+	public	static	String	COMPARE_ELSE			= PREFIX + "eoce";
 	public	static	String	COMPARE_END			= PREFIX + "eoc";
-	public	static	String	META				= PREFIX + "meta";
+	public	static	String	META					= PREFIX + "meta";
 	public	static	String	CONSTR_INIT			= PREFIX + "cinit";
 	public	static	String	LOCGIC_END			= PREFIX + "eolb";
 	public	static	String	LOCGIC_NOT_END		= PREFIX + "eonlb";
 	public	static	String	FIELDS_INIT			= PREFIX + "finit";
 	public	static	String	DIV_END				= PREFIX + "ediv";
 	public	static	String	DIV_NO_ERR			= PREFIX + "nediv";
+	public	static	String	TERNARY_END			= PREFIX + "tere";
 	
 }

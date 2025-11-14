@@ -16,16 +16,17 @@
 package ru.vm5277.common.cg.items;
 
 import ru.vm5277.common.cg.scopes.CGLabelScope;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class CGIAsmJump extends CGIAsm {
 	private	String	labelName;
 	
-	public CGIAsmJump(String instr, CGLabelScope lbScope) {
+	public CGIAsmJump(String instr, CGLabelScope lbScope) throws CompileException {
 		super(instr);
 		this.labelName = lbScope.getName();
 	}
 
-	public CGIAsmJump(String instr, String labelName) {
+	public CGIAsmJump(String instr, String labelName) throws CompileException {
 		super(instr);
 		this.labelName = labelName;
 	}

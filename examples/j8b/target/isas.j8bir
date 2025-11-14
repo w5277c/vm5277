@@ -6,7 +6,10 @@ class Main {
     public class Short {
         private short value;
         public Short(short value) {
-            null.value=value;
+            this.value=value;
+        }
+        public Number getThis() {
+            return this;
         }
         public byte toByte() {
             return (byte)value;
@@ -19,12 +22,13 @@ class Main {
         System.setParam(0, 16);
         System.setParam(2, 18);
         System.setParam(3, 1);
-        Object num2 = Short.Short(258);
-        if (num2 is Short as s) {
-            System.out(s.toShort());
+        Object num = new Short(short);
+        if (num is Short as s) {
+            System.out(s.value);
             System.outCStr(" is short\n");
+            if ((Number)s is Short as s2) {
+                System.outCStr("Is short too\n");
+            }
         }
-    }
-    public Main() {
     }
 }

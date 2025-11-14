@@ -1,0 +1,118 @@
+/*
+ * Copyright 2025 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+public class Snake implements MovableGameObject {
+	private static final byte HEAD_SIGN = 0x94;
+	private static final byte BODY_SIGN = 0x8D;
+	private	Direction dir = Direction.LEFT;
+	private bool isAlive = true;
+	private	Coord[] parts;
+	private	byte size;
+
+	public Snake(Coord coord) {
+		this.screenSize = screenSize;
+		this.parts = new Coord[Main.maxSize];
+		this.parts[0] = new Coord(x, y);
+		this.parts[1] = new Coord(x+1, y);
+		this.parts[2] = new Coord(x+2, y);
+		this.size = 3;
+	}
+
+	public void draw(Game game) {
+		for(int i=0; i<size; i++) {
+			Coord part = parts[i];
+			if(null!=part) {
+				game.setCell(part, 0==i ? HEAD_SIGN : BODY_SIGN, isAlive ? Color.BLACK : Color.RED);
+			}
+		}
+	}
+
+	public Coord getCoord() {
+		return coord[0];
+	}
+
+	public bool isAlive() {
+		return isAlive;
+	}
+	public void setAlive(bool isAlive) {
+		this.isAlive = isAlive;
+	}
+
+	public void move() {
+		Coord newHead = addHead();
+		if(0>newHead.getX() || newHead.getX()>Main.screenSzie.getX()-1 || 0>newHead.getY() || newHead.getY()>Main.screenSzie.getY()-1) {
+			isAlive = false;
+		}
+		else {
+			removeTail();
+		}
+	}
+
+	public void setDirection(Direction dir) {
+		if(Direction.LEFT == this.dir && Direction.RIGHT == dir) return;
+		if(Direction.RIGHT == this.dir && Direction.LEFT == dir) return;
+		if(Direction.UP == this.dir && Direction.DOWN == dir) return;
+		if(Direction.DOWN == this.dir && Direction.UP == dir) return;
+
+		Coord part0 = bodyCoords[0];
+		Coord part1  = bodyCoords[1];
+		if(Direction.LEFT == this.dir && part0.getX() == part1.getX()) return;
+		if(Direction.RIGHT == this.dir && part0.getX() == part1.getX()) return;
+		if(Direction.UP == this.dir && part0.getY() == part1.getY()) return;
+		if(Direction.DOWN == this.dir && part0.getY() == part1.getY()) return;
+
+		this.dir = dir;
+	}
+	public Direction getDirection() {
+		return dir;
+	}
+
+	public Coord addHead() {
+		Coord head = parts[0];
+
+		Coord newHead;
+		if(Direction.LEFT == dir) newHead = new Coord(head.getX()-1, head.getY());
+		else if(Direction.RIGHT == dir) newHead = new Coord(head.getX()+1, head.getY());
+		else if(Direction.UP == dir) newHead = new Coord(head.getX(), head.getY()-1);
+		else newHead = new Coord(head.getX(), head.getY()+1);
+
+		for(byte i=size; i>=0; i--) {
+			Coord coord = parts[i-1];
+			parts[i] = coord;
+		}
+		parts[0] = newHead;
+		size++;
+		return newHead;
+	}
+
+	public void removeTail() {
+		if(1!=size) {
+			parts[--size] = null;
+		}
+	}
+
+	public bool checkCollision(GameObject gObject) {
+		Coord objCoord = gObject.getCoord();
+		for(byte i=0; i<size, i++) {
+			Coord part = parts[i];
+			return (part.getX() == objCoord.getX() && part.getY() == objCoord.getY());
+		}
+	}
+
+	public byte getSize() {
+		return size;
+	}
+}

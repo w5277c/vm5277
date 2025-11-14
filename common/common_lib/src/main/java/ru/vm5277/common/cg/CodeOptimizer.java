@@ -27,11 +27,12 @@ import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGItem;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.exceptions.CompileException;
 
 public abstract class CodeOptimizer {
 
-	public abstract void optimizeBranchChains(CGScope scope);
-	public abstract void optimizeBaseInstr(CGScope scope);
+	public abstract void optimizeBranchChains(CGScope scope) throws CompileException ;
+	public abstract void optimizeBaseInstr(CGScope scope) throws CompileException ;
 	
 	protected boolean optimizeEmptyJumps(CGScope scope) {
 		boolean result=false;
@@ -47,13 +48,20 @@ public abstract class CodeOptimizer {
 				CGItem item1 = list.get(i);
 				if(item1 instanceof CGIAsmJump) {
 					CGIAsmJump jump = (CGIAsmJump)item1;
-					CGItem item2 = list.get(i+1);
-					if(item2 instanceof CGLabelScope) {
-						String name = ((CGLabelScope)item2).getName();
-						if(jump.getLabelName().equalsIgnoreCase(name)) {
-							jump.disable();
-							changed=true;
-							result=true;
+					i++;
+					for(;i<list.size()-1;i++) {
+						CGItem item2 = list.get(i);
+						if(item2 instanceof CGLabelScope) {
+							String name = ((CGLabelScope)item2).getName();
+							if(jump.getLabelName().equalsIgnoreCase(name)) {
+								jump.disable();
+								changed=true;
+								result=true;
+							}
+						}
+						else {
+							i--;
+							break;
 						}
 					}
 				}
@@ -138,9 +146,11 @@ public abstract class CodeOptimizer {
 					if(list.get(i-1) instanceof CGIAsmJump) {
 						CGItem nextItem = list.get(i+1);
 						if(nextItem instanceof CGIAsmJump) {
-							replacementMap.put(name, ((CGIAsmJump)nextItem).getLabelName());
-							item.disable();
-							nextItem.disable();
+							if(!name.equals(((CGIAsmJump)nextItem).getLabelName())) {
+								replacementMap.put(name, ((CGIAsmJump)nextItem).getLabelName());
+								item.disable();
+								nextItem.disable();
+							}
 						}
 					}
 				}

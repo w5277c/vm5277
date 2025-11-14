@@ -16,6 +16,7 @@
 
 package ru.vm5277.compiler.semantic;
 
+import java.util.ArrayList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -31,14 +32,14 @@ public class ScopeTest {
 
     @BeforeEach
     void setup() throws CompileException {
-        globalScope = new ClassScope("Global", null, null);
-        childScope = new ClassScope("Child", globalScope, null);
+        globalScope = new ClassScope("Global", null, new ArrayList<>());
+        childScope = new ClassScope("Child", globalScope, new ArrayList<>());
     }
 
     @Test
     void resolveFieldFromParentScope() throws CompileException {
         globalScope.addField(new Symbol("x", VarType.INT, false, false));
-        Symbol resolved = childScope.resolveSymbol("x");
+        Symbol resolved = childScope.resolveField("x", false);
         assertNotNull(resolved);
         assertEquals(VarType.INT, resolved.getType());
     }

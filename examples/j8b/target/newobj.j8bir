@@ -5,27 +5,31 @@ class Main {
     public class Byte {
         private byte value;
         public Byte(byte value) {
-            null.value=value;
+            this.value=value;
         }
         public byte toByte() {
             return value;
         }
-        public void finalize() {
-        }
     }
     static public void main() {
+        System.setParam(0, 16);
         System.setParam(2, 18);
-        Byte b1 = Byte.Byte(1);
-        System.out(b1.toByte());
+        System.setParam(3, 1);
+        Byte b1 = new Byte(byte);
+        System.out(b1.value);
+        Byte b2 = new Byte(byte);
+        System.out(b2.value);
         b1=null;
-        Byte b2 = Byte.Byte(1);
-        System.out(b2.toByte());
-        System.out(b2.getClassTypeId());
-        System.out(b2.getClassId());
-        {
-            System.out(33);
+        Byte b3 = new Byte(byte);
+        System.out(b3.value);
+        System.out(b3.typeid());
+        System.out(b3.instanceid());
+        Byte b4 = b1;
+        if (b1==b2) {
+            System.out(1);
         }
-    }
-    public Main() {
+        if (b1==b4) {
+            System.out(2);
+        }
     }
 }

@@ -15,18 +15,26 @@
  */
 package ru.vm5277.common.cg.items;
 
+import ru.vm5277.common.exceptions.CompileException;
+
 public class CGIAsm extends CGItem {
 	protected	String	text;
 	
-	public CGIAsm(String text) {
+	public CGIAsm(String text) throws CompileException {
 		this.text = text;
+		if(null==text) {
+			throw new CompileException("Asm instruction is null");
+		}
 	}
 
 	public String getText() {
 		return text;
 	}
-	public void setText(String text) {
+	public void setText(String text)  throws CompileException  {
 		this.text = text;
+		if(null==text) {
+			throw new CompileException("Asm instruction is null");
+		}
 	}
 	
 	@Override

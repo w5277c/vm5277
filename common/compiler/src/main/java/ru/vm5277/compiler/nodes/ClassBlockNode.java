@@ -47,8 +47,7 @@ public class ClassBlockNode extends AstNode {
 
 			// Обработка классов с модификаторами
 			if (tb.match(TokenType.OOP, Keyword.CLASS)) {
-				ClassNode cNode = new ClassNode(tb, mc, modifiers, null, null);
-				cNode.parse();
+				ClassNode cNode = new ClassNode(tb, mc, modifiers, true, null);
 				children.add(cNode);
 				continue;
 			}
@@ -61,7 +60,6 @@ public class ClassBlockNode extends AstNode {
 			// Обработка интерфейсов с модификаторами
 			if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
 				InterfaceNode iNode = new InterfaceNode(tb, mc, modifiers, null, null);
-				iNode.parse();
 				children.add(iNode);
 				continue;
 			}
@@ -101,8 +99,9 @@ public class ClassBlockNode extends AstNode {
 					children.add(new ArrayDeclarationNode(tb, mc, modifiers, type, name));
 				}
 				else { // Поле
-					children.add(new FieldNode(tb, mc, modifiers, type, name));
+					children.add(new FieldNode(tb, mc, classNode, modifiers, type, name));
 				}
+				continue;
 			}
 
 			if(tb.match(Delimiter.LEFT_BRACE)) {
@@ -112,7 +111,10 @@ public class ClassBlockNode extends AstNode {
 				}
 				catch(CompileException e) {}
 				tb.getLoopStack().remove(this);
+				continue;
 			}
+
+			markError("Unexprected token:" + tb.consume().toString());
 		}
 		
 		//Попытка потребить '}'
@@ -124,17 +126,18 @@ public class ClassBlockNode extends AstNode {
 	}
 	
 	@Override
-	public String getNodeType() {
-		return "class body";
-	}
-
-	@Override
 	public boolean preAnalyze() {
+		boolean result = true;
 		// Проверка всех объявлений в блоке
 		for (AstNode node : children) {
-			node.preAnalyze(); // Не реагируем на критические ошибки
+			result&=node.preAnalyze();
+			
+			if(node instanceof FieldNode && ((FieldNode)node).isStatic() && classNode.isInner() && !classNode.isStatic()) {
+				markError("Static member '" + ((FieldNode)node).getName() + "' in non-static inner class.");
+				result = false;
+			}
 		}
-		return true;
+		return result;
 	}
 
 	@Override
@@ -165,10 +168,22 @@ public class ClassBlockNode extends AstNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		boolean result = true;
 		
-		for (AstNode node : children) {
+		for(AstNode node : children) {
 			result &= node.postAnalyze(scope, cg);
 		}
+		
+		//TODO добавить проверку инициализации не инициализованных final полей в каждом конструкторе
+		
 		return result;
+	}
+	
+	@Override
+	public void codeOptimization(Scope scope, CodeGenerator cg) {
+		for(AstNode node : children) {
+			if(!node.isDisabled()) {
+				node.codeOptimization(scope, cg);
+			}
+		}
 	}
 	
 	private boolean checkNonStaticMembers(ClassScope classScope) {
@@ -179,14 +194,14 @@ public class ClassBlockNode extends AstNode {
 
 		// Проверка методов
 		for (MethodSymbol method : classScope.getMethods()) {
-			if (!method.isStatic()) return true;
+			if (!method.isStatic() && !method.isPredefined()) return true;
 		}
 
 		return false;
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 		

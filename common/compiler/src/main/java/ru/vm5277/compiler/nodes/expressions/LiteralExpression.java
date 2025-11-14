@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.nodes.expressions;
 
 import ru.vm5277.common.NumUtils;
@@ -22,9 +23,12 @@ import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
+import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.tokens.Token;
+import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import ru.vm5277.common.cg.CGCells;
 
 public class LiteralExpression extends ExpressionNode {
     private Object value;
@@ -33,26 +37,24 @@ public class LiteralExpression extends ExpressionNode {
         super(tb, mc);
         
 		this.value = value;
-    }
-
-	@Override
-	public VarType getType(Scope scope) {
-		if (value == null) return VarType.NULL;
-		if (value instanceof Boolean) return VarType.BOOL;
-		if (value instanceof Number)  {
-			if(value instanceof Double && ((double)value) != ((Double)value).longValue()) return VarType.FIXED;
-			
-			long l = ((Number)value).longValue();
-			if(l<0) return VarType.FIXED;
-			if(l<=255) return VarType.BYTE;
-			if(l<=65535) return VarType.SHORT;
-			return VarType.INT;
+		type = VarType.UNKNOWN;
+		
+		if(null==value) type = VarType.NULL;
+		else if(value instanceof Boolean) type = VarType.BOOL;
+		else if(value instanceof Character) type = VarType.BYTE;
+		else if(value instanceof String) type = VarType.CSTR;
+		else if(value instanceof VarType) type = (VarType)value;
+		else if(value instanceof Number)  {
+			if(value instanceof Double && ((double)value)!=((Double)value).longValue()) type = VarType.FIXED;
+			else {
+				long l = ((Number)value).longValue();
+				if(l<0) type = VarType.FIXED;
+				else if(l<=255) type = VarType.BYTE;
+				else if(l<=65535) type = VarType.SHORT;
+				else type = VarType.INT;
+			}
 		}
-		if (value instanceof Character) return VarType.BYTE;
-		if (value instanceof String) return VarType.CSTR;
-		if (value instanceof VarType) return (VarType)value;
-		return VarType.UNKNOWN;
-	}	
+    }
 
 	public Object getValue() {
 		return value;
@@ -118,18 +120,25 @@ public class LiteralExpression extends ExpressionNode {
 	
 	@Override
 	public boolean preAnalyze() {
-		return true;
+		boolean result = true;
+		return result;
+	}
+	
+	@Override
+	public boolean declare(Scope scope) {
+		boolean result = true;
+		return result;
 	}
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		boolean result = true;
+		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 		cgScope = cg.enterExpression(toString());
 		
-		try {
+		try{
 			if(value instanceof Number) {
-				VarType type = getType(scope);
-				if(type == VarType.UNKNOWN) {
+				if(VarType.UNKNOWN==type) {
 					markError("Unsupported numeric literal type");
 					result = false;
 				}
@@ -139,22 +148,32 @@ public class LiteralExpression extends ExpressionNode {
 				}
 			}
 		} 
-		catch (CompileException e) {
+		catch(CompileException e) {
 			markError(e.getMessage());
 			result = false;
 		}
 		
 		cg.leaveExpression();
+		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws Exception {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+		CGScope cgs = null == parent ? cgScope : parent;
+		
+		//cg.setDataSymbol(cg.defineData(vScope.getResId(), -1, (String)le.getValue()));
 		//TODO попыка вынести запись в аккумулятор на свое место
 		if(toAccum) {
 			//cg.constToAcc(cgScope, returnType.getSize(), isFixed() ? getFixedValue() : getNumValue(), isFixed());
-			long v = isFixed() ? getFixedValue() : getNumValue();
-			cg.constToAcc(cgScope, NumUtils.getBytesRequired(v), v, isFixed());
+			if(isString()) {
+				cg.cellsToAcc(cgs, new CGCells(cg.defineData(cg.genId(), -1, value).getLabel()));
+			}
+			else {
+				long v = isFixed() ? getFixedValue() : getNumValue();
+				// LiteralExpression не должен задавать размер аккумулятору!
+				cg.constToAcc(cgs, -1, v, isFixed());
+			}
 			return CodegenResult.RESULT_IN_ACCUM;
 		}
 
@@ -163,6 +182,10 @@ public class LiteralExpression extends ExpressionNode {
 	
 	@Override
 	public String toString() {
-		return getClass().getSimpleName() + " " + Token.toStringValue(value);
+		return Token.toStringValue(value);
+    }
+	
+	public String getFullInfo() {
+		return getClass().getSimpleName() + " " + toString();
     }
 }
