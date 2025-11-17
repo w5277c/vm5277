@@ -42,13 +42,14 @@ import ru.vm5277.avr_asm.scope.MacroCallSymbol;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.common.AssemblerInterface;
 import ru.vm5277.common.FSUtils;
+import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class Assembler implements AssemblerInterface {
-	public	final	static	String	VERSION		= "0.4";
+	public	final	static	String	VERSION		= StrUtils.readVersion(Assembler.class);
 	public			static	int		tabSize		= 4;
 	public			static	boolean	isWindows;
 	public			static	Path	toolkitPath;
@@ -282,7 +283,7 @@ public class Assembler implements AssemblerInterface {
 		System.err.println();
 		System.err.println("Possible solutions:");
 		System.err.println("1. Specify custom path with --platformspath (-P) option");
-		System.err.println("2. Add platform directory(VM5277_PLATFORM) to system environment variables");
+		System.err.println("2. Add platform directory(vm5277_PLATFORM) to system environment variables");
 		System.err.println("3. Check project source or documentation at https://github.com/w5277c/vm5277");
 	}
 }

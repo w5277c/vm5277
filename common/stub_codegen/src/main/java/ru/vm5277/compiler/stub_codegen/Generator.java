@@ -22,14 +22,13 @@ import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import ru.vm5277.common.NativeBinding;
 import ru.vm5277.common.Operator;
+import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.SystemParam;
 import ru.vm5277.common.cg.CGArrCells;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.DataSymbol;
-import ru.vm5277.common.cg.Operand;
 import ru.vm5277.common.cg.RegPair;
-import ru.vm5277.common.cg.items.CGIAsm;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.CGBranch;
@@ -42,7 +41,7 @@ import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class Generator extends CodeGenerator {
-	private	final	static	String				VERSION		= "0.1";
+	private	final	static	String				VERSION		= StrUtils.readVersion(Generator.class);
 
 	public Generator(String platform, int optLevel, Map<String, NativeBinding> nbMap, Map<SystemParam, Object> params) {
 		super(platform, optLevel, nbMap, params);

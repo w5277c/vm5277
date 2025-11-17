@@ -24,7 +24,7 @@ import java.util.regex.Pattern;
 public class FSUtils {
 	
 	public static Path getToolkitPath() {
-		String toolkitPath = System.getenv("VM5277");
+		String toolkitPath = System.getenv("vm5277");
 		if(null == toolkitPath || toolkitPath.isEmpty()) {
 			File currentDir = new File("").getAbsoluteFile();
 			File parentDir = currentDir.getParentFile().getParentFile();

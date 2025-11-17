@@ -12,7 +12,7 @@
             <properties>
                 <exec.vmArgs></exec.vmArgs>
                 <exec.args>${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}</exec.args>
-                <exec.appArgs>$VM5277/examples/avr_asm/hello_world/main.asm -I $VM5277/defs/avr/ -I $VM5277/rtos/avr/ -s light -m test.map -l test.lst</exec.appArgs>
+                <exec.appArgs></exec.appArgs>
                 <exec.mainClass>${packageClassName}</exec.mainClass>
                 <exec.executable>java</exec.executable>
             </properties>
@@ -29,7 +29,7 @@
             <properties>
                 <exec.vmArgs>-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address}</exec.vmArgs>
                 <exec.args>${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}</exec.args>
-                <exec.appArgs>$VM5277/examples/avr_asm/hello_world/main.asm -I $VM5277/defs/avr/ -I $VM5277/rtos/avr/ -s light -m test.map -l test.lst</exec.appArgs>
+                <exec.appArgs></exec.appArgs>
                 <exec.mainClass>${packageClassName}</exec.mainClass>
                 <exec.executable>java</exec.executable>
                 <jpda.listen>true</jpda.listen>
@@ -49,7 +49,7 @@
                 <exec.args>${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}</exec.args>
                 <exec.mainClass>${packageClassName}</exec.mainClass>
                 <exec.executable>java</exec.executable>
-                <exec.appArgs>$VM5277/examples/avr_asm/hello_world/main.asm -I $VM5277/defs/avr/ -I $VM5277/rtos/avr/ -s light -m test.map -l test.lst</exec.appArgs>
+                <exec.appArgs></exec.appArgs>
             </properties>
         </action>
     </actions>

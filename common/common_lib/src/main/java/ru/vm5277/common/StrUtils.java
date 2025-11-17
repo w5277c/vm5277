@@ -13,11 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.common;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.Collection;
+import java.util.Properties;
 
 public class StrUtils {
+    public static String readVersion(Class<?> clazz) {
+		String packagePath = clazz.getPackage().getName().replace('.', '/');
+		String resourcePath = packagePath + "/version.properties";
+		try (InputStream input = clazz.getClassLoader().getResourceAsStream(resourcePath)) {
+			if(input != null) {
+				Properties prop = new Properties();
+				prop.load(input);
+				return prop.getProperty("version");
+			}
+		}
+		catch (IOException e) {
+		}
+		return " UNKNOWN";
+    }
+
 	public static String toString(Collection collection) {
 		if(null != collection && !collection.isEmpty()) {
 			StringBuilder sb = new StringBuilder();

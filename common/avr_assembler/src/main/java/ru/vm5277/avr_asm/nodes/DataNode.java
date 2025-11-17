@@ -17,11 +17,8 @@ package ru.vm5277.avr_asm.nodes;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
-import javax.xml.bind.DatatypeConverter;
 import ru.vm5277.avr_asm.Assembler;
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;

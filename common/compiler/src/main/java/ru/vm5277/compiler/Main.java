@@ -19,17 +19,20 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Properties;
 import static ru.vm5277.common.AssemblerInterface.STRICT_LIGHT;
 import static ru.vm5277.common.AssemblerInterface.STRICT_NONE;
 import static ru.vm5277.common.AssemblerInterface.STRICT_STRONG;
 import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.SemanticAnalyzePhase;
 import ru.vm5277.common.SourceType;
+import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.SystemParam;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.Optimization;
@@ -43,7 +46,7 @@ import ru.vm5277.compiler.nodes.ClassNode;
 import ru.vm5277.compiler.nodes.MethodNode;
 
 public class Main {
-    public	final	static	String					VERSION				= "0.3.0";
+	public	final	static	String					VERSION				= StrUtils.readVersion(Main.class);
 	public			static	boolean					isWindows;
 	public			static	Path					toolkitPath;
 	public			static	String					launchMethodName	= "main";
@@ -56,8 +59,9 @@ public class Main {
 	
 	public static void main(String[] args) throws IOException, Exception {
 		long startTimestamp = System.currentTimeMillis();
-		System.out.println("j8b compiler v" + VERSION + " started");
 		showDisclaimer();
+		
+		Class<Main> aClass = Main.class;
 		
 		isWindows = (null != System.getProperty("os.name") && System.getProperty("os.name").toLowerCase().contains("windows"));
 
@@ -126,7 +130,7 @@ public class Main {
 						}
 						continue;
 					}
-					else if(arg.equals("-o") || arg.equals("--opt")) {
+					else if(arg.equals("-p") || arg.equals("--opt")) {
 						String optStr = args[++i];
 						if(optStr.equalsIgnoreCase("none")) optLevel = Optimization.NONE;
 						else if(optStr.equalsIgnoreCase("front")) optLevel = Optimization.FRONT;
@@ -217,7 +221,7 @@ public class Main {
 		ASTParser parser = new ASTParser(runtimePath, basePath, lexer.getTokens(), mc);
 		ClassNode clazz = (ClassNode)parser.getClazz();
 		float time = (System.currentTimeMillis() - timestamp) / 1000f;
-		System.out.println("Parsing done, time:" + String.format(Locale.US, "%.2f", time) + " s");
+		System.out.println("Parsing done, time:" + String.format(Locale.US, "%.3f", time) + " s");
 		timestamp = System.currentTimeMillis();
 		if(null == clazz) {
 			mc.add(new ErrorMessage("Main class or interface not found", null));
@@ -226,7 +230,7 @@ public class Main {
 			System.out.println("Semantic...");
 			SemanticAnalyzer.analyze(clazz, cg);
 			time = (System.currentTimeMillis() - timestamp) / 1000f;
-			System.out.println("Semantic done, time:" + String.format(Locale.US, "%.2f", time) + " s");
+			System.out.println("Semantic done, time:" + String.format(Locale.US, "%.3f", time) + " s");
 
 			//ReachableAnalyzer.analyze(mc, (ClassNode)parser.getClazz(), cg);
 
@@ -294,13 +298,13 @@ public class Main {
 						}
 
 						time = (System.currentTimeMillis() - timestamp) / 1000f;
-						System.out.println("Codegen done, time:" + String.format(Locale.US, "%.2f", time) + " s");
+						System.out.println("Codegen done, time:" + String.format(Locale.US, "%.3f", time) + " s");
 
 						timestamp = System.currentTimeMillis();
 						System.out.println("Assembling...");
 						PlatformLoader.launchAssembler(platform, libDir, mc, asmFile.toPath(), sourcePaths, asmPath.toString(), asmMapFile, listBw);
 						time = (System.currentTimeMillis() - timestamp) / 1000f;
-						System.out.println("Assembling done, time:" + String.format(Locale.US, "%.2f", time) + " s");
+						System.out.println("Assembling done, time:" + String.format(Locale.US, "%.3f", time) + " s");
 
 					}
 					else {
@@ -313,11 +317,12 @@ public class Main {
 			}
 		}
 		time = (System.currentTimeMillis() - startTimestamp) / 1000f;
-		System.out.println("Total time:" + String.format(Locale.US, "%.2f", time) + " s");
+		System.out.println("Total time:" + String.format(Locale.US, "%.3f", time) + " s");
 
     }
 	
 	private static void showDisclaimer() {
+		System.out.println("Version: " + VERSION + " | License: Apache-2.0");
 		System.out.println("================================================================");
 		System.out.println("WARNING: This project is under active development.");
 		System.out.println("The primary focus is on functionality; testing is currently limited.");
@@ -329,7 +334,6 @@ public class Main {
 	
 	private static void showHelp() {
 		System.out.println("j8b compiler: Java-like source code compiler for vm5277 Embedded Toolkit");
-		System.out.println("Version: " + VERSION + " | License: Apache-2.0");
 		System.out.println("-------------------------------------------");
 		System.out.println();
 		System.out.println("This tool is part of the open-source project for 8-bit microcontrollers (AVR, PIC, STM8, etc.)");
@@ -352,7 +356,7 @@ public class Main {
 		System.out.println("                        strong  - Treat as error");
 		System.out.println("                        light   - Show warning (default)");
 		System.out.println("                        none    - Silent mode");
-		System.out.println("  -o,  --opt            <none|front|size|speed> Optimization high language(j8b) level");
+		System.out.println("  -p,  --opt            <none|front|size|speed> Optimization high language(j8b) level");
 		System.out.println("                        none    - No optimization");
 		System.out.println("                        front   - Frontend optimization only");
 		System.out.println("                        size    - Size(Flash) optimization (default)");
@@ -388,7 +392,7 @@ public class Main {
 		System.err.println();
 		System.err.println("Possible solutions:");
 		System.err.println("1. Specify custom path with --path (-P) option");
-		System.err.println("2. Add toolkit directory(VM5277) to system environment variables");
+		System.err.println("2. Add toolkit directory(vm5277) to system environment variables");
 		System.err.println("3. Check project source or documentation at https://github.com/w5277c/vm5277");
 	}
 	

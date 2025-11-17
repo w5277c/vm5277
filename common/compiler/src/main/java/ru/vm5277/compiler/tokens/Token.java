@@ -18,7 +18,7 @@ package ru.vm5277.compiler.tokens;
 import java.text.DecimalFormat;
 import java.text.DecimalFormatSymbols;
 import java.util.Locale;
-import javax.xml.bind.DatatypeConverter;
+import ru.vm5277.common.DatatypeConverter;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.SourceBuffer;
 import ru.vm5277.common.SourcePosition;

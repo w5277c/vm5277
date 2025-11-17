@@ -20,7 +20,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
-import javax.xml.bind.DatatypeConverter;
+import ru.vm5277.common.DatatypeConverter;
 
 public class IntelHexBuilder implements Builder, Closeable {
 	public static class Row {

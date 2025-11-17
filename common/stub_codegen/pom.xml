@@ -18,7 +18,13 @@
         <exec.mainClass>ru.vm5277.stub_codegen.Generator</exec.mainClass>
     </properties>
     <build>
-	    <plugins>
+		<resources>
+			<resource>
+				<directory>src/main/resources</directory>
+				<filtering>true</filtering>
+			</resource>
+		</resources>
+		<plugins>
 			<plugin>
 	            <groupId>org.apache.maven.plugins</groupId>
 		        <artifactId>maven-resources-plugin</artifactId>

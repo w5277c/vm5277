@@ -9,6 +9,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>8</maven.compiler.release>
         <exec.mainClass>ru.vm5277.compiler.Main</exec.mainClass>
+		<graalvm.version>21.2.0</graalvm.version>
     </properties>
     <name>сompiler</name>
     <dependencies>
@@ -29,9 +30,30 @@
             <artifactId>common</artifactId>
             <version>0.1</version>
         </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>avr_codegen</artifactId>
+            <version>0.1</version>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>stub_codegen</artifactId>
+            <version>0.1</version>
+        </dependency>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>avr_assembler</artifactId>
+            <version>0.1</version>
+        </dependency>
     </dependencies>
 	<build>
-	    <plugins>
+		<resources>
+			<resource>
+				<directory>src/main/resources</directory>
+				<filtering>true</filtering>
+			</resource>
+		</resources>
+		<plugins>
 			<plugin>
 	            <groupId>org.apache.maven.plugins</groupId>
 		        <artifactId>maven-resources-plugin</artifactId>
@@ -44,7 +66,7 @@
 				            <goal>copy-resources</goal>
 					    </goals>
 						<configuration>
-	                        <outputDirectory>${project.basedir}/../../bin/libs</outputDirectory>
+							<outputDirectory>${project.basedir}/../../bin/libs</outputDirectory>
 		                    <resources>
 			                    <resource>
 				                    <directory>${project.build.directory}</directory>
@@ -58,7 +80,46 @@
 				</executions>
 			</plugin>
 		</plugins>
-
 		<finalName>j8bc</finalName>
 	</build>
+	<profiles>
+		<!-- Профиль по умолчанию - обычный JAR -->
+		<!-- Нативная сборка -->
+		<profile>
+			<id>native</id>
+			<build>
+				<resources>
+					<resource>
+						<directory>src/main/resources</directory>
+						<filtering>true</filtering>
+					</resource>
+				</resources>
+				<plugins>
+					<plugin>
+						<groupId>org.graalvm.nativeimage</groupId>
+						<artifactId>native-image-maven-plugin</artifactId>
+						<version>21.2.0</version>
+						<executions>
+							<execution>
+								<goals>
+									<goal>native-image</goal>
+								</goals>
+								<phase>package</phase>
+							</execution>
+						</executions>
+						<configuration>
+							<outputDirectory>${project.basedir}/../../bin</outputDirectory>
+							<skip>false</skip>
+							<mainClass>ru.vm5277.compiler.Main</mainClass>
+							<imageName>j8bc</imageName>
+							<buildArgs>
+								<arg>--no-fallback</arg>
+								<arg>-H:IncludeResources=ru/vm5277/compiler/version.properties</arg>
+							</buildArgs>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
 </project>

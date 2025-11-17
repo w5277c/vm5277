@@ -36,6 +36,7 @@ import ru.vm5277.common.compiler.Case;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.RTOSFeature;
 import ru.vm5277.common.RTOSLibs;
+import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.SystemParam;
 import ru.vm5277.common.cg.CGActionHandler;
 import ru.vm5277.common.cg.CGArrCells;
@@ -68,7 +69,7 @@ import ru.vm5277.common.exceptions.CompileException;
 // этой задачей лучше, а кодогенератор может ему помешать.
 
 public class Generator extends CodeGenerator {
-	private	final	static	String				VERSION				= "0.1";
+	private	final	static	String				VERSION				= StrUtils.readVersion(Generator.class);
 	private	final	static	byte[]				usableRegs			= new byte[]{20,21,22,23,24,25,26,27}; //Используем регистры
 	private	final	static	byte[]				usableRegsArr		= new byte[]{20,21,22,23,24,25}; //Используем регистры(X-под массивы)
 	//private	final	static	byte[]				usableRegs	= new byte[]{}; 	//Без регистров для локальных переменных

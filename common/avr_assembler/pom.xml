@@ -8,10 +8,16 @@
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>8</maven.compiler.release>
-        <exec.mainClass>ru.vm5277.avr_asm.AvrAssembler</exec.mainClass>
+        <exec.mainClass>ru.vm5277.avr_asm.Assembler</exec.mainClass>
     </properties>
     <build>
-	    <plugins>
+		<resources>
+			<resource>
+				<directory>src/main/resources</directory>
+				<filtering>true</filtering>
+			</resource>
+		</resources>
+		<plugins>
 			<plugin>
 	            <groupId>org.apache.maven.plugins</groupId>
 		        <artifactId>maven-resources-plugin</artifactId>
