@@ -9,5 +9,4 @@
 *.lst
 *.map
 /common/compiler/target/
-/docs/
 /common/stub_codegen/target/
