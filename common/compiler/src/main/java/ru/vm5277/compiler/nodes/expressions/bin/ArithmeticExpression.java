@@ -206,6 +206,30 @@ public class ArithmeticExpression extends BinaryExpression {
 		return result;
 	}
 	
+	
+	@Override
+	public void codeOptimization(Scope scope, CodeGenerator cg) {
+		CGScope oldScope = cg.setScope(cgScope);
+
+		leftExpr.codeOptimization(scope, cg);
+		rightExpr.codeOptimization(scope, cg);
+		
+		try {
+			ExpressionNode optimizedExpr = leftExpr.optimizeWithScope(scope, cg);
+			if(null != optimizedExpr) {
+				leftExpr = optimizedExpr;
+			}
+			optimizedExpr = rightExpr.optimizeWithScope(scope, cg);
+			if(null != optimizedExpr) {
+				rightExpr = optimizedExpr;
+			}
+		}
+		catch(CompileException ex) {
+			markError(ex);
+		}
+		cg.setScope(oldScope);
+	}
+
 	//TODO Добавить явные случаи Array + VarField и VarField + Array
 	//TODO Проверить порядок операндов в Literal + VarField
 	

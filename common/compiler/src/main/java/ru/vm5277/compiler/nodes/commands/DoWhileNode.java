@@ -18,7 +18,12 @@ package ru.vm5277.compiler.nodes.commands;
 
 import java.util.Arrays;
 import java.util.List;
+import ru.vm5277.common.cg.CGBranch;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
+import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
@@ -37,18 +42,19 @@ public class DoWhileNode extends CommandNode {
 	private	ExpressionNode	condition;
 	private	BlockNode		blockNode;
 	private	BlockScope		blockScope;
+	private	CGBranch		branch		= new CGBranch();
+	private	boolean			alwaysTrue;
+	private	boolean			alwaysFalse;
 
 	public DoWhileNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
 
 		consumeToken(tb);
 		// Тело цикла
-		tb.getLoopStack().add(this);
 		try {
 			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
 		}
 		catch(CompileException e) {markFirstError(e);}
-		tb.getLoopStack().remove(this);
 
 		try {
 			consumeToken(tb, TokenType.COMMAND, Keyword.WHILE);
@@ -67,73 +73,157 @@ public class DoWhileNode extends CommandNode {
 		return condition;
 	}
 
-	public BlockNode getBody() {
-		return blockNode;
+	public boolean isAlwaysFalse() {
+		return alwaysFalse;
 	}
-
-	@Override
-	public String toString() {
-		StringBuilder sb = new StringBuilder("do ");
-		sb.append(getBody());
-		sb.append(" while (");
-		sb.append(condition);
-		sb.append(");");
-		return sb.toString();
-	}
-
+	
 	@Override
 	public boolean preAnalyze() {
-		// Проверка тела цикла (выполняется всегда хотя бы один раз)
-		if (null != getBody()) getBody().preAnalyze();
-		else markError("Do-while body cannot be null");
+		boolean result = true;		
+		
+		result&=blockNode.preAnalyze();
+		
 
-		// Проверка условия цикла
-		if (null != condition) condition.preAnalyze();
-		else markError("Do-while condition cannot be null");
+		if(result && null!=condition) {
+			result&=condition.preAnalyze();
+		}
 
-		return true;
+		return result;
 	}
 
 	@Override
 	public boolean declare(Scope scope) {
+		boolean result = true;
+		
 		// Создаем новую область видимости для тела цикла
 		blockScope = new BlockScope(scope);
 
 		// Объявляем элементы тела цикла
-		if (null != getBody()) getBody().declare(blockScope);
+		result&=blockNode.declare(blockScope);
 
 		// Объявляем переменные условия (в той же области, что и тело)
-		if (null != condition) condition.declare(blockScope);
+		if(result && null!=condition) {
+			result&=condition.declare(blockScope);
+		}
 
-		return true;
+		return result;
 	}
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		// Анализ тела цикла
-		if (null != getBody()) getBody().postAnalyze(blockScope, cg);
+		boolean result = true;
+		cgScope = cg.enterLoopBlock();
 
-		// Проверка типа условия
-		if (null != condition) {
-			if(condition.postAnalyze(scope, cg)) {
-				VarType condType = condition.getType();
-				if(VarType.BOOL!=condType) {
-					markError("While condition must be boolean, got: " + condType);
+		// Анализ тела цикла
+		result&=blockNode.postAnalyze(blockScope, cg);
+
+		if(result) {
+			result&=condition.postAnalyze(blockScope, cg);
+		}
+		
+		if(result) {
+			try {
+				ExpressionNode optimizedExpr = condition.optimizeWithScope(blockScope, cg);
+				if(null != optimizedExpr) {
+					condition = optimizedExpr;
+					result&=condition.postAnalyze(blockScope, cg);
 				}
 			}
-			
+			catch (CompileException e) {
+				markFirstError(e);
+				result = false;
+			}
+		}
+		
+		if(result) {
+			VarType condType = condition.getType();
+			if(null==condType || VarType.BOOL!=condType) {
+				markError("Loop condition must be boolean, got: " + condType);
+				result = false;
+			}
+		}
+
+		if(result) {
 			// Проверяем бесконечный цикл с возвратом
-			if (	condition instanceof LiteralExpression && Boolean.TRUE.equals(((LiteralExpression)condition).getValue()) &&
-					isControlFlowInterrupted(getBody())) {
+			if (condition instanceof LiteralExpression && Boolean.TRUE.equals(((LiteralExpression)condition).getValue()) &&
+				isControlFlowInterrupted(blockNode)) {
 				
 				markWarning("Code after infinite while loop is unreachable");
 			}
 		}
-		return true;
+		
+		cg.leaveLoopBlock();
+		return result;
 	}
 	
 	@Override
+	public void codeOptimization(Scope scope, CodeGenerator cg) {
+		CGScope oldScope = cg.setScope(cgScope);
+		
+		condition.codeOptimization(scope, cg);
+		if(null!=blockNode) {
+			blockNode.codeOptimization(scope, cg);
+		}
+		
+		if(condition instanceof LiteralExpression) {
+			LiteralExpression le = (LiteralExpression)condition;
+			if(VarType.BOOL==le.getType()) {
+				if((boolean)le.getValue()) {
+					alwaysTrue = true;
+				}
+				else {
+					alwaysFalse = true;
+				}
+			}
+		}
+
+		cg.setScope(oldScope);
+	}
+
+	@Override
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+		if(cgDone) return null;
+		cgDone = true;
+
+		CodegenResult result = null;
+		CGScope cgs = null == parent ? cgScope : parent;
+		cgs.setBranch(branch);
+		
+		if(!alwaysFalse) {
+			cgs.append(((CGLoopBlockScope)cgScope).getStartLbScope());
+			blockNode.codeGen(cg, cgs, false);
+		}
+
+		if(!alwaysFalse && !alwaysTrue) {
+			condition.codeGen(cg, cgs, false);
+		}
+
+		if(!alwaysFalse) {
+			cg.jump(cgs, ((CGLoopBlockScope)cgScope).getStartLbScope());
+		}
+		if(!alwaysFalse) {
+			cgs.append(branch.getEnd());
+		}
+
+		cgs.append(((CGLoopBlockScope)cgScope).getEndLbScope());
+		
+		((CGBlockScope)cgScope).build(cg, false);
+		((CGBlockScope)cgScope).restoreRegsPool();
+		return result;
+	}
+
+	@Override
 	public List<AstNode> getChildren() {
 		return Arrays.asList(blockNode);
+	}
+	
+	@Override
+	public String toString() {
+		StringBuilder sb = new StringBuilder("do ");
+		sb.append(blockNode);
+		sb.append(" while (");
+		sb.append(condition);
+		sb.append(");");
+		return sb.toString();
 	}
 }

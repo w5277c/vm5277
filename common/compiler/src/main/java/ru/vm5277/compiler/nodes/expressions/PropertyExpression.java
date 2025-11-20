@@ -333,6 +333,39 @@ public class PropertyExpression extends ExpressionNode {
 	}
 	
 	@Override
+	public void codeOptimization(Scope scope, CodeGenerator cg) {
+		CGScope oldScope = cg.setScope(cgScope);
+		
+		try {
+			ExpressionNode optimizedParentScope = targetExpr.optimizeWithScope(scope, cg);
+			if(null!=optimizedParentScope) {
+				targetExpr = optimizedParentScope;
+			}
+		}
+		catch(CompileException ex) {
+			markError(ex);
+		}
+		
+		for(int i=0; i<args.size(); i++) {
+			ExpressionNode arg = args.get(i);
+			arg.codeOptimization(scope, cg);
+			try {
+				ExpressionNode optimizedExpr = arg.optimizeWithScope(scope, cg);
+				if(null != optimizedExpr) {
+					arg = optimizedExpr;
+					args.set(i, arg);
+				}
+			}
+			catch(CompileException ex) {
+				markError(ex);
+			}
+		}
+		
+		cg.setScope(oldScope);
+	}
+
+	
+	@Override
 	public List<AstNode> getChildren() {
 		// У этого выражения нет дочерних узлов в AST
 		return Arrays.asList();

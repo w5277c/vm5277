@@ -46,6 +46,7 @@ public class CGBlockScope extends CGScope {
 	private				CGMethodScope				mScope;
 	private				List<Byte>					usedRegs	= new ArrayList<>();
 	private				boolean						isFirstBlock;
+	private				Set<String>					labels		= new HashSet<>();
 	
 	public CGBlockScope(CodeGenerator cg, CGScope parent, int id) {
 		super(parent, id, "");
@@ -61,7 +62,7 @@ public class CGBlockScope extends CGScope {
 		mScope.addBlockScope(this);
 
 		lbEScope = new CGLabelScope(null, null, LabelNames.BLOCK_END, true);
-	//	cg.addLabel(lbEScope);
+//		cg.addLabel(lbEScope);
 	}
 	
 	public void build(CodeGenerator cg, boolean isLaunchPoint) throws CompileException {
@@ -135,6 +136,16 @@ public class CGBlockScope extends CGScope {
 		if(VERBOSE_LO <= verbose) append(new CGIText(";block end"));
 	}
 
+	public CGLabelScope addLabel(String name) {
+		labels.add(name);
+		CGLabelScope result = new CGLabelScope(this, genId(), name, true);
+		return result;
+	}
+	
+	public boolean containsLabel(String name) {
+		return labels.contains(name);
+	}
+	
 	public void addVar(CGVarScope vScope) {
 		locals.put(vScope.getResId(), vScope);
 	}

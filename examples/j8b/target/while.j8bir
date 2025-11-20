@@ -1,5 +1,5 @@
 class Main {
-    static public void main() {
+    public static void main() {
         System.setParam(2, 18);
         byte i = 3;
         while (i<10) {
@@ -22,5 +22,19 @@ class Main {
             //AST>CONST final int i = 287454020;
         }
         
+        do {
+            System.out('!');
+            i++;
+        }
+        while (i<20);
+        do {
+            System.out(' ');
+            i++;
+        }
+        while (true);
+        do {
+            //AST>REMOVED
+        }
+        while (false);
     }
 }

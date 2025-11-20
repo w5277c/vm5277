@@ -367,6 +367,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 								result&=expr.postAnalyze(scope, cg);
 								symbol = expr.getSymbol();
 							}
+							continue;
 						}
 						else if(null!=pathExpr && pathExpr.getScope() instanceof EnumScope) {
 							resolvedExpr = new EnumExpression(tb, mc, pathExpr, qSeg.getName());
@@ -374,6 +375,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 							if(result) {
 								result&=resolvedExpr.postAnalyze(scope, cg);
 							}
+							continue;
 						}
 						else {
 							symbol = null==pathExpr ? scope.resolveVar(qSeg.getName()) : pathExpr.getScope().resolveVar(qSeg.getName());
@@ -388,6 +390,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 									expr.getSymbol().setAccessed(getSN());
 									result&=expr.postAnalyze(scope, cg);
 									symbol = expr.getSymbol();
+									continue;
 								}
 							}
 							else {
@@ -404,15 +407,20 @@ public class QualifiedPathExpression extends ExpressionNode {
 										}
 										expr.getSymbol().setAccessed(getSN());
 									}
+									continue;
 								}
 								else {
 									CIScope cis = null==pathExpr ? scope.resolveCI(qSeg.getName(), false) : pathExpr.getScope().resolveCI(qSeg.getName(), true);
 									if(null!=cis) {
 										pathExpr = new TypeReferenceExpression(tb, mc, pathExpr, qSeg.getName(), cis);
+										continue;
 									}
 								}
 							}
 						}
+
+						markError("Can't resolve " + segment.toString());
+						result = false;
 					}
 					else if(segment instanceof ArraySegment) {
 						resolvedExpr = new ArrayExpression(tb, mc, sp, resolvedExpr, ((ArraySegment)segment).getIndices());
@@ -490,8 +498,6 @@ public class QualifiedPathExpression extends ExpressionNode {
 										Symbol paramSymbol = mSymbol.getParameters().get(j);
 										if(paramSymbol.getName().equals(argName)) {
 											VarFieldExpression vfe = (VarFieldExpression)expr.getPathExpr();
-//											TypeReferenceExpression tre = new TypeReferenceExpression(	tb, mc, (TypeReferenceExpression)vfe.getPathExpr(),
-//																										vfe.getValue());
 											result.add(BinaryExpression.create(	tb, mc, expr.getSP(),
 																				new VarFieldExpression(	tb, mc, expr.getSP(), expr.getSN(), vfe,
 																										((VarFieldExpression)be.getLeft()).getName(), true),

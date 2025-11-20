@@ -589,7 +589,7 @@ public class Generator extends CodeGenerator {
 		int size = arrCells.getSize();
 		byte[] accRegs = getAccRegs(size);
 		for(int i=0; i<size; i++) {
-			scope.append(new CGIAsm("ld r" + accRegs[i] + ",x" + (i!=size-1 ? "+" : "")));
+			scope.append(new CGIAsm("ld r" + accRegs[i] + ",x+"));
 		}
 		accum.setSize(size);
 	}
@@ -602,7 +602,7 @@ public class Generator extends CodeGenerator {
 		
 		byte[] accRegs = getAccRegs(size);
 		for(int i=0; i<size; i++) {
-			scope.append(new CGIAsm("st x" + (i!=size-1 ? "+" : "") + ",r" + accRegs[i]));
+			scope.append(new CGIAsm("st x+,r" + accRegs[i]));
 		}
 		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING) && 1!=size) scope.append(new CGIAsm("clt"));
 	}
@@ -765,6 +765,10 @@ public class Generator extends CodeGenerator {
 				}
 				break;
 			case HEAP_ALT:
+				if(0!=cells.getId(0)) {
+					scope.append(new CGIAsm("subi xl,-" + (cells.getId(0)&0xff)));
+					scope.append(new CGIAsm("sbci xh,-" + ((cells.getId(0)>>8)&0xff)));
+				}
 				for(int i=0; i<size; i++) {
 					scope.append(new CGIAsm("ld r" + registers[i] + ",x+"));
 				}
@@ -815,6 +819,10 @@ public class Generator extends CodeGenerator {
 				}
 				break;
 			case HEAP_ALT:
+				if(0!=cells.getId(0)) {
+					cont.append(new CGIAsm("subi xl,-" + (cells.getId(0)&0xff)));
+					cont.append(new CGIAsm("sbci xh,-" + ((cells.getId(0)>>8)&0xff)));
+				}
 				for(int i=0; i<cells.getSize(); i++) {
 					String cReg = getConstReg(cont, tmpReg, i, value);
 					cont.append(new CGIAsm("st x+,"+cReg));
@@ -825,7 +833,7 @@ public class Generator extends CodeGenerator {
 				int size = arrCells.getSize();
 				for(int i=0; i<size; i++) {
 					String cReg = getConstReg(cont, tmpReg, i, value);
-					cont.append(new CGIAsm("st x" + (i!=size-1 ? "+" : "") + ","+cReg));
+					cont.append(new CGIAsm("st x+,"+cReg));
 				}
 				break;
 			case STAT:
@@ -2190,6 +2198,8 @@ public class Generator extends CodeGenerator {
 	
 	@Override
 	public CGIContainer eNewArray(VarType type, int depth, int[] cDims) throws CompileException {
+		RTOSLibs.NEW_ARRAY.setRequired();
+		
 		CGIContainer result = new CGIContainer();
 		if(VERBOSE_LO <= verbose) result.append(new CGIText(";eNewArray " + type));
 		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
@@ -2200,7 +2210,6 @@ public class Generator extends CodeGenerator {
 		}
 		int typeSize = (-1 == vt.getSize() ? getRefSize() : vt.getSize());
 		int typeBits = (0x04==typeSize ? 0x02 : typeSize-1);
-		RTOSFeatures.add(RTOSFeature.OS_FT_DRAM);
 
 		//TODO 0x02 - количество байт под размер массива
 		// Флаги: 0x07-isView, 0x06-расширенный тип данных(2байта), 0x05,0x04-размер ячейки-1, 0x02-0x00-глубина-1
@@ -2222,13 +2231,7 @@ public class Generator extends CodeGenerator {
 			//TODO добавить проверку переполнения
 			result.append(new CGIAsm("ldi r16," + ((headerSize+dataSize)&0xff)));
 			result.append(new CGIAsm("ldi r17," + (((headerSize+dataSize)>>0x08)&0xff)));
-			result.append(new CGIAsm("push r30"));
-			result.append(new CGIAsm("push r31"));
-			result.append(new CGIAsm("rcall os_dram_alloc"));
-			result.append(new CGIAsm("movw r26,r30"));
-			result.append(new CGIAsm("pop r31"));
-			result.append(new CGIAsm("pop r30"));
-			result.append(new CGIAsm("movw r16,xl"));
+			result.append(new CGIAsm("rcall j8bproc_new_array"));
 			result.append(new CGIAsm("ldi r19," + ((typeBits<<0x04)+(depth-1)))); //TODO учет только 1 байтового размера типов
 			result.append(new CGIAsm("st x+,r19")); // Флаги и глубина
 			result.append(new CGIAsm("st x+,C0x01")); // Количество ссылок(массив не может быть создан без присваивания)
@@ -2277,13 +2280,7 @@ public class Generator extends CodeGenerator {
 			// Учитываем заголовок массива
 			result.append(new CGIAsm("subi r16,low(-" + headerSize + ")"));
 			result.append(new CGIAsm("sbci r17,high(-" + headerSize + ")"));
-			result.append(new CGIAsm("push r30"));
-			result.append(new CGIAsm("push r31"));
-			result.append(new CGIAsm("rcall os_dram_alloc"));
-			result.append(new CGIAsm("movw r26,r30"));
-			result.append(new CGIAsm("pop r31"));
-			result.append(new CGIAsm("pop r30"));
-			result.append(new CGIAsm("movw r16,xl"));
+			result.append(new CGIAsm("rcall j8bproc_new_array"));
 			result.append(new CGIAsm("ldi r19," + ((typeBits<<0x04)+depth-1))); //TODO учет только 1 байтового размера типов
 			result.append(new CGIAsm("st x+,r19")); // Флаги и глубина
 			result.append(new CGIAsm("st x+,C0x01")); // Количество ссылок(массив не может быть создан без присваивания)

@@ -27,7 +27,6 @@ import ru.vm5277.compiler.tokens.Token;
 public class TokenBuffer {
 	private	Token	current;
 	private	final	ListIterator<Token>	iterator;
-	private	final	Stack<AstNode>		loopStack		= new Stack<>();
 	
 	public TokenBuffer(ListIterator<Token> iterator) {
 		this.iterator = iterator;
@@ -69,10 +68,6 @@ public class TokenBuffer {
 	public boolean match(Operator operator) {
         return TokenType.OPERATOR == current.getType() && current.getValue() == operator;
     }
-	
-	public Stack<AstNode> getLoopStack() {
-		return loopStack;
-	}
 	
 	public SourcePosition getSP() {
 		return current.getSP();

@@ -149,7 +149,7 @@ public abstract class CodeOptimizer {
 							if(!name.equals(((CGIAsmJump)nextItem).getLabelName())) {
 								replacementMap.put(name, ((CGIAsmJump)nextItem).getLabelName());
 								item.disable();
-								nextItem.disable();
+								//Нельзя, иначе не будет исполнено для выполнения в текущей ветке nextItem.disable();
 							}
 						}
 					}

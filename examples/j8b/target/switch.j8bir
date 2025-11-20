@@ -1,0 +1,16 @@
+class Main {
+    public static void main() {
+        System.setParam(0, 16);
+        System.setParam(2, 18);
+        System.setParam(3, 1);
+        byte b = 11;
+        b++;
+        switch (b) {
+            case 0: 	System.out(0);
+            case 1..10: 	System.out(1);
+            case 15..17,20..25,30,32: 	System.out(2);
+            default: 	System.out(3);
+        }
+        System.stop();
+    }
+}

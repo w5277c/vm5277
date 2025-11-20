@@ -13,14 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.nodes.commands;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import ru.vm5277.common.AssemblerInterface;
+import ru.vm5277.common.Operator;
+import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.Main;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -33,23 +42,19 @@ import ru.vm5277.compiler.tokens.Token;
 
 public abstract class CommandNode extends AstNode {
 	public static class AstCase extends AstNode {
-		private	final	long		from;
-		private	final	Long		to;
-		private	final	BlockNode	blockNode;
-		private			BlockScope	scope;
+		private	final	List<Integer>	values;
+		private	final	BlockNode		blockNode;
+		private			BlockScope		scope;
 		
-		public AstCase(long from, Long to, BlockNode block) {
-			this.from = from;
-			this.to = to;
+		public AstCase(Set<Integer> values, BlockNode block) {
+			this.values = new ArrayList<>(values);
+			Collections.sort(this.values);
+			
 			this.blockNode = block;
 		}
 		
-		public long getFrom() {
-			return from;
-		}
-		
-		public Long getTo() {
-			return to;
+		public List<Integer> getValues() {
+			return values;
 		}
 		
 		public BlockNode getBlock() {
@@ -63,6 +68,35 @@ public abstract class CommandNode extends AstNode {
 			this.scope = scope;
 		}
 
+		public String getValuesAsStr() {
+			StringBuilder result = new StringBuilder();
+			
+			int i = 0;
+			while(i<values.size()) {
+				int from = values.get(i);
+				int to = from;
+
+				// Ищем непрерывную последовательность
+				while(i+1<values.size() && values.get(i+1)==values.get(i)+1) {
+					i++;
+					to = values.get(i);
+				}
+
+				if(from==to) {
+					// Одиночное значение
+					result.append(from).append(",");
+				} else {
+					// Диапазон значений
+					result.append(from).append("..").append(to).append(",");
+				}
+				i++;
+			}
+			if(0!=result.length()) {
+				result.deleteCharAt(result.length()-1);
+			}
+			return result.toString();
+		}
+		
 		@Override
 		public List<AstNode> getChildren() {
 			return Arrays.asList(blockNode);
@@ -75,10 +109,9 @@ public abstract class CommandNode extends AstNode {
 		super(tb, mc);
 	}
 	
-	protected boolean isLoopOrSwitch(CommandNode node) {
-		return null != node && (node instanceof ForNode || node instanceof WhileNode || node instanceof DoWhileNode || node instanceof SwitchNode);
+	protected boolean isLoopNode(CommandNode node) {
+		return null != node && (node instanceof ForNode || node instanceof WhileNode || node instanceof DoWhileNode);
 	}
-	
 	
 	protected boolean isLabelInCurrentMethod(LabelSymbol symbol, Scope scope) {
 		// Ищем метод в текущей цепочке областей видимости
@@ -100,26 +133,54 @@ public abstract class CommandNode extends AstNode {
 		return false;
 	}
 	
-	protected AstCase parseCase(TokenBuffer tb, MessageContainer mc) {
+	protected AstCase parseCase(TokenBuffer tb, MessageContainer mc) throws CompileException {
 		consumeToken(tb); // Потребляем "case"
 
 		// Парсим значение или диапазон
-		long from = 0;
-		Long to = null;
-
-		try {from = parseNumber(tb);} catch(CompileException e) {markFirstError(e);}
-		if (tb.match(Delimiter.RANGE)) {
-			consumeToken(tb); // Потребляем ".."
-			try{to = parseNumber(tb);}catch(CompileException e) {to=0l;markFirstError(e);}
+		Set<Integer> values = new HashSet<>();
+		while(true) {
+			int num = (int)parseNumber(tb);
+			if(tb.match(Delimiter.RANGE)) {
+				consumeToken(tb);
+				
+				int to = (int)parseNumber(tb);
+				if(to<num) {
+					throw new CompileException("Invalid case range: " + num + ".." + to);
+				}
+				for(int i=num; i<=to; i++) {
+					if(!values.add(i)) {
+						if(AssemblerInterface.STRICT_STRONG==Main.getStrictLevel()) {
+							throw new CompileException("Duplicate case value: " + i);
+						}
+						else if(AssemblerInterface.STRICT_LIGHT==Main.getStrictLevel()) {
+							markWarning("Duplicate case value: " + i);
+						}
+					}
+				}
+			}
+			else {
+				if(!values.add(num)) {
+					if(AssemblerInterface.STRICT_STRONG==Main.getStrictLevel()) {
+						throw new CompileException("Duplicate case value: " + num);
+					}
+					else if(AssemblerInterface.STRICT_LIGHT==Main.getStrictLevel()) {
+						markWarning("Duplicate case value: " + num);
+					}
+				}
+			}
+			
+			if(!tb.match(Delimiter.COMMA)) {
+				break;
+			}
+			
+			consumeToken(tb);
 		}
-
-		try {consumeToken(tb, Delimiter.COLON);} catch(CompileException e) {markFirstError(e);}
+		consumeToken(tb, Delimiter.COLON);
+		
 		BlockNode blockNode = null;
-		tb.getLoopStack().add(this);
-		try {blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());}
-		catch(CompileException e) {markFirstError(e);}
-		tb.getLoopStack().remove(this);
-		return new AstCase(from, to, blockNode);
+		blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
+		
+		return new AstCase(values, blockNode);
 	}
 
 	private long parseNumber(TokenBuffer tb) throws CompileException {
@@ -130,6 +191,6 @@ public abstract class CommandNode extends AstNode {
 				return number.longValue();
 			}
 		}
-		throw parserError("Expected numeric value(or range) for 'case' in switch statement");
+		throw new CompileException("Expected constant value with integral type for 'case' statement");
 	}
 }

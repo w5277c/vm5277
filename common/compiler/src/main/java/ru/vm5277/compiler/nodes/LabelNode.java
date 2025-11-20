@@ -17,6 +17,11 @@ package ru.vm5277.compiler.nodes;
 
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.cg.scopes.CGLabelScope;
+import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
+import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
@@ -25,8 +30,8 @@ import ru.vm5277.compiler.semantic.LabelSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class LabelNode extends AstNode {
-	private	final	String	name;
-	private			boolean	used	= false;
+	private	final	String			name;
+	private			CGLabelScope	labelScope;
 
 	public LabelNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
@@ -36,13 +41,6 @@ public class LabelNode extends AstNode {
 
 	public String getName() {
 		return name;
-	}
-
-	public void setUsed() {
-		used = true;
-	}
-	public Boolean isUsed() {
-		return used;
 	}
 
 	@Override
@@ -64,12 +62,34 @@ public class LabelNode extends AstNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		if (!used) addMessage(new WarningMessage("Unused label '" + name + "'", sp));
+		cgScope = cg.enterCommand();
+		
+		labelScope = ((CGBlockScope)cgScope.getScope(CGBlockScope.class)).addLabel(name);
+		
+		if(!((LabelSymbol)symbol).isUsed()) {
+			markWarning("Unused label '" + name + "'");
+		}
 
+		((LabelSymbol)symbol).setCGScopes(cgScope, labelScope);
+		
 		// TODO Контроль достижимости кода после return/break/continue
+		cg.leaveCommand();
 		return true;
 	}
 
+	@Override
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+		CodegenResult result = null;
+		
+		CGScope cgs = null == parent ? cgScope : parent;
+		cgs.append(labelScope);
+		return result;
+	}
+
+	public CGLabelScope getLabelScope() {
+		return labelScope;
+	}
+	
 	@Override
 	public String toString() {
 		return "label: " + name;

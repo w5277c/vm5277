@@ -175,7 +175,7 @@ public class AssignExpression extends BinaryExpression {
 
 			if(postResult) {
 				if(!isCompatibleWith(scope, leftType, rightType)) {
-					if(VarType.FIXED==type && rightExpr instanceof LiteralExpression && rightType.isInteger()) {
+					if(VarType.FIXED==type && rightExpr instanceof LiteralExpression && rightType.isIntegral()) {
 						long num = ((LiteralExpression)rightExpr).getNumValue();
 						if(num<VarType.FIXED_MIN || num>VarType.FIXED_MAX) {
 							markError("Type mismatch: cannot assign " + rightType + " to " + type);

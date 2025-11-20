@@ -13,19 +13,16 @@ class Main {
         System.setParam(2, 18);
         System.out(EStatus.ERROR.index());
         System.out(EStatus.size());
-        EDirection dir = EDirection.item(1);
-        if (EDirection.UP==dir) {
-            System.out(1);
-        }
-        else {
+        //AST>CONST final EDirection dir = EDirection.RIGHT;
+        {
             System.out(0);
         }
         printDirection(EDirection.UP);
-        EStatus st = EStatus.OK;
-        System.out(st.index());
-        EStatus s = EStatus.item(EStatus.ERROR.index());
-        System.out(s.index());
-        System.out(EStatus.item(1).index());
+        //AST>CONST final EStatus st = EStatus.OK;
+        System.out(EStatus.OK.index());
+        //AST>CONST final EStatus s = EStatus.item(EStatus.ERROR.index());
+        System.out(EStatus.item(EStatus.ERROR.index()).index());
+        System.out(EStatus.ERROR.index());
     }
     static public void printDirection(EDirection dir) {
         System.out(dir.index());

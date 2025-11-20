@@ -39,5 +39,20 @@ class Main {
 		while(true) {
 			int i=0x11223344;
 		}
+
+		do {
+			System.out('!');
+			i++;
+		} while(i<20);
+
+        do {
+            System.out(' ');
+            i++;
+        } while(true);
+
+        do {
+            System.out('#');
+            i++;
+        } while(false);
     }
 }

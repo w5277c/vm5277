@@ -228,7 +228,7 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 					}
 					else if(!isCompatibleWith(scope, type, initType)) {
 						// Дополнительная проверка автоматического привдения целочисленной константы к fixed.
-						if(VarType.FIXED == type && init instanceof LiteralExpression && initType.isInteger()) {
+						if(VarType.FIXED == type && init instanceof LiteralExpression && initType.isIntegral()) {
 							long num = ((LiteralExpression)init).getNumValue();
 							if(num<VarType.FIXED_MIN || num>VarType.FIXED_MAX) {
 								markError("Type mismatch: cannot assign " + initType + " to " + type);
@@ -279,7 +279,7 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 
 			if(!symbol.isReassigned()) {
 				// Возможно упростить?
-				if(	init instanceof LiteralExpression ||
+				if(	init instanceof LiteralExpression || init.getType().isEnum() ||
 					(init instanceof VarFieldExpression && null!=((VarFieldExpression)init).getSymbol() &&
 					((VarFieldExpression)init).getSymbol().isFinal())) {
 
@@ -332,7 +332,8 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 			else if(init instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
 				LiteralExpression le = (LiteralExpression)init;
 				boolean isFixed = le.isFixed() || VarType.FIXED == ((CGFieldScope)cgScope).getType();
-				cScope.getFieldsInitCont().append(cg.constToCells(null, isFixed ? le.getFixedValue() : le.getNumValue(), ((CGFieldScope)cgScope).getCells(), isFixed));
+				cScope.getFieldsInitCont().append(cg.constToCells(	null, isFixed ? le.getFixedValue() : le.getNumValue(), ((CGFieldScope)cgScope).getCells(),
+																	isFixed));
 			}
 			else if(init instanceof NewExpression) {
 				init.codeGen(cg, null, true);

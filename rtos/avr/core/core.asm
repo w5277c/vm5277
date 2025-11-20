@@ -15,6 +15,7 @@
  */
 .IFNDEF _OS_INIT
 .include "mem/ram_fill.asm"
+.include "mem/ram_clear.asm"
 .IF OS_FT_STDOUT == 0x01
 .include "stdio/out_init.asm"
 .ENDIF
@@ -181,11 +182,10 @@ _OS_INIT:
 
 .IF OS_FT_TIMER1 == 0x01
 	;Сброс счетчика времени
-	LDI ACCUM_L,0x00
 	LDI_Y _OS_UPTIME
 	LDI TEMP_L,0x05
 	LDI TEMP_H,0x00
-	MCALL OS_RAM_FILL_NR
+	MCALL OS_RAM_CLEAR_NR
 .ENDIF
 
 OS_SOFTRESET:

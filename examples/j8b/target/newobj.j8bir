@@ -16,12 +16,12 @@ class Main {
         System.setParam(2, 18);
         System.setParam(3, 1);
         Byte b1 = new Byte(byte);
-        System.out(b1.value);
+        System.out(b1.toByte());
         Byte b2 = new Byte(byte);
-        System.out(b2.value);
+        System.out(b2.toByte());
         b1=null;
         Byte b3 = new Byte(byte);
-        System.out(b3.value);
+        System.out(b3.toByte());
         System.out(b3.typeid());
         System.out(b3.instanceid());
         Byte b4 = b1;

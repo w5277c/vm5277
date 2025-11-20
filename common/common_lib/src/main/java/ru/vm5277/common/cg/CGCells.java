@@ -109,6 +109,10 @@ public class CGCells {
 		return obj;
 	}
 	
+	public int[] getIds() {
+		return ids;
+	}
+	
 	@Override
 	public String toString() {
 		return type + "[" + (Type.STACK == type ? "x" + size : StrUtils.toString(ids)) + "]";

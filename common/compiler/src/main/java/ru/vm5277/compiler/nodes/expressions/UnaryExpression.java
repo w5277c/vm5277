@@ -131,7 +131,7 @@ public class UnaryExpression extends ExpressionNode {
 					}
 					break;
 				case BIT_NOT:
-					if(!type.isInteger()) {
+					if(!type.isIntegral()) {
 						markError("Bitwise ~ requires integer type");
 						result = false;
 					}

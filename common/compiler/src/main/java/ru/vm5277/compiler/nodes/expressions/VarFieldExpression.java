@@ -34,9 +34,7 @@ import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.cg.CGCells;
-import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
-import ru.vm5277.compiler.nodes.FieldNode;
 import ru.vm5277.compiler.semantic.AstHolder;
 import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.FieldSymbol;
@@ -147,24 +145,6 @@ public class VarFieldExpression extends ExpressionNode {
 					symbol = targetScope.resolveField(name, true);
 					if(null!=symbol) {
 						type = symbol.getType();
-						// Режим AST инлайнинга
-						if(isInliningMode) {
-							// Обращение к внешнему полю
-							CGFieldScope oldCgFS = (CGFieldScope)symbol.getCGScope();
-							// Не трогаем статические поля
-							if(!oldCgFS.isStatic()) {
-								// symbol - элемент FieldNode, а не текущего выражения, его нельзя менять. Создаем локальную копию.
-								symbol = new FieldSymbol(	symbol.getName(), symbol.getType(), symbol.isFinal(), symbol.isStatic(),
-															((FieldSymbol)symbol).isPrivate(), ((FieldSymbol)symbol).getScope(),
-															(FieldNode)((FieldSymbol)symbol).getNode());
-								// Также создаем scope кодогенератора
-								CGFieldScope newCgFS = new CGFieldScope((CGClassScope)oldCgFS.getParent(), oldCgFS.getResId(), oldCgFS.getType(),
-																		oldCgFS.getSize(), oldCgFS.isStatic(), oldCgFS.getName());
-								// Задаем альтернативный механизм обращения к HEAP(чтобы не оборачивыать текущий регистр HEAP инструкциями PUSH/POP)
-								newCgFS.setCells(new CGCells(CGCells.Type.HEAP_ALT, oldCgFS.getSize()));
-								symbol.setCGScope(newCgFS);
-							}
-						}
 					}
 				}
 			}
@@ -200,26 +180,6 @@ public class VarFieldExpression extends ExpressionNode {
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
-	
-/*	@Override
-	public Symbol getSymbol() {
-		// Переменная/поле могут быть переданы в вызываемый метод(в котором данное выражение), но на этапе семантики мы получаем Symbol построенный на
-		// параметрах метода(которые по понятным причинам не содержат значение)
-		// Значение появляется позже(на этапе кодогенерации в MethodCallExpression) в виде VarSymbol/FieldSymbol(вероятно также AliasSymbol, если не рудимент)
-		// Здесь мы проверяем на Symbol, и обновляем symbol на актуальное значение.
-
-		if(symbol instanceof VarSymbol || symbol instanceof FieldSymbol || symbol instanceof AliasSymbol) {
-			return symbol;
-		}
-		if(null != scope) { //TODO вероятно всегда null
-			//TODO вообще сомнительная логика, нужно перепроверить
-			//CGScope cgScope = symbol.getCGScope();
-			symbol = scope.resolveVFSymbol(value);
-			//symbol.setCGScope(cgScope);
-		}
-		return symbol;
-	}
-*/
 	
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
@@ -270,6 +230,14 @@ public class VarFieldExpression extends ExpressionNode {
 						cg.cellsToArrReg(cgs, ((CGCellsScope)((VarFieldExpression)targetExpr).getSymbol().getCGScope()).getCells());
 					}
 
+					if(null!=targetExpr && isInliningMode) {
+						// Режим AST инлайнинга
+						CGFieldScope cgfs = (CGFieldScope)symbol.getCGScope();
+						if(!cgfs.isStatic()) {
+							CGCells cgcs = new CGCells(CGCells.Type.HEAP_ALT, cgfs.getCells().getIds());
+							cgfs.setCells(cgcs);
+						}
+					}
 					if(toAccum) {
 						cg.cellsToAcc(cgs, (CGCellsScope)symbol.getCGScope());
 					}
@@ -295,7 +263,8 @@ public class VarFieldExpression extends ExpressionNode {
 	}
 
 	public void postCodeGen(CodeGenerator cg, CGScope parent) throws CompileException {
-		if(!disabled) {;
+		//TODO рудимент
+		if(!disabled) {
 			CGScope cgs = null == parent ? cgScope : parent;
 
 			if(null!=targetExpr && targetExpr instanceof VarFieldExpression) { //Не смотрим на isInliningMode

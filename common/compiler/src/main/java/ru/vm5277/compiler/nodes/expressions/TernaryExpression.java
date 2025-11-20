@@ -36,7 +36,7 @@ import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class TernaryExpression extends ExpressionNode {
-	private final	ExpressionNode	condition;
+	private			ExpressionNode	condition;
 	private			ExpressionNode	trueExpr;
 	private			ExpressionNode	falseExpr;
 	private			boolean			alwaysTrue;
@@ -93,8 +93,46 @@ public class TernaryExpression extends ExpressionNode {
 		
 		// Проверяем условие и ветки
 		result&=condition.postAnalyze(scope, cg);
+		if(result) {
+			try {
+				ExpressionNode optimizedExpr = condition.optimizeWithScope(scope, cg);
+				if(null!=optimizedExpr) {
+					condition = optimizedExpr;
+				}
+			}
+			catch (CompileException e) {
+				markError(e);
+				result = false;
+			}
+		}		
+
 		result&=trueExpr.postAnalyze(scope, cg);
+		if(result) {
+			try {
+				ExpressionNode optimizedExpr = trueExpr.optimizeWithScope(scope, cg);
+				if(null!=optimizedExpr) {
+					trueExpr = optimizedExpr;
+				}
+			}
+			catch (CompileException e) {
+				markError(e);
+				result = false;
+			}
+		}		
+
 		result&=falseExpr.postAnalyze(scope, cg);
+		if(result) {
+			try {
+				ExpressionNode optimizedExpr = falseExpr.optimizeWithScope(scope, cg);
+				if(null!=optimizedExpr) {
+					falseExpr = optimizedExpr;
+				}
+			}
+			catch (CompileException e) {
+				markError(e);
+				result = false;
+			}
+		}		
 
 		// Находим более общий тип
 		VarType trueType = trueExpr.getType();

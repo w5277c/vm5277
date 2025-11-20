@@ -24,7 +24,7 @@ class Main {
         System.setParam(3, 1);
         Object num = new Short(short);
         if (num is Short as s) {
-            System.out(s.value);
+            System.out(s.toShort());
             System.outCStr(" is short\n");
             if ((Number)s is Short as s2) {
                 System.outCStr("Is short too\n");

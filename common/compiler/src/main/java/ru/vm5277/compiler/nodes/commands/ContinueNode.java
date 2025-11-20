@@ -17,6 +17,10 @@ package ru.vm5277.compiler.nodes.commands;
 
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
+import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.common.exceptions.CompileException;
@@ -36,10 +40,20 @@ public class ContinueNode extends CommandNode {
         
         consumeToken(tb);
 		if(tb.match(TokenType.ID)) {
-			try {label = consumeToken(tb, TokenType.ID).toString();}catch(CompileException e) {markFirstError(e);};
+			try {
+				label = (String)consumeToken(tb, TokenType.ID).getValue();
+			}
+			catch(CompileException e) {
+				markFirstError(e);
+			}
 		}
 		
-		try {consumeToken(tb, Delimiter.SEMICOLON);}catch(CompileException e) {markFirstError(e);}
+		try {
+			consumeToken(tb, Delimiter.SEMICOLON);
+		}
+		catch(CompileException e) {
+			markFirstError(e);
+		}
     }
 
 	public String getLabel() {
@@ -53,39 +67,105 @@ public class ContinueNode extends CommandNode {
 
 	@Override
 	public boolean preAnalyze() {
-		// Базовая проверка - команда break должна быть внутри цикла
-        if (tb.getLoopStack().isEmpty()) markError("'continue' outside of loop");
-
-		return true;
+		boolean result = true;
+		
+		return result;
 	}
 
 	@Override
 	public boolean declare(Scope scope) {
-		if (label != null) {
-			if (!(scope instanceof BlockScope)) markError("Labeled break must be inside block scope");
-			else {
+		boolean result = true;
+		
+		if(label!=null) {
+			if(!(scope instanceof BlockScope)) {
+				markError("Labeled break must be inside block scope");
+				result = false;
+			}
+			
+			if(result) {
 				// Разрешаем метку
 				symbol = ((BlockScope)scope).resolveLabel(label);
-				if (null == symbol) markError("Undefined label: " + label);
+				if(null==symbol) {
+					markError("Undefined label: " + label);
+					result = false;
+				}
 
-				// Регистрируем использование метки
-				symbol.addReference(this);
+				if(result) {
+					// Регистрируем использование метки
+					symbol.addReference(this);
+				}
 			}
 		}
-		return true;
+		
+		return result;
 	}
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		AstNode node = tb.getLoopStack().peek();
-		if (null == node || !(node instanceof ForNode || node instanceof WhileNode || node instanceof DoWhileNode)) {
-            markFirstError(parserError("'continue' can only be used inside loop statements"));
-        }
+		boolean result = true;
+		cgScope = cg.enterCommand();
+		
+		// Базовая проверка - команда break должна быть внутри цикла
+        if(null==cgScope.getScope(CGLoopBlockScope.class)) {
+			markError("'continue' outside of loop");
+			result = false;
+		}
 
 		// Проверка видимости
-		if(null != label && !isLabelInCurrentMethod(symbol, scope)) markError("Cannot break to label in different method");
+		if(null!=label && !isLabelInCurrentMethod(symbol, scope)) {
+			markError("Cannot break to label in different method");
+			result = false;
+		}
+		//TODO добавить проверку: между циклом и меткой не должно быть кода
 		
-		return true;
+		cg.leaveCommand();
+		return result;
+	}
+
+	@Override
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+		CodegenResult result = null;
+		
+		CGScope cgs = null == parent ? cgScope : parent;
+		
+		if(null==label) {
+			CGLoopBlockScope cgLoop = ((CGLoopBlockScope)cgs.getScope(CGLoopBlockScope.class));
+			cg.jump(cgs, cgLoop.getNextLbScope().isUsed() ? cgLoop.getNextLbScope() : cgLoop.getStartLbScope());
+		}
+		else {
+			//TODO можно упростить?
+			// Ищем code-блок, который содержит нашу метку
+			CGBlockScope cgBlock = ((CGBlockScope)cgScope.getScope(CGBlockScope.class));
+			while(null!=cgBlock) {
+				if(cgBlock.containsLabel(label)) {
+					break;
+				}
+				cgBlock = (CGBlockScope)cgBlock.getParent().getScope(CGBlockScope.class);
+			}
+
+			if(null==cgBlock) {
+				throw new CompileException("COMPILER BUG: Label '" + label + "' outside the code block");
+			}
+			
+			// Ищем этот-же code-блок перебирая loop-блоки, таки образом определяем к какому loop-блоку относится наша метка.
+			CGLoopBlockScope cgLoop = (CGLoopBlockScope)cgScope.getScope(CGLoopBlockScope.class);
+			while(null!=cgLoop) {
+				CGBlockScope cgLoopBlock = (CGBlockScope)cgLoop.getParent().getScope(CGBlockScope.class);
+				if(cgLoopBlock==cgBlock) {
+					break;
+				}
+				cgLoop = (CGLoopBlockScope)cgLoop.getParent().getScope(CGLoopBlockScope.class);
+			}
+
+			if(null==cgLoop) {
+				throw new CompileException("COMPILER BUG: Cannot resolve Loop node for labeled break '" + label + "'");
+			}
+			
+			// Прыжок на метку начала loop-блока
+			cg.jump(cgs, cgLoop.getNextLbScope().isUsed() ? cgLoop.getNextLbScope() : cgLoop.getStartLbScope());
+		}
+
+		return result;
 	}
 
 	@Override

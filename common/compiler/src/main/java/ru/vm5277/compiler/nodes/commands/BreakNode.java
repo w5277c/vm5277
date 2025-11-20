@@ -20,6 +20,8 @@ import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
@@ -45,7 +47,7 @@ public class BreakNode extends CommandNode {
         
 		if(tb.match(TokenType.ID)) {
 			try {
-				label = consumeToken(tb, TokenType.ID).toString();
+				label = (String)consumeToken(tb, TokenType.ID).getValue();
 			}
 			catch(CompileException e) {
 				markFirstError(e);
@@ -77,11 +79,6 @@ public class BreakNode extends CommandNode {
 		boolean result = true;
 		debugAST(this, PRE, true, getFullInfo());
 
-		// Базовая проверка - команда break должна быть внутри цикла
-		if(!isInLoopNode()) {
-			markError("'break' outside of loop");
-			result = false;
-        }
 
 		debugAST(this, PRE, false, result, getFullInfo());
 		return result;
@@ -122,20 +119,13 @@ public class BreakNode extends CommandNode {
 		debugAST(this, POST, true, getFullInfo());
 		cgScope = cg.enterCommand();
 		
-		// Проверка для break с меткой
-        if(null!=symbol) {
-			// Метка должна быть на цикле или switch
-            if(!isLoopOrSwitch((CommandNode)tb.getLoopStack().peek())) {
-				markError("Break label must be on loop or switch statement");
-				result = false;
-			}
-            
-            // Проверка видимости
-            if(!isLabelInCurrentMethod(symbol, scope)) {
-				markError("Cannot break to label in different method");
-				result = false;
-			}
+		// Базовая проверка - команда break должна быть внутри цикла
+		if(null==cgScope.getScope(CGLoopBlockScope.class)) {
+			markError("'break' outside of loop");
+			result = false;
         }
+
+		//TODO добавить проверку: между циклом и меткой не должно быть кода		
 		
 		cg.leaveCommand();
 		debugAST(this, POST, false, result, getFullInfo());
@@ -153,7 +143,41 @@ public class BreakNode extends CommandNode {
 		
 		CGScope cgs = null == parent ? cgScope : parent;
 		
-		cg.jump(cgs, ((CGLoopBlockScope)cgs.getScope(CGLoopBlockScope.class)).getEndLbScope());
+		if(null==label) {
+			cg.jump(cgs, ((CGLoopBlockScope)cgScope.getScope(CGLoopBlockScope.class)).getEndLbScope());
+		}
+		else {
+			//TODO можно упростить?
+			// Ищем code-блок, который содержит нашу метку
+			CGBlockScope cgBlock = ((CGBlockScope)cgScope.getScope(CGBlockScope.class));
+			while(null!=cgBlock) {
+				if(cgBlock.containsLabel(label)) {
+					break;
+				}
+				cgBlock = (CGBlockScope)cgBlock.getParent().getScope(CGBlockScope.class);
+			}
+
+			if(null==cgBlock) {
+				throw new CompileException("COMPILER BUG: Label '" + label + "' outside the code block");
+			}
+			
+			// Ищем этот-же code-блок перебирая loop-блоки, таки образом определяем к какому loop-блоку относится наша метка.
+			CGLoopBlockScope cgLoop = (CGLoopBlockScope)cgScope.getScope(CGLoopBlockScope.class);
+			while(null!=cgLoop) {
+				CGBlockScope cgLoopBlock = (CGBlockScope)cgLoop.getParent().getScope(CGBlockScope.class);
+				if(cgLoopBlock==cgBlock) {
+					break;
+				}
+				cgLoop = (CGLoopBlockScope)cgLoop.getParent().getScope(CGLoopBlockScope.class);
+			}
+
+			if(null==cgLoop) {
+				throw new CompileException("COMPILER BUG: Cannot resolve Loop node for labeled break '" + label + "'");
+			}
+			
+			// Прыжок на метку окончания loop-блока
+			cg.jump(cgs, cgLoop.getEndLbScope());
+		}
 		
 		return result;
 	}

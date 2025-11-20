@@ -1,11 +1,11 @@
-; vm5277.avr_codegen v0.1 at Fri Nov 14 05:23:30 VLAT 2025
+; vm5277.avr_codegen v0.1 at Thu Nov 20 06:21:10 GMT+10:00 2025
 .equ stdout_port = 18
 
 .set OS_ARRAY_3D = 1
-.set OS_ARRAY_2D = 1
+.set OS_FT_DRAM = 1
 .set OS_ARRAY_1D = 1
 .set OS_FT_STDOUT = 1
-.set OS_FT_DRAM = 1
+.set OS_ARRAY_2D = 1
 
 .include "devices/atmega328p.def"
 .include "core/core.asm"
@@ -70,14 +70,14 @@ j8bCMainMmain:
 	push c0x00
 	movw r26,r22
 	rcall j8bproc_arr_celladdr
-	ld r16,x
+	ld r16,x+
 	rcall os_out_num8
 	ldi r19,2
 	push r19
 	push c0x00
 	movw r26,r22
 	rcall j8bproc_arr_celladdr
-	ld r16,x
+	ld r16,x+
 	rcall os_out_num8
 	ldi r16,15
 	ldi r17,0
@@ -127,20 +127,20 @@ j8bCMainMmain:
 	ldd r26,y+31
 	ldd r27,y+30
 	adiw r26,10
-	ld r16,x
+	ld r16,x+
 	ldd r26,y+31
 	ldd r27,y+30
 	adiw r26,8
-	st x,r16
+	st x+,r16
 	ldd r26,y+33
 	ldd r27,y+32
 	adiw r26,6
-	ld r16,x
+	ld r16,x+
 	push r16
 	ldd r26,y+33
 	ldd r27,y+32
 	adiw r26,5
-	ld r16,x
+	ld r16,x+
 	pop j8b_atom
 	add r16,j8b_atom
 	std y+29,r16
@@ -161,7 +161,7 @@ j8bCMainMmain:
 	push c0x00
 	movw r16,r26
 	rcall j8bproc_arr_celladdr
-	ld r16,x
+	ld r16,x+
 	rcall os_out_num8
 	push r30
 	push r31
@@ -172,7 +172,7 @@ j8bCMainMmain:
 	ldd r26,y+33
 	ldd r27,y+32
 	rcall j8bproc_arr_celladdr
-	st x,c0x00
+	st x+,c0x00
 	push r30
 	push r31
 	rcall j8bC21CMainMmethod3
@@ -182,7 +182,7 @@ j8bCMainMmain:
 	ldd r26,y+33
 	ldd r27,y+32
 	rcall j8bproc_arr_celladdr
-	ld r16,x
+	ld r16,x+
 	std y+29,r16
 	ldd r26,y+33
 	ldd r27,y+32
@@ -205,7 +205,7 @@ j8bCMainMmain:
 	push c0x00
 	movw r16,r26
 	rcall j8bproc_arr_celladdr
-	ld r16,x
+	ld r16,x+
 	push r16
 	push r30
 	push r31
@@ -220,7 +220,7 @@ j8bCMainMmain:
 	ldd r26,y+33
 	ldd r27,y+32
 	rcall j8bproc_arr_celladdr
-	ld r16,x
+	ld r16,x+
 	pop j8b_atom
 	add r16,j8b_atom
 	push r16
@@ -240,7 +240,7 @@ j8bCMainMmain:
 	ldd r27,y+32
 	rcall j8bproc_arr_celladdr
 	pop r16
-	st x,r16
+	st x+,r16
 	movw r26,r20
 	rcall j8bproc_arr_refcount_dec
 	movw r26,r22
@@ -265,7 +265,7 @@ j8bC17CMainMmethod1:
 	ldd r26,y+6
 	ldd r27,y+5
 	rcall j8bproc_arr_celladdr
-	ld r16,x
+	ld r16,x+
 	ldi r30,2
 	rjmp j8bproc_mfin_sf
 

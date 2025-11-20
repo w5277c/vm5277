@@ -77,12 +77,10 @@ public class MethodNode extends AstNode {
 		}
 
 		if(tb.match(Delimiter.LEFT_BRACE)) {
-			tb.getLoopStack().add(this);
 			try {
 				blockNode = new BlockNode(tb, mc);
 			}
 			catch(CompileException e) {}
-			tb.getLoopStack().remove(this);
 		}
 		else {
 			try {consumeToken(tb, Delimiter.SEMICOLON);}catch(CompileException e) {markFirstError(e);}

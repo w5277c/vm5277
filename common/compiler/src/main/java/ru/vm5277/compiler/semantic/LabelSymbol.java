@@ -17,15 +17,27 @@ package ru.vm5277.compiler.semantic;
 
 import java.util.ArrayList;
 import java.util.List;
+import ru.vm5277.common.cg.scopes.CGLabelScope;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.nodes.commands.CommandNode;
 
 public class LabelSymbol extends Symbol {
 	private	Scope				scope;
+	private	CGLabelScope		cgLabelScope;
 	private List<CommandNode>	references	= new ArrayList<>();
 
 	public LabelSymbol(String name, Scope scope) {
 		super(name);
 		this.scope = scope;
+	}
+	
+	public void setCGScopes(CGScope cgScope, CGLabelScope cgLabelScope) {
+		this.cgScope = cgScope;
+		this.cgLabelScope = cgLabelScope;
+	}
+	
+	public CGLabelScope getCGLabelScope() {
+		return cgLabelScope;
 	}
 	
 	public Scope getScope() {

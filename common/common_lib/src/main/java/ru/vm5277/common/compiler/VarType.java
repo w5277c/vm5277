@@ -141,7 +141,7 @@ public class VarType {
 		return this == BYTE || this == SHORT || this == INT || this == FIXED;
 	}
 
-	public boolean isInteger() {
+	public boolean isIntegral() {
 		return this == BYTE || this == SHORT || this == INT;
 	}
 
@@ -158,18 +158,27 @@ public class VarType {
 	}
 
 	public void checkRange(Number num) throws CompileException {
-		if (null == num) throw new CompileException("Value cannot be null");
-		
-		if(isInteger()) {
-			long l = num.longValue();
-			if(this == BYTE && (l < 0 || l > 0xff)) throw new CompileException("byte value out of range (0..255). Given:" + l);
-			if(this == SHORT && (l < 0 || l > 0xffff)) throw new CompileException("short value out of range (0..65535). Given: " + l);
-			if(this == INT && (l < 0 || l > 0xffffffffl)) throw new CompileException("int value out of range (0..4294967295). Given: " + l);
+		if(null==num) {
+			throw new CompileException("Value cannot be null");
 		}
-		else if(this == FIXED) {
+		
+		if(isIntegral()) {
+			long l = num.longValue();
+			if(this==BYTE && (l<0 || l> 0xff)) {
+				throw new CompileException("byte value out of range (0..255). Given:" + l);
+			}
+			if(this==SHORT && (l<0 || l> 0xffff)) {
+				throw new CompileException("short value out of range (0..65535). Given: " + l);
+			}
+			if(this==INT && (l<0 || l> 0xffffffffl)) {
+				throw new CompileException("int value out of range (0..4294967295). Given: " + l);
+			}
+		}
+		else if(this==FIXED) {
 			double d = (num instanceof Double ? ((Double)num) : (num.doubleValue()));
-			if(d<FIXED_MIN || d>FIXED_MAX) throw new CompileException(	String.format("fixed value out of range (" + FIXED_MIN + ".." + FIXED_MAX +
-																		"). Given: %.8f", d));
+			if(d<FIXED_MIN || d>FIXED_MAX) {
+				throw new CompileException(	String.format("fixed value out of range (" + FIXED_MIN + ".." + FIXED_MAX + "). Given: %.8f", d));
+			}
 		}
 	}
 	

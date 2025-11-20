@@ -105,12 +105,10 @@ public class ClassBlockNode extends AstNode {
 			}
 
 			if(tb.match(Delimiter.LEFT_BRACE)) {
-				tb.getLoopStack().add(this);
 				try {
 					children.add(new BlockNode(tb, mc));
 				}
 				catch(CompileException e) {}
-				tb.getLoopStack().remove(this);
 				continue;
 			}
 

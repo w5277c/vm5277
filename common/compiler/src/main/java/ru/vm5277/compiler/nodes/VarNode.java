@@ -227,7 +227,7 @@ public class VarNode extends AstNode implements InitNodeHolder {
 					}
 					else if(!isCompatibleWith(scope, type, initType)) {
 						// Дополнительная проверка автоматического привдения целочисленной константы к fixed.
-						if(VarType.FIXED == type && init instanceof LiteralExpression && initType.isInteger()) {
+						if(VarType.FIXED == type && init instanceof LiteralExpression && initType.isIntegral()) {
 							long num = ((LiteralExpression)init).getNumValue();
 							if(num<VarType.FIXED_MIN || num>VarType.FIXED_MAX) {
 								markError("Type mismatch: cannot assign " + initType + " to " + type);
@@ -278,7 +278,7 @@ public class VarNode extends AstNode implements InitNodeHolder {
 
 			if(!symbol.isReassigned()) {
 				// Возможно упростить?
-				if(	init instanceof LiteralExpression ||
+				if(	init instanceof LiteralExpression || init.getType().isEnum() ||
 					(init instanceof VarFieldExpression && null!=((VarFieldExpression)init).getSymbol() &&
 					((VarFieldExpression)init).getSymbol().isFinal())) {
 
@@ -308,6 +308,7 @@ public class VarNode extends AstNode implements InitNodeHolder {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 
+		CGScope cgs = null == parent ? cgScope : parent;
 		CGVarScope vScope = (CGVarScope)cgScope;
 		
 		Boolean accUsed = null;
@@ -324,17 +325,17 @@ public class VarNode extends AstNode implements InitNodeHolder {
 		else {
 			// Инициализация(заполнение нулями необходима только регистрам, остальные проинициализированы вместе с HEAP/STACK)
 			if(null==init) {
-				if(CGCells.Type.REG==vScope.getCells().getType()) cgScope.append(cg.constToCells(cgScope, 0, vScope.getCells(), false));
+				if(CGCells.Type.REG==vScope.getCells().getType()) cgs.append(cg.constToCells(cgs, 0, vScope.getCells(), false));
 			}
 			else if(init instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
 				LiteralExpression le = (LiteralExpression)init;
 				boolean isFixed = le.isFixed() || VarType.FIXED == vScope.getType();
-				cgScope.append(cg.constToCells(cgScope, isFixed ? le.getFixedValue() : le.getNumValue(), vScope.getCells(), isFixed));
+				cgs.append(cg.constToCells(cgs, isFixed ? le.getFixedValue() : le.getNumValue(), vScope.getCells(), isFixed));
 			}
 			else if(init instanceof NewExpression) {
 				init.codeGen(cg, null, true);
 				cg.accCast(null, VarType.SHORT);
-				cg.accToCells(cgScope, vScope);
+				cg.accToCells(cgs, vScope);
 			}
 			else if(init instanceof NewArrayExpression) {
 				init.codeGen(cg, null, true);
@@ -343,70 +344,70 @@ public class VarNode extends AstNode implements InitNodeHolder {
 				
 				//Перенес в declare //((VarSymbol)symbol).setArrayDimensions(((NewArrayExpression)initializer).getConsDimensions());
 				cg.accCast(null, VarType.SHORT);
-				cg.accToCells(cgScope, vScope);
+				cg.accToCells(cgs, vScope);
 			}
 //			else if(init instanceof ArrayExpression) {
 //				init.codeGen(cg, null, true);
-//				//cg.arrToCells(cgScope, (CGArrCells)((CGCellsScope)init.getSymbol().getCGScope()).getCells(), vScope.getCells());
-//				//cg.arrToCells(cgScope, (CGArrCells)((CGCellsScope)init.getSymbol().getCGScope()).getCells(), vScope.getCells());
+//				//cg.arrToCells(cgs, (CGArrCells)((CGCellsScope)init.getSymbol().getCGScope()).getCells(), vScope.getCells());
+//				//cg.arrToCells(cgs, (CGArrCells)((CGCellsScope)init.getSymbol().getCGScope()).getCells(), vScope.getCells());
 //			}
 			else if(init instanceof BinaryExpression) {
-				CGScope oldScope = cg.setScope(cgScope);
+				CGScope oldScope = cg.setScope(cgs);
 				CGBranch branch = new CGBranch();
-				cgScope.setBranch(branch);
+				cgs.setBranch(branch);
 				
-				init.codeGen(cg, cgScope, true);
+				init.codeGen(cg, cgs, true);
 				//TODO проверить на объекты и на массивы(передача ref)
 				VarType initType = init.getType();
 				if(VarType.CLASS == initType) {
-					cg.pushHeapReg(cgScope);
-					cg.updateClassRefCount(cgScope, vScope.getCells(), true);
-					cg.popHeapReg(cgScope);
+					cg.pushHeapReg(cgs);
+					cg.updateClassRefCount(cgs, vScope.getCells(), true);
+					cg.popHeapReg(cgs);
 				}
 				else if(initType.isArray()) {
-					cg.updateArrRefCount(cgScope, vScope.getCells(), true, ((CGCellsScope)cgScope).isArrayView());
+					cg.updateArrRefCount(cgs, vScope.getCells(), true, ((CGCellsScope)cgs).isArrayView());
 				}
 				if(branch.isUsed()) {
-					cg.constToAcc(cgScope, 1, 1, false);
+					cg.constToAcc(cgs, 1, 1, false);
 					CGLabelScope lbScope = new CGLabelScope(null, null, LabelNames.LOCGIC_END, true);
-					cg.jump(cgScope, lbScope);
-					cgScope.append(((CGBranch)branch).getEnd());
-					cg.constToAcc(cgScope, 1, 0, false);
-					cgScope.append(lbScope);
-					cg.accToCells(cgScope, vScope);
+					cg.jump(cgs, lbScope);
+					cgs.append(((CGBranch)branch).getEnd());
+					cg.constToAcc(cgs, 1, 0, false);
+					cgs.append(lbScope);
+					cg.accToCells(cgs, vScope);
 				}
 				accUsed = true;
 				cg.setScope(oldScope);
 			}
 			else if(init instanceof ArrayExpression) {
-				init.codeGen(cg, cgScope, false);
-				cg.accToCells(cgScope, vScope);
+				init.codeGen(cg, cgs, false);
+				cg.accToCells(cgs, vScope);
 				VarType initType = init.getType();
 				if(VarType.CLASS == initType) {
-					cg.pushHeapReg(cgScope);
-					cg.updateClassRefCount(cgScope, vScope.getCells(), true);
-					cg.popHeapReg(cgScope);
+					cg.pushHeapReg(cgs);
+					cg.updateClassRefCount(cgs, vScope.getCells(), true);
+					cg.popHeapReg(cgs);
 				}
 				else if(initType.isArray()) {
-					cg.updateArrRefCount(cgScope, vScope.getCells(), true, ((CGCellsScope)cgScope).isArrayView());
+					cg.updateArrRefCount(cgs, vScope.getCells(), true, ((CGCellsScope)vScope).isArrayView());
 				}
 				accUsed = true;
 			}
 			else if(init instanceof EnumExpression) {
-				cgScope.append(cg.constToCells(cgScope, ((EnumExpression)init).getIndex(), vScope.getCells(), false));
+				cgs.append(cg.constToCells(cgs, ((EnumExpression)init).getIndex(), vScope.getCells(), false));
 			}
 			else {
-				init.codeGen(cg, cgScope, true);
+				init.codeGen(cg, cgs, true);
 				cg.accResize(type);
-				cg.accToCells(cgScope, vScope);
+				cg.accToCells(cgs, vScope);
 				VarType initType = init.getType();
 				if(VarType.CLASS == initType) {
-					cg.pushHeapReg(cgScope);
-					cg.updateClassRefCount(cgScope, vScope.getCells(), true);
-					cg.popHeapReg(cgScope);
+					cg.pushHeapReg(cgs);
+					cg.updateClassRefCount(cgs, vScope.getCells(), true);
+					cg.popHeapReg(cgs);
 				}
 				else if(initType.isArray()) {
-					cg.updateArrRefCount(cgScope, vScope.getCells(), true, ((CGCellsScope)cgScope).isArrayView());
+					cg.updateArrRefCount(cgs, vScope.getCells(), true, ((CGCellsScope)vScope).isArrayView());
 				}
 
 				accUsed = true;

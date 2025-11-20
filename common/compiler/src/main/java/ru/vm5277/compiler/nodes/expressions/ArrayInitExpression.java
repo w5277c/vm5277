@@ -166,7 +166,7 @@ public class ArrayInitExpression extends ExpressionNode {
 					}
 					else if (!isCompatibleWith(scope, basedType, valueType)) {
 						// Дополнительная проверка автоматического привдения целочисленной константы к fixed.
-						if(VarType.FIXED == basedType && valueExpr instanceof LiteralExpression && valueType.isInteger()) {
+						if(VarType.FIXED == basedType && valueExpr instanceof LiteralExpression && valueType.isIntegral()) {
 							long num = ((LiteralExpression)valueExpr).getNumValue();
 							if(num<VarType.FIXED_MIN || num>VarType.FIXED_MAX) {
 								markError("Type mismatch: cannot assign " + valueType + " to " + basedType);

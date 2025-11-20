@@ -505,16 +505,6 @@ public abstract class AstNode extends SemanticAnalyzer {
 		return false;
 	}
 	
-	public boolean isInLoopNode() {
-		boolean result = false;
-		for(AstNode node : tb.getLoopStack()) {
-			if(node instanceof ForNode || node instanceof WhileNode || node instanceof DoWhileNode) {
-				result = true;
-			}
-		}
-		return result;
-	}
-
 	public SourcePosition getSP() {
 		return sp;
 	}
@@ -618,8 +608,8 @@ public abstract class AstNode extends SemanticAnalyzer {
 	public abstract List<AstNode> getChildren();
 	
 	// Формирует код AST ноды единожды(см. cgDone), загружает результат в аккумулятор, если включен toAccum
-	// Код записываем в parentCgScope, но если null, то записываем в cg.getScope() он содержит текущий cgScope AST ноды
-	public Object codeGen(CodeGenerator cg, CGScope parentCgScope, boolean toAccum) throws CompileException { 
+	// Код записываем в parent, но если null, то записываем в cg.getScope() он содержит текущий cgScope AST ноды
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException { 
 		throw new UnsupportedOperationException(this.toString());
 	}
 	

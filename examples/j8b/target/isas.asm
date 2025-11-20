@@ -1,9 +1,9 @@
-; vm5277.avr_codegen v0.1 at Fri Nov 14 05:44:38 VLAT 2025
+; vm5277.avr_codegen v0.1 at Thu Nov 20 07:51:20 GMT+10:00 2025
 .equ core_freq = 16
 .equ stdout_port = 18
 
-.set OS_FT_DRAM = 1
 .set OS_FT_STDOUT = 1
+.set OS_FT_DRAM = 1
 .set OS_FT_WELCOME = 1
 
 .include "devices/atmega328p.def"
@@ -29,7 +29,7 @@ _j8b_meta23:
 	.db 13,0
 _j8b_meta25:
 	.db 15,1,14,2
-	.dw 0,0
+	.dw 0,j8bC34CShortMtoShort
 
 j8bC28CShortMShort:
 	ldi r16,low(7)
@@ -55,6 +55,11 @@ _j8b_cinit26:
 	ldi r30,2
 	rjmp j8bproc_mfin_sf
 
+j8bC34CShortMtoShort:
+	ldd r16,z+5
+	ldd r17,z+6
+	rjmp j8bproc_mfin
+
 j8bCMainMmain:
 	push r30
 	push r31
@@ -72,9 +77,10 @@ j8bCMainMmain:
 	pop r30
 	sbrs r16,0x00
 	rjmp _j8b_eoc0
-	movw r26,r20
-	ld r16,x+
-	ld r17,x+
+	push r30
+	push r31
+	movw r30,r20
+	rcall j8bC34CShortMtoShort
 	rcall os_out_num16
 	ldi r16,low(j8bD98*2)
 	ldi r17,high(j8bD98*2)

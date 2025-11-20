@@ -202,7 +202,7 @@ public class BinaryExpression extends ExpressionNode {
 			}
 		}
 		if(result) {
-			if(operator.isBitwise() && (!leftType.isInteger() || !rightType.isInteger())) {
+			if(operator.isBitwise() && (!leftType.isIntegral() || !rightType.isIntegral())) {
 				markError("Bitwise operators require integer operands");
 				result = false;
 			}

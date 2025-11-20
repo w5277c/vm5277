@@ -42,7 +42,7 @@ public class EnumScope extends CIScope {
 	}
 	
 	public String getValue(int index) {
-		if(values.size()>=index) return null;
+		if(values.size()<=index) return null;
 		return values.get(index);
 	}
 	

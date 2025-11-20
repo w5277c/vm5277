@@ -17,11 +17,9 @@ package ru.vm5277.compiler.nodes.commands;
 
 import java.util.Arrays;
 import java.util.List;
-import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.CGBranch;
-import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
@@ -84,9 +82,7 @@ public class WhileNode extends CommandNode {
 		}
 
 		if(null!=blockNode) {
-			tb.getLoopStack().add(this);
 			result&=blockNode.preAnalyze();
-			tb.getLoopStack().remove(this);
 		}
 		
 		return result;
@@ -137,15 +133,6 @@ public class WhileNode extends CommandNode {
 			}
 		}
 
-		if(result && condition instanceof LiteralExpression) {
-			if(((LiteralExpression)condition).getBooleanValue()) {
-				alwaysTrue = true;
-			}
-			else {
-				alwaysFalse = true;
-			}
-		}
-		
 		// Анализ тела цикла
 		if(null!=blockNode) {
 			result&=blockNode.postAnalyze(blockScope, cg);
@@ -170,6 +157,18 @@ public class WhileNode extends CommandNode {
 			blockNode.codeOptimization(scope, cg);
 		}
 		
+		if(condition instanceof LiteralExpression) {
+			LiteralExpression le = (LiteralExpression)condition;
+			if(VarType.BOOL==le.getType()) {
+				if((boolean)le.getValue()) {
+					alwaysTrue = true;
+				}
+				else {
+					alwaysFalse = true;
+				}
+			}
+		}
+
 		cg.setScope(oldScope);
 	}
 
@@ -182,9 +181,8 @@ public class WhileNode extends CommandNode {
 		CGScope cgs = null == parent ? cgScope : parent;
 		cgs.setBranch(branch);
 		
-		CGLabelScope loopLbScope = new CGLabelScope(null, null, LabelNames.LOOP, true);
 		if(!alwaysFalse) {
-			cgs.append(loopLbScope);
+			cgs.append(((CGLoopBlockScope)cgScope).getStartLbScope());
 			if(!alwaysTrue) {
 				condition.codeGen(cg, cgs, false);
 			}
@@ -195,7 +193,7 @@ public class WhileNode extends CommandNode {
 		}
 
 		if(!alwaysFalse) {
-			cg.jump(cgs, loopLbScope);
+			cg.jump(cgs, ((CGLoopBlockScope)cgScope).getStartLbScope());
 		}
 		if(!alwaysFalse) {
 			cgs.append(branch.getEnd());

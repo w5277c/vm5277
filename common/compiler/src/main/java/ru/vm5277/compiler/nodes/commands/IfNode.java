@@ -63,12 +63,10 @@ public class IfNode extends CommandNode {
 		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(CompileException e){markFirstError(e);}
 
 		// Then блок
-		tb.getLoopStack().add(this);
 		try {
 			thenBlockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
 		}
 		catch(CompileException e) {markFirstError(e);}
-		tb.getLoopStack().remove(this);
 
 		// Else блок
         if (tb.match(Keyword.ELSE)) {
@@ -76,17 +74,14 @@ public class IfNode extends CommandNode {
         
 			if (tb.match(TokenType.COMMAND, Keyword.IF)) {
 				// Обработка else if
-				tb.getLoopStack().add(this);
 				elseBlockNode = new BlockNode(tb, mc, new IfNode(tb, mc));
-				tb.getLoopStack().remove(this);
+
 			}
 			else {
-				tb.getLoopStack().add(this);
 				try {
 					elseBlockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
 				}
 				catch(CompileException e) {markFirstError(e);}
-				tb.getLoopStack().remove(this);
 			}
 		}
 	}
@@ -184,7 +179,7 @@ public class IfNode extends CommandNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		boolean result = true;
 		cgScope = cg.enterCommand();
-		
+
 		//TODO привести в соответствие как в ForNode
 		// Проверка типа условия
 		if(null!=condition) {
@@ -210,20 +205,6 @@ public class IfNode extends CommandNode {
 			if(VarType.BOOL!=condType) {
 				markError("If condition must be boolean, got: " + condType);
 				result = false;
-			}
-		}
-
-		if(result) {
-			if(condition instanceof LiteralExpression) {
-				LiteralExpression le = (LiteralExpression)condition;
-				if(VarType.BOOL == le.getType()) {
-					if((boolean)le.getValue()) {
-						alwaysTrue = true;
-					}
-					else {
-						alwaysFalse = true;
-					}
-				}
 			}
 		}
 
@@ -257,6 +238,16 @@ public class IfNode extends CommandNode {
 		CGScope oldScope = cg.setScope(cgScope);
 		
 		condition.codeOptimization(scope, cg);
+		try {
+			ExpressionNode optimizedExpr = condition.optimizeWithScope(scope, cg);
+			if(null != optimizedExpr) {
+				condition = optimizedExpr;
+			}
+		}
+		catch(CompileException ex) {
+			markError(ex);
+		}
+
 		if(null!=thenBlockNode) {
 			thenBlockNode.codeOptimization(scope, cg);
 		}
@@ -264,6 +255,18 @@ public class IfNode extends CommandNode {
 			elseBlockNode.codeOptimization(scope, cg);
 		}
 		
+		if(condition instanceof LiteralExpression) {
+			LiteralExpression le = (LiteralExpression)condition;
+			if(VarType.BOOL==le.getType()) {
+				if((boolean)le.getValue()) {
+					alwaysTrue = true;
+				}
+				else {
+					alwaysFalse = true;
+				}
+			}
+		}
+
 		cg.setScope(oldScope);
 	}
 	

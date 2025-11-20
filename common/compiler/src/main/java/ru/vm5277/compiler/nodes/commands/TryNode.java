@@ -51,9 +51,7 @@ public class TryNode extends CommandNode {
 		
 		// Блок try
 		if(tb.match(Delimiter.LEFT_BRACE)) {
-			tb.getLoopStack().add(this);
 			try {this.tryBlock = new BlockNode(tb, mc);} catch(CompileException e) {markFirstError(e);}
-			tb.getLoopStack().remove(this);
 		}
 		else markError("Expected '{' after 'try'");
 
@@ -71,9 +69,7 @@ public class TryNode extends CommandNode {
 
 			// Если сразу идет код без case/default - считаем его default-блоком
             if (!tb.match(Keyword.CASE) && !tb.match(Keyword.DEFAULT) && !tb.match(Delimiter.RIGHT_BRACE)) {
-				tb.getLoopStack().add(this);
                 try {catchDefaultBlock = new BlockNode(tb, mc, true);} catch (CompileException e) {markFirstError(e);}
-                tb.getLoopStack().remove(this);
 			}
 			else {
 				// Парсим case-блоки
@@ -84,16 +80,20 @@ public class TryNode extends CommandNode {
 							tb.skip(Delimiter.RIGHT_BRACE);
 							break;
 						}
-						AstCase c = parseCase(tb, mc);
-						if(null != c) catchCases.add(c);
+						try {
+							AstCase astCsse = parseCase(tb, mc);
+							if(null != astCsse) catchCases.add(astCsse);
+						}
+						catch(CompileException ex) {
+							markError(ex);
+							tb.skip(Delimiter.COLON);
+						}
 					}
 					else if (tb.match(Keyword.DEFAULT)) {
 						consumeToken(tb); // Потребляем "default"
 						try {consumeToken(tb, Delimiter.COLON);} catch(CompileException e) {markFirstError(e);}
-						tb.getLoopStack().add(this);
 						try {catchDefaultBlock = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());}
 						catch(CompileException e) {markFirstError(e);}
-						tb.getLoopStack().remove(this);
 					}
 					else {
 						markFirstError(parserError("Expected 'case', 'default' or code block in catch"));
@@ -178,22 +178,16 @@ public class TryNode extends CommandNode {
 		if (null != tryBlock) tryBlock.postAnalyze(tryScope, cg);
 
 		// Проверка catch-значений на уникальность
-		List<Long> catchValues = new ArrayList<>();
+		List<Integer> catchValues = new ArrayList<>();
 		for (AstCase astCase : catchCases) {
-			// Проверка диапазона
-			if (null != astCase.getTo() && astCase.getFrom() > astCase.getTo()) {
-				markError("Invalid catch range: " + astCase.getFrom() + ".." + astCase.getTo());
-			}
-
 			// Проверка на дубликаты
-			if (null == astCase.getTo()) {
-				if (catchValues.contains(astCase.getFrom())) markError("Duplicate catch value: " + astCase.getFrom());
-				else catchValues.add(astCase.getFrom());
-			}
-			else {
-				for (long i = astCase.getFrom(); i <= astCase.getTo(); i++) {
-					if (catchValues.contains(i)) markError("Duplicate catch value in range: " + i);
-					else catchValues.add(i);
+			for(Integer num : astCase.getValues()) {
+				if(catchValues.contains(num)) {
+					markError("Duplicate case value in range: " + num);
+					//TODO result = false;
+				}
+				else {
+					catchValues.add(num);
 				}
 			}
 
@@ -221,7 +215,7 @@ public class TryNode extends CommandNode {
 			CGBlockScope caseBlockScope = cg.enterBlock();
 			astCase.getBlock().codeGen(cg, null, false);
 			cg.leaveBlock();
-			cases.add(new Case(astCase.getFrom(), astCase.getTo(), caseBlockScope));
+			//TODO cases.add(new Case(astCase.getFrom(), astCase.getTo(), caseBlockScope));
 		}
 			
 		CGBlockScope defaultBlockScope = null;

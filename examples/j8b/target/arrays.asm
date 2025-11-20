@@ -1,10 +1,10 @@
-; vm5277.avr_codegen v0.1 at Fri Nov 14 05:23:06 VLAT 2025
+; vm5277.avr_codegen v0.1 at Thu Nov 20 06:06:46 GMT+10:00 2025
 .equ stdout_port = 18
 
-.set OS_FT_DRAM = 1
-.set OS_FT_STDOUT = 1
 .set OS_ARRAY_3D = 1
+.set OS_FT_STDOUT = 1
 .set OS_ARRAY_2D = 1
+.set OS_FT_DRAM = 1
 
 .include "devices/atmega328p.def"
 .include "core/core.asm"
@@ -73,7 +73,7 @@ j8bCMainMmain:
 	mov r16,r20
 	ldi r17,0x00
 	st x+,r16
-	st x,r17
+	st x+,r17
 	push zl
 	push zh
 	ldi zl,low(j8bD22*2)
@@ -89,7 +89,7 @@ j8bCMainMmain:
 	movw r26,r22
 	adiw r26,7
 	ld r16,x+
-	ld r17,x
+	ld r17,x+
 	rcall os_out_q7n8
 	ldi r21,8
 	mov r16,r21
@@ -163,7 +163,7 @@ j8bCMainMmain:
 	movw r26,r24
 	rcall j8bproc_arr_celladdr
 	ld r16,x+
-	ld r17,x
+	ld r17,x+
 	rcall os_out_num16
 _j8b_eoc0:
 	push c0x01
@@ -171,7 +171,7 @@ _j8b_eoc0:
 	movw r26,r24
 	rcall j8bproc_arr_celladdr
 	ld r16,x+
-	ld r17,x
+	ld r17,x+
 	mov r17,r16
 	clr r16
 	push r17
@@ -181,7 +181,7 @@ _j8b_eoc0:
 	pop r16
 	pop r17
 	st x+,r16
-	st x,r17
+	st x+,r17
 	push r30
 	push r31
 	movw r30,r22

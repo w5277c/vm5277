@@ -20,14 +20,26 @@ import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.CodeGenerator;
 
 public class CGLoopBlockScope extends CGBlockScope {
+	private	CGLabelScope	startLbScope;
+	private	CGLabelScope	nextLbScope;
 	private	CGLabelScope	endLbScope;
 	
 	public CGLoopBlockScope(CodeGenerator cg, CGScope parent, int id) {
 		super(cg, parent, id);
 		
+		startLbScope = new CGLabelScope(null, null, LabelNames.LOOP, true);
+		nextLbScope = new CGLabelScope(null, null, LabelNames.LOOP_NEXT, false);
 		endLbScope = new CGLabelScope(null, null, LabelNames.LOOP_END, true);
 	}
 	
+	public CGLabelScope getStartLbScope() {
+		return startLbScope;
+	}
+
+	public CGLabelScope getNextLbScope() {
+		return nextLbScope;
+	}
+
 	public CGLabelScope getEndLbScope() {
 		return endLbScope;
 	}

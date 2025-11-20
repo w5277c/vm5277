@@ -25,7 +25,7 @@ public class Symbol {
 	protected			boolean				isStatic;
 	protected			boolean				isFinal;
 	protected			boolean				isNative;
-	private				CGScope				cgScope;
+	protected			CGScope				cgScope;
 	private				boolean				reassigned		= false;
 	private				Integer				lastAccessedSN	= null;
 	

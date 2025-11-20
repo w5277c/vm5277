@@ -38,6 +38,7 @@ public enum RTOSLibs {
 	MATH_DIV16("math/div16.asm"),
 	MATH_DIVQ7N8("math/divq7n8.asm"),
 	MATH_DIV32("math/div32.asm"),
+	NEW_ARRAY("j8b/new_array.asm"),
 	ARR_CELLADDR("j8b/arr_celladdr.asm"),
 	ARR_SIZE("j8b/arr_size.asm"),
 	ARR_REFCOUNT("j8b/arr_refcount.asm"),

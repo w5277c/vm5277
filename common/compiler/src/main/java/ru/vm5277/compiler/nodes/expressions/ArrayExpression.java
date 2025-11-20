@@ -129,7 +129,7 @@ public class ArrayExpression extends ExpressionNode {
 
 							// Проверяем тип индекса
 							VarType indexType = expr.getType();
-							if (!indexType.isInteger()) {
+							if (!indexType.isIntegral()) {
 								markError("Array index must be integer, got " + indexType);
 								result = false;
 							}

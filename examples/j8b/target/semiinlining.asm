@@ -1,4 +1,4 @@
-; vm5277.avr_codegen v0.1 at Fri Nov 14 05:51:04 VLAT 2025
+; vm5277.avr_codegen v0.1 at Fri Nov 21 07:26:06 GMT+10:00 2025
 .equ core_freq = 16
 .equ stdout_port = 18
 .set OS_STAT_POOL_SIZE = 3
@@ -62,9 +62,11 @@ j8bCMainMmain:
 	rcall j8bC30CClazzMClazz
 	movw r20,r16
 	movw r26,r20
+	adiw r26,5
 	ldi r19,16
 	st x+,r19
 	movw r26,r20
+	adiw r26,5
 	ld r16,x+
 	rcall os_out_num8
 	movw r30,r20

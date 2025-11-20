@@ -1,16 +1,17 @@
-; vm5277.avr_codegen v0.1 at Fri Nov 14 05:49:18 VLAT 2025
+; vm5277.avr_codegen v0.1 at Thu Nov 20 08:00:26 GMT+10:00 2025
 .equ core_freq = 16
 .equ stdout_port = 18
 
-.set OS_FT_WELCOME = 1
 .set OS_FT_DRAM = 1
 .set OS_FT_STDOUT = 1
+.set OS_FT_WELCOME = 1
 
 .include "devices/atmega328p.def"
 .include "core/core.asm"
 .include "dmem/dram.asm"
 .include "j8b/class_refcount.asm"
 .include "j8b/clear_fields.asm"
+.include "j8b/mfin.asm"
 .include "j8b/mfin_sf.asm"
 .include "stdio/out_num8.asm"
 .include "stdio/out_num16.asm"
@@ -21,7 +22,7 @@ _j8b_meta23:
 	.db 13,0
 _j8b_meta25:
 	.db 15,1,14,1
-	.dw 0
+	.dw j8bC30CByteMtoByte
 
 j8bC28CByteMByte:
 	ldi r16,low(6)
@@ -45,6 +46,10 @@ _j8b_cinit26:
 	ldi r30,1
 	rjmp j8bproc_mfin_sf
 
+j8bC30CByteMtoByte:
+	ldd r16,z+5
+	rjmp j8bproc_mfin
+
 j8bCMainMmain:
 	push yl
 	push yh
@@ -57,8 +62,10 @@ j8bCMainMmain:
 	push c0x01
 	rcall j8bC28CByteMByte
 	movw r20,r16
-	movw r26,r20
-	ld r16,x+
+	push r30
+	push r31
+	movw r30,r20
+	rcall j8bC30CByteMtoByte
 	rcall os_out_num8
 	push r30
 	push r31
@@ -66,8 +73,10 @@ j8bCMainMmain:
 	push r19
 	rcall j8bC28CByteMByte
 	movw r22,r16
-	movw r26,r22
-	ld r16,x+
+	push r30
+	push r31
+	movw r30,r22
+	rcall j8bC30CByteMtoByte
 	rcall os_out_num8
 	push r30
 	push r31
@@ -82,8 +91,10 @@ j8bCMainMmain:
 	push c0x01
 	rcall j8bC28CByteMByte
 	movw r24,r16
-	movw r26,r24
-	ld r16,x+
+	push r30
+	push r31
+	movw r30,r24
+	rcall j8bC30CByteMtoByte
 	rcall os_out_num8
 	ldi r16,15
 	rcall os_out_num8

@@ -263,214 +263,256 @@ public class ASTPrinter {
 		out.put("{"); out.print(); out.extend();
 		if(null!=body) {
 			for(AstNode node : body.getChildren()) {
-				if(node instanceof LabelNode) {
-					out.put(((LabelNode)node).getName() + ":");
-					continue;
-				}
-				else if(node instanceof BreakNode) {
-					BreakNode bn = (BreakNode)node;
-					out.put("break");
-					if(null != bn.getLabel()) out.put(" " + bn.getLabel());
-					out.put(";");
-				}
-				else if(node instanceof ContinueNode) {
-					out.put("continue;");
-				}
-				else if(node instanceof DoWhileNode) {
-					DoWhileNode dwn = (DoWhileNode)node;
-					out.put("do ");
-					printBody(dwn.getBody());
-					out.put(" while(");
-					printExpr(dwn.getCondition());
-					out.put(");"); out.print();
-				}
-				else if(node instanceof ForNode) {
-					ForNode fn = (ForNode)node;
-					out.put("for(");
-					if(fn.getInitialization() instanceof FieldNode) {
-						printField((FieldNode)fn.getInitialization());
-					}
-					else if(fn.getInitialization() instanceof VarNode) {
-						printVar((VarNode)fn.getInitialization());
-					}
-					else {
-						printExpr((ExpressionNode)fn.getInitialization());
-					}
-					out.put("; ");
-					if(null != fn.getCondition()) {
-						printExpr(fn.getCondition());
-					}
-					out.put("; ");
-					if(null != fn.getIteration()) {
-						printExpr(fn.getIteration());
-					}
-					out.put(") ");
-					if(fn.isAlwaysFalse()) {
-						out.put("{");
-						out.print();
-						out.extend();
-						out.put("//AST>REMOVED");
-						out.print();
-						out.reduce();
-						out.put("}");
-						out.print();
-					}
-					else {
-						printBody(fn.getBody());
-					}
-					if(null!=fn.getElseBlock()) {
-						out.put("else");
-						printBody(fn.getElseBlock());
-					}
-				}
-				else if(node instanceof IfNode) {
-					IfNode in = (IfNode)node;
-
-					if(in.alwaysTrue() || in.alwaysFalse()) {
-						if(in.alwaysTrue()) {
-							printBody(in.getThenBlock());
-						}
-						else if(null != in.getElseBlock()) {
-							printBody(in.getElseBlock());
-						}
-					}
-					else {
-						out.put("if (");
-						printExpr(in.getCondition());
-						if(null != in.getVarName()) {
-							out.put(" as " + in.getVarName());
-						}
-						out.put(") ");
-						printBody(in.getThenBlock());
-						if(null != in.getElseBlock()) {
-							out.print();
-							out.put("else ");
-							printBody(in.getElseBlock());
-						}
-					}
-				}
-				else if(node instanceof ReturnNode) {
-					ReturnNode rn = (ReturnNode)node;
-					out.put("return");
-					if(null != rn.getExpression()) {
-						out.put(" ");
-						printExpr(rn.getExpression());
-					}
-					out.put(";");
-				}
-				else if(node instanceof SwitchNode) {
-					SwitchNode sn = (SwitchNode)node;
-					out.put("switch (");
-					printExpr(sn.getExpression());
-					out.put(") {"); out.extend(); out.print();
-					for(SwitchNode.AstCase astCase : sn.getCases()) {
-						out.put("case " + astCase.getFrom());
-						if(null != astCase.getTo()) {
-							out.put(".." + astCase.getTo());
-						}
-						out.put(": ");
-						out.extend(); out.print();
-						printBody(astCase.getBlock());
-						out.reduce(); out.print();
-					}
-					out.reduce(); out.put("}");
-				}
-				else if(node instanceof WhileNode) {
-					WhileNode wn = (WhileNode)node;
-					out.put("while (");
-					printExpr(wn.getCondition());
-					out.put(") ");
-					if(wn.isAlwaysFalse()) {
-						out.put("{");
-						out.print();
-						out.extend();
-						out.put("//AST>REMOVED");
-						out.print();
-						out.reduce();
-						out.put("}");
-						out.print();
-					}
-					else {
-						printBody(wn.getBody());
-						out.print();
-					}
-				}
-				else if(node instanceof ClassNode) {
-					printClass((ClassNode)node);
-				}
-				else if(node instanceof ArrayDeclarationNode) {
-					//TODO
-				}
-				else if(node instanceof FieldNode) {
-					printField((FieldNode)node);
-					out.put(";");
-				}
-				else if(node instanceof VarNode) {
-					VarNode vNode = (VarNode)node; //TODO повотрить для остальных
-					if(vNode.isFinal() && null!=vNode.getSymbol() && !vNode.getSymbol().isReassigned()) {
-						out.put("//AST>CONST ");
-					}
-					printVar((VarNode)node);
-					out.put(";");
-				}
-				else if(node instanceof ExpressionNode) {
-					if(printExpr((ExpressionNode)node)) out.put(";");
-				}
-				else if(node instanceof BlockNode) {
-					printBody((BlockNode)node);
-					out.print();
-				}
-				else if(node instanceof InterfaceNode) {
-					printInterface((InterfaceNode)node);
-				}
-				else if(node instanceof TryNode) {
-					TryNode tryNode = (TryNode)node;
-					out.put("try ");
-					printBody(tryNode.getTryBlock());
-					if(!tryNode.getCatchCases().isEmpty() || null != tryNode.getCatchDefault()) {
-						out.print();
-						out.put("catch (byte ");
-						out.put(tryNode.getVarName());
-						out.put(") ");
-						if(tryNode.getCatchCases().isEmpty()) {
-							printBody(tryNode.getCatchDefault());
-						}
-						else {
-							out.put("{");
-							out.print();
-							out.extend();
-							for(AstCase astCase : tryNode.getCatchCases()) {
-								out.put("case " + astCase.getFrom());
-								if(null != astCase.getTo()) {
-									out.put(".." + astCase.getTo());
-								}
-								out.put(": ");
-								printBody(astCase.getBlock());
-								out.print();
-							}
-							if(null != tryNode.getCatchDefault()) {
-								out.put("default: ");
-								printBody(tryNode.getCatchDefault());
-							}
-							out.print();
-							out.reduce();
-							out.put("}");
-						}
-					}
-
-				}
-				else if(node instanceof ThrowNode) {
-					out.put("throw ");
-					printExpr(((ThrowNode)node).getExceptionExpr());
-					out.put(";");
-				}
-				else {
-					out.put("!unknown node:" + node); out.print();
-				}
+				printNode(node);
 				out.print();
 			}
 		}
 		out.reduce(); out.put("}");
+	}
+
+	void printNode(AstNode node) {
+		if(node instanceof LabelNode) {
+			out.put(((LabelNode)node).getName() + ":");
+		}
+		else if(node instanceof BreakNode) {
+			BreakNode bn = (BreakNode)node;
+			out.put("break");
+			if(null != bn.getLabel()) out.put(" " + bn.getLabel());
+			out.put(";");
+		}
+		else if(node instanceof ContinueNode) {
+			out.put("continue;");
+		}
+		else if(node instanceof DoWhileNode) {
+			DoWhileNode dwn = (DoWhileNode)node;
+			out.put("do ");
+			if(dwn.isAlwaysFalse()) {
+				out.put("{");
+				out.print();
+				out.extend();
+				out.put("//AST>REMOVED");
+				out.print();
+				out.reduce();
+				out.put("}");
+				out.print();
+			}
+			else {
+				printBody((BlockNode)dwn.getChildren().get(0));
+				out.print();
+			}
+			out.put("while (");
+			printExpr(dwn.getCondition());
+			out.put(");");
+		}
+		else if(node instanceof ForNode) {
+			ForNode fn = (ForNode)node;
+			out.put("for(");
+			if(fn.getInitialization() instanceof FieldNode) {
+				printField((FieldNode)fn.getInitialization());
+			}
+			else if(fn.getInitialization() instanceof VarNode) {
+				printVar((VarNode)fn.getInitialization());
+			}
+			else {
+				printExpr((ExpressionNode)fn.getInitialization());
+			}
+			out.put("; ");
+			if(null != fn.getCondition()) {
+				printExpr(fn.getCondition());
+			}
+			out.put("; ");
+			if(null != fn.getIteration()) {
+				printExpr(fn.getIteration());
+			}
+			out.put(") ");
+			if(fn.isAlwaysFalse()) {
+				out.put("{");
+				out.print();
+				out.extend();
+				out.put("//AST>REMOVED");
+				out.print();
+				out.reduce();
+				out.put("}");
+				out.print();
+			}
+			else {
+				printBody(fn.getBody());
+			}
+			if(null!=fn.getElseBlock()) {
+				out.put("else");
+				printBody(fn.getElseBlock());
+			}
+		}
+		else if(node instanceof IfNode) {
+			IfNode in = (IfNode)node;
+
+			if(in.alwaysTrue() || in.alwaysFalse()) {
+				if(in.alwaysTrue()) {
+					printBody(in.getThenBlock());
+				}
+				else if(null != in.getElseBlock()) {
+					printBody(in.getElseBlock());
+				}
+			}
+			else {
+				out.put("if (");
+				printExpr(in.getCondition());
+				if(null != in.getVarName()) {
+					out.put(" as " + in.getVarName());
+				}
+				out.put(") ");
+				printBody(in.getThenBlock());
+				if(null != in.getElseBlock()) {
+					out.print();
+					out.put("else ");
+					printBody(in.getElseBlock());
+				}
+			}
+		}
+		else if(node instanceof ReturnNode) {
+			ReturnNode rn = (ReturnNode)node;
+			out.put("return");
+			if(null != rn.getExpression()) {
+				out.put(" ");
+				printExpr(rn.getExpression());
+			}
+			out.put(";");
+		}
+		else if(node instanceof SwitchNode) {
+			SwitchNode sn = (SwitchNode)node;
+			if(null==sn.getConstantValue()) {
+				out.put("switch (");
+				printExpr(sn.getExpression());
+				out.put(") {");
+				out.print();
+				out.extend();
+				for(SwitchNode.AstCase astCase : sn.getCases()) {
+					out.put("case " + astCase.getValuesAsStr());
+					out.put(": ");
+					if(0x01==astCase.getBlock().getChildren().size()) {
+						out.put("\t");
+						printNode(astCase.getBlock().getChildren().get(0));
+						out.print();
+					}
+					else {
+						out.extend(); out.print();
+						printBody(astCase.getBlock());
+						out.reduce(); out.print();
+					}
+				}
+				if(null!=sn.getDefaultBlock()) {
+					out.put("default: ");
+					if(0x01==sn.getDefaultBlock().getChildren().size()) {
+						out.put("\t");
+						printNode(sn.getDefaultBlock().getChildren().get(0));
+						out.print();
+					}
+					else {
+						out.extend(); out.print();
+						printBody(sn.getDefaultBlock());
+						out.reduce(); out.print();
+					}
+				}
+
+				out.reduce(); out.put("}");
+			}
+			else {
+				BlockNode bNode = sn.getConstantFoldedBlock();
+				if(null!=bNode) {
+					printBody(bNode);
+					out.print();
+				}
+			}
+		}
+		else if(node instanceof WhileNode) {
+			WhileNode wn = (WhileNode)node;
+			out.put("while (");
+			printExpr(wn.getCondition());
+			out.put(") ");
+			if(wn.isAlwaysFalse()) {
+				out.put("{");
+				out.print();
+				out.extend();
+				out.put("//AST>REMOVED");
+				out.print();
+				out.reduce();
+				out.put("}");
+				out.print();
+			}
+			else {
+				printBody(wn.getBody());
+				out.print();
+			}
+		}
+		else if(node instanceof ClassNode) {
+			printClass((ClassNode)node);
+		}
+		else if(node instanceof ArrayDeclarationNode) {
+			//TODO
+		}
+		else if(node instanceof FieldNode) {
+			printField((FieldNode)node);
+			out.put(";");
+		}
+		else if(node instanceof VarNode) {
+			VarNode vNode = (VarNode)node; //TODO повотрить для остальных
+			if(vNode.isFinal() && null!=vNode.getSymbol() && !vNode.getSymbol().isReassigned()) {
+				out.put("//AST>CONST ");
+			}
+			printVar((VarNode)node);
+			out.put(";");
+		}
+		else if(node instanceof ExpressionNode) {
+			if(printExpr((ExpressionNode)node)) out.put(";");
+		}
+		else if(node instanceof BlockNode) {
+			printBody((BlockNode)node);
+			out.print();
+		}
+		else if(node instanceof InterfaceNode) {
+			printInterface((InterfaceNode)node);
+		}
+		else if(node instanceof TryNode) {
+			TryNode tryNode = (TryNode)node;
+			out.put("try ");
+			printBody(tryNode.getTryBlock());
+			if(!tryNode.getCatchCases().isEmpty() || null != tryNode.getCatchDefault()) {
+				out.print();
+				out.put("catch (byte ");
+				out.put(tryNode.getVarName());
+				out.put(") ");
+				if(tryNode.getCatchCases().isEmpty()) {
+					printBody(tryNode.getCatchDefault());
+				}
+				else {
+					out.put("{");
+					out.print();
+					out.extend();
+					for(AstCase astCase : tryNode.getCatchCases()) {
+						out.put("case " + astCase.getValuesAsStr());
+						out.put(": ");
+						printBody(astCase.getBlock());
+						out.print();
+					}
+					if(null != tryNode.getCatchDefault()) {
+						out.put("default: ");
+						printBody(tryNode.getCatchDefault());
+					}
+					out.print();
+					out.reduce();
+					out.put("}");
+				}
+			}
+
+		}
+		else if(node instanceof ThrowNode) {
+			out.put("throw ");
+			printExpr(((ThrowNode)node).getExceptionExpr());
+			out.put(";");
+		}
+		else {
+			out.put("!unknown node:" + node); out.print();
+		}
 	}
 	
 	void printField(FieldNode node) {

@@ -19,7 +19,6 @@ package ru.vm5277.compiler.nodes.commands;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import ru.vm5277.common.LabelNames;
 import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
@@ -216,9 +215,7 @@ public class ForNode extends CommandNode {
 
 		// Проверка основного тела цикла
 		if(null!=blockNode) {
-			tb.getLoopStack().add(this);
 			result&=blockNode.preAnalyze();
-			tb.getLoopStack().remove(this);
 		}
 
 		// Проверка else-блока (если есть)
@@ -274,7 +271,7 @@ public class ForNode extends CommandNode {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
 		cgScope = cg.enterLoopBlock();
-		
+
 		// Анализ блока инициализации
 		if(null!=init) {
 			result&=init.postAnalyze(forScope, cg);
@@ -340,6 +337,66 @@ public class ForNode extends CommandNode {
 	}
 
 	@Override
+	public void codeOptimization(Scope scope, CodeGenerator cg) {
+		CGScope oldScope = cg.setScope(cgScope);
+		
+		//TODO добавить остальные елементы
+		
+		if(null!=init) {
+			init.codeOptimization(scope, cg);
+		}
+		
+		if(null!=condition) {
+			condition.codeOptimization(scope, cg);
+			try {
+				ExpressionNode optimizedExpr = condition.optimizeWithScope(scope, cg);
+				if(null != optimizedExpr) {
+					condition = optimizedExpr;
+				}
+			}
+			catch(CompileException ex) {
+				markError(ex);
+			}
+		}
+		
+		if(null!=iteration) {
+			iteration.codeOptimization(scope, cg);
+			try {
+				ExpressionNode optimizedExpr = iteration.optimizeWithScope(scope, cg);
+				if(null != optimizedExpr) {
+					iteration = optimizedExpr;
+				}
+			}
+			catch(CompileException ex) {
+				markError(ex);
+			}
+		}
+
+		if(null!=blockNode) {
+			blockNode.codeOptimization(scope, cg);
+		}
+		
+		if(null!=elseBlockNode) {
+			elseBlockNode.codeOptimization(scope, cg);
+		}
+
+		if(null!=condition && condition instanceof LiteralExpression) {
+			LiteralExpression le = (LiteralExpression)condition;
+			if(VarType.BOOL==le.getType()) {
+				if((boolean)le.getValue()) {
+					alwaysTrue = true;
+				}
+				else {
+					alwaysFalse = true;
+				}
+			}
+		}
+
+		cg.setScope(oldScope);
+	}
+
+	
+	@Override
 	public List<AstNode> getChildren() {
 		if(null==elseBlockNode) {
 			return Arrays.asList(blockNode);
@@ -362,14 +419,12 @@ public class ForNode extends CommandNode {
 			init.codeGen(cg, cgs, false);
 		}
 		
-		CGLabelScope loopLbScope = new CGLabelScope(null, null, LabelNames.LOOP, true);
-		
 		if(null==condition) {
-			cgs.append(loopLbScope);
+			cgs.append(((CGLoopBlockScope)cgScope).getStartLbScope());
 		}
 		else {
 			if(!alwaysFalse) {
-				cgs.append(loopLbScope);
+				cgs.append(((CGLoopBlockScope)cgScope).getStartLbScope());
 				if(!alwaysTrue) {
 					condition.codeGen(cg, cgs, false);
 				}
@@ -381,11 +436,14 @@ public class ForNode extends CommandNode {
 		}
 		
 		if(null!=iteration && !alwaysFalse) {
+			CGLabelScope nextLbScope = ((CGLoopBlockScope)cgScope).getNextLbScope();
+			cgs.append(nextLbScope);
+			nextLbScope.setUsed();
 			iteration.codeGen(cg, cgs, false);
 		}
 
 		if(!alwaysFalse) {
-			cg.jump(cgs, loopLbScope);
+			cg.jump(cgs, ((CGLoopBlockScope)cgScope).getStartLbScope());
 		}
 		if(null!=condition && !alwaysFalse) {
 			cgs.append(branch.getEnd());

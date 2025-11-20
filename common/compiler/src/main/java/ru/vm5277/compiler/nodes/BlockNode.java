@@ -196,7 +196,7 @@ public class BlockNode extends AstNode {
 		}
 		else if(node instanceof DoWhileNode) {
 			DoWhileNode dowhileNode = (DoWhileNode)node;
-			return hasReturnStatement(dowhileNode.getBody());
+			return hasReturnStatement(dowhileNode.getChildren().get(0));
 		}
 		else if(node instanceof WhileNode) {
 			WhileNode whileNode = (WhileNode)node;
@@ -316,7 +316,7 @@ public class BlockNode extends AstNode {
 
 				// Проверяем недостижимый код после прерывающих инструкций
 				if(i > 0 && isControlFlowInterrupted(children.get(i - 1))) {
-					markError("Unreachable code after " + children.get(i - 1).getClass().getSimpleName());
+					markWarning("Unreachable code after " + children.get(i - 1).getClass().getSimpleName());
 					// Можно пропустить анализ остального кода, так как он недостижим
 					break;
 				}

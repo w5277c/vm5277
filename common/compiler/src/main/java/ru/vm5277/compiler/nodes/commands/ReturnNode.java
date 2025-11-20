@@ -22,6 +22,7 @@ import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -171,6 +172,25 @@ public class ReturnNode extends CommandNode {
 	}
 	
 	@Override
+	public void codeOptimization(Scope scope, CodeGenerator cg) {
+		CGScope oldScope = cg.setScope(cgScope);
+
+		expr.codeOptimization(scope, cg);
+		
+		try {
+			ExpressionNode optimizedExpr = expr.optimizeWithScope(scope, cg);
+			if(null != optimizedExpr) {
+				expr = optimizedExpr;
+			}
+		}
+		catch(CompileException ex) {
+			markError(ex);
+		}
+
+		cg.setScope(oldScope);
+	}
+
+	@Override
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
@@ -182,13 +202,25 @@ public class ReturnNode extends CommandNode {
 				throw new CompileException("Accum not used for operand:" + expr);
 			}
 		}
-		// Можно было бы вызвать cg.eReturn(cgScope, returnType.getSize());, но в блоке мог быть выделен STACK_FRAME и возможно что-то еще, поэтому переходим
-		// на завершение блока. Оптимизатор в будущем почистит лишние JMP(например если после JMP сразу следует метка.
-		CGBlockScope bScope = (CGBlockScope)cgScope.getParent();
-		cg.jump(cgs, bScope.getELabel());
 		
-		if(null!=expr) {
-			return CodegenResult.RESULT_IN_ACCUM;
+		CGScope scope = cgScope.getParent();
+		while(null!=scope) {
+			CGScope nextScope = scope.getParent();
+			if(null!=nextScope && nextScope instanceof CGMethodScope) {
+				break;
+			}
+			scope = nextScope;
+		}
+				
+		if(null==scope || !(scope instanceof CGBlockScope)) {
+			markError("COPMILER BUG: block scope without method scope");
+		}
+		else {
+			cg.jump(cgs, ((CGBlockScope)scope).getELabel());
+
+			if(null!=expr) {
+				return CodegenResult.RESULT_IN_ACCUM;
+			}
 		}
 		return null;
 	}

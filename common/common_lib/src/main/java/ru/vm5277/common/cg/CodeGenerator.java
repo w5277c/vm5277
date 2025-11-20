@@ -142,7 +142,10 @@ public abstract class CodeGenerator extends CGScope {
 		scope = scope.free();
 	}
 
-
+	public CGLabelScope putLabel(String label) {
+		return new CGLabelScope(scope, genId(), label, true);
+	}
+	
 	public CGBlockScope enterLoopBlock() {
 		scope = new CGLoopBlockScope(this, scope, genId());
 		return (CGBlockScope)scope;
