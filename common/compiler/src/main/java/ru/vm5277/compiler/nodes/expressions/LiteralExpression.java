@@ -16,11 +16,10 @@
 
 package ru.vm5277.compiler.nodes.expressions;
 
-import ru.vm5277.common.NumUtils;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -29,6 +28,7 @@ import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.tokens.Token;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.cg.CGCells;
+import ru.vm5277.common.cg.CGExcs;
 
 public class LiteralExpression extends ExpressionNode {
     private Object value;
@@ -159,7 +159,7 @@ public class LiteralExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		CGScope cgs = null == parent ? cgScope : parent;
 		
 		//cg.setDataSymbol(cg.defineData(vScope.getResId(), -1, (String)le.getValue()));

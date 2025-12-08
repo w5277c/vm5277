@@ -19,6 +19,7 @@ import java.util.List;
 import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
@@ -138,13 +139,16 @@ public class BreakNode extends CommandNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		CodegenResult result = null;
 		
 		CGScope cgs = null == parent ? cgScope : parent;
 		
 		if(null==label) {
-			cg.jump(cgs, ((CGLoopBlockScope)cgScope.getScope(CGLoopBlockScope.class)).getEndLbScope());
+			CGLabelScope lbScope = ((CGLoopBlockScope)cgScope.getScope(CGLoopBlockScope.class)).getEndLbScope();
+			lbScope.setUsed();
+			cg.jump(cgs, lbScope);
+			
 		}
 		else {
 			//TODO можно упростить?
@@ -176,6 +180,7 @@ public class BreakNode extends CommandNode {
 			}
 			
 			// Прыжок на метку окончания loop-блока
+			cgLoop.getEndLbScope().setUsed();
 			cg.jump(cgs, cgLoop.getEndLbScope());
 		}
 		

@@ -17,7 +17,7 @@ package ru.vm5277.compiler.semantic;
 
 import java.util.ArrayList;
 import java.util.List;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.compiler.nodes.AstNode;
 
 public class MethodSymbol extends AstHolder {
@@ -27,6 +27,7 @@ public class MethodSymbol extends AstHolder {
 	private	final	MethodScope		scope;
 	private			AstNode			astNode;
 	private			boolean			isPredefined;
+	private			boolean			isInterfaceImpl;
 	
 	public MethodSymbol(String name, VarType returnType, List<Symbol> parameters, boolean isFinal, boolean isStatic, boolean isNative, boolean canThrow,
 						boolean isPredefined, MethodScope scope, AstNode astNode) {
@@ -59,6 +60,13 @@ public class MethodSymbol extends AstHolder {
 	
 	public boolean canThrow() {
 		return canThrow;
+	}
+	
+	public boolean isInterfaceImpl() {
+		return isInterfaceImpl;
+	}
+	public void setInterfaceImpl(boolean isInterfaceImpl) {
+		this.isInterfaceImpl = isInterfaceImpl;
 	}
 	
 	public synchronized String getSignature() {

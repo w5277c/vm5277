@@ -18,13 +18,13 @@ package ru.vm5277.compiler.semantic;
 
 import java.util.ArrayList;
 import java.util.List;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class ClassScope extends CIScope {
 	private	final	List<MethodSymbol>				constructors	= new ArrayList<>();
 	
-	public ClassScope(String name, Scope parent, List<VarType> impl) throws CompileException {
+	public ClassScope(Scope parent, String name) throws CompileException {
 		super(parent);
 		
 		addInternal(new InterfaceScope("Object", this, new ArrayList<>()));
@@ -37,7 +37,7 @@ public class ClassScope extends CIScope {
 		mScope.setSymbol(mSymbol);
 		methods.add(mSymbol);
 		
-		if(null!=parent && !(parent instanceof ClassScope)) {
+		if(null!=parent && !(parent instanceof GlobalScope) && !(parent instanceof ClassScope)) {
 			throw new CompileException("Сlass " + name + " can only be declared within a class.");
 		}
 		if(name==null || name.isEmpty()) {
@@ -45,7 +45,6 @@ public class ClassScope extends CIScope {
 		}
 
 		this.name = name;
-		this.impl = impl;
 	}
 	
 	public void addConstructor(MethodSymbol newSymbol) throws CompileException {

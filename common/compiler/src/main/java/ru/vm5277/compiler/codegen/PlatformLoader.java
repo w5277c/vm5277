@@ -26,7 +26,7 @@ import java.util.Map;
 import ru.vm5277.common.AssemblerInterface;
 import ru.vm5277.common.NativeBinding;
 import ru.vm5277.common.SourceType;
-import ru.vm5277.common.SystemParam;
+import ru.vm5277.common.RTOSParam;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.messages.MessageContainer;
 
@@ -51,7 +51,7 @@ public class PlatformLoader {
 	}
 
 	public static CodeGenerator loadGenerator(	String platform, File libsDir, int optLevel, Map<String, NativeBinding> nbMap,
-												Map<SystemParam, Object> params) throws Exception {
+												Map<RTOSParam, Object> params) throws Exception {
 
 		if(IS_NATIVE_IMAGE) {
 			return new ru.vm5277.compiler.avr_codegen.Generator(platform + LIB_CG_POSTFIX, optLevel, nbMap, params);
@@ -83,7 +83,7 @@ public class PlatformLoader {
 				assembler = new ru.vm5277.avr_asm.Assembler();
 			}
 			if(null!=assembler) {
-				return assembler.exec(mc, null, sourcePath, sourcePaths, AssemblerInterface.STRICT_LIGHT, outputFilename, mapFile, listBW);
+				return assembler.exec(mc, null, sourcePath, sourcePaths, AssemblerInterface.STRICT_LIGHT, outputFilename, mapFile, listBW, null, null);
 			}
 			return false;
 		}

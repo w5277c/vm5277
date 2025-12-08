@@ -26,10 +26,11 @@ import ru.vm5277.common.Operator;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.cg.CGArrCells;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Main;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -196,14 +197,14 @@ public class AssignExpression extends BinaryExpression {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, boolean toAccum, CGExcs excs) throws CompileException {
 		if(disabled) return null;
 		
 		CGScope cgs = null == parent ? cgScope : parent;
 		
 		// Для всех выражений должны быть удовлетворены зависимости
-		depCodeGen(cg, leftExpr.getSymbol());
-		depCodeGen(cg, rightExpr.getSymbol());
+		depCodeGen(cg, leftExpr.getSymbol(), excs);
+		depCodeGen(cg, rightExpr.getSymbol(), excs);
 
 		// В присваивании размер аккумулятора всегда соотвествует левому выражению
 		cg.accResize(leftType);
@@ -211,7 +212,7 @@ public class AssignExpression extends BinaryExpression {
 		//================ VarFieldExpression ================================
 		if(leftExpr instanceof VarFieldExpression) {
 			VarFieldExpression leftVfe = (VarFieldExpression)leftExpr;
-			leftExpr.codeGen(cg, cgs, false);
+			leftExpr.codeGen(cg, cgs, false, excs);
 			CGCellsScope leftCScope = (CGCellsScope)leftVfe.getSymbol().getCGScope();
 
 			//================ VarFieldExpression ==== NULL ================================
@@ -229,7 +230,7 @@ public class AssignExpression extends BinaryExpression {
 			else if(rightExpr instanceof VarFieldExpression) {
 				VarFieldExpression rightVfe = (VarFieldExpression)rightExpr;
 				CGCellsScope rightCScope = (CGCellsScope)rightExpr.getSymbol().getCGScope();				
-				if(CodegenResult.RESULT_IN_ACCUM!=rightVfe.codeGen(cg, cgs, true)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=rightVfe.codeGen(cg, cgs, true, excs)) {
 					cg.cellsToAcc(cgs, rightCScope);
 				}
 			    cg.accToCells(cgs, leftCScope);
@@ -237,7 +238,7 @@ public class AssignExpression extends BinaryExpression {
 			//================ VarFieldExpression ==== ARRAY ================================
 			else if(rightExpr instanceof ArrayExpression) {
 				ArrayExpression ae = (ArrayExpression)rightExpr;
-				if(CodegenResult.RESULT_IN_ACCUM!=ae.codeGen(cg, cgs, true)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=ae.codeGen(cg, cgs, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + rightExpr);
 				}
 				cgs.append(cg.accCast(rightType, leftType));
@@ -262,10 +263,10 @@ public class AssignExpression extends BinaryExpression {
 				}
 				
 				if(justInvertVar) {
-					rightExpr.codeGen(cg, cgs, false);
+					rightExpr.codeGen(cg, cgs, false, excs);
 				}
 				else {
-					if(CodegenResult.RESULT_IN_ACCUM==rightExpr.codeGen(cg, cgs, true)) {
+					if(CodegenResult.RESULT_IN_ACCUM==rightExpr.codeGen(cg, cgs, true, excs)) {
 						cgs.append(cg.accCast(rightType, leftType));
 						cg.accToCells(cgs, leftCScope);
 					}
@@ -273,7 +274,7 @@ public class AssignExpression extends BinaryExpression {
 			}
 			//================ VarFieldExpression ==== OTHER ================================
 			else {
-				if(CodegenResult.RESULT_IN_ACCUM!=rightExpr.codeGen(cg, cgs, true)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=rightExpr.codeGen(cg, cgs, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + rightExpr);
 				}
 				else {
@@ -289,7 +290,7 @@ public class AssignExpression extends BinaryExpression {
 
 			//================ ArrayExpression ==== NULL ================================
 			if(VarType.NULL==rightType) { // В левой части reference type (гарантирует postAnalyze)
-				leftExpr.codeGen(cg, cgs, false);
+				leftExpr.codeGen(cg, cgs, false, excs);
 				//TODO нужно проверить!
 				// Проверяем на View
 				boolean isView = false;
@@ -307,29 +308,29 @@ public class AssignExpression extends BinaryExpression {
 			}
 			//================ ArrayExpression ==== ARRAY ================================
 			else if(rightExpr instanceof ArrayExpression) {
-				if(CodegenResult.RESULT_IN_ACCUM!=rightExpr.codeGen(cg, cgs, true)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=rightExpr.codeGen(cg, cgs, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + rightExpr);
 				}
-				leftExpr.codeGen(cg, cgs, false);
+				leftExpr.codeGen(cg, cgs, false, excs);
 				cgs.append(cg.accCast(rightType, leftType));
 				cg.accToArr(cgs, (CGArrCells)leftCScope.getCells());
 			}
 			//================ ArrayExpression ==== LITERAL ================================
 			else if(rightExpr instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)rightExpr;
-				leftExpr.codeGen(cg, cgs, false);
+				leftExpr.codeGen(cg, cgs, false, excs);
 				// Определяем использование FIXED
 				boolean isFixed = le.isFixed() || VarType.FIXED == leftType;
 				cgs.append(cg.constToCells(cgs, isFixed ? le.getFixedValue() : le.getNumValue(), leftCScope.getCells(), isFixed));
 			}
 			//================ ArrayExpression ==== OTHER ================================
 			else {
-				if(CodegenResult.RESULT_IN_ACCUM!=rightExpr.codeGen(cg, cgs, true)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=rightExpr.codeGen(cg, cgs, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + rightExpr);
 				}
 				int accumSize = cg.getAccumSize();
 				cg.pushAccBE(cgs, accumSize);
-				leftExpr.codeGen(cg, cgs, false);
+				leftExpr.codeGen(cg, cgs, false, excs);
 				cg.popAccBE(cgs, accumSize);
 				cg.accCast(rightType, leftType);
 				cg.accToCells(cgs, (CGCellsScope)leftExpr.getSymbol().getCGScope());

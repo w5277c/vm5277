@@ -13,32 +13,66 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.common.cg.items;
 
 import ru.vm5277.common.exceptions.CompileException;
 
 public class CGIAsm extends CGItem {
-	protected	String	text;
+	protected	String	instr;
+	protected	String	postfix;
+	protected	Integer	sizeInBytes	= null;
 	
-	public CGIAsm(String text) throws CompileException {
-		this.text = text;
-		if(null==text) {
+	public CGIAsm(String instr) throws CompileException {
+		if(null==instr) {
 			throw new CompileException("Asm instruction is null");
 		}
+		this.instr = instr.toLowerCase();
+	}
+
+	public CGIAsm(String instr, String postfix) throws CompileException {
+		if(null==instr) {
+			throw new CompileException("Asm instruction is null");
+		}
+		this.instr = instr.toLowerCase();
+		this.postfix = (null==postfix ? null : postfix.toLowerCase());
+	}
+	
+	public String getInstr() {
+		return instr;
+	}
+	public void setInstr(String instr) throws CompileException {
+		if(null==instr) {
+			throw new CompileException("Asm instruction is null");
+		}
+		this.instr = instr.toLowerCase();
+	}
+	
+	public String getPostfix() {
+		return postfix;
+	}
+	public void setPostfix(String postfix) {
+		this.postfix = (null==postfix ? null : postfix.toLowerCase());
 	}
 
 	public String getText() {
-		return text;
+		return instr + (null==postfix||postfix.isEmpty() ? "" : " " + postfix);
 	}
-	public void setText(String text)  throws CompileException  {
-		this.text = text;
-		if(null==text) {
-			throw new CompileException("Asm instruction is null");
-		}
+	
+	public void setSizeInBytes(int sizeInBytes) {
+		this.sizeInBytes = sizeInBytes;
+	}
+	public Integer getSizeInBytes() {
+		return sizeInBytes;
 	}
 	
 	@Override
 	public String getSource() {
-		return "\t" + text + "\n";
+		return "\t" + getText() + "\n";
+	}
+	
+	@Override
+	public String toString() {
+		return getText();
 	}
 }

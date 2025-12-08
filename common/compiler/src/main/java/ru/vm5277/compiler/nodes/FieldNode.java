@@ -31,12 +31,13 @@ import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGBranch;
 import ru.vm5277.common.cg.CGCells;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -305,7 +306,7 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 
@@ -336,11 +337,11 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 																	isFixed));
 			}
 			else if(init instanceof NewExpression) {
-				init.codeGen(cg, null, true);
+				init.codeGen(cg, null, true, excs);
 				accUsed = true;
 			}
 			else if(init instanceof NewArrayExpression) {
-				init.codeGen(cg, null, true);
+				init.codeGen(cg, null, true, excs);
 				if(VarType.CLASS == ((CGFieldScope)cgScope).getType()) {
 					cg.pushHeapReg(cgScope);
 					cg.updateClassRefCount(cgScope, ((CGFieldScope)cgScope).getCells(), true);
@@ -354,7 +355,7 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 				CGBranch branch = new CGBranch();
 				cgScope.setBranch(branch);
 				
-				init.codeGen(cg, cgScope, true);
+				init.codeGen(cg, cgScope, true, excs);
 				//TODO проверить на объекты и на массивы(передача ref)
 				VarType initType = init.getType();
 				if(VarType.CLASS == initType) {
@@ -380,7 +381,7 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 				cgScope.append(cg.constToCells(cgScope, ((EnumExpression)init).getIndex(), fScope.getCells(), false));
 			}
 			else {
-				init.codeGen(cg, null, true);
+				init.codeGen(cg, null, true, excs);
 				//TODO проверить на объекты и на массивы(передача ref)
 				VarType initType = init.getType();
 				if(VarType.CLASS == initType) {

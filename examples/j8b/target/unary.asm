@@ -1,33 +1,29 @@
-; vm5277.avr_codegen v0.1 at Fri Nov 14 05:51:55 VLAT 2025
-.equ stdout_port = 18
+; vm5277.avr_codegen v0.2
+.equ STDOUT_PORT = 18
 
-.set OS_FT_DRAM = 1
 .set OS_FT_STDOUT = 1
 
 .include "devices/atmega328p.def"
 .include "core/core.asm"
-.include "dmem/dram.asm"
-.include "j8b/mfin_sf.asm"
+.include "sys/mcu_halt.asm"
 .include "stdio/out_num16.asm"
 .include "stdio/out_bool.asm"
 .include "stdio/out_q7n8.asm"
 
 Main:
-	rjmp j8bCMainMmain
-_j8b_meta14:
-	.db 12,0
+	jmp j8b_CMainMmain
+_j8b_meta_32:
+	.db 15,0
 
-j8bCMainMmain:
-	push yl
-	push yh
-	lds yl,SPL
-	lds yh,SPH
+j8b_CMainMmain:
+	push r28
+	push r29
+	lds r28,SPL
+	lds r29,SPH
 	push c0x00
 	push c0x00
 	ldi r20,0
 	ldi r21,0
-	ldi r22,0
-	ldi r23,0
 	ldi r22,0
 	ldi r23,0
 	ldi r24,2
@@ -38,31 +34,31 @@ j8bCMainMmain:
 	subi yl,low(33)
 	sbci yh,high(33)
 	std y+32,r19
-	add r24,C0x01
-	adc r25,C0x00
-	sub r24,C0x01
-	sbc r25,C0x00
-	add r24,C0x01
-	adc r25,C0x00
-	sub r24,C0x01
-	sbc r25,C0x00
+	add r24,c0x01
+	adc r25,c0x00
+	sub r24,c0x01
+	sbc r25,c0x00
+	add r24,c0x01
+	adc r25,c0x00
+	sub r24,c0x01
+	sbc r25,c0x00
 	movw r16,r24
-	add r24,C0x01
-	adc r25,C0x00
+	add r24,c0x01
+	adc r25,c0x00
 	std y+33,r16
 	std y+32,r17
 	movw r16,r24
-	sub r24,C0x01
-	sbc r25,C0x00
+	sub r24,c0x01
+	sbc r25,c0x00
 	std y+33,r16
 	std y+32,r17
-	add r24,C0x01
-	adc r25,C0x00
+	add r24,c0x01
+	adc r25,c0x00
 	movw r16,r24
 	std y+33,r16
 	std y+32,r17
-	sub r24,C0x01
-	sbc r25,C0x00
+	sub r24,c0x01
+	sbc r25,c0x00
 	movw r16,r24
 	std y+33,r16
 	std y+32,r17
@@ -73,8 +69,8 @@ j8bCMainMmain:
 	com r16
 	mov r17,r25
 	com r17
-	add r16,C0x01
-	adc r17,C0x00
+	add r16,c0x01
+	adc r17,c0x00
 	std y+33,r16
 	std y+32,r17
 	mov r16,r20
@@ -84,47 +80,47 @@ j8bCMainMmain:
 	mov r16,r20
 	com r16
 	mov r17,r16
-	clr r16
+	ldi r16,0x00
 	movw r22,r16
 	mov r16,r24
 	com r16
 	mov r17,r25
 	com r17
-	add r16,C0x01
-	adc r17,C0x00
+	add r16,c0x01
+	adc r17,c0x00
 	mov r17,r16
-	clr r16
+	ldi r16,0x00
 	movw r22,r16
-	add r24,C0x01
-	adc r25,C0x00
+	add r24,c0x01
+	adc r25,c0x00
 	movw r16,r24
 	mov r17,r16
-	clr r16
+	ldi r16,0x00
 	movw r22,r16
-	sub r24,C0x01
-	sbc r25,C0x00
+	sub r24,c0x01
+	sbc r25,c0x00
 	movw r16,r24
 	mov r17,r16
-	clr r16
+	ldi r16,0x00
 	movw r22,r16
 	movw r16,r24
-	add r24,C0x01
-	adc r25,C0x00
+	add r24,c0x01
+	adc r25,c0x00
 	mov r17,r16
-	clr r16
+	ldi r16,0x00
 	movw r22,r16
 	movw r16,r24
-	sub r24,C0x01
-	sbc r25,C0x00
+	sub r24,c0x01
+	sbc r25,c0x00
 	mov r17,r16
-	clr r16
+	ldi r16,0x00
 	movw r22,r16
-	add r24,C0x01
-	adc r25,C0x00
+	add r24,c0x01
+	adc r25,c0x00
 	movw r16,r24
 	movw r24,r16
-	sub r24,C0x01
-	sbc r25,C0x00
+	sub r24,c0x01
+	sbc r25,c0x00
 	movw r16,r24
 	movw r24,r16
 	mov r16,r20
@@ -133,15 +129,14 @@ j8bCMainMmain:
 	mov r16,r21
 	pop j8b_atom
 	or r16,j8b_atom
-	rcall os_out_bool
+	call os_out_bool
 	movw r16,r24
-	rcall os_out_num16
+	call os_out_num16
 	ldd r16,y+33
 	ldd r17,y+32
-	rcall os_out_num16
+	call os_out_num16
 	movw r16,r22
-	rcall os_out_q7n8
+	call os_out_q7n8
 	mov r16,r21
-	rcall os_out_bool
-	ldi r30,0
-	rjmp j8bproc_mfin_sf
+	call os_out_bool
+	jmp mcu_halt

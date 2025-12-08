@@ -1,0 +1,48 @@
+class Main {
+    public exception Test1Exception {
+        TEST0,
+        TEST1;
+    }
+    public exception Test2Exception {
+        TEST1,
+        TEST3;
+    }
+    public static byte divTest(byte value) throws  {
+        byte b = 1;
+        b--;
+        return value/b;
+    }
+    public void test() throws  {
+        DivByZeroException.throw();
+    }
+    public static void runtimeTest() {
+        RuntimeException.throw();
+    }
+    public static void main() {
+        System.setParam(0, 16);
+        System.setParam(3, 17);
+        System.setParam(2, 18);
+        System.setParam(4, 1);
+        System.setParam(6, 1);
+        System.setParam(7, 0);
+        System.setParam(8, 3);
+        try {
+            runtimeTest();
+        }
+        catch(MathException ex) {
+            System.out('@');
+        }catch(RuntimeException ex) {
+            System.out(' ');
+        }catch(Exception ex) {
+            System.out('!');
+        }
+        try {
+            Test2Exception.throw(2);
+        }
+        catch(Exception ex) {
+            System.out(1);
+        }
+    }
+    public Main() {
+    }
+}

@@ -1,0 +1,29 @@
+[BUILTIN_TYPES]
+0 Object
+1 void
+2 bool
+3 byte
+4 short
+5 int
+6 fixed
+7 cstr
+8 null
+
+[EXCEPTION_TYPES]
+0 Exception
+1 RuntimeException : Exception
+2 MathException : Exception
+3 DivByZeroException : MathException
+4 MathOverflowException : MathException
+
+[CLASS_TYPES]
+9 Runtime
+10 GPIO
+11 HaltMode
+12 RTOSParam
+13 System
+14 Thread
+15 Main
+
+[THROW_POINTS]
+

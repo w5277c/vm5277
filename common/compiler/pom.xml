@@ -16,7 +16,7 @@
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
 			<artifactId>junit-jupiter-api</artifactId>
-			<version>5.9.2</version> <!-- Актуальная версия -->
+			<version>5.9.2</version>
 			<scope>test</scope>
 		</dependency>
 		<dependency>
@@ -28,22 +28,22 @@
         <dependency>
             <groupId>ru.vm5277</groupId>
             <artifactId>common</artifactId>
-            <version>0.1</version>
+            <version>[0,)</version>
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>avr_codegen</artifactId>
-            <version>0.1</version>
+            <version>[0,)</version>
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>stub_codegen</artifactId>
-            <version>0.1</version>
+            <version>[0,)</version>
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>avr_assembler</artifactId>
-            <version>0.1</version>
+            <version>[0,)</version>
         </dependency>
     </dependencies>
 	<build>
@@ -98,7 +98,7 @@
 					<plugin>
 						<groupId>org.graalvm.nativeimage</groupId>
 						<artifactId>native-image-maven-plugin</artifactId>
-						<version>21.2.0</version>
+						<version>${graalvm.version}</version>
 						<executions>
 							<execution>
 								<goals>
@@ -110,11 +110,13 @@
 						<configuration>
 							<outputDirectory>${project.basedir}/../../bin</outputDirectory>
 							<skip>false</skip>
-							<mainClass>ru.vm5277.compiler.Main</mainClass>
+							<mainClass>${exec.mainClass}</mainClass>
 							<imageName>j8bc</imageName>
 							<buildArgs>
 								<arg>--no-fallback</arg>
-								<arg>-H:IncludeResources=ru/vm5277/compiler/version.properties</arg>
+								<arg>-H:IncludeResources=.*</arg>
+<!--								<arg>-H:IncludeResources=ru/vm5277/compiler/version.properties</arg>
+								<arg>-H:IncludeResources=ru/vm5277/compiler/avr_codegen/version.properties</arg>-->
 							</buildArgs>
 						</configuration>
 					</plugin>

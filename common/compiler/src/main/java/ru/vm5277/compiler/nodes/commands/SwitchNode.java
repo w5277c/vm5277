@@ -27,11 +27,12 @@ import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.Operator;
 import ru.vm5277.common.cg.CGBranch;
 import ru.vm5277.common.cg.CGCells;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -201,6 +202,19 @@ public class SwitchNode extends CommandNode {
 
 		// Проверка типа выражения switch
 		result&=expression.postAnalyze(scope, cg);
+		if(result) {
+			try {
+				ExpressionNode optimizedExpr = expression.optimizeWithScope(scope, cg);
+				if(null!=optimizedExpr) {
+					expression = optimizedExpr;
+					result&=expression.postAnalyze(scope, cg);
+				}
+			}
+			catch (CompileException e) {
+				markFirstError(e);
+				result = false;
+			}
+		}		
 
 		if(result) {
 			VarType exprType = expression.getType();
@@ -279,7 +293,7 @@ public class SwitchNode extends CommandNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
 
@@ -289,7 +303,7 @@ public class SwitchNode extends CommandNode {
 		if(null==constantValue) {
 			// Генерируем выражение switch
 			cg.setAccumSize(-1==expression.getType().getSize() ? cg.getRefSize() : expression.getType().getSize());
-			if(CodegenResult.RESULT_IN_ACCUM!=expression.codeGen(cg, cgs, true)) {
+			if(CodegenResult.RESULT_IN_ACCUM!=expression.codeGen(cg, cgs, true, excs)) {
 				throw new CompileException("Accum not used for expr:" + expression);
 			}
 
@@ -349,21 +363,21 @@ public class SwitchNode extends CommandNode {
 				CGBranch branch = branches.get(i);
 
 				cgs.append(branch.getEnd());
-				astCase.getBlock().codeGen(cg, cgs, false);
+				astCase.getBlock().codeGen(cg, cgs, false, excs);
 
 				cg.jump(cgs, endLabel);
 			}
 
 			if(null!=defaultLabel) {
 				cgs.append(defaultLabel);
-				defaultBlock.codeGen(cg, cgs, false);
+				defaultBlock.codeGen(cg, cgs, false, excs);
 
 			}
 		}
 		else {
 			BlockNode bNode = getConstantFoldedBlock();
 			if(null!=bNode) {
-				bNode.codeGen(cg, cgs, false);
+				bNode.codeGen(cg, cgs, false, excs);
 			}
 		}
 		cgs.append(endLabel);

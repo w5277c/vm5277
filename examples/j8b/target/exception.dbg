@@ -1,0 +1,34 @@
+[BUILTIN_TYPES]
+0 Object
+1 void
+2 bool
+3 byte
+4 short
+5 int
+6 fixed
+7 cstr
+8 null
+
+[EXCEPTION_TYPES]
+0 Exception
+1 RuntimeException : Exception
+2 MathException : Exception
+3 DivByZeroException : MathException
+4 MathOverflowException : MathException
+5 Test1Exception : Exception
+6 Test2Exception : Test1Exception
+
+[CLASS_TYPES]
+9 Runtime
+10 GPIO
+11 HaltMode
+12 RTOSParam
+13 System
+14 Thread
+15 Main
+
+[THROW_POINTS]
+1 39:8 /media/kostas/repos/w5277c/vm5277_local/examples/j8b/exception.j8b	 RuntimeException.throw []
+2 52:12 /media/kostas/repos/w5277c/vm5277_local/examples/j8b/exception.j8b	 Main.runtimeTest []
+3 65:12 /media/kostas/repos/w5277c/vm5277_local/examples/j8b/exception.j8b	 Test2Exception.throw [byte]
+

@@ -24,11 +24,12 @@ import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.StrUtils;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -77,7 +78,10 @@ public class PropertyExpression extends ExpressionNode {
 		if(result) {
 			result&=targetExpr.preAnalyze();
 			if(null!=args) {
-				if(!args.isEmpty() && (Property.index==property || Property.size==property)) {
+				if(	!args.isEmpty() && (
+					Property.index==property || Property.size==property || Property.code==property || Property.instanceId==property ||
+					Property.length==property || Property.typeId==property)) {
+					
 					markError("Property '" + property + "' does not accept arguments");
 					result = false;
 				}
@@ -87,6 +91,7 @@ public class PropertyExpression extends ExpressionNode {
 				}
 			}
 			
+			//TODO
 			// EnumExpression - это выражение вида EStatus.OK, LiteralExpression - EStatus
 			if(targetExpr instanceof EnumExpression && Property.size==property) {
 				markError("Cannot get size from enum value '" + ((EnumExpression)targetExpr).toString() + "' - use enum type instead");
@@ -293,6 +298,24 @@ public class PropertyExpression extends ExpressionNode {
 						result = false;
 					}
 				}
+				else if(VarType.EXCEPTION==targetExpr.getType()) {
+					if(args.isEmpty()) {
+						if(Property.typeId==property) {
+							type = VarType.BYTE;
+						}
+						else if(Property.code==property) {
+							type = VarType.BYTE;
+						}
+						else {
+							markError("Unsupported exception property:" + property.name() + "()");
+							result = false;
+						}
+					}
+					else {
+						markError("Unsupported exception property:" + property.name() + "(" + StrUtils.toString(args) + ")");
+						result = false;
+					}
+				}
 				else {
 					markError("Unsupported init expr in var/field: " + targetExpr);
 					result = false;
@@ -372,12 +395,12 @@ public class PropertyExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		CodegenResult result = null;
 		
 		CGScope cgs = (null==parent ? cgScope : parent);
 		
-		targetExpr.codeGen(cg, null, false);
+		targetExpr.codeGen(cg, null, false, excs);
 		
 		if(null==enumScope && !targetExpr.getType().isEnum() && !targetExpr.getType().isClassType()) {
 			//TODO нужно проверить!
@@ -427,11 +450,11 @@ public class PropertyExpression extends ExpressionNode {
 						cg.constToAcc(cgs, 0x01, ((EnumExpression)targetExpr).getIndex(), false);
 					}
 					else {
-						targetExpr.codeGen(cg, cgs, true);
+						targetExpr.codeGen(cg, cgs, true, excs);
 					}
 				}
 				else { //ITEM
-					args.get(0).codeGen(cg, cgs, true);
+					args.get(0).codeGen(cg, cgs, true, excs);
 				}
 				result = CodegenResult.RESULT_IN_ACCUM;
 			}

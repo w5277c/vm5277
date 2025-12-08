@@ -18,12 +18,14 @@ WAIT_MS:
 ;--------------------------------------------------------
 ;Ждем истечения времени с момента прошлого сна или
 ;с момента вызова C5_TIMER_MARK
+;Или выжидаем считая такты при OS_FT_TIMER1==0 (без
+;мультипоточности)
 ;IN ACCUM_H,ACCUM_L - время в 0.001s
 ;--------------------------------------------------------
 	PUSH ACCUM_H
 	PUSH ACCUM_L
 	PUSH_T16
-
+.IF OS_FT_TIMER1 == 0x01
 	LDS TEMP_H,_OS_UPTIME+0x05
 _WAIT_MS__LOOP:
 	LDS TEMP_L,_OS_UPTIME+0x05
@@ -33,6 +35,22 @@ _WAIT_MS__LOOP:
 	SUB ACCUM_L,TEMP_L
 	SBC ACCUM_H,C0x00
 	BRCC _WAIT_MS__LOOP
+.ELSE
+_WAIT_MS__LOOP1:
+	LDI TEMP_H,(29*CORE_FREQ)/10
+_WAIT_MS__LOOP2:
+	LDI TEMP_L,0x4f
+_WAIT_MS__LOOP3:
+	NOP
+	DEC TEMP_L
+	BRNE _WAIT_MS__LOOP3
+	DEC TEMP_H
+	BRNE _WAIT_MS__LOOP2
+
+	SUBI ACCUM_L,0x01
+	SBCI ACCUM_H,0x00
+	BRCC _WAIT_MS__LOOP1
+.ENDIF
 
 	POP_T16
 	POP ACCUM_L

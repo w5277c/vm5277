@@ -34,6 +34,7 @@ import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.cg.CGCells;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.compiler.semantic.AstHolder;
 import ru.vm5277.compiler.semantic.CIScope;
@@ -165,7 +166,6 @@ public class VarFieldExpression extends ExpressionNode {
 			FieldSymbol fSymbol = (FieldSymbol)symbol;
 			MethodScope mScope = scope.getMethod();
 			if(!isInliningMode && mScope.getSymbol().isStatic() && !fSymbol.isStatic()) {
-				//TODO не корректный номер строки в сообщении
 				markError("Non-static field '" + fSymbol.getName() + "' cannot be referenced from a static context");
 				result = false;
 			}
@@ -193,7 +193,7 @@ public class VarFieldExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(disabled) return null;
 		CGScope cgs = null == parent ? cgScope : parent;
 		
@@ -201,7 +201,7 @@ public class VarFieldExpression extends ExpressionNode {
 		//getSymbol();
 		
 		// Выполняет запись значения в аккумулятор. Но зачастую это не требуется, достаточно вызвать depCodeGen
-		if(null==depCodeGen(cg)) {
+		if(null==depCodeGen(cg, excs)) {
 /*			if(symbol instanceof AliasSymbol) {
 				Symbol vfSymbol = scope.resolveVFSymbol(value);
 				while(vfSymbol instanceof AliasSymbol) {
@@ -224,7 +224,7 @@ public class VarFieldExpression extends ExpressionNode {
 //				if(null!=cScope) {
 					
 					if(null!=targetExpr) {
-						targetExpr.codeGen(cg, parent, false);
+						targetExpr.codeGen(cg, parent, false, excs);
 					}
 					if(null!=targetExpr && targetExpr instanceof VarFieldExpression) { //Не смотрим на isInliningMode
 						cg.cellsToArrReg(cgs, ((CGCellsScope)((VarFieldExpression)targetExpr).getSymbol().getCGScope()).getCells());
@@ -251,8 +251,8 @@ public class VarFieldExpression extends ExpressionNode {
 		return (toAccum ? CodegenResult.RESULT_IN_ACCUM : null);
 	}
 	
-	public void codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, CGBranch brScope) throws CompileException {
-		depCodeGen(cg);
+	public void codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, CGBranch brScope, CGExcs excs) throws CompileException {
+		depCodeGen(cg, excs);
 		
 		CGScope cgs = null == parent ? cgScope : parent;
 		
@@ -273,6 +273,11 @@ public class VarFieldExpression extends ExpressionNode {
 				}
 			}
 		}
+	}
+	
+	@Override
+	public String getQualifiedPath() {
+		return (null!=targetExpr ? targetExpr.getQualifiedPath() + ".": "" ) + name;
 	}
 	
 	@Override

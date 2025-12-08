@@ -15,6 +15,9 @@
  */
 
 ;---OS-FEATURES---------------------------------------------
+.IFNDEF OS_FT_BOOTLOADER_ONLY
+	.SET	OS_FT_BOOTLOADER_ONLY					= 0x00	;Режим сьорки только бутлоадера
+.ENDIF
 .IFNDEF OS_FT_IR_TABLE
 	.SET	OS_FT_IR_TABLE							= 0x00	;Таблица прерываний
 .ENDIF
@@ -23,6 +26,9 @@
 .ENDIF
 .IFNDEF OS_FT_WELCOME
 	.SET	OS_FT_WELCOME							= 0x00	;Логировать приветственное сообщение
+.ENDIF
+.IFNDEF OS_FT_HEARTBEAT
+	.SET	OS_FT_HEARTBEAT							= 0x00	;Индикация работы RTOS
 .ENDIF
 .IFNDEF OS_FT_DIAG
 	.SET	OS_FT_DIAG								= 0x00	;Логировать диагностику при инициализации
@@ -36,6 +42,14 @@
 .IFNDEF OS_FT_DRAM
 	.SET	OS_FT_DRAM								= 0x00	;Функционал динамического выделения памяти
 .ENDIF
+.IFNDEF OS_FT_ETRACE
+	.SET	OS_FT_ETRACE							= 0x00	;Поддержка механизма исключений
+.ENDIF
+
+	.SET	OS_ETRACE_POINT_BITSIZE					= 0x07	;По умолчанию 7 бит для идентификаторов точек прохода для трассировки исключений
+															;Старший бит выделен под признак переполнения буфера
+
+	.SET	OS_ETRACE_BUFFER_SIZE					= 0x08	;Размер буфера для трассировки исключений. Размер от 0x04 до 0xff.
 
 .IF OS_FT_WELCOME == 0x01
 	.SET	OS_FT_STDOUT 							= 0x01
@@ -48,8 +62,9 @@
 	.EQU	OSR_OK									= 0x00	;Успешно выполнено
 	.EQU	OSR_ALLOC_FAIL							= 0x01	;Ошибка выделения памяти
 
-
+.IFNDEF OS_STAT_POOL_SIZE
 	.SET	OS_STAT_POOL_SIZE						= 0x0000;Размер статических данных(статические поля классов)
+.ENDIF
 .IFNDEF CORE_FREQ
 	.EQU	CORE_FREQ								= 8
 .ENDIF

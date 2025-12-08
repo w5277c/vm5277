@@ -18,7 +18,7 @@ package ru.vm5277.compiler.semantic;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.Test;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.nodes.AstNode;
 

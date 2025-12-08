@@ -26,6 +26,7 @@ import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGCells;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGMethodScope;
@@ -34,13 +35,16 @@ import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.common.messages.WarningMessage;
 import static ru.vm5277.compiler.Main.debugAST;
+import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
+import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
+import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.ClassScope;
+import ru.vm5277.compiler.semantic.ExceptionScope;
 import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.MethodSymbol;
@@ -48,14 +52,15 @@ import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 
 public class MethodNode extends AstNode {
-	private	final	Set<Keyword>		modifiers;
-	private	final	VarType				returnType;
-	private	final	String				name;
-	private	final	ObjectTypeNode		objTypeNode;
-	private			List<ParameterNode>	parameters;
-	private			BlockNode			blockNode;
-	private			MethodScope			methodScope; // Добавляем поле для хранения области видимости
-	private			boolean				canThrow	= false;
+	private	final	Set<Keyword>			modifiers;
+	private	final	VarType					returnType;
+	private	final	String					name;
+	private	final	ObjectTypeNode			objTypeNode;
+	private			List<ParameterNode>		parameters;
+	private			BlockNode				blockNode;
+	private			MethodScope				methodScope; // Добавляем поле для хранения области видимости
+	private			boolean					canThrow	= false;
+	private			List<ExpressionNode>	throws_		= new ArrayList<>();
 	
 	public MethodNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType returnType, String name, ObjectTypeNode objectTypeNode)
 																																	throws CompileException {
@@ -74,6 +79,14 @@ public class MethodNode extends AstNode {
 		if (tb.match(TokenType.OOP, Keyword.THROWS)) {
 			consumeToken(tb);
 			this.canThrow = true;
+			
+			if(tb.match(TokenType.ID)) {
+				throws_.add(parseFullQualifiedExpression(tb));
+				while(tb.match(Delimiter.COMMA)) {
+					tb.consume();
+					throws_.add(parseFullQualifiedExpression(tb));
+				}
+			}
 		}
 
 		if(tb.match(Delimiter.LEFT_BRACE)) {
@@ -83,7 +96,12 @@ public class MethodNode extends AstNode {
 			catch(CompileException e) {}
 		}
 		else {
-			try {consumeToken(tb, Delimiter.SEMICOLON);}catch(CompileException e) {markFirstError(e);}
+			try {
+				consumeToken(tb, Delimiter.SEMICOLON);
+			}
+			catch(CompileException e) {
+				markFirstError(e);
+			}
 		}
 	}
 	
@@ -182,6 +200,18 @@ public class MethodNode extends AstNode {
 			result = false;
 		}
 		
+		if(result && canThrow) {
+			if(throws_.isEmpty()) {
+				markError("Expected exception types after 'throws'");
+				result = false;
+			}
+			else {
+				for(ExpressionNode expr : throws_) {
+					result&=expr.preAnalyze();
+				}
+			}
+		}
+		
 		if(result) {
 			if(null==name) {
 				markError("Constructor or method declaration is invalid: name cannot be null");
@@ -268,6 +298,15 @@ public class MethodNode extends AstNode {
 			}
 
 			if(result) {
+				if(canThrow) {
+					for(ExpressionNode expr : throws_) {
+						result&=expr.declare(scope);
+					}
+				}
+			}
+			
+			
+			if(result) {
 				if(null!=blockNode) {
 					if (!(scope instanceof ClassScope)) { //TODO ввести подержу статики
 						markError("Method '" + name + "' cannot have body in interface '" + ((InterfaceScope)scope).getName() + "'");
@@ -294,85 +333,143 @@ public class MethodNode extends AstNode {
 			cgScope = cg.enterMethod(returnType, name);
 		}
 		symbol.setCGScope(cgScope);
-
-		if(modifiers.contains(Keyword.NATIVE) && blockNode!=null) {
-			markError("Native method cannot have a body");
-			result = false;
-		}
-
-		if(result) {
-			for(ParameterNode param : parameters) {
-				result&=param.postAnalyze(methodScope, cg);
-			}
-		}
 		
-		if(result) {
-			// Анализ тела метода (если есть)
-			if(null!=blockNode) {
-				// Анализируем тело метода
-				result&=blockNode.postAnalyze(methodScope, cg);
+		try {
+			if(canThrow) {
+				Set<Integer> ids = new HashSet<>();
+				for(ExpressionNode expr : throws_) {
+					result&=expr.postAnalyze(scope, cg);
+					if(result) {
+						ExpressionNode optimizedExpr = expr.optimizeWithScope(scope, cg);
+						if(null!=optimizedExpr) {
+							expr = optimizedExpr;
+						}
+						
+						if(expr instanceof TypeReferenceExpression) {
+							//TODO что насчет пути для импорта?
+							// Формируем список идентификаторов исключений с учетом иерархии наследования
+							String path = ((TypeReferenceExpression)expr).getQualifiedPath();
+							CIScope ciScope = scope.resolveCI(path, false);
+							if(ciScope instanceof ExceptionScope) {
+								
+								methodScope.addExceptionScope((ExceptionScope)ciScope);
+/*								// Нашли исключение, проходим по всей цепочке наследования
+								ExceptionScope eScope = (ExceptionScope)ciScope;
+								while(true) {
+									methodScope.addExceptionScope(eScope);
+									// Получаем идентификатор исключения
+									int id = VarType.getExceptionId(eScope.getName());
+									if(-1==id) {
+										markError("COMPILER ERROR: Unknown exception " + eScope.getName());
+										result = false;
+										break;
+									}
+									ids.add(id);
+									
+									// Выходим из цикла, если текущее исключение не имеет родителя (корень иерархии)
+									if(null==eScope.getExtScope()) {
+										break;
+									}
+									// Переходим к родительскому исключению
+									eScope = eScope.getExtScope();
+								}
+								
+								if(result) {
+									((CGMethodScope)cgScope).addExceptions(ids);
+								}*/
+							}
+							else {
+								markError("Non-exception type in throws declaration: " + path);
+								result = false;
+							}
+							
+						}
+					}
+				}
+				((CGMethodScope)cgScope).addExceptions(ids);
 			}
-		}
 
-		if(result) {
-			// Для не-void методов проверяем наличие return
-			// TODO переосмыслить после ConstantFolding
-			if(null!=returnType && !returnType.equals(VarType.VOID)) {
-				if(!BlockNode.hasReturnStatement(blockNode)) {
-					markError("Method '" + name + "' must return a value");
-					result = false;
+
+			if(modifiers.contains(Keyword.NATIVE) && blockNode!=null) {
+				markError("Native method cannot have a body");
+				result = false;
+			}
+
+			if(result) {
+				for(ParameterNode param : parameters) {
+					result&=param.postAnalyze(methodScope, cg);
 				}
 			}
-		}
 
-		if(result) {
-			if(null!=blockNode) {
-				List<AstNode> nodes = blockNode.getChildren();
-				for(int i=0; i<nodes.size(); i++) {
-					if(i>0 && isControlFlowInterrupted(nodes.get(i-1))) {
-						markError("Unreachable code in method " + name);
+			if(result) {
+				// Анализ тела метода (если есть)
+				if(null!=blockNode) {
+					// Анализируем тело метода
+					result&=blockNode.postAnalyze(methodScope, cg);
+				}
+			}
+
+			if(result) {
+				// Для не-void методов проверяем наличие return
+				// TODO переосмыслить после ConstantFolding
+				if(null!=returnType && !returnType.equals(VarType.VOID)) {
+					if(!BlockNode.hasReturnStatement(blockNode)) {
+						markError("Method '" + name + "' must return a value");
 						result = false;
-						break;
+					}
+				}
+			}
+
+			if(result) {
+				if(null!=blockNode) {
+					List<AstNode> nodes = blockNode.getChildren();
+					for(int i=0; i<nodes.size(); i++) {
+						if(i>0 && isControlFlowInterrupted(nodes.get(i-1))) {
+							markError("Unreachable code in method " + name);
+							result = false;
+							break;
+						}
+					}
+				}
+			}
+
+			if(result) {
+				VarType[] types = null;
+				if(!parameters.isEmpty()) {
+					types = new VarType[parameters.size()];
+					for(int i=0; i<parameters.size(); i++) {
+						types[i] = parameters.get(i).getType();
+					}
+				}
+				((CGMethodScope)cgScope).setTypes(types);
+			}
+
+			if(result) {
+				if(!isNative()) {
+					// Создаем CGScope для каждого параметра
+					int offset = 0;
+					for(Symbol pSymbol : ((MethodSymbol)symbol).getParameters()) {
+						try {
+							int size = (-1==pSymbol.getType().getSize() ? cg.getRefSize() : pSymbol.getType().getSize());
+							// Создаем CGScope для параметра
+							CGVarScope pScope = cg.enterLocal(pSymbol.getType(), size, false, pSymbol.getName());
+							pScope.setCells(new CGCells(CGCells.Type.ARGS, size, offset));
+							offset+=size;
+							cg.leaveLocal();
+							// Устанавливаем CGScope для символа параметра
+							pSymbol.setCGScope(pScope);
+						}
+						catch (CompileException ex) {
+							markError(ex);
+							result = false;
+						}
 					}
 				}
 			}
 		}
-
-		if(result) {
-			VarType[] types = null;
-			if(!parameters.isEmpty()) {
-				types = new VarType[parameters.size()];
-				for(int i=0; i<parameters.size(); i++) {
-					types[i] = parameters.get(i).getType();
-				}
-			}
-			((CGMethodScope)cgScope).setTypes(types);
-		}
-
-		((CGClassScope)cgScope.getParent()).addMethod((CGMethodScope)cgScope);
-
-		if(result) {
-			if(!isNative()) {
-				// Создаем CGScope для каждого параметра
-				CGMethodScope mScope = (CGMethodScope)cgScope;
-				int offset = 0;
-				for(Symbol pSymbol : ((MethodSymbol)symbol).getParameters()) {
-					try {
-						int size = (-1==pSymbol.getType().getSize() ? cg.getRefSize() : pSymbol.getType().getSize());
-						// Создаем CGScope для параметра
-						CGVarScope pScope = cg.enterLocal(pSymbol.getType(), size, false, pSymbol.getName());
-						pScope.setCells(new CGCells(CGCells.Type.ARGS, size, offset));
-						offset+=size;
-						cg.leaveLocal();
-						// Устанавливаем CGScope для символа параметра
-						pSymbol.setCGScope(pScope);
-					}
-					catch (CompileException ex) {
-						markError(ex);
-						result = false;
-					}
-				}
-			}
+		catch(CompileException ex) {
+			markError(ex);
+			result = false;
 		}
 		
 		if(null==returnType) {
@@ -403,31 +500,39 @@ public class MethodNode extends AstNode {
 		cg.setScope(oldScope);
 	}
 
-	public void firstCodeGen(CodeGenerator cg) throws CompileException {
+	public void firstCodeGen(CodeGenerator cg, CGExcs excs) throws CompileException {
 		cgDone = true;
 		
-		if(null != blockNode) {
-			blockNode.firstCodeGen(cg);
+		if(null!=blockNode) {
+			excs.setMethodEndLabel(blockNode.getCGScope().getELabel());
+			blockNode.firstCodeGen(cg, excs);
 		}
 
-		objTypeNode.codeGen(cg, null, false);		
+		objTypeNode.codeGen(cg, null, false, excs);		
 
 		if(!(objTypeNode instanceof InterfaceNode)) {
-			((CGMethodScope)cgScope).build(cg);
+			((CGMethodScope)cgScope).build(cg, excs);
 		}
+
+		// cg.terminate вынесен в CGBlockScope
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 
-		if(null != blockNode) blockNode.codeGen(cg, null, false);
+		((CGClassScope)cgScope.getParent()).addMethod((CGMethodScope)cgScope);
 		
-		objTypeNode.codeGen(cg, null, false);
+		if(null!=blockNode) {
+			excs.setMethodEndLabel(blockNode.getCGScope().getELabel());
+			blockNode.codeGen(cg, null, false, excs);
+		}
+		
+		objTypeNode.codeGen(cg, null, false, excs);
 
 		if(!(objTypeNode instanceof InterfaceNode)) {
-			((CGMethodScope)cgScope).build(cg);
+			((CGMethodScope)cgScope).build(cg, excs);
 		}
 		return null;
 	}

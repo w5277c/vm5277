@@ -1,8 +1,8 @@
 class Main {
-    static public bool test(bool _b1, bool _b2) {
+    public static bool test(bool _b1, bool _b2) {
         return _b1&&_b2;
     }
-    static public void main() {
+    public static void main() {
         System.setParam(2, 18);
         bool b10 = false;
         b10=!b10;

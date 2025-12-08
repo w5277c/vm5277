@@ -17,7 +17,7 @@
 package ru.vm5277.compiler.semantic;
 
 import java.util.List;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class InterfaceScope extends CIScope {
@@ -30,6 +30,6 @@ public class InterfaceScope extends CIScope {
 		}
 		
 		this.name = name;
-		this.impl = impl;
+		this.implTypes = impl;
 	}
 }

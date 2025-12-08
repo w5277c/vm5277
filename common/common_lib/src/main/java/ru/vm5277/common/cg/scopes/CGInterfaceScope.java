@@ -15,7 +15,7 @@
  */
 package ru.vm5277.common.cg.scopes;
 
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 
 public class CGInterfaceScope extends CGScope {
 	private	final	VarType				type;

@@ -19,7 +19,7 @@ import java.util.Arrays;
 import java.util.List;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -30,6 +30,7 @@ import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.cg.CGBranch;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
@@ -172,7 +173,7 @@ public class TernaryExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
 
@@ -180,18 +181,18 @@ public class TernaryExpression extends ExpressionNode {
 		cgs.setBranch(branch);
 		
 		if(alwaysTrue) {
-			return trueExpr.codeGen(cg, cgs, toAccum);
+			return trueExpr.codeGen(cg, cgs, toAccum, excs);
 		}
 		if(alwaysFalse) {
-			return falseExpr.codeGen(cg, cgs, toAccum);
+			return falseExpr.codeGen(cg, cgs, toAccum, excs);
 		}
 
-		Object obj = condition.codeGen(cg, cgs, true);
+		Object obj = condition.codeGen(cg, cgs, true, excs);
 		if(obj==CodegenResult.TRUE) {
-			return trueExpr.codeGen(cg, cgs, toAccum);
+			return trueExpr.codeGen(cg, cgs, toAccum, excs);
 		}
 		else if(obj==CodegenResult.FALSE) {
-			return falseExpr.codeGen(cg, cgs, toAccum);
+			return falseExpr.codeGen(cg, cgs, toAccum, excs);
 		}
 		else if(obj==CodegenResult.RESULT_IN_ACCUM) {
 			cg.boolCond(cgs, branch, true);
@@ -199,10 +200,10 @@ public class TernaryExpression extends ExpressionNode {
 
 		CGLabelScope endScope = new CGLabelScope(null, CGScope.genId(), LabelNames.TERNARY_END, true);
 		
-		trueExpr.codeGen(cg, cgs, toAccum);
+		trueExpr.codeGen(cg, cgs, toAccum, excs);
 		cg.jump(cgs, endScope);
 		cgs.append(branch.getEnd());
-		falseExpr.codeGen(cg, cgs, toAccum);
+		falseExpr.codeGen(cg, cgs, toAccum, excs);
 		cgs.append(endScope);
 
 		return (toAccum ? CodegenResult.RESULT_IN_ACCUM : null);

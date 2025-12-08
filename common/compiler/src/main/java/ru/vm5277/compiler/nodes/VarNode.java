@@ -30,11 +30,12 @@ import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CGBranch;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -304,7 +305,7 @@ public class VarNode extends AstNode implements InitNodeHolder {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 
@@ -333,12 +334,12 @@ public class VarNode extends AstNode implements InitNodeHolder {
 				cgs.append(cg.constToCells(cgs, isFixed ? le.getFixedValue() : le.getNumValue(), vScope.getCells(), isFixed));
 			}
 			else if(init instanceof NewExpression) {
-				init.codeGen(cg, null, true);
+				init.codeGen(cg, null, true, excs);
 				cg.accCast(null, VarType.SHORT);
 				cg.accToCells(cgs, vScope);
 			}
 			else if(init instanceof NewArrayExpression) {
-				init.codeGen(cg, null, true);
+				init.codeGen(cg, null, true, excs);
 				//TODO оптимизация, можно сразу назначать счетчику 1
 				//cg.updateRefCount(vScope, vScope.getCells(), true);
 				
@@ -356,7 +357,7 @@ public class VarNode extends AstNode implements InitNodeHolder {
 				CGBranch branch = new CGBranch();
 				cgs.setBranch(branch);
 				
-				init.codeGen(cg, cgs, true);
+				init.codeGen(cg, cgs, true, excs);
 				//TODO проверить на объекты и на массивы(передача ref)
 				VarType initType = init.getType();
 				if(VarType.CLASS == initType) {
@@ -380,7 +381,7 @@ public class VarNode extends AstNode implements InitNodeHolder {
 				cg.setScope(oldScope);
 			}
 			else if(init instanceof ArrayExpression) {
-				init.codeGen(cg, cgs, false);
+				init.codeGen(cg, cgs, false, excs);
 				cg.accToCells(cgs, vScope);
 				VarType initType = init.getType();
 				if(VarType.CLASS == initType) {
@@ -397,7 +398,7 @@ public class VarNode extends AstNode implements InitNodeHolder {
 				cgs.append(cg.constToCells(cgs, ((EnumExpression)init).getIndex(), vScope.getCells(), false));
 			}
 			else {
-				init.codeGen(cg, cgs, true);
+				init.codeGen(cg, cgs, true, excs);
 				cg.accResize(type);
 				cg.accToCells(cgs, vScope);
 				VarType initType = init.getType();

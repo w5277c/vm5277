@@ -3,14 +3,16 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>ru.vm5277</groupId>
     <artifactId>avr_assembler</artifactId>
-    <version>0.1</version>
+    <version>0.2</version>
     <packaging>jar</packaging>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>8</maven.compiler.release>
         <exec.mainClass>ru.vm5277.avr_asm.Assembler</exec.mainClass>
+		<graalvm.version>21.2.0</graalvm.version>
     </properties>
-    <build>
+    <name>avr_assembler</name>
+	<build>
 		<resources>
 			<resource>
 				<directory>src/main/resources</directory>
@@ -47,12 +49,50 @@
 
         <finalName>${project.artifactId}</finalName>
     </build>
-    <name>avr_assembler</name>
     <dependencies>
         <dependency>
             <groupId>${project.groupId}</groupId>
             <artifactId>common</artifactId>
-            <version>${project.version}</version>
+            <version>[0,)</version>
         </dependency>
     </dependencies>
+	<profiles>
+		<profile>
+			<id>native</id>
+			<build>
+				<resources>
+					<resource>
+						<directory>src/main/resources</directory>
+						<filtering>true</filtering>
+					</resource>
+				</resources>
+				<plugins>
+					<plugin>
+						<groupId>org.graalvm.nativeimage</groupId>
+						<artifactId>native-image-maven-plugin</artifactId>
+						<version>${graalvm.version}</version>
+						<executions>
+							<execution>
+								<goals>
+									<goal>native-image</goal>
+								</goals>
+								<phase>package</phase>
+							</execution>
+						</executions>
+						<configuration>
+							<outputDirectory>${project.basedir}/../../bin</outputDirectory>
+							<skip>false</skip>
+							<mainClass>${exec.mainClass}</mainClass>
+							<imageName>avrasm</imageName>
+							<buildArgs>
+								<arg>--no-fallback</arg>
+								<arg>-H:IncludeResources=ru/vm5277/avr_asm/version.properties</arg>
+							</buildArgs>
+						</configuration>
+					</plugin>
+				</plugins>
+			</build>
+		</profile>
+	</profiles>
+
 </project>

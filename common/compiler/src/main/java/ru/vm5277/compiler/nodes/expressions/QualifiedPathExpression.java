@@ -24,11 +24,12 @@ import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.StrUtils;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.compiler.Optimization;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Main;
@@ -282,7 +283,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 								i++;
 								continue;
 							}
-							else if(null!=prop && (Property.instanceId==prop || Property.typeId==prop)) {
+							else if(null!=prop && (Property.instanceId==prop || Property.typeId==prop || Property.code==prop)) {
 									ExpressionNode expr = new PropertyExpression(	tb, mc, sp, null==resolvedExpr ? pathExpr : resolvedExpr,
 																					prop, ((MethodSegment)secondSegment).getArguments());
 									resolvedExpr = expr;
@@ -413,7 +414,15 @@ public class QualifiedPathExpression extends ExpressionNode {
 									CIScope cis = null==pathExpr ? scope.resolveCI(qSeg.getName(), false) : pathExpr.getScope().resolveCI(qSeg.getName(), true);
 									if(null!=cis) {
 										pathExpr = new TypeReferenceExpression(tb, mc, pathExpr, qSeg.getName(), cis);
+										result&=pathExpr.declare(scope);
+										if(result) {
+											result&=pathExpr.postAnalyze(scope, cg);
+										}
+										resolvedExpr = pathExpr;
 										continue;
+									}
+									else {
+										int t=45454;
 									}
 								}
 							}
@@ -466,7 +475,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 	public List<ExpressionNode> optimizeMethodCall(MethodCallExpression expr) {
 		//TODO дополнить для методов других классов
 		MethodSymbol mSymbol = (MethodSymbol)expr.getSymbol();
-		if(mSymbol.isNative() || mSymbol.canThrow()) return null;
+		if(mSymbol.isNative() || mSymbol.canThrow() || mSymbol.isInterfaceImpl()) return null;
 
 		// Проверка на setter
 		// Возвращаемый тип:void, есть параметры, в методе один элемент
@@ -549,9 +558,9 @@ public class QualifiedPathExpression extends ExpressionNode {
 
 	//Не ясная логика, например для выражения classInst.method(...) здесь два выражения, но сохрянять результат в аккумулятор нужно только вызовы метода
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(null!=resolvedExpr) {
-			resolvedExpr.codeGen(cg, parent, true);
+			resolvedExpr.codeGen(cg, parent, true, excs);
 		}
 		
 		return CodegenResult.RESULT_IN_ACCUM;

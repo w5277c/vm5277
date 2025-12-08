@@ -30,10 +30,11 @@ import static ru.vm5277.common.Operator.PLUS;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.cg.CGCells;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -234,7 +235,7 @@ public class ArithmeticExpression extends BinaryExpression {
 	//TODO Проверить порядок операндов в Literal + VarField
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, boolean toAccum, CGExcs excs) throws CompileException {
 		if(disabled) return null;
 		
 		CGScope cgs = null == parent ? cgScope : parent;
@@ -244,8 +245,8 @@ public class ArithmeticExpression extends BinaryExpression {
 		ExpressionNode expr2 = rightExpr;
 
 		// Похоже для всех выражений должны быть удовлетворены зависимости
-		depCodeGen(cg, expr1.getSymbol());
-		depCodeGen(cg, expr2.getSymbol());
+		depCodeGen(cg, expr1.getSymbol(), excs);
+		depCodeGen(cg, expr2.getSymbol(), excs);
 		
 		// Оптимизация порядка для коммутативных операций
 		if(operator.isCommutative()) {
@@ -261,13 +262,13 @@ public class ArithmeticExpression extends BinaryExpression {
 			//================ VarFieldExpression ==== LITERAL ================================
 			if(expr1 instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)expr1;
-				if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgs, true)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgs, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr1);
 				}
 				if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
 					cgs.append(cg.accCast(expr2.getType(), expr1.getType()));
 				}
-				cg.constAction(cgs, operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed());
+				cg.constAction(cgs, operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed(), excs);
 			}
 			//================ VarFieldExpression ==== ARRAY ================================
 /*TODO вроде как попаадает под универсальный случай, надо проверить
@@ -281,26 +282,26 @@ public class ArithmeticExpression extends BinaryExpression {
 */
 			//================ VarFieldExpression ==== OTHER ================================
 			else {
-				if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgs, true)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgs, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr1);
 				}
 				if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
 					cgs.append(cg.accCast(expr1.getType(), expr2.getType()));
 				}
-				cg.cellsAction(cgs, cScope2.getCells(), operator, VarType.FIXED == expr2.getType());
+				cg.cellsAction(cgs, cScope2.getCells(), operator, VarType.FIXED == expr2.getType(), excs);
 			}
 		}
 		//================ LiteralExpression ================================
 		else if(expr2 instanceof LiteralExpression) {
 			LiteralExpression le = (LiteralExpression)expr2;
 			//================ LiteralExpression ==== OTHER ================================
-			if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgs, true)) {
+			if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgs, true, excs)) {
 				throw new CompileException("Accum not used for operand:" + expr1);
 			}
 			if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
 				cgs.append(cg.accCast(expr1.getType(), expr2.getType()));
 			}
-			cg.constAction(cgs, operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed());
+			cg.constAction(cgs, operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed(), excs);
 		}
 		//================ ArrayExpression ================================
 		else if(expr2 instanceof ArrayExpression) {
@@ -308,7 +309,7 @@ public class ArithmeticExpression extends BinaryExpression {
 			//================ ArrayExpression ==== LITERAL ================================
 			if(expr1 instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)expr1;
-				if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgs, true)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgs, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr2);
 				}
 				//Аккумулятор уже необходимого размера, но нужно проверить на Fixed
@@ -316,29 +317,29 @@ public class ArithmeticExpression extends BinaryExpression {
 					cgs.append(cg.accCast(expr2.getType(), expr1.getType()));
 				}
 				//Добавить проверку деления на 0
-				cg.constAction(cgs, operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed());
+				cg.constAction(cgs, operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed(), excs);
 			}
 			//================ ArrayExpression ==== OTHER ================================
 			else {
-				if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgs, true)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgs, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr2);
 				}					
 
 				// Определяем максмальный размер операнда
 				int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
 				cg.pushAccBE(cgs, size);
-				if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg, cgs, true)) {
+				if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg, cgs, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr1);
 				}
 				if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
 					cgs.append(cg.accCast(expr1.getType(), expr2.getType()));
 				}
-				cg.cellsAction(cgs, new CGCells(CGCells.Type.STACK, size), operator, VarType.FIXED == expr2.getType());
+				cg.cellsAction(cgs, new CGCells(CGCells.Type.STACK, size), operator, VarType.FIXED == expr2.getType(), excs);
 			}
 		}
 		//================ Other ================================
 		else {
-			if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgs, true)) {
+			if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgs, true, excs)) {
 				throw new CompileException("Accum not used for operand:" + expr2);
 			}					
 
@@ -347,7 +348,7 @@ public class ArithmeticExpression extends BinaryExpression {
 			// Выполняем операцию, левый операнд - аккумулятор, правый операнд - значение на вершине стека
 			cg.pushAccBE(cgs, size);
 			// Строим код для expr1(результат в аккумуляторе)
-			if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg, cgs, true)) {
+			if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg, cgs, true, excs)) {
 				throw new CompileException("Accum not used for operand:" + expr1);
 			}
 
@@ -355,7 +356,7 @@ public class ArithmeticExpression extends BinaryExpression {
 			if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
 				cgs.append(cg.accCast(expr1.getType(), expr2.getType()));
 			}
-			cg.cellsAction(cgs, new CGCells(CGCells.Type.STACK, size), operator, VarType.FIXED == expr2.getType());
+			cg.cellsAction(cgs, new CGCells(CGCells.Type.STACK, size), operator, VarType.FIXED == expr2.getType(), excs);
 		}
 		
 		return CodegenResult.RESULT_IN_ACCUM;

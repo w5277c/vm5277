@@ -19,30 +19,29 @@ import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
-import ru.vm5277.common.compiler.Case;
+import java.util.Set;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.cg.scopes.CGTryBlockScope;
+import ru.vm5277.common.VarType;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
-import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.compiler.semantic.BlockScope;
+import ru.vm5277.compiler.nodes.CatchBlock;
+import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
+import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
+import ru.vm5277.compiler.semantic.ExceptionScope;
 import ru.vm5277.compiler.semantic.Scope;
-import ru.vm5277.compiler.semantic.Symbol;
 
 public class TryNode extends CommandNode {
-	private	BlockNode		tryBlock;
-	private	String			varName;
-	private	List<AstCase>	catchCases			= new ArrayList<>();
-	private	BlockNode		catchDefaultBlock;
-	private	BlockScope		tryScope;
-	private	BlockScope		catchScope;
-	private	BlockScope		defaultScope;
-	private	boolean			hasDefault			= false;
+	private	BlockNode				tryBlock;
+	public	List<CatchBlock>		catchBlocks	= new ArrayList<>();
 	
 	public TryNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
@@ -51,189 +50,177 @@ public class TryNode extends CommandNode {
 		
 		// Блок try
 		if(tb.match(Delimiter.LEFT_BRACE)) {
-			try {this.tryBlock = new BlockNode(tb, mc);} catch(CompileException e) {markFirstError(e);}
-		}
-		else markError("Expected '{' after 'try'");
+			try {
+				tryBlock = new BlockNode(tb, mc, false, true);
 
-		// Парсим параметр catch (byte errCode)
-		if (tb.match(Keyword.CATCH)) {
-			consumeToken(tb); // Потребляем "catch"
-			try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(CompileException e) {markFirstError(e);}
-			if (tb.match(TokenType.TYPE, Keyword.BYTE)) {tb.consume();} // Потребляем "byte"
-			else markError("Expected 'byte' type in catch parameter");
-			if (tb.match(TokenType.ID)) {this.varName = consumeToken(tb).getStringValue();}
-			else markError("Expected variable name in catch parameter");
-			try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(CompileException e) {markFirstError(e);}
-			// Тело catch
-			try {consumeToken(tb, Delimiter.LEFT_BRACE);} catch(CompileException e) {markFirstError(e);}
+				// Парсим параметр catch (byte errCode)
+				while(tb.match(Keyword.CATCH)) {
+					consumeToken(tb); // Потребляем "catch"
+					consumeToken(tb, Delimiter.LEFT_PAREN);
 
-			// Если сразу идет код без case/default - считаем его default-блоком
-            if (!tb.match(Keyword.CASE) && !tb.match(Keyword.DEFAULT) && !tb.match(Delimiter.RIGHT_BRACE)) {
-                try {catchDefaultBlock = new BlockNode(tb, mc, true);} catch (CompileException e) {markFirstError(e);}
-			}
-			else {
-				// Парсим case-блоки
-				while (!tb.match(Delimiter.RIGHT_BRACE)) {
-					if (tb.match(Keyword.CASE)) {
-						if (hasDefault) {
-							markError("'case' cannot appear after 'default' in catch block");
-							tb.skip(Delimiter.RIGHT_BRACE);
-							break;
+					if(tb.match(TokenType.ID)) {
+						List<ExpressionNode> args = new ArrayList<>();
+						args.add(parseFullQualifiedExpression(tb));
+						while(tb.match(Delimiter.COMMA)) {
+							tb.consume();
+							args.add(parseFullQualifiedExpression(tb));
 						}
-						try {
-							AstCase astCsse = parseCase(tb, mc);
-							if(null != astCsse) catchCases.add(astCsse);
+
+						if(tb.match(TokenType.ID)) {
+							String varName = consumeToken(tb).getStringValue();
+							consumeToken(tb, Delimiter.RIGHT_PAREN);
+							
+							if(tb.match(Delimiter.LEFT_BRACE)) {
+								catchBlocks.add(new CatchBlock(tb, mc, args, varName));
+							}
 						}
-						catch(CompileException ex) {
-							markError(ex);
-							tb.skip(Delimiter.COLON);
+						else {
+							tb.skip(Delimiter.LEFT_BRACE);
 						}
-					}
-					else if (tb.match(Keyword.DEFAULT)) {
-						consumeToken(tb); // Потребляем "default"
-						try {consumeToken(tb, Delimiter.COLON);} catch(CompileException e) {markFirstError(e);}
-						try {catchDefaultBlock = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());}
-						catch(CompileException e) {markFirstError(e);}
 					}
 					else {
-						markFirstError(parserError("Expected 'case', 'default' or code block in catch"));
+						tb.skip(Delimiter.LEFT_BRACE);
 					}
 				}
-				try {consumeToken(tb, Delimiter.RIGHT_BRACE);}catch(CompileException e) {markFirstError(e);}
+			}
+			catch(CompileException ex) {
+				markError(ex);
 			}
 		}
-		// try может быть без catch
+		else {
+			markError("Expected '{' after 'try'");
+		}
 	}
 
-	public String getVarName() {
-		return varName;
+	public List<CatchBlock> getCatchBlocks() {
+		return catchBlocks;
 	}
 
 	public BlockNode getTryBlock() {
 		return tryBlock;
 	}
 
-	public List<AstCase> getCatchCases() {
-		return catchCases;
-	}
-
-	public BlockNode getCatchDefault() {
-		return catchDefaultBlock;
-	}
-	
-	public AstNode getEndNode() {
-		if (null != catchDefaultBlock) return catchDefaultBlock;
-		if (!catchCases.isEmpty()) return catchCases.get(catchCases.size()-1).getBlock();
-		return tryBlock;
-	}
-
 	@Override
 	public boolean preAnalyze() {
-		// Проверка блока try
-		if (null != tryBlock) tryBlock.preAnalyze();
-		else markError("Try block cannot be null");
+		boolean result = true;
 
-		// Проверка всех catch-блоков
-		for (AstCase c : catchCases) {
-			if (null != c.getBlock()) c.getBlock().preAnalyze();
+		if(null==tryBlock) {
+			markError("Try block cannot be null");
+			result = false;
 		}
 
-		// Проверка default-блока
-		if (null != catchDefaultBlock) catchDefaultBlock.preAnalyze();
+		if(catchBlocks.isEmpty()) {
+			markError("Missing catch block");
+			result = false;
+		}
 
-		return true;
+		if(result) {
+			result&=tryBlock.preAnalyze();
+		}
+		
+		if(result) {
+			for(CatchBlock cBlock : catchBlocks) {
+				result&=cBlock.preAnalyze();
+			}
+		}
+		
+		return result;
 	}
 	
 	@Override
 	public boolean declare(Scope scope) {
-		// Объявление блока try в новой области видимости
-		tryScope = new BlockScope(scope);
-		if (null != tryBlock) tryBlock.declare(tryScope);
+		boolean result = true;
+		
+		result&=tryBlock.declare(scope);
 
-		// Объявление переменной catch-параметра
-		catchScope = new BlockScope(scope);
-		if(null != varName)	{
-			try{catchScope.addVariable(new Symbol(varName, VarType.BYTE, true, false));}catch(CompileException e) {markError(e);}
+		if(result) {
+			for(CatchBlock cBlock : catchBlocks) {
+				result&=cBlock.declare(scope);
+			}
 		}
-
-		// Объявление catch-блоков
-		for (AstCase c : catchCases) {
-			BlockScope caseScope = new BlockScope(catchScope);
-			c.getBlock().declare(caseScope);
-			c.setScope(caseScope);
-		}
-
-		// Объявление default-блока
-		if (null != catchDefaultBlock) {
-			defaultScope = new BlockScope(catchScope);
-			catchDefaultBlock.declare(defaultScope);
-		}
-
-		return true;
+		
+		return result;
 	}
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		// Анализ блока try
-		if (null != tryBlock) tryBlock.postAnalyze(tryScope, cg);
+		boolean result = true;
+		cgScope = cg.enterCommand();
+		
 
-		// Проверка catch-значений на уникальность
-		List<Integer> catchValues = new ArrayList<>();
-		for (AstCase astCase : catchCases) {
-			// Проверка на дубликаты
-			for(Integer num : astCase.getValues()) {
-				if(catchValues.contains(num)) {
-					markError("Duplicate case value in range: " + num);
-					//TODO result = false;
-				}
-				else {
-					catchValues.add(num);
-				}
+		if(result) {
+			for(CatchBlock cBlock : catchBlocks) {
+				result&=cBlock.postAnalyze(cBlock.getScope(), cg, tryBlock);
 			}
-
-			// Анализ блока catch
-			if (null != astCase.getBlock()) astCase.getBlock().postAnalyze(astCase.getScope(), cg);
 		}
 
-		// Анализ default-блока
-		if (null != catchDefaultBlock) catchDefaultBlock.postAnalyze(defaultScope, cg);
+		if(result) {
+			result&=tryBlock.postAnalyze(tryBlock.getScope(), cg);
+		}
 
-		return true;
+		if(result) {
+			for(CatchBlock cBlock : catchBlocks) {
+				Set<Integer> ids = new HashSet<>();
+				
+				for(ExpressionNode expr : cBlock.getArgs()) {
+					ExceptionScope eScope = (ExceptionScope)((TypeReferenceExpression)expr).getScope();
+					ids.add(VarType.getExceptionId(eScope.getName()));
+				}
+				((CGTryBlockScope)tryBlock.getCGScope()).addCatchExceptions(ids);
+			}
+		}
+
+		
+		cg.leaveCommand();
+		return result;
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public void codeOptimization(Scope scope, CodeGenerator cg) {
+		CGScope oldScope = cg.setScope(cgScope);
+		
+		tryBlock.codeOptimization(scope, cg);
+		
+		for(CatchBlock cBlock : catchBlocks) {
+			cBlock.codeOptimization(cBlock.getScope(), cg);
+		}
+
+		cg.setScope(oldScope);
+	}
+
+	
+	@Override
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
 
-		CGBlockScope blockScope = cg.enterBlock();
-		tryBlock.codeGen(cg, null, false);
-		cg.leaveBlock();
-		
-		List<Case> cases = new ArrayList<>();
-		for(AstCase astCase : catchCases) {
-			CGBlockScope caseBlockScope = cg.enterBlock();
-			astCase.getBlock().codeGen(cg, null, false);
-			cg.leaveBlock();
-			//TODO cases.add(new Case(astCase.getFrom(), astCase.getTo(), caseBlockScope));
+		CGScope cgs = null == parent ? cgScope : parent;
+
+		CGExcs newExcs = new CGExcs();
+		CGTryBlockScope tbs = ((CGTryBlockScope)tryBlock.getCGScope());
+		for(CGLabelScope lbScope : tbs.getCatchLabels()) {
+			for(int exceptionId : tbs.getExceptionIds(lbScope)) {
+				newExcs.getRuntimeChecks().put(exceptionId, lbScope);
+			}
 		}
-			
-		CGBlockScope defaultBlockScope = null;
-		if(null != catchDefaultBlock) {
-			defaultBlockScope = cg.enterBlock();
-			catchDefaultBlock.codeGen(cg, null, false);
-			cg.leaveBlock();
+		newExcs.getRuntimeChecks().putAll(excs.getRuntimeChecks());
+
+		tryBlock.codeGen(cg, cgs, false, newExcs);
+		
+		for(CatchBlock cBlock : catchBlocks) {
+			cBlock.codeGen(cg, cgs, false, excs);
 		}
 		
-		cg.eTry(blockScope, cases, defaultBlockScope);
+		excs.getProduced().addAll(newExcs.getProduced());
 		
 		return null;
 	}
 	
 	@Override
 	public List<AstNode> getChildren() {
-		List<AstNode> result = new ArrayList<>(catchCases);
-		if(null != catchDefaultBlock) result.add(catchDefaultBlock);
+		List<AstNode> result = new ArrayList<>();
+		result.add(tryBlock);
+		result.addAll(catchBlocks);
 		return result;
 	}
 }

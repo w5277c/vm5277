@@ -70,7 +70,7 @@ public class InstrReader {
 	}
 
 	public void setMCU(String mcu) {
-		if(null == supported) {
+		if(null==supported) {
 			supported = new HashSet<>();
 			try(BufferedReader br = new BufferedReader(new FileReader(basePath.resolve(mcu + ".instr").normalize().toFile()))) {
 				while(true) {

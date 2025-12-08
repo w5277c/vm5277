@@ -23,11 +23,12 @@ import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.cg.CGArrCells;
 import ru.vm5277.common.cg.CGCells;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -191,13 +192,13 @@ public class ArrayExpression extends ExpressionNode {
 //	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		CodegenResult result = null;
 
 		CGScope cgs = (null==parent ? cgScope : parent);
 
 		// Как минимум необходим если targetExpr instanceof MethodCallExpr(MethodCallExpr на toAccum не смотрит, здесь главный тип метода(возвращаемое значение в accum))
-		targetExpr.codeGen(cg, cgs, false);
+		targetExpr.codeGen(cg, cgs, false, excs);
 
 		CGCellsScope cScope = (CGCellsScope)targetExpr.getSymbol().getCGScope(CGCellsScope.class);
 //		int accSize = cg.getAccumSize();
@@ -240,7 +241,7 @@ public class ArrayExpression extends ExpressionNode {
 				}
 				else {
 					if(indexExpr instanceof ArrayExpression) {
-						indexExpr.codeGen(cg, cgs, false);
+						indexExpr.codeGen(cg, cgs, false, excs);
 						cg.pushCells(cgs, 0x02, new CGCells(CGCells.Type.ARRAY,
 															(-1==indexExpr.getType().getSize() ? cg.getRefSize() : indexExpr.getType().getSize())));
 //						cgs.append(cg.accCast(null, VarType.SHORT));
@@ -248,7 +249,7 @@ public class ArrayExpression extends ExpressionNode {
 //						cg.pushArrReg(cgs);
 					}
 					else {
-						if(CodegenResult.RESULT_IN_ACCUM == indexExpr.codeGen(cg, cgs, true)) {
+						if(CodegenResult.RESULT_IN_ACCUM == indexExpr.codeGen(cg, cgs, true, excs)) {
 							//0x02 - количество байт под размер массива
 							cgs.append(cg.accCast(null, VarType.SHORT));
 							cg.pushAccBE(cgs, 0x02);
@@ -277,10 +278,10 @@ public class ArrayExpression extends ExpressionNode {
 		if(makeView) {
 //			cg.arrRegToCells(cgs, new CGCells(CGCells.Type.ACC, 0x02));
 //			cg.computeArrCellAddr(cgs, null, arrCells);
-			cgs.append(cg.eNewArrView(indexExprs.size()-1));
+			cgs.append(cg.eNewArrView(indexExprs.size()-1, excs));
 		}
 		else {
-			cg.computeArrCellAddr(cgs, null, arrCells);
+			cg.computeArrCellAddr(cgs, null, arrCells, excs);
 			if(toAccum) {
 				cg.arrToAcc(cgs, (CGArrCells)((CGCellsScope)symbol.getCGScope()).getCells());
 				result = CodegenResult.RESULT_IN_ACCUM;

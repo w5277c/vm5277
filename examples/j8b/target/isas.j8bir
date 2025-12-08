@@ -18,16 +18,16 @@ class Main {
             return value;
         }
     }
-    static public void main() {
+    public static void main() {
         System.setParam(0, 16);
         System.setParam(2, 18);
-        System.setParam(3, 1);
+        System.setParam(4, 1);
         Object num = new Short(short);
         if (num is Short as s) {
             System.out(s.toShort());
-            System.outCStr(" is short\n");
+            System.out(" is short\n");
             if ((Number)s is Short as s2) {
-                System.outCStr("Is short too\n");
+                System.out("Is short too\n");
             }
         }
     }

@@ -14,10 +14,6 @@
  * limitations under the License.
  */
 
-import rtos.System;
-import rtos.RTOSParam;
-import hal.GPIO;
-
 class Main {
     public static void main() {
 		System.setParam(RTOSParam.CORE_FREQ, 16);
@@ -32,7 +28,7 @@ class Main {
 		System.out(sum);
 
 		final cstr text="Hello world!";
-		System.outCStr(text);
+		System.out(text);
 		final byte newLine = '\n';
 		System.outChar(newLine);
 
@@ -50,6 +46,5 @@ class Main {
 		System.out(i);
 		i++;
 		System.out(i);
-		System.stop();
     }
 }

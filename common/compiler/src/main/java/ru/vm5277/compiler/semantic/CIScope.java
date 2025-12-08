@@ -21,23 +21,28 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.nodes.AstNode;
 
-public abstract class CIScope extends Scope {
-	protected			String					name;
-	protected	final	Map<String, String>		staticImports	= new HashMap<>();
-	protected	final	Map<String, String>		imports			= new HashMap<>();
-	protected	final	Map<String, CIScope>	imported		= new HashMap<>();
-	protected			List<VarType>			impl			= new ArrayList<>();	//extends и implements(наследование только интерфейсов)
-	protected	final	Map<String, Symbol>		fields			= new HashMap<>();
-	protected	final	List<MethodSymbol>		methods			= new ArrayList<>();
+public abstract class CIScope extends Scope implements ImportableScope {
+	protected			String						name;
+	protected	final	Map<String, String>			staticImports	= new HashMap<>();
+	protected	final	Map<String, String>			imports			= new HashMap<>();
+	protected	final	Map<String, CIScope>		imported		= new HashMap<>();
+	protected			List<VarType>				implTypes		= new ArrayList<>();	//extends и implements(наследование только интерфейсов)
+	protected	final	Map<String, Symbol>			fields			= new HashMap<>();
+	protected	final	List<MethodSymbol>			methods			= new ArrayList<>();
 	
 	public CIScope(Scope parent) {
 		super(parent);
 	}
-	
+
+	public void setImplTypes(List<VarType> implTypes) {
+		this.implTypes = implTypes;
+	}
+
+	@Override
 	public void addImport(String importPath, String alias) throws CompileException {
 		String importName = (alias != null) ? alias : getLastComponent(importPath);
 		if(imports.containsKey(importName)) {
@@ -46,6 +51,7 @@ public abstract class CIScope extends Scope {
 		imports.put(importName, importPath);
 	}
 
+	@Override
 	public void addStaticImport(String importPath, String alias) throws CompileException {
 		String importName = (alias!=null) ? alias : getLastComponent(importPath);
 		if(staticImports.containsKey(importName)) {
@@ -54,11 +60,16 @@ public abstract class CIScope extends Scope {
 		staticImports.put(importName, importPath);
 	}
 
+	@Override
 	public boolean checkStaticImportExists(String path) {
 		return staticImports.containsKey(path);
 	}
 
+	@Override
 	public void addCI(CIScope cis, boolean isInternal) throws CompileException {
+		if(name.equals(cis.getName())) {
+			throw new CompileException(cis.getName() + " conflicts with class/interface/exception of the same name");
+		}
 		if(null!=imported.get(cis.getName())) throw new CompileException(cis.getName() + "' conflicts with import");
 
 		if(isInternal) {
@@ -70,10 +81,10 @@ public abstract class CIScope extends Scope {
 	}
 	
 	public boolean isImplements(VarType ifaceType) {
-		if(impl.isEmpty()) return false;
+		if(implTypes.isEmpty()) return false;
 		if(ifaceType.isPrimitive()) return false;
 		if(ifaceType.isObject()) return true;
-		for(VarType type : impl) {
+		for(VarType type : implTypes) {
 			if(ifaceType==type) return true;
 			CIScope cis = resolveCI(type.getName(), false);
 			if(null!=cis && cis instanceof InterfaceScope) {
@@ -84,7 +95,7 @@ public abstract class CIScope extends Scope {
 	}
 	
 	public List<VarType> getImpl() {
-		return impl;
+		return implTypes;
 	}
 
 	public void addField(Symbol symbol) throws CompileException {
@@ -102,7 +113,9 @@ public abstract class CIScope extends Scope {
 	}
 	
 	public void addMethod(MethodSymbol method) throws CompileException {
-		String symbolName = method.getName();
+		for(CIScope iScope : imported.values()) {
+			iScope.resolveMethod(method.getName(), (VarType[])method.getParameterTypes().toArray(), false);
+		}
 
 		String methodSignature = method.getSignature();
 		for(MethodSymbol symbol : methods) {
@@ -202,7 +215,7 @@ public abstract class CIScope extends Scope {
 		Symbol symbol = fields.get(name);
 		if(null!=symbol) return symbol;
 		
-		for(VarType type : impl) {
+		for(VarType type : implTypes) {
 			CIScope cis = resolveCI(null==caller ? this : caller, type.getName(), false);
 			symbol = cis.resolveField(null==caller ? this : caller, name, false);
 			if(null!=symbol) return symbol;

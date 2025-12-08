@@ -22,7 +22,7 @@ import ru.vm5277.common.Pair;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.DataSymbol;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Delimiter;
@@ -30,6 +30,7 @@ import ru.vm5277.compiler.TokenType;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.cg.CGArrCells;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.semantic.CIScope;
 
@@ -294,7 +295,7 @@ public class ArrayInitExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		int size = (-1==basedType.getSize() ? cg.getRefSize() : basedType.getSize());
 		int rangeId=0;
 		for(int i=0; i<linearValues.size(); i++) {
@@ -322,7 +323,7 @@ public class ArrayInitExpression extends ExpressionNode {
 				parent.append(cg.constToCells(parent, isFixed ? le.getFixedValue() : le.getNumValue(), arrCells, isFixed));
 			}
 			else {
-				expr.codeGen(cg, parent, true);
+				expr.codeGen(cg, parent, true, excs);
 				cg.accToArr(parent, arrCells);
 			}
 		}

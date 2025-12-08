@@ -1,20 +1,20 @@
 class Main {
-    //AST>UNUSED static public final byte b1 = 123;
-    static public short s1 = 32768;
-    //AST>UNUSED static public final int i1 = 16909060;
-    //AST>CONST static public final byte b2 = 52;
-    static public void main() {
+    //AST>UNUSED final public static byte b1 = 123;
+    public static short s1 = 32768;
+    //AST>UNUSED final public static int i1 = 16909060;
+    //AST>CONST final public static byte b2 = 52;
+    public static void main() {
         System.setParam(2, 18);
         s1++;
         System.out(s1);
-        Test2.test=110;
-        byte ttt = Test2.test;
+        Test1.Test2.test=110;
+        byte ttt = Test1.Test2.test;
         System.out(ttt);
         System.out(52);
     }
     class Test1 {
         static class Test2 {
-            static public byte test = 2;
+            public static byte test = 2;
             //AST>CONST final int g = 1;
             public Test2() {
                 test=5;

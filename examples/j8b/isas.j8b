@@ -14,10 +14,6 @@
  * limitations under the License.
  */
 
-import rtos.System;
-import rtos.RTOSParam;
-import hal.GPIO;
-
 class Main {
 	public interface Number {
 		byte toByte();
@@ -47,10 +43,10 @@ class Main {
 		Object num = new Short(0x0102);
 		if(num is Short as s) {
 			System.out(s.toShort());
-			System.outCStr(" is short\n");
+			System.out(" is short\n");
 			
 			if(s.getThis() is Short as s2) {
-				System.outCStr("Is short too\n");
+				System.out("Is short too\n");
 			}
 		}
 	}

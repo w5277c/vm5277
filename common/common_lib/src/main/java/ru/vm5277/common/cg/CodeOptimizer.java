@@ -13,16 +13,22 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.common.cg;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.LabelNames;
+import ru.vm5277.common.cg.items.CGIAsmCall;
+import ru.vm5277.common.cg.items.CGIAsmCondJump;
 import ru.vm5277.common.cg.items.CGIAsmJump;
+import ru.vm5277.common.cg.items.CGIAsmLd;
 import ru.vm5277.common.cg.items.CGIAsmLdLabel;
+import ru.vm5277.common.cg.items.CGIAsmSkipInstr;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGItem;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
@@ -31,8 +37,69 @@ import ru.vm5277.common.exceptions.CompileException;
 
 public abstract class CodeOptimizer {
 
-	public abstract void optimizeBranchChains(CGScope scope) throws CompileException ;
-	public abstract void optimizeBaseInstr(CGScope scope) throws CompileException ;
+	public abstract boolean optimizeJumpInstr(List<CGItem> list) throws CompileException;
+	public abstract boolean optimizeBranchInstr(List<CGItem> list) throws CompileException;
+//	public abstract void optimizeBranchChains(CGScope scope) throws CompileException;
+	public abstract void optimizeBaseInstr(CGScope scope) throws CompileException;
+	
+	public void optimizeRegLoad(CGScope scope) {
+		ArrayList<CGItem> list = new ArrayList();
+		CodeGenerator.treeToList(scope, list);
+
+		for(int i=0; i<list.size()-1; i++) {
+			CGItem item1 = list.get(i);
+			if(item1 instanceof CGIAsmLd && !item1.isDisabled()) {
+				CGIAsmLd regLoad1 = (CGIAsmLd)item1;
+				for(int j=i+1; j<list.size();j++) {
+					CGItem item2 = list.get(j);
+					if(item2.isDisabled()) {
+						continue;
+					}
+					
+					if(!(item2 instanceof CGIAsmLd)) {
+						break;
+					}
+
+					CGIAsmLd regLoad2 = (CGIAsmLd)item2;
+					if(regLoad1.getReg().equalsIgnoreCase(regLoad2.getReg())) {
+						regLoad1.disable();
+					}
+				}
+			}
+		}
+	}
+
+	public void optimizeAfterJump(CGScope scope) {
+		ArrayList<CGItem> list = new ArrayList();
+		boolean changed=true;
+		while(changed) {
+			list.clear();
+			CodeGenerator.treeToList(scope, list);
+		
+			changed=false;
+			for(int i=0; i<list.size()-1; i++) {
+				CGItem item1 = list.get(i);
+				if(item1 instanceof CGIAsmSkipInstr) {
+					i++;
+					continue;
+				}
+				if(item1 instanceof CGIAsmJump) {
+					CGIAsmJump jump = (CGIAsmJump)item1;
+					i++;
+					for(;i<list.size();i++) {
+						CGItem item2 = list.get(i);
+						if(item2 instanceof CGLabelScope) {
+							break;
+						}
+						if(!item2.isDisabled()) {
+							item2.disable();
+							changed=true;
+						}
+					}
+				}
+			}
+		}
+	}
 	
 	protected boolean optimizeEmptyJumps(CGScope scope) {
 		boolean result=false;
@@ -100,8 +167,14 @@ public abstract class CodeOptimizer {
 			if(item instanceof CGIAsmJump) {
 				usedLabels.add(((CGIAsmJump)item).getLabelName().toLowerCase());
 			}
+			else if(item instanceof CGIAsmCondJump) {
+				usedLabels.add(((CGIAsmCondJump)item).getLabelName().toLowerCase());
+			}
 			else if(item instanceof CGIAsmLdLabel) {
 				usedLabels.add(((CGIAsmLdLabel)item).getLabelName().toLowerCase());
+			}
+			else if(item instanceof CGIAsmCall) {
+				usedLabels.add(((CGIAsmCall)item).getLabelName().toLowerCase());
 			}
 			else if(item instanceof CGLabelScope) {
 				CGLabelScope label = (CGLabelScope)item;
@@ -149,7 +222,7 @@ public abstract class CodeOptimizer {
 							if(!name.equals(((CGIAsmJump)nextItem).getLabelName())) {
 								replacementMap.put(name, ((CGIAsmJump)nextItem).getLabelName());
 								item.disable();
-								//Нельзя, иначе не будет исполнено для выполнения в текущей ветке nextItem.disable();
+								nextItem.disable();
 							}
 						}
 					}
@@ -176,11 +249,20 @@ public abstract class CodeOptimizer {
 			}
 
 			for(CGItem item : list) {
-				if(!item.isDisabled() && item instanceof CGIAsmJump) {
-					CGIAsmJump oldJump = (CGIAsmJump)item;
-					String target = replacementMap.get(oldJump.getLabelName());
-					if(null != target) {
-						oldJump.setLabelName(target);
+				if(!item.isDisabled()) {
+					if(item instanceof CGIAsmJump) {
+						CGIAsmJump oldJump = (CGIAsmJump)item;
+						String target = replacementMap.get(oldJump.getLabelName());
+						if(null != target) {
+							oldJump.setLabelName(target);
+						}
+					}
+					else if(item instanceof CGIAsmCondJump) {
+						CGIAsmCondJump oldJump = (CGIAsmCondJump)item;
+						String target = replacementMap.get(oldJump.getLabelName());
+						if(null != target) {
+							oldJump.setLabelName(target);
+						}
 					}
 				}
 			}

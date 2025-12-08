@@ -1,6 +1,6 @@
 package ru.vm5277.common.cg;
 
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
 

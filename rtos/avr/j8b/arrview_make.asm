@@ -14,7 +14,8 @@
  * limitations under the License.
  */
 
-//TODO при работе с массивами большая часть кода дублируется, нужно вынести в отдельную функцию
+;TODO при работе с массивами большая часть кода дублируется, нужно вынести в отдельную функцию
+;TODO добавить проверку на OUT_OF_MEMORY (C=true) после OS_DRAM_ALLOC, возвращать флаг C
 
 .include "dmem/dram.asm"
 .include "math/mul16.asm"

@@ -22,12 +22,13 @@ import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.StrUtils;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -197,7 +198,7 @@ public class NewExpression extends ExpressionNode {
 
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		CGScope cgs = null == parent ? cgScope : parent;
 
 		CIScope cis = (CIScope)((MethodSymbol)symbol).getScope().getParent();
@@ -207,8 +208,8 @@ public class NewExpression extends ExpressionNode {
 		// Всегда сохраняем heapIReg, метод может использовать его в своих целях
 		cg.pushHeapReg(cgs);
 
-		putArgsToStack(cg, cgs, refTypeSize);
-		depCodeGen(cg);
+		putArgsToStack(cg, cgs, refTypeSize, excs);
+		depCodeGen(cg, excs);
 
 		CGMethodScope mScope = (CGMethodScope)((AstHolder)symbol).getNode().getCGScope().getScope(CGMethodScope.class);
 		cg.call(cgs, mScope.getLabel());
@@ -216,7 +217,7 @@ public class NewExpression extends ExpressionNode {
 		return null;
 	}
 
-	private void putArgsToStack(CodeGenerator cg, CGScope cgs, int refTypeSize) throws CompileException {
+	private void putArgsToStack(CodeGenerator cg, CGScope cgs, int refTypeSize, CGExcs excs) throws CompileException {
 		if(!args.isEmpty()) {
 
 			CGMethodScope mScope = (CGMethodScope)symbol.getCGScope(CGMethodScope.class);
@@ -248,20 +249,20 @@ public class NewExpression extends ExpressionNode {
 
 				if(argExpr instanceof LiteralExpression) {
 					// Выполняем зависимость
-					argExpr.codeGen(cg, cgs, false);
+					argExpr.codeGen(cg, cgs, false, excs);
 					LiteralExpression le = (LiteralExpression)argExpr;
 					cg.pushConst(cgs, exprTypeSize, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed());
 				}
 				else if(argExpr instanceof VarFieldExpression) {
-					argExpr.codeGen(cg, cgs, false);
+					argExpr.codeGen(cg, cgs, false, excs);
 					cg.pushCells(cgs, exprTypeSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells());
 				}
 				else if(argExpr instanceof MethodCallExpression) {
-					argExpr.codeGen(cg, cgs, true);
+					argExpr.codeGen(cg, cgs, true, excs);
 					cg.pushAccBE(cgs, paramVarType.getSize());
 				}
 				else if(argExpr instanceof BinaryExpression) {
-					argExpr.codeGen(cg, cgs, true);
+					argExpr.codeGen(cg, cgs, true, excs);
 					cg.pushAccBE(cgs, paramVarType.getSize());
 				}
 				else if(argExpr instanceof EnumExpression) {

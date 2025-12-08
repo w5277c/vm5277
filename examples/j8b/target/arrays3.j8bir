@@ -1,5 +1,5 @@
 class Main {
-    static public void main() {
+    public static void main() {
         System.setParam(2, 18);
         byte[][] b1 = new byte[4][5];
         System.out(b1.length());
@@ -21,13 +21,13 @@ class Main {
         --arr[0];
         arr[arr[arr[0]]]=arr[method1(arr)]+method2(5)[0];
     }
-    static public byte method1(byte[] barr) {
+    public static byte method1(byte[] barr) {
         return barr[1];
     }
-    static public byte[] method2(byte b) {
+    public static byte[] method2(byte b) {
         return new byte[b];
     }
-    static public byte method3() {
+    public static byte method3() {
         return 3;
     }
 }

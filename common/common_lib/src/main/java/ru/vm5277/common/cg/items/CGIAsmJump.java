@@ -19,32 +19,29 @@ import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class CGIAsmJump extends CGIAsm {
-	private	String	labelName;
+	private	boolean	isExternal;
 	
-	public CGIAsmJump(String instr, CGLabelScope lbScope) throws CompileException {
-		super(instr);
-		this.labelName = lbScope.getName();
+	public CGIAsmJump(String instr, CGLabelScope lbScope, boolean isExternal) throws CompileException {
+		super(instr, null);
+		postfix = lbScope.getName();
+		this.isExternal = isExternal;
 	}
 
-	public CGIAsmJump(String instr, String labelName) throws CompileException {
-		super(instr);
-		this.labelName = labelName;
+	public CGIAsmJump(String instr, String labelName, boolean isExternal) throws CompileException {
+		super(instr, null);
+		postfix = labelName;
+		this.isExternal = isExternal;
+		
 	}
 
 	public String getLabelName() {
-		return labelName;
+		return postfix;
 	}
 	public void setLabelName(String labelName) {
-		this.labelName = labelName;
+		this.postfix = labelName;
 	}
 	
-	@Override
-	public String getSource() {
-		return "\t" + text + " " + labelName + "\n";
-	}
-	
-	@Override
-	public String toString() {
-		return text + " " + labelName;
+	public boolean isExternal() {
+		return isExternal;
 	}
 }

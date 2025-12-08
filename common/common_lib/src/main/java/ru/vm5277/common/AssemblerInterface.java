@@ -19,6 +19,7 @@ package ru.vm5277.common;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Map;
 import ru.vm5277.common.messages.MessageContainer;
 
@@ -28,5 +29,5 @@ public interface AssemblerInterface {
 	public	final	static	int										STRICT_NONE		= 3;
 
 	public boolean exec(MessageContainer mc, String mcu, Path sourcePath, Map<Path, SourceType> sourcePaths, int stirctLevel, String outputFileName,
-						File mapFile, BufferedWriter listWriter) throws Exception;
+						File mapFile, BufferedWriter listWriter, Map<String, Long> defines, List<String> imports) throws Exception;
 }

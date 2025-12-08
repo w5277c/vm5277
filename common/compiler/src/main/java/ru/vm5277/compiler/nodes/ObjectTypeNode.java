@@ -19,14 +19,15 @@ package ru.vm5277.compiler.nodes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-import ru.vm5277.common.compiler.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
+import ru.vm5277.compiler.semantic.CIScope;
 
 public abstract class ObjectTypeNode extends AstNode {
 	protected			List<ObjectTypeNode>	importedClasses;
+	protected			CIScope					ciScope;
 	protected			Set<Keyword>			modifiers;
 	protected			String					name;
 	protected			String					parentClassName;
@@ -44,7 +45,6 @@ public abstract class ObjectTypeNode extends AstNode {
         consumeToken(tb);	// Пропуск class токена
 		try {
 			this.name = (String)consumeToken(tb, TokenType.ID).getValue();
-			VarType.addClassName(this.name, false);
 		}
 		catch(CompileException e) {markFirstError(e);} // ошибка в имени, оставляем null
 	}
@@ -53,6 +53,10 @@ public abstract class ObjectTypeNode extends AstNode {
 		return name;
 	}
 	
+	public CIScope getScope() {
+		return ciScope;
+	}
+
 	public String getFullName() {
 		return null == parentClassName ? name : parentClassName + "." + name;
 	}

@@ -15,47 +15,26 @@
  */
 package ru.vm5277.common.cg.items;
 
-import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class CGIAsmLdLabel extends CGIAsm {
-	private	String	labelName;
-	private	String	postfix;
+	private	String	reg;
 	
-	public CGIAsmLdLabel(String instr, CGLabelScope lbScope, String postfix) throws CompileException {
-		super(instr);
-		this.labelName = lbScope.getName();
+	public CGIAsmLdLabel(String instr, String reg, String postfix) throws CompileException {
+		super(instr, null);
+		this.reg = reg;
 		this.postfix = postfix;
-	}
-	public CGIAsmLdLabel(String instr, CGLabelScope lbScope) throws CompileException {
-		super(instr);
-		this.labelName = lbScope.getName();
-	}
-
-	public CGIAsmLdLabel(String instr, String labelName, String postfix) throws CompileException {
-		super(instr);
-		this.labelName = labelName;
-		this.postfix = postfix;
-	}
-	public CGIAsmLdLabel(String instr, String labelName) throws CompileException {
-		super(instr);
-		this.labelName = labelName;
 	}
 
 	public String getLabelName() {
-		return labelName;
+		return postfix;
 	}
 	public void setLabelName(String labelName) {
-		this.labelName = labelName;
+		this.postfix = labelName;
 	}
 	
 	@Override
-	public String getSource() {
-		return "\t" + text + "(" + labelName + (null == postfix ? "" : postfix) + ")\n";
-	}
-	
-	@Override
-	public String toString() {
-		return text + "(" + labelName + (null == postfix ? "" : postfix) + ")";
+	public String getText() {
+		return instr + " " + reg + "," + postfix;
 	}
 }

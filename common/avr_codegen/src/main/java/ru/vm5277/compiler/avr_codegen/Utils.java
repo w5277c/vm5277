@@ -25,7 +25,7 @@ public class Utils {
 	 * @return - инвертированная br инструкция, null если инструкции нет
 	 */
 	public static String brInstrInvert(String branchInstr) throws CompileException {
-		switch(branchInstr.toLowerCase()) {
+		switch(branchInstr) {
 			case "brbc": return "brbs";
 			case "brbs": return "brbc";
 			case "brcc": return "brcs";

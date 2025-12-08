@@ -16,13 +16,16 @@
 package ru.vm5277.compiler.semantic;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
-import ru.vm5277.common.compiler.VarType;
+import java.util.Set;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class BlockScope extends Scope {
-	protected	final	Map<String, Symbol>			variables	= new HashMap<>();
-	private		final	Map<String, LabelSymbol>	labels		= new HashMap<>();
+	protected	final	Map<String, Symbol>			variables			= new HashMap<>();
+	private		final	Map<String, LabelSymbol>	labels				= new HashMap<>();
+	private		final	Set<ExceptionScope>			exceptionScopes		= new HashSet<>();
 	
 	public BlockScope(Scope parent) {
 		super(parent);
@@ -36,6 +39,12 @@ public class BlockScope extends Scope {
 		variables.put(name, symbol);
 	}
 
+	public void addExceptionScope(ExceptionScope eScope) {
+		exceptionScopes.add(eScope);
+	}
+	public Set<ExceptionScope> getExceptionScopes() {
+		return exceptionScopes;
+	}
 	
 	@Override
 	public CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess) {

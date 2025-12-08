@@ -1,5 +1,5 @@
 class Main {
-    static public void main() {
+    public static void main() {
         System.setParam(2, 18);
         int[] bArray1 = new int[2];
         int[] bArray2 = new int[4];

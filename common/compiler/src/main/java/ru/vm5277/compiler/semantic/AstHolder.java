@@ -16,7 +16,7 @@
 
 package ru.vm5277.compiler.semantic;
 
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.compiler.nodes.AstNode;
 
 public abstract class AstHolder extends Symbol {

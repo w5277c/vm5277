@@ -29,7 +29,7 @@ public class CGLoopBlockScope extends CGBlockScope {
 		
 		startLbScope = new CGLabelScope(null, null, LabelNames.LOOP, true);
 		nextLbScope = new CGLabelScope(null, null, LabelNames.LOOP_NEXT, false);
-		endLbScope = new CGLabelScope(null, null, LabelNames.LOOP_END, true);
+		endLbScope = new CGLabelScope(null, null, LabelNames.LOOP_END, false);
 	}
 	
 	public CGLabelScope getStartLbScope() {

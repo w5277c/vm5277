@@ -18,6 +18,7 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.ArrayList;
 import java.util.List;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
@@ -76,9 +77,9 @@ public class ExpressionsContainer extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		for(ExpressionNode expr : expressions) {
-			Object result = expr.codeGen(cg, parent, toAccum);
+			Object result = expr.codeGen(cg, parent, toAccum, excs);
 			if(toAccum && CodegenResult.RESULT_IN_ACCUM!=result) {
 				throw new CompileException("Accum not used for operand:" + expr);
 			}

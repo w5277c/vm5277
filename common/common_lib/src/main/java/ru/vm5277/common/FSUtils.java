@@ -20,22 +20,29 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class FSUtils {
 	
-	public static Path getToolkitPath() {
+	public static Path getToolkitPath() throws CompileException {
 		String toolkitPath = System.getenv("vm5277");
-		if(null == toolkitPath || toolkitPath.isEmpty()) {
-			File currentDir = new File("").getAbsoluteFile();
-			File parentDir = currentDir.getParentFile().getParentFile();
-			toolkitPath = parentDir.getAbsolutePath();
+		if(null==toolkitPath || toolkitPath.isEmpty()) {
+			return null;
 		}
 		return Paths.get(toolkitPath).normalize().toAbsolutePath();
 	}
 
 	public static Path resolve(Path home, String path) {
 		Path resolvedPath = resolveWithEnv(path);
-		if (resolvedPath.isAbsolute()) return resolvedPath.normalize();
+		if(resolvedPath.isAbsolute()) {
+			return resolvedPath.normalize();
+		}
+
+		Path currentDirPath = Paths.get("").toAbsolutePath().resolve(resolvedPath).normalize();
+		if(currentDirPath.toFile().exists()) {
+			return currentDirPath;
+		}
+		
 		return home.resolve(resolvedPath).normalize();
 	}
 	
@@ -52,7 +59,8 @@ public class FSUtils {
 			}
 		}
 		matcher.appendTail(resolved);
-		return Paths.get(resolved.toString()).normalize();
+		
+		return Paths.get(expandTilde(resolved.toString())).normalize();
 	}
 	
 	public static String getBaseName(Path path) {
@@ -60,6 +68,18 @@ public class FSUtils {
 		int pos = fileName.lastIndexOf(".");
 		if(-1 == pos) return fileName;
 		return fileName.substring(0, pos);
+	}
+	
+	private static String expandTilde(String path) {
+		if(path==null || !path.startsWith("~")) {
+			return path;
+		}
+
+		if(path.equals("~")) {
+			return System.getProperty("user.home");
+		}
+		
+		return System.getProperty("user.home") + path.substring(1);
 	}
 }
 

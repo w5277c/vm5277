@@ -17,20 +17,22 @@ package ru.vm5277.common.cg.scopes;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGCells;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.CodeOptimizer;
 import ru.vm5277.common.cg.RegPair;
-import ru.vm5277.common.cg.items.CGIConstrInit;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.compiler.Optimization;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
 /*TODO 
@@ -55,9 +57,12 @@ public class CGMethodScope extends CGCellsScope {
 	private			CGIContainer				fieldsInitCallCont;
 	private			CGCells						cells;
 
+	private			CGIContainer				initContainer		= new CGIContainer();
+	
 	private			boolean						heapIRegModified;
 	private			AtomicInteger				lastHeapOffset		= new AtomicInteger();
 	private			AtomicInteger				lastStackOffset		= new AtomicInteger();
+	private			Set<Integer>				exceptionIds		= new HashSet<>();
 	
 	public CGMethodScope(CodeGenerator cg, CGClassScope parent, int resId, VarType type, int size, String name, ArrayList<RegPair> regsPool) {
 		super(parent, resId, type, size, name);
@@ -99,11 +104,15 @@ public class CGMethodScope extends CGCellsScope {
 			lbScope = new CGLabelScope(null, -1, LabelNames.MAIN, true);
 		}
 		else {
-			lbScope = new CGLabelScope(this, null, "C", true);
+			lbScope = new CGLabelScope(this, null, null, true);
 		}
 	}
 	
-	public void build(CodeGenerator cg) throws CompileException {
+	public CGIContainer getInitContainer() {
+		return initContainer;
+	}
+	
+	public void build(CodeGenerator cg, CGExcs excs) throws CompileException {
 		isUsed = true;
 		
 		CGIContainer cont = new CGIContainer();
@@ -116,11 +125,9 @@ public class CGMethodScope extends CGCellsScope {
 		cg.normalizeIRegConst(this, 'y', lastStackOffset);
 		
 		CGClassScope cScope = (CGClassScope)parent;
-		if(null == type) {
+		if(null==type) {
 			//cont.append(cg.eNewInstance(cScope.getHeapOffset(), cScope.getIIDLabel(), cScope.getType(), false, false));
-			CGIConstrInit contrInit = new CGIConstrInit(this);
-			cont.append(contrInit);
-			cont.append(contrInit.getCont());
+			cont.append(initContainer);
 			cont.append(lbCIScope);
 			fieldsInitCallCont = cg.call(null, cScope.getFieldInitLabel());
 			cont.append(fieldsInitCallCont);
@@ -131,7 +138,9 @@ public class CGMethodScope extends CGCellsScope {
 		if(Optimization.FRONT<cg.getOptLevel()) {
 			CodeOptimizer co = cg.getOptimizer();
 			if(null != co) {
-				co.removeUnusedLabels(this, lbScope, lbCIScope);
+//				co.removeUnusedLabels(this, lbScope, lbCIScope);
+				co.optimizeAfterJump(this);
+				co.optimizeRegLoad(parent);
 			}
 		}
 
@@ -170,6 +179,16 @@ public class CGMethodScope extends CGCellsScope {
 			if(scope instanceof CGCommandScope) return ((CGBlockScope)scope.getScope(CGBlockScope.class)).getVar(resId);
 		}
 		return null;
+	}
+	
+	public void addExceptions(Set<Integer> ids) {
+		exceptionIds.addAll(ids);
+	}
+	public boolean containsException(int id) {
+		return exceptionIds.contains(id);
+	}
+	public Set<Integer> getExceptionIds() {
+		return exceptionIds;
 	}
 
 	/**

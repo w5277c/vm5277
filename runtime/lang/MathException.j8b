@@ -1,0 +1,2 @@
+public exception MathException extends Exception {
+}

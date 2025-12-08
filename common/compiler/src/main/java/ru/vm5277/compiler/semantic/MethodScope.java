@@ -16,10 +16,13 @@
 
 package ru.vm5277.compiler.semantic;
 
+import java.util.HashSet;
+import java.util.Set;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class MethodScope extends Scope {
-	private	MethodSymbol	mSymbol;
+	private	MethodSymbol		mSymbol;
+	private	Set<ExceptionScope>	exceptionScopes		= new HashSet<>();	// исключения заданные через throws
 	
 	public MethodScope(MethodSymbol mSymbol, Scope parent) {
 		super(parent);
@@ -34,6 +37,15 @@ public class MethodScope extends Scope {
 		this.mSymbol = mSymbol;
 	}
 
+	public void addExceptionScope(ExceptionScope eScope) {
+		exceptionScopes.add(eScope);
+	}
+	public boolean containsException(ExceptionScope eScope) {
+		return exceptionScopes.contains(eScope);
+	}
+	public Set<ExceptionScope> getExceptionScopes() {
+		return exceptionScopes;
+	}
 	
 	@Override
 	public CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess) {

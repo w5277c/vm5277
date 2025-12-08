@@ -23,7 +23,7 @@ import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.SourceBuffer;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.StrUtils;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Keyword;

@@ -23,16 +23,20 @@ import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.AssemblerInterface;
 import ru.vm5277.common.Operator;
+import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.cg.scopes.CGTryBlockScope;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Main;
+import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.commands.CommandNode.AstCase;
 import ru.vm5277.compiler.nodes.commands.DoWhileNode;
 import ru.vm5277.compiler.nodes.commands.ForNode;
@@ -55,9 +59,10 @@ import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class BlockNode extends AstNode {
-	private	List<AstNode>			children	= new ArrayList<>();
-	private	Map<String, LabelNode>	labels		= new HashMap<>();
-	private	BlockScope				blockScope;
+	protected	List<AstNode>			children	= new ArrayList<>();
+	private		Map<String, LabelNode>	labels		= new HashMap<>();
+	private		boolean					isTry		= false;
+	protected	BlockScope				blockScope;
 	
 	public BlockNode() {
 	}
@@ -69,11 +74,13 @@ public class BlockNode extends AstNode {
 	}
 
 	public BlockNode(TokenBuffer tb, MessageContainer mc) throws CompileException {
-		this(tb, mc, false);
+		this(tb, mc, false, false);
 	}
-	public BlockNode(TokenBuffer tb, MessageContainer mc, boolean leftBraceConsumed) throws CompileException {
+	public BlockNode(TokenBuffer tb, MessageContainer mc, boolean leftBraceConsumed, boolean isTry) throws CompileException {
 		super(tb, mc);
         
+		this.isTry = isTry;
+		
 		if(!leftBraceConsumed) consumeToken(tb, Delimiter.LEFT_BRACE); //Наличие токена должно быть гарантировано вызывающим
 
 		while (!tb.match(TokenType.EOF) && !tb.match(Delimiter.RIGHT_BRACE)) {
@@ -113,6 +120,12 @@ public class BlockNode extends AstNode {
 				children.add(iNode);
 				continue;
 			}
+			// Обработка exception с модификаторами
+			if (tb.match(TokenType.OOP, Keyword.EXCEPTION)) {
+				ExceptionNode eNode = new ExceptionNode(tb, mc, modifiers, null);
+				children.add(eNode);
+				continue;
+			}
 
 			try {
 				// Определение типа (примитив или класс)
@@ -133,15 +146,8 @@ public class BlockNode extends AstNode {
 						String name = null;
 						try {name = consumeToken(tb, TokenType.ID).getStringValue();}catch(CompileException e) {markFirstError(e);} // Нет имени сущности, пытаемся парсить дальше
 
-						if (tb.match(Delimiter.LEFT_BRACKET)) { // Это объявление массива
-							//TODO рудимент?
-							ArrayDeclarationNode node = new ArrayDeclarationNode(tb, mc, modifiers, type, name);
-							if(null != name) children.add(node);
-						}
-						else { // Переменная
-							VarNode varNode = new VarNode(tb, mc, modifiers, type, name);
-							if(null!=name) children.add(varNode);
-						}
+						VarNode varNode = new VarNode(tb, mc, modifiers, type, name);
+						if(null!=name) children.add(varNode);
 						continue;
 					}
 				}
@@ -213,6 +219,10 @@ public class BlockNode extends AstNode {
 		return labels;
 	}
 	
+	public BlockScope getScope() {
+		return blockScope;
+	}
+	
 	@Override
 	public boolean preAnalyze() {
 		boolean result = true;
@@ -265,8 +275,11 @@ public class BlockNode extends AstNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		boolean result = true;
-		cgScope = cg.enterBlock();
+		if(null!=postResult) return postResult;
+		postResult = true;
+
+		debugAST(this, POST, true, getFullInfo());
+		cgScope = cg.enterBlock(isTry);
 		
 		boolean inTryBlock = false;
 		TryNode currentTryNode = null;
@@ -278,8 +291,8 @@ public class BlockNode extends AstNode {
 			sp = node.getSP();
 			
 			// Анализируем текущую ноду
-			result&=node.postAnalyze(blockScope, cg);
-			if(result) {
+			postResult&=node.postAnalyze(blockScope, cg);
+			if(postResult) {
 				if(node instanceof ExpressionNode) {
 					try {
 						ExpressionNode optimizedNode = ((ExpressionNode)node).optimizeWithScope(blockScope, cg);
@@ -308,12 +321,6 @@ public class BlockNode extends AstNode {
 					}
 				}
 
-				// Если это конец try-block, сбрасываем флаг
-				if(inTryBlock && node == currentTryNode.getEndNode()) {
-					inTryBlock = false;
-					currentTryNode = null;
-				}
-
 				// Проверяем недостижимый код после прерывающих инструкций
 				if(i > 0 && isControlFlowInterrupted(children.get(i - 1))) {
 					markWarning("Unreachable code after " + children.get(i - 1).getClass().getSimpleName());
@@ -324,7 +331,8 @@ public class BlockNode extends AstNode {
 		}
 		
 		cg.leaveBlock();
-		return result;
+		debugAST(this, POST, false, postResult, getFullInfo());
+		return postResult;
 	}
 
 	@Override
@@ -337,27 +345,27 @@ public class BlockNode extends AstNode {
 		}
 		cg.setScope(oldScope);
 	}
-
-	public void firstCodeGen(CodeGenerator cg) throws CompileException {
+	
+	public void firstCodeGen(CodeGenerator cg, CGExcs excs) throws CompileException {
 		cgDone = true;
 		
 		for(AstNode node : children) {
 			//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
 			if(!node.isDisabled() && !(node instanceof VarNode)) {
 				if(node instanceof ExpressionNode) {
-					((ExpressionNode)node).codeGen(cg, null, false);
+					((ExpressionNode)node).codeGen(cg, null, false, excs);
 				}
 				else {
-					node.codeGen(cg, null, false);
+					node.codeGen(cg, null, false, excs);
 				}
 			}
 		}
 		
-		((CGBlockScope)cgScope).build(cg, true);
+		((CGBlockScope)cgScope).build(cg, true, excs);
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 		
@@ -366,11 +374,11 @@ public class BlockNode extends AstNode {
 		for(AstNode node : children) {
 			//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
 			if(!(node instanceof VarNode)) {
-				node.codeGen(cg, cgs, false);
+				node.codeGen(cg, cgs, false, excs);
 			}
 		}
 		
-		((CGBlockScope)cgScope).build(cg, false);
+		((CGBlockScope)cgScope).build(cg, false, excs);
 		((CGBlockScope)cgScope).restoreRegsPool();
 		
 		return null;
@@ -378,6 +386,10 @@ public class BlockNode extends AstNode {
 	
 	@Override
 	public String toString() {
+		return "";
+	}
+
+	public String getFullInfo() {
 		return getClass().getSimpleName();
 	}
 

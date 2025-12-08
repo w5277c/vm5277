@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.nodes;
 
 import java.io.File;
@@ -23,7 +24,7 @@ import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.compiler.semantic.ClassScope;
+import ru.vm5277.compiler.semantic.ImportableScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.tokens.Token;
 
@@ -31,6 +32,12 @@ public class ImportNode extends AstNode {
 	private	boolean	isStatic;
 	private	String	importStr;
 	private	String	alias;
+
+	public ImportNode(TokenBuffer tb, MessageContainer mc, String importStr) {
+        super(tb, mc);
+		
+		this.importStr = importStr;
+	}
 
 	public ImportNode(TokenBuffer tb, MessageContainer mc) {
         super(tb, mc);
@@ -117,43 +124,54 @@ public class ImportNode extends AstNode {
 
 	@Override
 	public boolean declare(Scope scope) {
-		if (scope instanceof ClassScope) {
-			ClassScope classScope = (ClassScope) scope;
+		boolean result = true;
+		
+		if(scope instanceof ImportableScope) {
+			ImportableScope iScope = (ImportableScope)scope;
 
-			// Регистрируем импорт в классе
+			// Регистрируем импорт
 			try {
 				if (isStatic) {
-					classScope.addStaticImport(importStr, alias);
+					iScope.addStaticImport(importStr, alias);
 				}
 				else {
-					classScope.addImport(importStr, alias);
+					iScope.addImport(importStr, alias);
 				}
 			}
-			catch(CompileException e) {markError(e);}
-			return true;
+			catch(CompileException e) {
+				markError(e);
+				result = false;
+			}
 		}
-		markError("Import declarations must be at the beginning of the file, before any class members");
-		return true;
+		else {
+			markError("Import declarations must be at the beginning of the file, before any class members");
+			result = false;
+		}
+		
+		return result;
 	}
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		if(scope instanceof ClassScope) {
-			ClassScope classScope = (ClassScope)scope;
-			if(isStatic) {
-				// Проверяем существование статического члена
-				if(!classScope.checkStaticImportExists(importStr)) {
-					markError("Static import not found: " + importStr);
-				}
-			}
-			else {
-				// Проверяем существование класса
-				if(null==classScope.resolveCI(importStr, false)) {
-					markError("Imported class not found: " + importStr);
-				}
+		boolean result = true;
+
+		ImportableScope iScope = (ImportableScope)scope;
+		if(isStatic) {
+			// Проверяем существование статического члена
+			if(!iScope.checkStaticImportExists(importStr)) {
+				markError("Static import not found: " + importStr);
+				result = false;
 			}
 		}
-		return true;
+		else {
+			// Проверяем существование класса
+			if(null==iScope.resolveCI(importStr, false)) {
+				markError("Imported class not found: " + importStr);
+				result = false;
+			}
+		}
+		
+		return result;
 	}
 
 	@Override

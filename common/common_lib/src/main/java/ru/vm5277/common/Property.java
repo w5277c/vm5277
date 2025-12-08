@@ -21,5 +21,6 @@ public enum Property {
 	item,		//Получить элемент enum
 	size,		//Получить размер элементов enum
 	instanceId,	//Получить ид экземпляра класса
-	typeId;		//Получить ид типа класса
+	typeId,		//Получить ид типа класса или exception
+	code;		//Получить дополнительный код exception
 }

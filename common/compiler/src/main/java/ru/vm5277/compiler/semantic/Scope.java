@@ -22,8 +22,8 @@ import java.util.Map;
 import ru.vm5277.common.exceptions.CompileException;
 
 public abstract class Scope {
-	protected			Scope					parent;
-	protected	final	Map<String, CIScope>	internal	= new HashMap<>();
+	protected			Scope						parent;
+	protected	final	Map<String, CIScope>		internal	= new HashMap<>();
 
 	public Scope(Scope parent) {
 		this.parent = parent;
@@ -31,7 +31,7 @@ public abstract class Scope {
 	
 	public void addInternal(CIScope cis) throws CompileException {
 		if(null!=internal.get(cis.getName())) {
-			throw new CompileException(cis.getName() + " conflicts with class/interface of the same name");
+			throw new CompileException(cis.getName() + " conflicts with class/interface/exception of the same name");
 		}
 
 		internal.put(cis.getName(), cis);
@@ -76,5 +76,4 @@ public abstract class Scope {
 		}
 		return null;
 	}
-
 }

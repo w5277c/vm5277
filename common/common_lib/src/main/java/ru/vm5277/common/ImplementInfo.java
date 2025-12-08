@@ -16,7 +16,6 @@
 package ru.vm5277.common;
 
 import java.util.List;
-import ru.vm5277.common.compiler.VarType;
 
 public class ImplementInfo implements Comparable<ImplementInfo> {
 	private	VarType			type;

@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 
-import rtos.System;
-import rtos.RTOSParam;
-
 class Main {
 
 	public static bool test(bool _b1, bool _b2) {

@@ -14,10 +14,6 @@
  * limitations under the License.
  */
 
-import rtos.System;
-import rtos.RTOSParam;
-import hal.GPIO;
-
 class Main {
     public static void main() {
 		System.setParam(RTOSParam.CORE_FREQ, 16);
@@ -33,7 +29,5 @@ class Main {
 			case 15,20..25,16,17,30,32: System.out(2);
 			default: System.out(3);
 		}
-
-		System.stop();
 	}
 }

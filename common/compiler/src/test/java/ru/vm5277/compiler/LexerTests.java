@@ -35,12 +35,12 @@ public class LexerTests {
 						"static final private public native atomic " +
 						"class interface implements this " +
 						"import as else case default new " +
-						"try catch throw throws";
+						"try catch throws";
         MessageContainer mc = new MessageContainer(100, true, false);
 		Lexer lexer = new Lexer(source, mc);
         List<Token> tokens = lexer.getTokens();
         
-        assertEquals(38, tokens.size() - 1); // -1 для EOF
+        assertEquals(37, tokens.size() - 1); // -1 для EOF
         
 		int pos=0;
 		// Проверка литералов
@@ -128,8 +128,6 @@ public class LexerTests {
 		assertEquals(Keyword.TRY, tokens.get(pos++).getValue());
 		assertEquals(TokenType.KEYWORD, tokens.get(pos).getType());
 		assertEquals(Keyword.CATCH, tokens.get(pos++).getValue());
-		assertEquals(TokenType.COMMAND, tokens.get(pos).getType());
-		assertEquals(Keyword.THROW, tokens.get(pos++).getValue());
 		assertEquals(TokenType.OOP, tokens.get(pos).getType());
 		assertEquals(Keyword.THROWS, tokens.get(pos++).getValue());
 

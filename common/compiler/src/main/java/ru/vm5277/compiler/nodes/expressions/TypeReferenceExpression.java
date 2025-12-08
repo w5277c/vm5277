@@ -17,7 +17,7 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -28,8 +28,10 @@ import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.EnumScope;
+import ru.vm5277.compiler.semantic.ExceptionScope;
 
 //Выражение описывающее доступ к типу которое может состоять из других типпов (по аналогии с FS: путь к файлу, без имени саммого файла, только директории)
 public class TypeReferenceExpression extends ExpressionNode {
@@ -62,8 +64,9 @@ public class TypeReferenceExpression extends ExpressionNode {
 		this.type = VarType.fromClassName(cis.getName());
 	}
 
-	public String getClassPath() {
-		return lastId;
+	@Override
+	public String getQualifiedPath() {
+		return (null!=parentExpr ? parentExpr.getQualifiedPath() + ".": "" ) + lastId;
 	}
 
 	@Override
@@ -106,12 +109,15 @@ public class TypeReferenceExpression extends ExpressionNode {
 		else {
 			declarationPendingNodes.remove(this);
 
-			if(!(cis instanceof ClassScope) && !(cis instanceof EnumScope)) {
-				markError("Unexpected scope:" + cis + ", for:" + lastId);
-				result = false;
+			if(cis instanceof ExceptionScope) {
+				type = VarType.EXCEPTION;
+			}
+			else if(cis instanceof ClassScope || cis instanceof EnumScope) {
+				type = VarType.fromClassName((((CIScope)cis).getName()));
 			}
 			else {
-				type = VarType.fromClassName((((CIScope)cis).getName()));
+				markError("Unexpected scope:" + cis + ", for:" + lastId);
+				result = false;
 			}
 		}
 
@@ -129,7 +135,7 @@ public class TypeReferenceExpression extends ExpressionNode {
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 		
 		// Находим тип-класс, если он существует
-		if(null!=type && !type.isClassType()) {
+		if(null!=type && !type.isClassType() && VarType.EXCEPTION!=type) {
 			markError("Type '" + lastId + "' not found");
 			result = false;
 		}
@@ -155,7 +161,7 @@ public class TypeReferenceExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		//cg.setAcc(new Operand(VarType.CLASS, OperandType.TYPE, varType.getId()));
 		return null;
 	}

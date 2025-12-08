@@ -23,9 +23,10 @@ import java.util.Set;
 import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
@@ -170,7 +171,7 @@ public class EnumNode extends AstNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		return null;
 	}
 	

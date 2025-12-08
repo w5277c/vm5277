@@ -30,8 +30,9 @@ import ru.vm5277.compiler.nodes.commands.WhileNode;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.common.Operator;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.compiler.nodes.commands.BreakNode;
 import ru.vm5277.compiler.nodes.commands.ContinueNode;
@@ -45,7 +46,6 @@ import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.compiler.nodes.commands.CommandNode.AstCase;
-import ru.vm5277.compiler.nodes.commands.ThrowNode;
 import ru.vm5277.compiler.nodes.commands.TryNode;
 import ru.vm5277.compiler.nodes.expressions.QualifiedPathExpression;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
@@ -101,7 +101,6 @@ public abstract class AstNode extends SemanticAnalyzer {
 		if(Keyword.RETURN == kw) return new ReturnNode(tb, mc);
 		if(Keyword.SWITCH == kw) return new SwitchNode(tb, mc);
 		if(Keyword.TRY == kw) return new TryNode(tb, mc);
-		if(Keyword.THROW == kw) return new ThrowNode(tb, mc);
 		markFirstError(error);
 		throw new CompileException("Unexpected command token " + tb.current(), sp);
 	}
@@ -174,11 +173,20 @@ public abstract class AstNode extends SemanticAnalyzer {
 		return false;
 	}
 	protected VarType checkClassType() throws CompileException {
-		if (tb.match(TokenType.ID)) {
+		if(tb.match(TokenType.ID)) {
 			VarType type = VarType.fromClassName((String)tb.current().getValue());
-			if(null != type) {
+			if(null!=type) {
 				consumeToken(tb);
 				return checkArrayType(type);
+			}
+		}
+		return null;
+	}
+	protected VarType checkExceptionType() throws CompileException {
+		if(tb.match(TokenType.ID)) {
+			if(-1!=VarType.getExceptionId((String)tb.current().getValue())) {
+				consumeToken(tb);
+				return VarType.EXCEPTION;
 			}
 		}
 		return null;
@@ -467,40 +475,57 @@ public abstract class AstNode extends SemanticAnalyzer {
 	
 	public static boolean isCompatibleWith(Scope scope, VarType left, VarType right) {
 		// Проверка одинаковых типов
-		if (left == right) return true;
+		if(left==right) {
+			return true;
+		}
 
 		//TODO Любой тип данных можно привести к Object?
-		if ("Object".equals(left.getClassName())) return true;
+		if("Object".equals(left.getClassName())) {
+			return true;
+		}
 		
 		// Специальные случаи для NULL
-		if (VarType.NULL == left || VarType.NULL == right) return left.isReferenceType() || right.isReferenceType();
+		if(VarType.NULL==left || VarType.NULL==right) {
+			return left.isReferenceType() || right.isReferenceType();
+		}
 
-		// Большинство типов можно объединить со строковой константой
-		if(VarType.CSTR == left && VarType.VOID != right) return true;
-
-		if (left.isNumeric() && right.isBoolean()) {
+		//TODO РАЗВЕ? Большинство типов можно объединить со строковой константой
+		//if(VarType.CSTR == left && VarType.VOID != right) return true;
+		if(VarType.CSTR==left || VarType.CSTR==right) {
+			return false;
+		}
+		
+		if(left.isNumeric() && right.isBoolean()) {
 			return true;
 		}
 		
 		// Проверка числовых типов
-		if (left.isNumeric() && right.isNumeric()) {
+		if(left.isNumeric() && right.isNumeric()) {
 			// FIXED совместим только с FIXED
-			if (left == VarType.FIXED || right == VarType.FIXED) return left == VarType.FIXED && right == VarType.FIXED;
+			if(left==VarType.FIXED || right==VarType.FIXED) {
+				return left==VarType.FIXED && right==VarType.FIXED;
+			}
 
 			// Для арифметических операций разрешаем смешивание любых целочисленных типов
-			return left.getSize() >= right.getSize();
+			return left.getSize()>=right.getSize();
 		}
 
 		// Проверка классовых типов
-		if (left.isClassType() && right.isClassType()) {
-			if(null == left.getClassName()) return false;
-			if(left.getClassName().equals(right.getClassName())) return true;
+		if(left.isClassType() && right.isClassType()) {
+			if(null==left.getClassName()) {
+				return false;
+			}
+			if(left.getClassName().equals(right.getClassName())) {
+				return true;
+			}
 			CIScope cis = scope.getThis().resolveCI(right.getName(), false);
 			return null!=cis && cis instanceof InterfaceScope;
 		}
 		
 		// Проверка массивов
-		if (left.isArray() && right.isArray()) return isCompatibleWith(scope, left.getElementType(), right.getElementType());
+		if(left.isArray() && right.isArray()) {
+			return isCompatibleWith(scope, left.getElementType(), right.getElementType());
+		}
     
 		return false;
 	}
@@ -526,21 +551,27 @@ public abstract class AstNode extends SemanticAnalyzer {
             if(op == tb.current().getValue()) return consumeToken(tb);
 			else throw parserError("Expected operator " + op + ", but got " + tb.current().getValue());
         }
-		else throw parserError("Expected " + TokenType.OPERATOR + ", but got " + tb.current().getType());
+		else {
+			throw parserError("Expected " + TokenType.OPERATOR + ", but got " + tb.current().getType());
+		}
     }
 	public Token consumeToken(TokenBuffer tb, Delimiter delimiter) throws CompileException {
 		if (TokenType.DELIMITER == tb.current().getType()) {
             if(delimiter == tb.current().getValue()) return consumeToken(tb);
 			else throw parserError("Expected delimiter " + delimiter + ", but got " + tb.current().getValue());
         }
-		else throw parserError("Expected " + TokenType.DELIMITER + ", but got " + tb.current().getType());
+		else {
+			throw parserError("Expected " + TokenType.DELIMITER + ", but got " + tb.current().getType());
+		}
     }
 	public Token consumeToken(TokenBuffer tb, TokenType type, Keyword keyword) throws CompileException {
 		if (type == tb.current().getType()) {
             if(keyword == tb.current().getValue()) return consumeToken(tb);
 			else throw parserError("Expected keyword " + keyword + ", but got " + tb.current().getValue());
         }
-		else throw parserError("Expected " + TokenType.KEYWORD + ", but got " + tb.current().getType());
+		else {
+			throw parserError("Expected " + TokenType.KEYWORD + ", but got " + tb.current().getType());
+		}
     }
 	
 	public CompileException parserError(String text) {
@@ -609,20 +640,23 @@ public abstract class AstNode extends SemanticAnalyzer {
 	
 	// Формирует код AST ноды единожды(см. cgDone), загружает результат в аккумулятор, если включен toAccum
 	// Код записываем в parent, но если null, то записываем в cg.getScope() он содержит текущий cgScope AST ноды
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException { 
+//	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+//		return codeGen(cg, parent, true, null);
+//	}
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException { 
 		throw new UnsupportedOperationException(this.toString());
 	}
 	
-	public CGScope depCodeGen(CodeGenerator cg) throws CompileException {
-		return depCodeGen(cg, symbol);
+	public CGScope depCodeGen(CodeGenerator cg, CGExcs excs) throws CompileException {
+		return depCodeGen(cg, symbol, excs);
 	}
-	protected CGScope depCodeGen(CodeGenerator cg, Symbol symbol) throws CompileException {
+	protected CGScope depCodeGen(CodeGenerator cg, Symbol symbol, CGExcs excs) throws CompileException {
 		if(null != symbol && symbol instanceof AstHolder) {
 			AstNode node = ((AstHolder)symbol).getNode();
 			if(null != node) {
 				// Генерация кода зависимостей не должна влиять на текущий размер аккумулятора
 				int accSize = cg.getAccumSize();
-				Object obj = node.codeGen(cg, null, false);
+				Object obj = node.codeGen(cg, null, false, excs);
 				cg.setAccumSize(accSize);
 				if(null != obj) return symbol.getCGScope();
 			}

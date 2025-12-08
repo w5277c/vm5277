@@ -25,6 +25,7 @@ import java.util.Set;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGCells;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.CodeOptimizer;
 import ru.vm5277.common.cg.RegPair;
@@ -61,16 +62,16 @@ public class CGBlockScope extends CGScope {
 		mScope = (CGMethodScope)parent.getScope(CGMethodScope.class);
 		mScope.addBlockScope(this);
 
-		lbEScope = new CGLabelScope(null, null, LabelNames.BLOCK_END, true);
+		lbEScope = new CGLabelScope(null, null, LabelNames.BLOCK_END, false);
 //		cg.addLabel(lbEScope);
 	}
 	
-	public void build(CodeGenerator cg, boolean isLaunchPoint) throws CompileException {
+	public void build(CodeGenerator cg, boolean isLaunchPoint, CGExcs excs) throws CompileException {
 		CGIContainer cont = new CGIContainer();
 		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";build block"));
 
 		if(0!=mScope.getArgsStackSize() || 0!=stackOffset) {
-			cont.append(cg.stackAlloc(isFirstBlock, mScope.getArgsStackSize(), stackOffset));
+			cont.append(cg.stackPrepare(isFirstBlock, mScope.getArgsStackSize(), stackOffset, excs));
 		}
 
 		// Регистры(если используются в качестве переменных) используемые в нативных вызовах должны быть сохранены в методе invokeNative
@@ -91,17 +92,19 @@ public class CGBlockScope extends CGScope {
 			}
 		}
 		
-		//Декрементируем счетчики ссылок
-		for(CGVarScope vScope : locals.values()) {
-			if(vScope.getType().isClassType() && !vScope.getType().isEnum()) {
-				cg.updateClassRefCount(this, vScope.getCells(), false);
+		if(!isLaunchPoint || !isFirstBlock) {
+			//Декрементируем счетчики ссылок
+			for(CGVarScope vScope : locals.values()) {
+				if(vScope.getType().isClassType() && !vScope.getType().isEnum()) {
+					cg.updateClassRefCount(this, vScope.getCells(), false);
+				}
+				else if(vScope.getType().isArray()) {
+					cg.updateArrRefCount(this, vScope.getCells(), false, vScope.isArrayView());
+				}
 			}
-			else if(vScope.getType().isArray()) {
-				cg.updateArrRefCount(this, vScope.getCells(), false, vScope.isArrayView());
+			if(!isFirstBlock && 0!=stackOffset) {
+				append(cg.blockFree(stackOffset));
 			}
-		}
-		if(!isFirstBlock && 0!=stackOffset) {
-			append(cg.blockFree(stackOffset));
 		}
 
 		if(0!=mScope.getArgsStackSize() || 0!=stackOffset) {
@@ -114,7 +117,12 @@ public class CGBlockScope extends CGScope {
 
 		
 		if(isFirstBlock) {
-			append(cg.finMethod(mScope.getType(), mScope.getArgStackSize(), stackOffset, mScope.getLastStackOffset()));
+			if(isLaunchPoint) {
+				cg.terminate(this, true, !excs.getProduced().isEmpty());
+			}
+			else {
+				append(cg.finMethod(mScope.getType(), mScope.getArgStackSize(), stackOffset, mScope.getLastStackOffset()));
+			}
 		}
 		//if(isFirstBlock && 0!=stackOffset) {
 			//append(cg.eReturn(null, mScope.getStackSize(), stackOffset, mScope.getType()));
@@ -125,10 +133,11 @@ public class CGBlockScope extends CGScope {
 			CodeOptimizer co = cg.getOptimizer();
 			if(null != co) {
 				co.optimizeJumpChains(this);
-				co.removeUnusedLabels(this);
-				co.optimizeBranchChains(this);
+//				co.optimizeBranchChains(this);
 				co.optimizePushConst(this, 'Y');
 				co.optimizePushConst(this, 'Z');
+				co.optimizeAfterJump(this);
+				co.optimizeRegLoad(parent);
 				co.optimizeBaseInstr(this);
 			}
 		}
@@ -252,12 +261,11 @@ public class CGBlockScope extends CGScope {
 	}
 	
 	public CGLabelScope getELabel() {
-		lbEScope.setUsed();
 		return lbEScope;
 	}
 
 	@Override
 	public String getLName() {
-		return "B" + resId;
+		return "";
 	}
 }

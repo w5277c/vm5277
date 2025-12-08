@@ -16,15 +16,14 @@
 package ru.vm5277.compiler.nodes;
 
 import java.util.List;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
-import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.LabelSymbol;
 import ru.vm5277.compiler.semantic.Scope;
@@ -78,7 +77,7 @@ public class LabelNode extends AstNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		CodegenResult result = null;
 		
 		CGScope cgs = null == parent ? cgScope : parent;

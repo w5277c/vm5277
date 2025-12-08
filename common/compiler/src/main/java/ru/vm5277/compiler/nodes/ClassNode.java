@@ -23,30 +23,35 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.ImplementInfo;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.ClassScope;
+import ru.vm5277.compiler.semantic.ImportableScope;
 import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class ClassNode extends ObjectTypeNode {
 	private	ClassBlockNode	blockNode;
-	private	ClassScope		classScope;
 	private	boolean			isInner;
 	
 	public ClassNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, boolean isInner, List<ObjectTypeNode> importedClasses)
 																																	throws CompileException {
 		super(tb, mc, modifiers, null, importedClasses);
+		
+		if(null!=name) {
+			VarType.addClassName(this.name, false);
+		}
 		
 		this.isInner = isInner;
 		
@@ -62,6 +67,7 @@ public class ClassNode extends ObjectTypeNode {
 			consumeToken(tb);
 			while(true) {
 				try {
+					//TODO QualifiedPath
 					impl.add((String)consumeToken(tb, TokenType.ID).getValue());
 				}
 				catch(CompileException e) {
@@ -74,10 +80,6 @@ public class ClassNode extends ObjectTypeNode {
 
 		// Парсинг тела класса
 		blockNode = new ClassBlockNode(tb, mc, this);
-	}
-	
-	public ClassScope getScope() {
-		return classScope;
 	}
 	
 	@Override
@@ -117,45 +119,54 @@ public class ClassNode extends ObjectTypeNode {
 	}
 	
 	@Override
-	public boolean declare(Scope parentScope) {
+	public boolean declare(Scope scope) {
 		boolean result = true;
 		
-		if(null!=importedClasses) {
-			for(ObjectTypeNode imported : importedClasses) {
-				result&=imported.declare(null);
-			}
-		}
-		
 		try {
-			List<VarType> implTypes = new ArrayList<>();
-			for(String ifaceName : impl) {
-				implTypes.add(VarType.fromClassName(ifaceName));
-			}
-			classScope = new ClassScope(name, parentScope, implTypes);
-			if(null!=parentScope) {
-				((ClassScope)parentScope).addCI(classScope, true);
+			ciScope = new ClassScope(scope, name);
+			if(null!=scope) {
+				((ImportableScope)scope).addCI(ciScope, true);
 			}
 
-			if(null!=importedClasses) {			
+			if(null!=importedClasses) {
 				for(ObjectTypeNode imported : importedClasses) {
-					try {
-						if(imported instanceof InterfaceNode) {
-							classScope.addCI(((InterfaceNode)imported).getScope(), false);
+					result&=imported.declare(ciScope);
+
+					if(result) {
+						try {
+							ciScope.addCI(((ObjectTypeNode)imported).getScope(), false);
 						}
-						else {
-							classScope.addCI(((ClassNode)imported).getScope(), false);
+						catch(CompileException ex) {
+							markError(ex);
+							result = false;
 						}
-					}
-					catch(CompileException ex) {
-						markError(ex);
-						result = false;
 					}
 				}
 			}
 
-			result&=blockNode.declare(classScope);
+			List<VarType> implTypes = new ArrayList<>();
+			for(String ifaceName : impl) {
+				if(null==scope.resolveCI(ifaceName, false)) {
+					markError("Interface not found: " + ifaceName);
+					result = false;
+				}
+				else {
+					implTypes.add(VarType.fromClassName(ifaceName));
+				}
+			}
+			
+			if(result) {
+				ciScope.setImplTypes(implTypes);
+			}
+
+			if(result) {
+				result&=blockNode.declare(ciScope);
+			}
 		}
-		catch(CompileException e) {markError(e); return false;}
+		catch(CompileException e) {
+			markError(e);
+			return false;
+		}
 
 		return result;
 	}
@@ -165,7 +176,7 @@ public class ClassNode extends ObjectTypeNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		if(null != importedClasses) {
 			for (ObjectTypeNode imported : importedClasses) {
-				imported.postAnalyze(classScope, cg); // Заменил scope на classScope, надо проверить
+				imported.postAnalyze(ciScope, cg); // Заменил scope на classScope, надо проверить
 			}
 		}
 
@@ -194,7 +205,7 @@ public class ClassNode extends ObjectTypeNode {
 
 		cgScope = cg.enterClass(VarType.fromClassName(name), name, implInfos, null == parentClassName);
 
-		blockNode.postAnalyze(classScope, cg);
+		blockNode.postAnalyze(ciScope, cg);
 
 		cg.leaveClass();
 		return true;
@@ -204,18 +215,18 @@ public class ClassNode extends ObjectTypeNode {
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
 		CGScope oldScope = cg.setScope(cgScope);
 		
-		blockNode.codeOptimization(classScope, cg);
+		blockNode.codeOptimization(ciScope, cg);
 		
 		cg.setScope(oldScope);
 	}
 	
 	private void fillInterfaces(List<InterfaceScope> iScopes, String ifaceName) {
-		CIScope cis = classScope.resolveCI(ifaceName, false);
+		CIScope cis = ciScope.resolveCI(ifaceName, false);
 		if(null==cis || !(cis instanceof InterfaceScope)) {
 			markError("Interface not found: " + ifaceName);
 		}
 		else if(!iScopes.contains((InterfaceScope)cis)) {
-			checkInterfaceImplementation(classScope, (InterfaceScope)cis);
+			checkInterfaceImplementation(ciScope, (InterfaceScope)cis);
 			iScopes.add((InterfaceScope)cis);
 			for(VarType type : cis.getImpl()) {
 				fillInterfaces(iScopes, type.getClassName());
@@ -223,26 +234,27 @@ public class ClassNode extends ObjectTypeNode {
 		}
 	}
 	
-	private boolean checkInterfaceImplementation(ClassScope classScope, InterfaceScope interfaceSymbol) {
+	private boolean checkInterfaceImplementation(CIScope classScope, InterfaceScope interfaceSymbol) {
 		boolean allMethodsImplemented = true;
 		
 		// Для каждого метода в интерфейсе
-		for (MethodSymbol interfaceMethod : interfaceSymbol.getMethods()) {
+		for(MethodSymbol interfaceMethod : interfaceSymbol.getMethods()) {
 			boolean found = false;
 			// Получаем методы класса с таким же именем
 			List<MethodSymbol> classMethods = classScope.getMethods(interfaceMethod.getName());
 			
 			// Проверяем каждый метод класса
-			if(null != classMethods) {
-				for (MethodSymbol classMethod : classMethods) {
-					if (interfaceMethod.getSignature().equals(classMethod.getSignature())) {
+			if(null!=classMethods) {
+				for(MethodSymbol classMethod : classMethods) {
+					if(interfaceMethod.getSignature().equals(classMethod.getSignature())) {
+						classMethod.setInterfaceImpl(true);
 						found = true;
 						break;
 					}
 				}
 			}
 
-			if (!found) {
+			if(!found) {
 				markError(	"Class '" + classScope.getName() + "' must implement method: " + interfaceMethod.getSignature() + 
 							" from interface '" + interfaceSymbol.getName() + "'");
 				allMethodsImplemented = false;
@@ -251,20 +263,20 @@ public class ClassNode extends ObjectTypeNode {
 		return allMethodsImplemented;
 	}
 	
-	public void firstCodeGen(CodeGenerator cg, MethodNode methodNode) throws CompileException {
+	public void firstCodeGen(CodeGenerator cg, MethodNode methodNode, CGExcs excs) throws CompileException {
 		cgDone = true;
 
-		methodNode.firstCodeGen(cg);
-
-		((CGClassScope)cgScope).build(cg);
+		methodNode.firstCodeGen(cg, excs);
+		
+		((CGClassScope)cgScope).build(cg, excs);
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 
-		((CGClassScope)cgScope).build(cg);
+		((CGClassScope)cgScope).build(cg, excs);
 /*		if(null != importedClasses) {
 			for (ClassNode imported : importedClasses) {
 				if(isUsed()) imported.codeGen(cg);

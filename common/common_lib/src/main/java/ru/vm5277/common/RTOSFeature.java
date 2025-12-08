@@ -13,12 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.common;
 
 public enum RTOSFeature {
 	OS_FT_IR_TABLE,
 	OS_FT_STDOUT,
 	OS_FT_WELCOME,
+	OS_FT_HEARTBEAT,
 	OS_FT_DIAG,
 	OS_FT_TIMER1,
 	OS_FT_TIMER2,
@@ -26,5 +28,6 @@ public enum RTOSFeature {
 	OS_FT_MULTITHREADING,
 	OS_ARRAY_1D,
 	OS_ARRAY_2D,
-	OS_ARRAY_3D;
+	OS_ARRAY_3D,
+	OS_FT_ETRACE;
 }

@@ -27,7 +27,8 @@ import ru.vm5277.compiler.semantic.Scope;
 import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.cg.CGExcs;
+import ru.vm5277.common.VarType;
 import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.EnumScope;
 
@@ -98,7 +99,7 @@ public class EnumExpression extends ExpressionNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(toAccum) {
 			cg.constToAcc(parent, 0x01, index, false);
 			return CodegenResult.RESULT_IN_ACCUM;

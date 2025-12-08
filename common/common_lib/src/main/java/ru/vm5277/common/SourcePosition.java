@@ -62,7 +62,9 @@ public class SourcePosition implements Cloneable {
 			sb.append("|").append(macroName.toUpperCase()).append(":").append(macroLine);
 		}
 		sb.append(" ");
-		if(null != sourceFile) sb.append(sourceFile.getAbsolutePath());
+		//TODO Лучше полный путь или нет?
+		//if(null != sourceFile) sb.append(sourceFile.getAbsolutePath());
+		if(null != sourceFile) sb.append(sourceFile.getPath());
 		sb.append("\t");
 		return sb.toString();
 		

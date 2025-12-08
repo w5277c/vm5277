@@ -14,12 +14,8 @@
  * limitations under the License.
  */
 
-import rtos.System;
-import rtos.RTOSParam;
-import hal.GPIO;
-
 class Main {
-    public static int someMethod() {
+	public static int someMethod() {
 		int i1 = 0x01020304;
 		int i2 = 0x05060708;
 		int i3 = 0x090a0b0c;
@@ -31,15 +27,13 @@ class Main {
 		}
 		
 		return i1+i2+i3+i4;
-    }
-    
-    public static void main() {
+	}
+
+	public static void main() {
 		System.setParam(RTOSParam.CORE_FREQ, 16);
 		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
 		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
 
 		System.out(someMethod());
-
-		System.stop();
 	}
 }

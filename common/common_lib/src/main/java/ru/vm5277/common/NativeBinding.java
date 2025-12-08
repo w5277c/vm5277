@@ -18,7 +18,6 @@ package ru.vm5277.common;
 import java.io.File;
 import java.text.ParseException;
 import java.util.Arrays;
-import ru.vm5277.common.compiler.VarType;
 
 public class NativeBinding {
 	private	String			signature;
@@ -69,6 +68,7 @@ public class NativeBinding {
 						case "int": paramTypes[i] = VarType.INT; break;
 						case "fixed": paramTypes[i] = VarType.FIXED; break;
 						case "cstr": paramTypes[i] = VarType.CSTR; break;
+						case "exception": paramTypes[i] = VarType.EXCEPTION; break;
 						default:
 							throw new ParseException("Invalid method parameter type " + paramsParts[i].trim() + "in: " + line, 0);
 					}

@@ -1,15 +1,19 @@
-; vm5277.avr_codegen v0.1 at Thu Nov 20 07:51:20 GMT+10:00 2025
-.equ core_freq = 16
-.equ stdout_port = 18
+; vm5277.avr_codegen v0.2
+.equ CORE_FREQ = 16
+.equ STDOUT_PORT = 18
+.set OS_ETRACE_POINT_BITSIZE = 7
 
 .set OS_FT_STDOUT = 1
-.set OS_FT_DRAM = 1
 .set OS_FT_WELCOME = 1
+.set OS_FT_DRAM = 1
+.set OS_FT_ETRACE = 1
 
 .include "devices/atmega328p.def"
 .include "core/core.asm"
+.include "sys/mcu_halt.asm"
+.include "j8b/etrace_out.asm"
+.include "j8b/etrace_add.asm"
 .include "dmem/dram.asm"
-.include "j8b/class_refcount.asm"
 .include "j8b/instanceof.asm"
 .include "j8b/clear_fields.asm"
 .include "j8b/mfin.asm"
@@ -17,80 +21,94 @@
 .include "stdio/out_num16.asm"
 .include "stdio/out_cstr.asm"
 
-j8bD98:
+j8bD116:
 .db " is short",0x0a,0x00,0x00
 
-j8bD99:
+j8bD117:
 .db "Is short too",0x0a,0x00
 
 Main:
-	rjmp j8bCMainMmain
-_j8b_meta23:
-	.db 13,0
-_j8b_meta25:
-	.db 15,1,14,2
-	.dw 0,j8bC34CShortMtoShort
+	jmp j8b_CMainMmain
+_j8b_meta_34:
+	.db 15,0
+_j8b_meta_36:
+	.db 17,1,16,2
+	.dw 0,j8b_CShortMtoShort_45
 
-j8bC28CShortMShort:
+j8b_CShortMShort_39:
 	ldi r16,low(7)
 	ldi r17,high(7)
-	rcall os_dram_alloc
+	call os_dram_alloc
+	brcc _j8b_throwskip_113
+	ldi r16,4
+	call j8bproc_etrace_addfirst
+	set
+	rjmp _j8b_eob_38
+_j8b_throwskip_113:
 	std z+0,r16
 	std z+1,r17
-	std z+2,c0x00
-	ldi r16,low(_j8b_meta25*2)
+	std z+2,c0xff
+	ldi r16,low(_j8b_meta_36*2)
 	std z+3,r16
-	ldi r16,high(_j8b_meta25*2)
+	ldi r16,high(_j8b_meta_36*2)
 	std z+4,r16
-	rcall j8bproc_clear_fields_nr
-_j8b_cinit26:
-	push yl
-	push yh
-	lds yl,SPL
-	lds yh,SPH
+	call j8bproc_clear_fields_nr
+	push r28
+	push r29
+	lds r28,SPL
+	lds r29,SPH
 	ldd r16,y+6
 	ldd r17,y+5
 	std z+5,r16
 	std z+6,r17
+_j8b_eob_38:
 	ldi r30,2
-	rjmp j8bproc_mfin_sf
+	jmp j8bproc_mfin_sf
 
-j8bC34CShortMtoShort:
+j8b_CShortMtoShort_45:
 	ldd r16,z+5
 	ldd r17,z+6
-	rjmp j8bproc_mfin
+	jmp j8bproc_mfin
 
-j8bCMainMmain:
+j8b_CMainMmain:
 	push r30
 	push r31
 	ldi r19,2
 	push r19
 	push c0x01
-	rcall j8bC28CShortMShort
+	rcall j8b_CShortMShort_39
 	movw r20,r16
 	push r30
 	push r31
 	movw r30,r20
-	ldi r19,15
-	rcall j8bproc_instanceof_nr
+	ldi r19,17
+	call j8bproc_instanceof_nr
 	pop r31
 	pop r30
 	sbrs r16,0x00
-	rjmp _j8b_eoc0
+	rjmp _j8b_eoc_0
 	push r30
 	push r31
 	movw r30,r20
-	rcall j8bC34CShortMtoShort
-	rcall os_out_num16
-	ldi r16,low(j8bD98*2)
-	ldi r17,high(j8bD98*2)
+	rcall j8b_CShortMtoShort_45
+	brtc _j8b_throwskip_115
+	ldi r18,1
+	call j8bproc_etrace_add
+	rjmp _j8b_eob_46
+_j8b_throwskip_115:
+	call os_out_num16
+	ldi r16,low(j8bD116*2)
+	ldi r17,high(j8bD116*2)
 	movw r30,r16
-	rcall os_out_cstr
-	ldi r16,low(j8bD99*2)
-	ldi r17,high(j8bD99*2)
+	call os_out_cstr
+	ldi r16,low(j8bD117*2)
+	ldi r17,high(j8bD117*2)
 	movw r30,r16
-	rcall os_out_cstr
-_j8b_eoc0:
-	movw r30,r20
-	rcall j8bproc_class_refcount_dec
-	rjmp j8bproc_mfin
+	call os_out_cstr
+_j8b_eoc_0:
+_j8b_eob_46:
+	brts _j8b_skip_118
+	jmp mcu_halt
+_j8b_skip_118:
+	call j8bproc_etrace_out
+	jmp mcu_halt

@@ -13,11 +13,18 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.common;
 
 public enum RTOSLibs {
 	STACK_ALLOC("sys/stack_alloc.asm"),
 	STACK_FREE("sys/stack_free.asm"),
+	MCU_HALT("sys/mcu_halt.asm"),
+	MCU_BLINK_FOREVER("sys/mcu_blick_forever.asm"),
+	MCU_RESET("sys/mcu_reset.asm"),
+	MCU_BLINK_N_RESET("sys/mcu_blink_n_reset.asm"),
+	ETRACE_OUT("j8b/etrace_out.asm"),
+	ETRACE_ADD("j8b/etrace_add.asm"),
 	DRAM("dmem/dram.asm"),
 	CLASS_REFCOUNT("j8b/class_refcount.asm"),
 	INCTANCEOF("j8b/instanceof.asm"),
@@ -46,8 +53,9 @@ public enum RTOSLibs {
 	ARRVIEW_ARRADDR("j8b/arrview_arraddr.asm"),
 	ROM_READ16("mem/rom_read16.asm"),
 	METHOD_FIN("j8b/mfin.asm"), //Без STACKFRAME IReg в стеке
-	METHOD_FIN_SF("j8b/mfin_sf.asm"); //С STACKFRAME IReg в стеке
-
+	METHOD_FIN_SF("j8b/mfin_sf.asm"), //С STACKFRAME IReg в стеке
+	MEM_RAMCLEAR("mem/ram_clear.asm");
+	
 	private	final	String	path;
 	private			boolean	required;
 	

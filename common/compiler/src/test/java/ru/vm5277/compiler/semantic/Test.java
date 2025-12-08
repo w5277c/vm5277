@@ -66,6 +66,6 @@ public class Test {
 		MessageContainer mc = new MessageContainer(100, true, false);
 		Lexer lexer = new Lexer("class Clazz{ void method() { byte b1 = -1; byte b2=0; byte b3=255; byte b4 = 256; byte B5=128; }}", mc);
 		ASTParser parser = new ASTParser(null, null, lexer.getTokens(), mc);
-		SemanticAnalyzer.analyze(parser.getClazz(), cg);
+		SemanticAnalyzer.analyze(parser.getClazz(), cg, null);
 	}
 }

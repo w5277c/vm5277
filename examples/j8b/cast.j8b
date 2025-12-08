@@ -13,9 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-import rtos.System;
-import rtos.RTOSParam;
-import hal.GPIO;
 
 class Main {
     public static void main() {
@@ -23,16 +20,16 @@ class Main {
 		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PB2);
 
 		int i = 0x04030201;
-		System.outCStr("orig num:");
+		System.out("orig num:");
 		System.out(i);
 		System.outChar('\n');
 
 		i = (int)(short)(int)(short)i;
-		System.outCStr("short:");
+		System.out("short:");
 		System.out(i);
 		System.outChar('\n');
 
-		System.outCStr("byte:");
+		System.out("byte:");
 		System.out((byte)i);
 		System.outChar('\n');
     }

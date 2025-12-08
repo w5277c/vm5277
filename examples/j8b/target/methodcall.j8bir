@@ -1,12 +1,12 @@
 class Main {
-    static public void main() {
+    public static void main() {
         System.setParam(2, 18);
         //AST>CONST final byte a = 1;
         //AST>CONST final byte b = 2;
         //AST>CONST final byte c = 3;
         System.out(add(3, add(3, 8)));
     }
-    static private byte add(byte b1, byte b2) {
+    private static byte add(byte b1, byte b2) {
         return b1+b2;
     }
 }

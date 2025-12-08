@@ -19,12 +19,14 @@ package ru.vm5277.compiler.nodes.commands;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.CGBranch;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
@@ -37,7 +39,7 @@ import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -271,7 +273,9 @@ public class ForNode extends CommandNode {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
 		cgScope = cg.enterLoopBlock();
-
+		
+		// Для метка на next блок используется для ForNode 
+		((CGLoopBlockScope)cgScope).getNextLbScope().setUsed();
 		// Анализ блока инициализации
 		if(null!=init) {
 			result&=init.postAnalyze(forScope, cg);
@@ -405,7 +409,7 @@ public class ForNode extends CommandNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
 
@@ -416,7 +420,7 @@ public class ForNode extends CommandNode {
 		
 		if(null!=init) {
 			//TODO VarScope не учитывает CGScope родиеля(этот) при регистрации переменной
-			init.codeGen(cg, cgs, false);
+			init.codeGen(cg, cgs, false, excs);
 		}
 		
 		if(null==condition) {
@@ -426,20 +430,20 @@ public class ForNode extends CommandNode {
 			if(!alwaysFalse) {
 				cgs.append(((CGLoopBlockScope)cgScope).getStartLbScope());
 				if(!alwaysTrue) {
-					condition.codeGen(cg, cgs, false);
+					condition.codeGen(cg, cgs, false, excs);
 				}
 			}
 		}
 		
 		if(null!=blockNode && !alwaysFalse) {
-			blockNode.codeGen(cg, cgs, false);
+			blockNode.codeGen(cg, cgs, false, excs);
 		}
 		
 		if(null!=iteration && !alwaysFalse) {
 			CGLabelScope nextLbScope = ((CGLoopBlockScope)cgScope).getNextLbScope();
 			cgs.append(nextLbScope);
 			nextLbScope.setUsed();
-			iteration.codeGen(cg, cgs, false);
+			iteration.codeGen(cg, cgs, false, excs);
 		}
 
 		if(!alwaysFalse) {
@@ -450,12 +454,12 @@ public class ForNode extends CommandNode {
 		}
 		
 		if(null!=elseBlockNode) {
-			elseBlockNode.codeGen(cg, cgs, false);
+			elseBlockNode.codeGen(cg, cgs, false, excs);
 		}
 		
 		cgs.append(((CGLoopBlockScope)cgScope).getEndLbScope());
 		
-		((CGBlockScope)cgScope).build(cg, false);
+		((CGBlockScope)cgScope).build(cg, false, excs);
 		((CGBlockScope)cgScope).restoreRegsPool();
 		return result;
 	}

@@ -1,54 +1,48 @@
-; vm5277.avr_codegen v0.1 at Thu Nov 20 06:06:46 GMT+10:00 2025
-.equ stdout_port = 18
+; vm5277.avr_codegen v0.2
+.equ STDOUT_PORT = 18
 
-.set OS_ARRAY_3D = 1
 .set OS_FT_STDOUT = 1
-.set OS_ARRAY_2D = 1
 .set OS_FT_DRAM = 1
+.set OS_ARRAY_2D = 1
+.set OS_ARRAY_3D = 1
 
 .include "devices/atmega328p.def"
 .include "core/core.asm"
+.include "sys/mcu_halt.asm"
 .include "dmem/dram.asm"
 .include "j8b/class_refcount.asm"
+.include "j8b/new_array.asm"
 .include "j8b/arr_celladdr.asm"
-.include "j8b/arr_refcount.asm"
 .include "mem/rom_read16.asm"
-.include "j8b/mfin_sf.asm"
 .include "stdio/out_num16.asm"
 .include "stdio/out_q7n8.asm"
 
-j8bD21:
+j8bD99:
 .dw 128,0,0
 
-j8bD22:
+j8bD100:
 .dw 0,25853
 
 Main:
-	rjmp j8bCMainMmain
-_j8b_meta15:
-	.db 12,0
+	jmp j8b_CMainMmain
+_j8b_meta_33:
+	.db 15,0
 
-j8bCMainMmain:
-	push yl
-	push yh
-	lds yl,SPL
-	lds yh,SPH
+j8b_CMainMmain:
+	push r28
+	push r29
+	lds r28,SPL
+	lds r29,SPH
 	push c0x00
 	push c0x00
 	ldi r20,254
-	add r20,C0x01
+	add r20,c0x01
 	ldi r16,19
 	ldi r17,0
-	push r30
-	push r31
-	rcall os_dram_alloc
-	movw r26,r30
-	pop r31
-	pop r30
-	movw r16,xl
+	call j8bproc_new_array
 	ldi r19,17
 	st x+,r19
-	st x+,C0x01
+	st x+,c0x01
 	ldi r19,9
 	st x+,r19
 	ldi r19,3
@@ -61,26 +55,26 @@ j8bCMainMmain:
 	push r16
 	push zl
 	push zh
-	ldi zl,low(j8bD21*2)
-	ldi zh,high(j8bD21*2)
+	ldi zl,low(j8bD99*2)
+	ldi zh,high(j8bD99*2)
 	ldi r16,low(6)
 	ldi r17,high(6)
-	rcall os_rom_read16_nr
+	call os_rom_read16_nr
 	pop zh
 	pop zl
 	mov r17,r16
-	clr r16
+	ldi r16,0x00
 	mov r16,r20
 	ldi r17,0x00
 	st x+,r16
 	st x+,r17
 	push zl
 	push zh
-	ldi zl,low(j8bD22*2)
-	ldi zh,high(j8bD22*2)
+	ldi zl,low(j8bD100*2)
+	ldi zh,high(j8bD100*2)
 	ldi r16,low(4)
 	ldi r17,high(4)
-	rcall os_rom_read16_nr
+	call os_rom_read16_nr
 	pop zh
 	pop zl
 	pop r16
@@ -90,7 +84,7 @@ j8bCMainMmain:
 	adiw r26,7
 	ld r16,x+
 	ld r17,x+
-	rcall os_out_q7n8
+	call os_out_q7n8
 	ldi r21,8
 	mov r16,r21
 	ldi r17,0x00
@@ -98,25 +92,19 @@ j8bCMainMmain:
 	push r29
 	push r17
 	push r16
-	lds yl,SPL
-	lds yh,SPH
-	adiw yl,0x01
+	lds r28,SPL
+	lds r29,SPH
+	adiw r28,0x01
 	ld r16,y+
 	ld r17,y+
 	lsl r16
 	rol r17
 	subi r16,low(-5)
 	sbci r17,high(-5)
-	push r30
-	push r31
-	rcall os_dram_alloc
-	movw r26,r30
-	pop r31
-	pop r30
-	movw r16,xl
+	call j8bproc_new_array
 	ldi r19,16
 	st x+,r19
-	st x+,C0x01
+	st x+,c0x01
 	ldi r19,9
 	st x+,r19
 	pop r19
@@ -129,19 +117,19 @@ j8bCMainMmain:
 	push c0x01
 	push c0x00
 	movw r26,r24
-	rcall j8bproc_arr_celladdr
+	call j8bproc_arr_celladdr
 	ldi r19,3
 	st x+,r19
-	st x,c0x00
+	st x+,c0x00
 	std y+0,c0x01
 	subi yl,low(33)
 	sbci yh,high(33)
 	std y+32,c0x01
 	ldd r19,y+33
-	add r19,C0x01
+	add r19,c0x01
 	std y+33,r19
 	ldd r19,y+32
-	adc r19,C0x00
+	adc r19,c0x00
 	std y+32,r19
 	ldd r16,y+33
 	ldd r17,y+32
@@ -149,31 +137,31 @@ j8bCMainMmain:
 	push r19
 	push c0x00
 	movw r26,r24
-	rcall j8bproc_arr_celladdr
+	call j8bproc_arr_celladdr
 	ld r19,-x
 	cp r17,r19
 	breq pc+0x02
-	brcc _j8b_eoc0
+	brcc _j8b_eoc_0
 	ld r19,-x
 	cp r16,r19
-	brcc _j8b_eoc0
+	brcc _j8b_eoc_0
 	ldi r19,3
 	push r19
 	push c0x00
 	movw r26,r24
-	rcall j8bproc_arr_celladdr
+	call j8bproc_arr_celladdr
 	ld r16,x+
 	ld r17,x+
-	rcall os_out_num16
-_j8b_eoc0:
+	call os_out_num16
+_j8b_eoc_0:
 	push c0x01
 	push c0x00
 	movw r26,r24
-	rcall j8bproc_arr_celladdr
+	call j8bproc_arr_celladdr
 	ld r16,x+
 	ld r17,x+
 	mov r17,r16
-	clr r16
+	ldi r16,0x00
 	push r17
 	push r16
 	movw r26,r22
@@ -185,7 +173,7 @@ _j8b_eoc0:
 	push r30
 	push r31
 	movw r30,r22
-	rcall j8bproc_class_refcount_dec
+	call j8bproc_class_refcount_dec
 	pop r31
 	pop r30
 	ldi r22,0
@@ -193,14 +181,9 @@ _j8b_eoc0:
 	push r30
 	push r31
 	movw r30,r24
-	rcall j8bproc_class_refcount_dec
+	call j8bproc_class_refcount_dec
 	pop r31
 	pop r30
 	ldi r24,0
 	ldi r25,0
-	movw r26,r22
-	rcall j8bproc_arr_refcount_dec
-	movw r26,r24
-	rcall j8bproc_arr_refcount_dec
-	ldi r30,0
-	rjmp j8bproc_mfin_sf
+	jmp mcu_halt

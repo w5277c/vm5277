@@ -15,7 +15,7 @@
  */
 package ru.vm5277.compiler.semantic;
 
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 
 public class ClassSymbol extends Symbol {
 	private	final	Scope	scope;

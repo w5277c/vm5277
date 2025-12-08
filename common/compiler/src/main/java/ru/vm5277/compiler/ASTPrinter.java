@@ -19,13 +19,14 @@ import java.io.BufferedWriter;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.Operator;
-import ru.vm5277.common.compiler.VarType;
-import ru.vm5277.compiler.nodes.ArrayDeclarationNode;
+import ru.vm5277.common.VarType;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.BlockNode;
+import ru.vm5277.compiler.nodes.CatchBlock;
 import ru.vm5277.compiler.nodes.ClassBlockNode;
 import ru.vm5277.compiler.nodes.ClassNode;
 import ru.vm5277.compiler.nodes.EnumNode;
+import ru.vm5277.compiler.nodes.ExceptionNode;
 import ru.vm5277.compiler.nodes.FieldNode;
 import ru.vm5277.compiler.nodes.InterfaceBodyNode;
 import ru.vm5277.compiler.nodes.InterfaceNode;
@@ -34,14 +35,12 @@ import ru.vm5277.compiler.nodes.MethodNode;
 import ru.vm5277.compiler.nodes.ParameterNode;
 import ru.vm5277.compiler.nodes.VarNode;
 import ru.vm5277.compiler.nodes.commands.BreakNode;
-import ru.vm5277.compiler.nodes.commands.CommandNode.AstCase;
 import ru.vm5277.compiler.nodes.commands.ContinueNode;
 import ru.vm5277.compiler.nodes.commands.DoWhileNode;
 import ru.vm5277.compiler.nodes.commands.ForNode;
 import ru.vm5277.compiler.nodes.commands.IfNode;
 import ru.vm5277.compiler.nodes.commands.ReturnNode;
 import ru.vm5277.compiler.nodes.commands.SwitchNode;
-import ru.vm5277.compiler.nodes.commands.ThrowNode;
 import ru.vm5277.compiler.nodes.commands.TryNode;
 import ru.vm5277.compiler.nodes.commands.WhileNode;
 import ru.vm5277.compiler.nodes.expressions.ArrayExpression;
@@ -63,7 +62,6 @@ import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
 import ru.vm5277.compiler.nodes.expressions.UnaryExpression;
 import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
 import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
-import ru.vm5277.compiler.semantic.FieldSymbol;
 import ru.vm5277.compiler.tokens.Token;
 
 public class ASTPrinter {
@@ -148,6 +146,31 @@ public class ASTPrinter {
 					EnumNode en = (EnumNode)node;
 					printModifiers(en.getModifiers());
 					out.put("enum ");
+					out.put(en.getName());
+					out.put(" {");
+					if(!en.getValues().isEmpty()) {
+						out.print();
+						out.extend();
+						for(int i=0; i<en.getValues().size(); i++) {
+							
+							out.put(en.getValues().get(i).toUpperCase());
+							if(i!=en.getValues().size()-1) {
+								out.put(",");
+							}
+							else {
+								out.put(";");
+							}
+							out.print();
+						}
+						out.reduce();
+						out.put("}");
+					}
+					out.print();
+				}
+				else if(node instanceof ExceptionNode) {
+					ExceptionNode en = (ExceptionNode)node;
+					printModifiers(en.getModifiers());
+					out.put("exception ");
 					out.put(en.getName());
 					out.put(" {");
 					if(!en.getValues().isEmpty()) {
@@ -447,15 +470,12 @@ public class ASTPrinter {
 		else if(node instanceof ClassNode) {
 			printClass((ClassNode)node);
 		}
-		else if(node instanceof ArrayDeclarationNode) {
-			//TODO
-		}
 		else if(node instanceof FieldNode) {
 			printField((FieldNode)node);
 			out.put(";");
 		}
 		else if(node instanceof VarNode) {
-			VarNode vNode = (VarNode)node; //TODO повотрить для остальных
+			VarNode vNode = (VarNode)node;
 			if(vNode.isFinal() && null!=vNode.getSymbol() && !vNode.getSymbol().isReassigned()) {
 				out.put("//AST>CONST ");
 			}
@@ -476,39 +496,17 @@ public class ASTPrinter {
 			TryNode tryNode = (TryNode)node;
 			out.put("try ");
 			printBody(tryNode.getTryBlock());
-			if(!tryNode.getCatchCases().isEmpty() || null != tryNode.getCatchDefault()) {
-				out.print();
-				out.put("catch (byte ");
-				out.put(tryNode.getVarName());
-				out.put(") ");
-				if(tryNode.getCatchCases().isEmpty()) {
-					printBody(tryNode.getCatchDefault());
+			out.print();
+			for(CatchBlock cBlock : tryNode.getCatchBlocks()) {
+				out.put("catch(");
+				for(ExpressionNode arg : cBlock.getArgs()) {
+					printExpr(arg);
+					out.put(", ");
 				}
-				else {
-					out.put("{");
-					out.print();
-					out.extend();
-					for(AstCase astCase : tryNode.getCatchCases()) {
-						out.put("case " + astCase.getValuesAsStr());
-						out.put(": ");
-						printBody(astCase.getBlock());
-						out.print();
-					}
-					if(null != tryNode.getCatchDefault()) {
-						out.put("default: ");
-						printBody(tryNode.getCatchDefault());
-					}
-					out.print();
-					out.reduce();
-					out.put("}");
-				}
+				out.removeLast(2);
+				out.put(" " + cBlock.getVarName() + ") ");
+				printBody(cBlock);
 			}
-
-		}
-		else if(node instanceof ThrowNode) {
-			out.put("throw ");
-			printExpr(((ThrowNode)node).getExceptionExpr());
-			out.put(";");
 		}
 		else {
 			out.put("!unknown node:" + node); out.print();
@@ -626,7 +624,7 @@ public class ASTPrinter {
 		}
 		else if(expr instanceof TypeReferenceExpression) {
 			TypeReferenceExpression te = (TypeReferenceExpression)expr;
-			out.put(te.getClassPath());
+			out.put(te.getQualifiedPath());
 		}
 		else if(expr instanceof CastExpression) {
 			CastExpression ce = (CastExpression)expr;

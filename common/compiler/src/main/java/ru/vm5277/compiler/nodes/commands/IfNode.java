@@ -21,6 +21,7 @@ import java.util.List;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.CGBranch;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
@@ -30,7 +31,7 @@ import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -271,7 +272,7 @@ public class IfNode extends CommandNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
 
@@ -279,26 +280,26 @@ public class IfNode extends CommandNode {
 		cgs.setBranch(branch);
 		
 		if(alwaysTrue) {
-			thenBlockNode.codeGen(cg, cgs, false);
+			thenBlockNode.codeGen(cg, cgs, false, excs);
 			return null;
 		}
 		if(alwaysFalse) {
 			if(elseBlockNode != null) {
-				elseBlockNode.codeGen(cg, cgs, false);
+				elseBlockNode.codeGen(cg, cgs, false, excs);
 			}
 			return null;
 		}
 		
-		Object obj = condition.codeGen(cg, cgs, true);
+		Object obj = condition.codeGen(cg, cgs, true, excs);
 		
 		//Если результат стал известен без runtime
 		if(obj == CodegenResult.TRUE) {
-			thenBlockNode.codeGen(cg, cgs, false);
+			thenBlockNode.codeGen(cg, cgs, false, excs);
 			return null;
 		}
 		else if(obj == CodegenResult.FALSE) {
 			if(elseBlockNode != null) {
-				elseBlockNode.codeGen(cg, cgs, false);
+				elseBlockNode.codeGen(cg, cgs, false, excs);
 			}
 			return null;
 		}
@@ -309,11 +310,11 @@ public class IfNode extends CommandNode {
 		
 		CGLabelScope endScope = new CGLabelScope(null, CGScope.genId(), LabelNames.COMPARE_END, true);
 		
-		thenBlockNode.codeGen(cg, cgs, false);
+		thenBlockNode.codeGen(cg, cgs, false, excs);
 		if(null!=elseBlockNode) {
 			cg.jump(cgs, endScope);
 			cgs.append(branch.getEnd());
-			elseBlockNode.codeGen(cg, cgs, false);
+			elseBlockNode.codeGen(cg, cgs, false, excs);
 			cgs.append(endScope);
 		}
 		else {

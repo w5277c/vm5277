@@ -9,7 +9,7 @@ class Main {
         OK,
         ERROR;
     }
-    static public void main() {
+    public static void main() {
         System.setParam(2, 18);
         System.out(EStatus.ERROR.index());
         System.out(EStatus.size());
@@ -24,7 +24,7 @@ class Main {
         System.out(EStatus.item(EStatus.ERROR.index()).index());
         System.out(EStatus.ERROR.index());
     }
-    static public void printDirection(EDirection dir) {
+    public static void printDirection(EDirection dir) {
         System.out(dir.index());
     }
 }

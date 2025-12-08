@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.common.cg.scopes;
 
 public class CGLabelScope extends CGScope {
@@ -24,8 +25,8 @@ public class CGLabelScope extends CGScope {
 		super();
 		
 		this.resId = (null == resId ? idCntr++ : resId);
-		//this.name = "j8b" + (null == scope ? "" : scope.getLPath()) + (null != name ? name : "") + this.resId;
-		this.name = (null == scope ? (name + (-1 == this.resId ? "" : this.resId)) : ("j8b" + (null != name ? name : "") + this.resId + scope.getLPath()));
+		this.name = (null == scope ?	((null!=name ? name : "") + (-1==this.resId ? "" : "_" + this.resId)) :
+										("j8b_" + scope.getLPath()) + "_" + (null!=name ? name  + "_" : "") + this.resId);
 		this.isUsed = isUsed;
 	}
 

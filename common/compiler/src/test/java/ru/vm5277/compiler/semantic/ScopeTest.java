@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class ScopeTest {
@@ -32,8 +32,8 @@ public class ScopeTest {
 
     @BeforeEach
     void setup() throws CompileException {
-        globalScope = new ClassScope("Global", null, new ArrayList<>());
-        childScope = new ClassScope("Child", globalScope, new ArrayList<>());
+        globalScope = new ClassScope(null, "Global");
+        childScope = new ClassScope(globalScope, "Child");
     }
 
     @Test

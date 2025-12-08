@@ -98,7 +98,7 @@ public class CodeSegment {
 			total += (block.getWSize() - block.getOverlap());
 		}
 		System.out.println(" -----");
-		System.out.println(" Total\t:  " + total + " words (" + (total*2) + " bytes) " + (int)(100d/wSize*total) + "%");
+		System.out.println(" Total\t:  " + total + " words (" + (total*2) + " bytes) " + String.format("%.1f", 100d*total/wSize) + "%");
 	}
 
 	public void build(Builder builder) throws IOException {

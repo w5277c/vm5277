@@ -10,3 +10,7 @@
 *.map
 /common/compiler/target/
 /common/stub_codegen/target/
+bin/j8bc.exe
+bin/j8bc
+bin/avrasm.exe
+bin/avrasm

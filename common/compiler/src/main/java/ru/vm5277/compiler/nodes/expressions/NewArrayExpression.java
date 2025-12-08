@@ -22,10 +22,11 @@ import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Delimiter;
@@ -158,18 +159,18 @@ public class NewArrayExpression extends ExpressionNode {
 			}
 
 			if(null==constDimensions) {
-				cg.setRTOSFeature(RTOSFeature.OS_ARRAY_3D);
+				cg.setFeature(RTOSFeature.OS_ARRAY_3D);
 			}
 			else {
 				switch(depth) {
 					case 0x01:
-						cg.setRTOSFeature(RTOSFeature.OS_ARRAY_1D);
+						cg.setFeature(RTOSFeature.OS_ARRAY_1D);
 						break;
 					case 0x02:
-						cg.setRTOSFeature(RTOSFeature.OS_ARRAY_2D);
+						cg.setFeature(RTOSFeature.OS_ARRAY_2D);
 						break;
 					default:
-						cg.setRTOSFeature(RTOSFeature.OS_ARRAY_3D);
+						cg.setFeature(RTOSFeature.OS_ARRAY_3D);
 				}
 			}
 
@@ -220,7 +221,7 @@ public class NewArrayExpression extends ExpressionNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		CodegenResult result = null;
 
 		if(null==constDimensions) {
@@ -232,20 +233,20 @@ public class NewArrayExpression extends ExpressionNode {
 					cg.pushConst(cgScope, 0x02, ((LiteralExpression)expr).getNumValue(), false);
 				}
 				else {
-					expr.codeGen(cg, null, true);
+					expr.codeGen(cg, null, true, excs);
 					//TODO 0x02 - количество байт под размер массива
 					cgScope.append(cg.accCast(null, VarType.SHORT));
 					cg.pushAccBE(cgScope, 0x02);
 				}
 			}
 		}
-		cgScope.append(cg.eNewArray(type, depth, constDimensions));
+		cgScope.append(cg.eNewArray(type, depth, constDimensions, excs));
 		if(null==constDimensions) {
 			cg.popStackReg(cgScope);
 		}
 		if(null!=aiExpr) {
 			cg.pushAccBE(cgScope, 0x02);
-			aiExpr.codeGen(cg, cgScope, false);
+			aiExpr.codeGen(cg, cgScope, false, excs);
 			cg.popAccBE(cgScope, 0x02);
 		}
 

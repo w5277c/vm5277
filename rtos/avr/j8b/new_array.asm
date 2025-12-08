@@ -16,6 +16,8 @@
  
  .include "dmem/dram.asm"
  
+;TODO добавить проверку на OUT_OF_MEMORY (C=true) после OS_DRAM_ALLOC, возвращать флаг C
+ 
 .IFNDEF J8BPROC_NEW_ARRAY
 ;-----------------------------------------------------------
 J8BPROC_NEW_ARRAY:

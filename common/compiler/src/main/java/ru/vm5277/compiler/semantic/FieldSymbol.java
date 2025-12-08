@@ -15,17 +15,17 @@
  */
 package ru.vm5277.compiler.semantic;
 
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.FieldNode;
 
 public class FieldSymbol extends AstHolder {
-	private	final	ClassScope		scope;
+	private	final	CIScope			scope;
 	private			AstNode			astNode;
 	private			boolean			isPrivate;
 	private			int[]			arrayDimensions	= null;
 	
-	public FieldSymbol(String name, VarType returnType, boolean isFinal, boolean isStatic, boolean isPrivate, ClassScope scope, FieldNode astNode) {
+	public FieldSymbol(String name, VarType returnType, boolean isFinal, boolean isStatic, boolean isPrivate, CIScope scope, FieldNode astNode) {
 		super(name, returnType, isFinal, isStatic, false);
 		
 		
@@ -34,7 +34,7 @@ public class FieldSymbol extends AstHolder {
 		this.isPrivate = isPrivate;
 	}
 
-	public ClassScope getScope() {
+	public CIScope getScope() {
 		return scope;
 	}
 	

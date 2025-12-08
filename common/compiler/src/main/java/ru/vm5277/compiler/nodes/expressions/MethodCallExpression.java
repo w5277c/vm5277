@@ -16,8 +16,13 @@
 
 package ru.vm5277.compiler.nodes.expressions;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import ru.vm5277.common.ExcsThrowPoint;
+import ru.vm5277.common.Pair;
 import ru.vm5277.common.RTOSFeature;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.Operand;
@@ -27,7 +32,7 @@ import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.compiler.CodegenResult;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -43,10 +48,17 @@ import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.StrUtils;
-import ru.vm5277.common.SystemParam;
+import ru.vm5277.common.RTOSParam;
+import ru.vm5277.common.cg.CGExcs;
+import ru.vm5277.common.cg.TargetInfoBuilder;
+import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.cg.scopes.CGLabelScope;
+import ru.vm5277.common.cg.scopes.CGTryBlockScope;
 import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
+import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.ClassScope;
+import ru.vm5277.compiler.semantic.ExceptionScope;
 import ru.vm5277.compiler.semantic.MethodScope;
 
 public class MethodCallExpression extends ExpressionNode {
@@ -171,6 +183,34 @@ public class MethodCallExpression extends ExpressionNode {
 				else if(targetExpr instanceof TypeReferenceExpression) {
 					cis = ((TypeReferenceExpression)targetExpr).getScope();
 					symbol = cis.resolveMethod(methodName, argTypes, true);
+					
+					// Проверяем наличие throws в методе или блоков try-catch для ExceptionScope throw (кроме unchecked exceptions)
+					if(cis instanceof ExceptionScope) {
+						ExceptionScope eScope = (ExceptionScope)cis;
+						VarType.setUsedException(eScope.getId());
+						
+						if(!eScope.isUnchecked()) {
+							Scope scope_ = scope;
+							while(null!=scope_) {
+								if(scope_ instanceof BlockScope) {
+									if(eScope.isCompatible(((BlockScope)scope_).getExceptionScopes())) {
+										break;
+									}
+								}
+								else if(scope_ instanceof MethodScope) {
+									if(eScope.isCompatible(((MethodScope)scope_).getExceptionScopes())) {
+										break;
+									}
+								}
+								scope_ = scope_.getParent();
+							}
+
+							if(null==scope_) {
+								markError("Unhandled exception '" + eScope.getName() + "'");
+								result = false;
+							}
+						}
+					}
 				}
 				else if(targetExpr instanceof VarFieldExpression) {
 					VarType varType = ((VarFieldExpression)targetExpr).getSymbol().getType();
@@ -182,7 +222,7 @@ public class MethodCallExpression extends ExpressionNode {
 					}
 				}
 				if(null==symbol) {
-					markError(	"Method " + (null==type ? VarType.VOID : type) + " " + (null==targetExpr ? "" : targetExpr + ".") + methodName +
+					markError(	"Method " + (null==type ? VarType.VOID : type) + " " + getQualifiedPath() +
 								"(" + StrUtils.toString(argTypes) + ") not found");
 					result = false;
 				}
@@ -192,8 +232,32 @@ public class MethodCallExpression extends ExpressionNode {
 				isThisMethodCall = (scope.getThis()==cis);
 				type = symbol.getType();
 				symbol.setCGScope(cgScope);
-				
+
 				((MethodSymbol)symbol).markUsed();
+				
+/*
+				Set<ExceptionScope> eScopes = ((MethodScope)((MethodSymbol)symbol).getScope()).getExceptionScopes();
+				if(!eScopes.isEmpty()) {
+					for(ExceptionScope eScope : eScopes) {
+						Scope _scope = scope;
+						while(null!=_scope) {
+							if(_scope instanceof BlockScope) {
+								if(((BlockScope)_scope).containsException(eScope)) {
+									break;
+								}
+							}
+							else if(_scope instanceof MethodScope) {
+								if(((MethodScope)_scope).containsException(eScope)) {
+									break;
+								}
+							}
+							_scope = _scope.getParent();
+						}
+
+						if(null==_scope) {
+						}
+					}
+				}*/
 			}
 			
 			if(result) {
@@ -240,11 +304,11 @@ public class MethodCallExpression extends ExpressionNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		CGScope cgs = null == parent ? cgScope : parent;
 
 		if(null!=targetExpr) {
-			targetExpr.codeGen(cg, cgs, false);
+			targetExpr.codeGen(cg, cgs, false, excs);
 		}
 
 		String classNameStr = cis.getName();
@@ -261,10 +325,14 @@ public class MethodCallExpression extends ExpressionNode {
 			
 			int paramId = (int)((LiteralExpression)args.get(0)).getNumValue();
 			int valueId = (int)((LiteralExpression)args.get(1)).getNumValue();
-			SystemParam sp = SystemParam.values()[paramId];
+			RTOSParam sp = RTOSParam.values()[paramId];
 			switch(sp) {
+				case ACTLED_PORT:
+					cg.setFeature(RTOSFeature.OS_FT_HEARTBEAT);
 				case CORE_FREQ:
 				case STDOUT_PORT:
+				case HALT_OK_MODE:
+				case HALT_ERR_MODE:
 					cg.setParam(sp, valueId);
 					break;
 				case MULTITHREADING:
@@ -282,17 +350,69 @@ public class MethodCallExpression extends ExpressionNode {
 					break;
 			}
 		}
+		else if(cis instanceof ExceptionScope && (signature.endsWith(".throw []") || signature.endsWith(".throw [byte]"))) {
+			ExceptionScope eScope = (ExceptionScope)cis;
+			excs.getProduced().add(eScope.getId());
+			if(0x01==args.size()) {
+				if(CodegenResult.RESULT_IN_ACCUM!=args.get(0x00).codeGen(cg, cgs, true, excs)) {
+					throw new CompileException("Accum not used for operand:" + args.get(0x00));
+				}
+			}
+
+			CGLabelScope lbScope = null;
+			boolean	isMethodLeave = false;
+			CGScope cgScope_ = cgScope;
+			l1:			
+			// Ищем подходящий обработчик исключения: блок catch или выход из метода
+			while(null!=cgScope_) {
+				if(cgScope_ instanceof CGTryBlockScope) {
+					for(Integer catchExceptionId : ((CGTryBlockScope)cgScope_).getExceptionIds()) {
+						if(eScope.isCompatible(catchExceptionId)) {
+							lbScope = ((CGTryBlockScope)cgScope_).getCatchLabel(catchExceptionId);
+							break l1;
+						}
+					}
+				}
+				if(null!=cgScope_.getParent() && cgScope_.getParent() instanceof CGMethodScope) {
+					if(eScope.isUnchecked()) {
+						isMethodLeave = true;
+						lbScope = ((CGBlockScope)cgScope_).getELabel();
+						break;
+					}
+					else {
+						for(Integer catchExceptionId : ((CGMethodScope)cgScope_.getParent()).getExceptionIds()) {
+							if(eScope.isCompatible(catchExceptionId)) {
+								isMethodLeave = true;
+								lbScope = ((CGBlockScope)cgScope_).getELabel();
+								break l1;
+							}
+						}
+					}
+				}
+				cgScope_ = cgScope_.getParent();
+			}
+			
+			if(null==lbScope) {
+				throw new CompileException("COMPILER ERROR: Unable to locate exception handling label for " + signature);
+			}
+
+			ExcsThrowPoint excsThrowPoint = cg.getTargetInfoBuilder().addExcsThrowPoint(cg, sp, signature);
+			cg.eThrow(cgs, eScope.getId(), isMethodLeave, lbScope, 0x01==args.size(), excsThrowPoint);
+		}
 		else if(symbol.isNative()) {
 			cg.nativeMethodInit(cgs, signature);
 			for(int i=0; i<args.size(); i++) {
 				ExpressionNode argExpr = args.get(i);
 				cg.accResize(argTypes[i]);
-				if(CodegenResult.RESULT_IN_ACCUM!=argExpr.codeGen(cg, cgs, true)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=argExpr.codeGen(cg, cgs, true, excs)) {
 					throw new CompileException("Accum not used for argument:" + argExpr);
 				}
 				cg.nativeMethodSetArg(cgs, signature, i);
 			}
 			cg.nativeMethodInvoke(cgs, signature);
+			
+			// Точно нативным методам нужно бросать исключения?
+			//checkThrow(cg, cgScope, cgs);
 		}
 		else {
 		//	CGLabelScope rpCGScope = null;
@@ -313,7 +433,7 @@ public class MethodCallExpression extends ExpressionNode {
 			else {
 				int refTypeSize = 1; // TODO Определить значение на базе количества используемых типов класса
 			
-				depCodeGen(cg);
+				depCodeGen(cg, excs);
 
 				CGMethodScope mScope = (CGMethodScope)((AstHolder)symbol).getNode().getCGScope().getScope(CGMethodScope.class);
 
@@ -341,7 +461,7 @@ public class MethodCallExpression extends ExpressionNode {
 					}
 				}
 
-				putArgsToStack(cg, cgs, refTypeSize);
+				putArgsToStack(cg, cgs, refTypeSize, excs);
 
 /*				int methodSN = -1;
 				if(null != symbol.getCGScope()) {
@@ -357,14 +477,18 @@ public class MethodCallExpression extends ExpressionNode {
 					List<AstNode> depends = cis.fillDepends(((MethodSymbol)symbol).getSignature());
 					if(null != depends) {
 						for(AstNode node : depends) {
-							node.codeGen(cg, null, false);
+							node.codeGen(cg, null, false, excs);
 						}
 					}
 					int methodSN = cis.getMethodSN(symbol.getName(), ((MethodSymbol)symbol).getSignature());
 					cg.invokeInterfaceMethod(cgs, classNameStr, symbol.getName(), type, argTypes, VarType.fromClassName(cis.getName()), methodSN);
 				}
 
-
+				// Выходим, если исключений не ожидаем и не произвели (в том числе и unchecked)
+				if(!excs.getRuntimeChecks().isEmpty() || !excs.getProduced().isEmpty()) {
+					checkThrow(cg, cgScope, cgs, excs, signature);
+				}
+				
 				if(!type.isVoid()) {
 					cg.accCast(null, type);
 					return CodegenResult.RESULT_IN_ACCUM;
@@ -375,11 +499,73 @@ public class MethodCallExpression extends ExpressionNode {
 		return null;
 	}
 
-	private Operand makeNativeOperand(CodeGenerator cg, ExpressionNode expr) throws CompileException {
+	private void checkThrow(CodeGenerator cg, CGScope cgScope, CGScope cgs, CGExcs excs, String signature) throws CompileException {
+		List<Pair<CGLabelScope, Set<Integer>>> exceptionHandlers = new ArrayList<>();
+		CGLabelScope endMethodLbScope = null;
+
+		CGScope cgScope_ = cgScope;
+		l1:				
+		while(null!=cgScope_) {
+			if(cgScope_ instanceof CGTryBlockScope) {
+				CGTryBlockScope tryCatchBlock = (CGTryBlockScope)cgScope_;
+				for(CGLabelScope catchLabel : tryCatchBlock.getCatchLabels()) {
+					// Проверка на базовый Exception - под него попадает любое исключение
+					if(tryCatchBlock.containsException(catchLabel, 0x00)) {
+						exceptionHandlers.add(new Pair<CGLabelScope, Set<Integer>>(tryCatchBlock.getCatchLabel(0x00), null));
+						// Все обрабатываемые исключения здесь обрабатаны
+						excs.getRuntimeChecks().clear();
+						excs.getProduced().clear();
+						break l1;
+					}
+
+					// Список в котором будут ид исключения, обрабатывемые текущим catch блоком
+					HashSet<Integer> exceptionIds = new HashSet<>();
+					// Перебираем произведенные исключения
+					for(int producedExceptionId : new ArrayList<>(excs.getProduced())) {
+						// Анализируем в цикле текущее исключение и все от которых оно наследуется
+						boolean gotIt = false;
+						Integer exceptionId = producedExceptionId;
+						while(null!=exceptionId) {
+							// Если исключение обрабатывается в данном catch, то добавляем его в список и удаляем из ожидаемых
+							if(tryCatchBlock.containsException(catchLabel, exceptionId)) {
+								excs.getRuntimeChecks().remove(exceptionId);
+								exceptionIds.add(exceptionId);
+								gotIt = true;
+								// Достаточно первого найденного совместимого типа в иерархии
+								break;
+							}
+							// Получаем родителя
+							exceptionId = VarType.getExceptionParent(exceptionId);
+						}
+						// Удаляем исключение из списка произведенных (указываем что оно обработано)
+						if(gotIt) {
+							excs.getProduced().remove(producedExceptionId);
+						}
+					}
+
+					// Если список обрабатываемых исключений не пустой, то формируем обработчик
+					if(!exceptionIds.isEmpty()) {
+						exceptionHandlers.add(new Pair<CGLabelScope, Set<Integer>>(catchLabel, exceptionIds));
+					}
+				}
+			}
+			// Находим выход из метода
+			if(null!=cgScope_.getParent() && cgScope_.getParent() instanceof CGMethodScope) {
+				endMethodLbScope = ((CGBlockScope)cgScope_).getELabel();
+				break;
+			}
+			cgScope_ = cgScope_.getParent();
+		}
+
+		ExcsThrowPoint excsThrowPoint = cg.getTargetInfoBuilder().addExcsThrowPoint(cg, sp, signature);
+		cg.throwCheck(cgs, exceptionHandlers, endMethodLbScope, excsThrowPoint);
+	}
+	
+	private Operand makeNativeOperand(CodeGenerator cg, ExpressionNode expr, CGExcs excs) throws CompileException {
 		if(expr instanceof VarFieldExpression) {
 			VarFieldExpression ve = (VarFieldExpression)expr;
 			// Кодогенерация VarFieldExpression выполняет запись значения в аккумулятор, но нам этого не нужно, выполняем только зависимость
-			ve.depCodeGen(cg);
+			ve.depCodeGen(cg, excs);
 			return new Operand(VarType.CSTR == ve.getType() ? OperandType.FLASH_RES : OperandType.LOCAL_RES, ve.getSymbol().getCGScope().getResId());
 		}
 		else if(expr instanceof LiteralExpression) {
@@ -399,33 +585,33 @@ public class MethodCallExpression extends ExpressionNode {
 		}
 		else if(expr instanceof MethodCallExpression) {
 			MethodCallExpression mce = (MethodCallExpression)expr;
-			mce.codeGen(cg, null, false);
+			mce.codeGen(cg, null, false, excs);
 			return new Operand(OperandType.ACCUM, null);
 		}
 		else if(expr instanceof CastExpression) {
 			CastExpression ce = (CastExpression)expr;
-			ce.codeGen(cg, null, false);
-			return makeNativeOperand(cg, ce.getOperand());
+			ce.codeGen(cg, null, false, excs);
+			return makeNativeOperand(cg, ce.getOperand(), excs);
 		}
 		else if(expr instanceof BinaryExpression) {
 			BinaryExpression be = (BinaryExpression)expr;
-			be.codeGen(cg, null, false);
+			be.codeGen(cg, null, false, excs);
 			return new Operand(OperandType.ACCUM, null);
 		}
 		else if(expr instanceof UnaryExpression) {
 			UnaryExpression ue = (UnaryExpression)expr;
-			ue.codeGen(cg, null, true);
+			ue.codeGen(cg, null, true, excs);
 			return new Operand(OperandType.ACCUM, null);
 		}
 		else if(expr instanceof ArrayExpression) {
 			ArrayExpression ae = (ArrayExpression)expr;
-			ae.codeGen(cg, null, false);
+			ae.codeGen(cg, null, false, excs);
 
 			return new Operand(OperandType.ARRAY, null);
 		}
 		else if(expr instanceof PropertyExpression) {
 			PropertyExpression ape = (PropertyExpression)expr;
-			ape.codeGen(cg, null, true);
+			ape.codeGen(cg, null, true, excs);
 			return new Operand(OperandType.ACCUM, null);
 		}
 		else if(expr instanceof EnumExpression) {
@@ -434,7 +620,7 @@ public class MethodCallExpression extends ExpressionNode {
 		else throw new CompileException("Unexpected expression:" + expr);
 	}
 
-	private void putArgsToStack(CodeGenerator cg, CGScope cgs, int refTypeSize) throws CompileException {
+	private void putArgsToStack(CodeGenerator cg, CGScope cgs, int refTypeSize, CGExcs excs) throws CompileException {
 		if(!args.isEmpty()) {
 //			CGScope oldCGScope = cg.setScope(symbol.getCGScope());
 
@@ -476,20 +662,20 @@ public class MethodCallExpression extends ExpressionNode {
 
 					if(argExpr instanceof LiteralExpression) {
 						// Выполняем зависимость
-						argExpr.codeGen(cg, cgs, false);
+						argExpr.codeGen(cg, cgs, false, excs);
 						LiteralExpression le = (LiteralExpression)argExpr;
 						cg.pushConst(cgs, exprTypeSize, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed());
 					}
 					else if(argExpr instanceof VarFieldExpression) {
-						argExpr.codeGen(cg, cgs, false);
+						argExpr.codeGen(cg, cgs, false, excs);
 						cg.pushCells(cgs, exprTypeSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells());
 					}
 					else if(argExpr instanceof MethodCallExpression) {
-						argExpr.codeGen(cg, cgs, true);
+						argExpr.codeGen(cg, cgs, true, excs);
 						cg.pushAccBE(cgs, paramVarType.getSize());
 					}
 					else if(argExpr instanceof BinaryExpression) {
-						argExpr.codeGen(cg, cgs, true);
+						argExpr.codeGen(cg, cgs, true, excs);
 						cg.pushAccBE(cgs, paramVarType.getSize());
 					}
 					else if(argExpr instanceof EnumExpression) {
@@ -506,6 +692,11 @@ public class MethodCallExpression extends ExpressionNode {
 	@Override
 	public List<AstNode> getChildren() {
 		return null;
+	}
+
+	@Override
+	public String getQualifiedPath() {
+		return (null!=targetExpr ? targetExpr.getQualifiedPath() + ".": "" ) + methodName;
 	}
 
 	@Override

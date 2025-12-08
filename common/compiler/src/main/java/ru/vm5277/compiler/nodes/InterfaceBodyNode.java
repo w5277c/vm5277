@@ -18,12 +18,13 @@ package ru.vm5277.compiler.nodes;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
@@ -45,6 +46,12 @@ public class InterfaceBodyNode extends AstNode {
 			if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
 				InterfaceNode iNode = new InterfaceNode(tb, mc, modifiers, null, null);
 				children.add(iNode);
+				continue;
+			}
+			// Обработка exception с модификаторами
+			if (tb.match(TokenType.OOP, Keyword.EXCEPTION)) {
+				ExceptionNode eNode = new ExceptionNode(tb, mc, modifiers, null);
+				children.add(eNode);
 				continue;
 			}
 			// Обработка enum с модификаторами
@@ -208,7 +215,7 @@ public class InterfaceBodyNode extends AstNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 		

@@ -17,7 +17,7 @@ package ru.vm5277.common.cg.scopes;
 
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.items.CGIText;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class CGVarScope extends CGCellsScope {

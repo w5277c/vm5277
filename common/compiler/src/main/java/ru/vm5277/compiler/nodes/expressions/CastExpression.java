@@ -15,7 +15,7 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -30,6 +30,7 @@ import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.cg.CGExcs;
 
 public class CastExpression extends ExpressionNode {
 	private			VarType			sourceType;
@@ -114,7 +115,7 @@ public class CastExpression extends ExpressionNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		CGScope cgs = (null==parent ? cgScope : parent);
 		
 		// Для констант, переменных и полей мы можем задать размер аккумулятора изначально, это даст оптимальный код
@@ -122,11 +123,11 @@ public class CastExpression extends ExpressionNode {
 			if(sourceType!=type) {
 				cgs.append(cg.accCast(sourceType, type));
 			}
-			return operand.codeGen(cg, cgs, toAccum);
+			return operand.codeGen(cg, cgs, toAccum, excs);
 		}
 		else {
 			// В остальных случаев обработка выражений не может быть построена с учетом определенного размера аккумулятора, поэтому используем пост приведение
-			Object result = operand.codeGen(cg, cgs, toAccum);
+			Object result = operand.codeGen(cg, cgs, toAccum, excs);
 			if(sourceType!=type) {
 				cgs.append(cg.accCast(sourceType, type));
 			}

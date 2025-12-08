@@ -1,45 +1,44 @@
-; vm5277.avr_codegen v0.1 at Tue Nov 18 14:49:08 GMT+10:00 2025
-.equ stdout_port = 18
+; vm5277.avr_codegen v0.2
+.equ STDOUT_PORT = 18
 
 .set OS_FT_STDOUT = 1
-.set OS_FT_DRAM = 1
 
 .include "devices/atmega328p.def"
 .include "core/core.asm"
-.include "dmem/dram.asm"
-.include "j8b/mfin.asm"
+.include "sys/mcu_halt.asm"
 .include "stdio/out_num8.asm"
 
 Main:
-	rjmp j8bCMainMmain
-_j8b_meta22:
-	.db 12,0
+	jmp j8b_CMainMmain
+_j8b_meta_40:
+	.db 15,0
 
-j8bCMainMmain:
+j8b_CMainMmain:
 	ldi r20,3
-_j8b_loop46:
+_j8b_loop_43:
 	cpi r20,10
-	brcc _j8b_eoc0
+	brcc _j8b_eoc_0
 	mov r16,r20
-	rcall os_out_num8
-	add r20,C0x01
+	call os_out_num8
+	add r20,c0x01
 	cpi r20,5
-	brne _j8b_loop46
-_j8b_eoc0:
-_j8b_loop47:
+	brne _j8b_loop_43
+_j8b_eoc_0:
+_j8b_loop_49:
 	mov r16,r20
-	rcall os_out_num8
-	rjmp _j8b_loop47
-_j8b_loop49:
-	rjmp _j8b_loop49
-_j8b_loop50:
+	call os_out_num8
+	rjmp _j8b_loop_49
+_j8b_loop_59:
+	rjmp _j8b_loop_59
+_j8b_loop_64:
 	ldi r16,33
-	rcall os_out_num8
-	add r20,C0x01
+	call os_out_num8
+	add r20,c0x01
 	cpi r20,20
-	brcs _j8b_loop50
-_j8b_loop51:
+	brcs _j8b_loop_64
+_j8b_loop_69:
 	ldi r16,32
-	rcall os_out_num8
-	add r20,C0x01
-	rjmp _j8b_loop51
+	call os_out_num8
+	add r20,c0x01
+	rjmp _j8b_loop_69
+	jmp mcu_halt

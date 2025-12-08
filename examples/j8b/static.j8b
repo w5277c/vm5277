@@ -14,9 +14,6 @@
  * limitations under the License.
  */
 
-import rtos.System;
-import rtos.RTOSParam;
-
 class Main {
 	public static byte b1 = 123;
 	public static short s1 = 32768;

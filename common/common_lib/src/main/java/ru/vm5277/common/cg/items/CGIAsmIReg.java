@@ -16,8 +16,9 @@
 package ru.vm5277.common.cg.items;
 
 import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.exceptions.CompileException;
 
-public class CGIAsmIReg extends CGItem {
+public class CGIAsmIReg extends CGIAsm {
 	private CGIContainer	prefCont	= new CGIContainer();
 	private CGIContainer	postCont	= new CGIContainer();
 	private	char			ireg;
@@ -28,18 +29,22 @@ public class CGIAsmIReg extends CGItem {
 	private	CGBlockScope	varBScope;
 	private	boolean			isArg;
 	
-	public CGIAsmIReg(char ireg, String prefix, int offset, String postfix) {
+	public CGIAsmIReg(char ireg, String instr, String prefix, int offset, String postfix) throws CompileException {
+		super(instr, null);
+		
 		this.ireg = ireg;
-		this.prefix = prefix;
+		this.prefix = (null==prefix ? null : prefix.toLowerCase());
 		this.offset = offset;
-		this.postfix = postfix;
+		this.postfix = (null==postfix ? null : postfix.toLowerCase());
 	}
 
-	public CGIAsmIReg(char ireg, String prefix, int offset, String postfix, CGBlockScope curBScope, CGBlockScope varBScope, boolean isArg) {
+	public CGIAsmIReg(char ireg, String instr, String prefix, int offset, String postfix, CGBlockScope curBScope, CGBlockScope varBScope, boolean isArg)
+																																	throws CompileException {
+		super(instr, null);
 		this.ireg = ireg;
-		this.prefix = prefix;
+		this.prefix = (null==prefix ? null : prefix.toLowerCase());
 		this.offset = offset;
-		this.postfix = postfix;
+		this.postfix = (null==postfix ? null : postfix.toLowerCase());
 		this.curBScope = curBScope;
 		this.varBScope = varBScope;
 		this.isArg = isArg;
@@ -77,8 +82,8 @@ public class CGIAsmIReg extends CGItem {
 	}
 	
 	@Override
-	public String getSource() {
-		return "\t" + prefix + offset + postfix + "\n";
+	public String getText() {
+		return instr + " " + prefix + offset + postfix;
 	}
 	
 	@Override

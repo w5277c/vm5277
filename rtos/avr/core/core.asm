@@ -14,21 +14,28 @@
  * limitations under the License.
  */
 .IFNDEF _OS_INIT
+
+.IF OS_FT_IR_TABLE == 0x01 || OS_FT_DIAG == 0x01
 .include "mem/ram_fill.asm"
+.ENDIF
+.IF OS_FT_TIMER1 == 0x01 || OS_STAT_POOL_SIZE != 0x0000
 .include "mem/ram_clear.asm"
+.ENDIF
 .IF OS_FT_STDOUT == 0x01
 .include "stdio/out_init.asm"
 .ENDIF
 .IF OS_FT_WELCOME == 0x01 || OS_FT_DIAG == 0x01
 .include "stdio/out_cstr.asm"
 .ENDIF
+.IF OS_FT_ETRACE == 0x01
+.include "j8b/etrace_clear.asm"
+.ENDIF
 
 ;---CONSTANTS-----------------------------------------------
 	.EQU	_OS_TIMER_TICK_PERIOD				= 0x14		;20, т.е. 0.000050*20=0.001=1мс
 
 ;---TEXT-CONSTANTS------------------------------------------
-	.MESSAGE "######## LOGGING ENABLED"
-	.MESSAGE "######## IO BAUDRATE:";,14400*CORE_FREQ
+	.MESSAGE "######## IO BAUDRATE:",14400*CORE_FREQ
 .IF OS_FT_WELCOME == 0x01
 CSTR_OSNAME:
 	.db	"vm5277.avr v0.1",0x0d,0x0a,0x00
@@ -65,12 +72,18 @@ CSTR_MCUSR_RESET:
 	.SET	_OS_ROTO					= _OS_IR_VECTORS_TABLE+OS_IR_QNT*3
 .ENDIF
 
-;.IF OS_STAT_POOL_SIZE != 0x0000
+.IF OS_STAT_POOL_SIZE != 0x0000
 	.EQU	_OS_STAT_POOL				= _OS_ROTO
 	.SET	_OS_ROTO					= _OS_STAT_POOL + OS_STAT_POOL_SIZE
-;.ENDIF
+.ENDIF
 
-//TODO Нужен динамический размиер для блоков динамической памяти
+.IF OS_FT_ETRACE == 0x01
+	.EQU	_OS_ETRACE_BUFFER			= _OS_ROTO
+	.SET	_OS_ROTO					= _OS_ETRACE_BUFFER + OS_ETRACE_BUFFER_SIZE
+.ENDIF
+
+
+;TODO Нужен динамический размир для блоков динамической памяти
 .IF OS_FT_DRAM == 0x01
 	.SET	OS_DRAM_BMASK_1B			= _OS_ROTO
 	.SET	OS_DRAM_BMASK_2B			= OS_DRAM_BMASK_1B + OS_DRAM_BMASK_1B_SIZE
@@ -178,6 +191,18 @@ _OS_INIT:
 	LDI TEMP_L,low(SRAM_SIZE-0x0f)
 	LDI TEMP_H,high(SRAM_SIZE-0x0f)
 	MCALL OS_RAM_FILL_NR
+.ENDIF
+
+.IF OS_STAT_POOL_SIZE != 0x0000
+	;Очистка статического блока верхнего уровня
+	LDI_Y _OS_STAT_POOL
+	LDI TEMP_L,low(OS_STAT_POOL_SIZE)
+	LDI TEMP_H,high(OS_STAT_POOL_SIZE)
+	MCALL OS_RAM_CLEAR_NR
+.ENDIF
+
+.IF OS_FT_ETRACE == 0x01
+	MCALL J8BPROC_ETRACE_CLEAR
 .ENDIF
 
 .IF OS_FT_TIMER1 == 0x01

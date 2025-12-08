@@ -18,6 +18,7 @@ package ru.vm5277.compiler;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import ru.vm5277.common.cg.CodeGenerator;
@@ -26,6 +27,7 @@ import ru.vm5277.common.exceptions.CompileException;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.ObjectTypeNode;
+import ru.vm5277.compiler.semantic.GlobalScope;
 import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.Scope;
 
@@ -33,14 +35,26 @@ public class SemanticAnalyzer {
 	protected SemanticAnalyzer() {
 	}
 
-	public static void analyze(ObjectTypeNode clazz, CodeGenerator cg) {
+	public static void analyze(ObjectTypeNode clazz, CodeGenerator cg, List<ObjectTypeNode> autoImported) {
+		GlobalScope gScope = new GlobalScope();
+
+		if(null!=autoImported) {
+			for(ObjectTypeNode node : autoImported) {
+				if(node.preAnalyze()) {
+					if(node.declare(gScope)) {
+						node.postAnalyze(gScope, cg);
+					}
+				}
+			}
+		}
+		
 		if(clazz.preAnalyze()) {
-			if(clazz.declare(null)) {
+			if(clazz.declare(gScope)) {
 				// Выполняем если все declare отработали и никаких отложенных.
 				if(AstNode.getDeclarationPendingNodes().isEmpty()) {
-					if(clazz.postAnalyze(null, cg)) {
+					if(clazz.postAnalyze(gScope, cg)) {
 						if(Optimization.NONE!=Main.getOptLevel()) {
-							clazz.codeOptimization(null, cg);
+							clazz.codeOptimization(gScope, cg);
 						}
 					}
 				}
@@ -69,9 +83,9 @@ public class SemanticAnalyzer {
 			if(AstNode.getDeclarationPendingNodes().isEmpty()) {
 				// Все отложенные выполнены и ошибок не было
 				if(result) {
-					if(clazz.postAnalyze(null, cg)) {
+					if(clazz.postAnalyze(gScope, cg)) {
 						if(Optimization.NONE!=Main.getOptLevel()) {
-							clazz.codeOptimization(null, cg);
+							clazz.codeOptimization(gScope, cg);
 						}
 					}
 				}

@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler;
 
 import java.util.HashMap;
@@ -50,15 +51,15 @@ public class Keyword {
 	public	static	final	Keyword					ATOMIC		= new Keyword("atomic", TokenType.MODIFIER);
 	// Ключевые слова ООП
 	public	static	final	Keyword					CLASS		= new Keyword("class", TokenType.OOP);
-	public	static	final	Keyword					IMPLEMENTS	= new Keyword("implements", TokenType.OOP);
 	public	static	final	Keyword					INTERFACE	= new Keyword("interface", TokenType.OOP);
+	public	static	final	Keyword					EXCEPTION	= new Keyword("exception", TokenType.OOP);
+	public	static	final	Keyword					IMPLEMENTS	= new Keyword("implements", TokenType.OOP);
 	public	static	final	Keyword					EXTENDS		= new Keyword("extends", TokenType.OOP);
 	public	static	final	Keyword					THIS		= new Keyword("this", TokenType.OOP);
 	public	static	final	Keyword					ENUM		= new Keyword("enum", TokenType.OOP);
 	//Исключения
 	public	static	final	Keyword					TRY			= new Keyword("try", TokenType.COMMAND);
 	public	static	final	Keyword					CATCH		= new Keyword("catch", TokenType.KEYWORD);
-	public	static	final	Keyword					THROW		= new Keyword("throw", TokenType.COMMAND);
 	public	static	final	Keyword					THROWS		= new Keyword("throws", TokenType.OOP);
 	//Остальное
 	public	static	final	Keyword					IMPORT		= new Keyword("import", TokenType.KEYWORD);

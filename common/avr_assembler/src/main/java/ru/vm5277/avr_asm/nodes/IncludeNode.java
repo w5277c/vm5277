@@ -34,11 +34,13 @@ import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 
 public class IncludeNode {
-	public static Parser parse(TokenBuffer tb, Scope scope, MessageContainer mc, Map<Path, SourceType> sourcePaths)
-																												throws CompileException, CriticalParseException {
-		String importPath = (String)Node.consumeToken(tb, TokenType.STRING).getValue();
+	public static Parser parse(TokenBuffer tb, Scope scope, MessageContainer mc, Map<Path, SourceType> sourcePaths, String includeName)
+																											throws CompileException, CriticalParseException {
+		String importPath = (null==includeName ? (String)Node.consumeToken(tb, TokenType.STRING).getValue() : includeName);
 		Parser parser = null;
 
+		SourcePosition sp = (null==includeName ? tb.getSP() : null);
+		
 		Path sourcePath = null;
 		for(Path path : sourcePaths.keySet()) {
 			Path path2 = path.resolve(importPath).normalize();
@@ -47,16 +49,16 @@ public class IncludeNode {
 				break;
 			}
 		}
-		if(null == sourcePath) throw new CompileException("Import file not found: " + importPath, tb.getSP());
+		if(null==sourcePath) {
+			throw new CompileException("Import file not found: " + importPath, sp);
+		}
 
 		if(!scope.addImport(sourcePath.toString())) {
 			if(Assembler.STRICT_STRONG == Scope.getStrincLevel()) {
-				mc.add(new WarningMessage("File '" + importPath + "' already imported", tb.getSP()));
+				mc.add(new WarningMessage("File '" + importPath + "' already imported", sp));
 			}
 		}
 		else {
-			SourcePosition sp = tb.getSP();
-
 			scope.list(".INCLUDE " + sourcePath.toString());
 			
 			try {

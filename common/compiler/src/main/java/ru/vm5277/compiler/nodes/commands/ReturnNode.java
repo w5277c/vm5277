@@ -20,6 +20,7 @@ import java.util.List;
 import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.scopes.CGMethodScope;
@@ -28,7 +29,7 @@ import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -191,14 +192,14 @@ public class ReturnNode extends CommandNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
 
 		CGScope cgs = (null == parent ? cgScope : parent);
 		
 		if(null!=expr) {
-			if(CodegenResult.RESULT_IN_ACCUM!=expr.codeGen(cg, cgs, true)) {
+			if(CodegenResult.RESULT_IN_ACCUM!=expr.codeGen(cg, cgs, true, excs)) {
 				throw new CompileException("Accum not used for operand:" + expr);
 			}
 		}

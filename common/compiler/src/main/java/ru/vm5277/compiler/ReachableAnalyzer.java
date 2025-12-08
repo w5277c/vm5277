@@ -15,6 +15,7 @@
  */
 package ru.vm5277.compiler;
 
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -26,26 +27,30 @@ import ru.vm5277.compiler.semantic.Symbol;
 class ReachableAnalyzer {
 
 	// Ищем static FieldNode со включенным флагом reassigned, и выполняем кодогенерацию в нем(что скорее всего уже выполнено) и в его классе/интерфейсе
-	public static void analyze(MessageContainer mc, ObjectTypeNode objectTypeNode, CodeGenerator cg) {
+	public static void analyze(MessageContainer mc, ObjectTypeNode objectTypeNode, CodeGenerator cg, CGExcs excs) {
 		AstNode classBlockNode = objectTypeNode.getBody();
-		for(AstNode node : classBlockNode.getChildren()) {
-			if(node instanceof FieldNode) {
-				FieldNode fNode = (FieldNode)node;
-				if(fNode.isStatic()) {
-					try {
-						Symbol symbol = fNode.getSymbol();
-						if(null!=symbol && symbol.isReassigned()) {
-							fNode.getObjectTypeNode().codeGen(cg, cg, false);
-							fNode.codeGen(cg, null, false);
+		if(null!=classBlockNode) {
+			for(AstNode node : classBlockNode.getChildren()) {
+				if(node instanceof FieldNode) {
+					FieldNode fNode = (FieldNode)node;
+					if(fNode.isStatic()) {
+						try {
+							Symbol symbol = fNode.getSymbol();
+							if(null!=symbol && symbol.isReassigned()) {
+								
+								fNode.getObjectTypeNode().codeGen(cg, cg, false, excs);
+								fNode.codeGen(cg, null, false, excs);
+								//TODO пока статика работает не корректно cg.terminate(fNode.getCGScope(), false, true);
+							}
+						}
+						catch(CompileException ex) {
+							mc.add(ex.getErrorMessage());
 						}
 					}
-					catch(CompileException ex) {
-						mc.add(ex.getErrorMessage());
-					}
 				}
-			}
-			else if(node instanceof ObjectTypeNode) {
-				analyze(mc, (ObjectTypeNode)node, cg);
+				else if(node instanceof ObjectTypeNode) {
+					analyze(mc, (ObjectTypeNode)node, cg, excs);
+				}
 			}
 		}
 	}

@@ -17,9 +17,11 @@ package ru.vm5277.compiler.nodes.commands;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.CGBranch;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
@@ -27,7 +29,7 @@ import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -173,7 +175,7 @@ public class WhileNode extends CommandNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
 
@@ -184,12 +186,12 @@ public class WhileNode extends CommandNode {
 		if(!alwaysFalse) {
 			cgs.append(((CGLoopBlockScope)cgScope).getStartLbScope());
 			if(!alwaysTrue) {
-				condition.codeGen(cg, cgs, false);
+				condition.codeGen(cg, cgs, false, excs);
 			}
 		}
 
 		if(null!=blockNode && !alwaysFalse) {
-			blockNode.codeGen(cg, cgs, false);
+			blockNode.codeGen(cg, cgs, false, excs);
 		}
 
 		if(!alwaysFalse) {
@@ -201,7 +203,7 @@ public class WhileNode extends CommandNode {
 
 		cgs.append(((CGLoopBlockScope)cgScope).getEndLbScope());
 		
-		((CGBlockScope)cgScope).build(cg, false);
+		((CGBlockScope)cgScope).build(cg, false, excs);
 		((CGBlockScope)cgScope).restoreRegsPool();
 		return result;
 	}

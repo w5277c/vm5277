@@ -302,7 +302,12 @@ public class Scope {
 	}
 	
 	public void list(String str) {
-		if(null != listWriter) try {listWriter.write(str + "\n");} catch(Exception e) {}
+		if(null!=listWriter) {
+			try {
+				listWriter.write(str + "\n");
+			}
+			catch(Exception e) {}
+		}
 	}
 	public void setListEnabled(boolean enabled) {
 		this.listEnabled = enabled;

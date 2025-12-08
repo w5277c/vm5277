@@ -22,10 +22,11 @@ import java.util.Map;
 import ru.vm5277.common.ImplementInfo;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.CGCells;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGIText;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class CGClassScope extends CGScope {
@@ -75,9 +76,22 @@ public class CGClassScope extends CGScope {
 		return cells;
 	}
 	
-	public void build(CodeGenerator cg) throws CompileException {
+	public void build(CodeGenerator cg, CGExcs excs) throws CompileException {
 		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";======== enter CLASS " + getPath('.') + " ========================"));
 		prepend(cont);
+		
+		//TODO Похоже здесь мы знаем о всех используемых полях и можем выделить память для heap
+		//Нужно перенести из CodeGenerator.buiid
+		//constrInit.getCont().append(eNewInstance(cScope.getHeapOffset(), cScope.getIIDLabel(), cScope.getType(), false, excs));
+		//terminate(scope, false, true);
+		
+		for(CGMethodScope mScope : methods.values()) {
+			if(null==mScope.getType()) {
+				CGScope scope = new CGScope();
+				cg.eNewInstance(scope, fieldsOffset, lbIIDSScope, type, isImported, excs);
+				mScope.getInitContainer().append(scope);
+			}
+		}
 		
 		if(VERBOSE_LO <= verbose) append(new CGIText(";======== leave CLASS " + getPath('.') + " ========================"));
 	}
@@ -149,7 +163,7 @@ public class CGClassScope extends CGScope {
 				for(String mehodId : pair.getSignatures()) {
 					CGMethodScope mScope = methods.get(mehodId);
 					// Метод может не использоваться в кодогенерации
-					if(mScope.isUsed()) {
+					if(null!=mScope && mScope.isUsed()) { //TODO похоже isUsed = рудимент
 						methodsAddrSB.append(mScope.getLabel().getName()).append(",");
 					}
 					else {

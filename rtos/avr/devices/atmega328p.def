@@ -18,11 +18,15 @@
 
 ;---CONSTANTS-----------------------------------------------
 	.SET	_MCALL_SIZE								= 0x02	;Размер макроса MCALL/MJMP: 1(RCALL)-2(CALL)
+	.SET	JMP_SUPPORT								= 0x01	;Поддержка JMP,CALL
+	.SET	MUL_SUPPORT								= 0x01	;Поддержка MUL,MULS,MULSU
 	.EQU	OS_IR_QNT								= 0x1a	;Количество перырваний(без RESET)
 	.EQU	OS_PCINT_PORTS_QNT						= 0x03	;Количество портов поддерживающих внешние прерывания(PCINT)
 	.EQU	OS_RAM_BORDER_SIZE						= 0x20	;Минимальное допустимое расстояние между вершинами FREE_RAM и STACK
 	.SET	OS_STACK_SIZE							= 0xc0	;Общий стек(192 байта)
 	.SET	OS_IO_BUFFER_SIZE						= 0x40	;Размер буфера ввода (не менее 2)
+
+	.SET	OS_ETRACE_BUFFER_SIZE					= 0x10	;Размер буфера для трассировки исключений
 
 	.EQU	OS_DRAM_BMASK_1B_SIZE					= 16	;Размер 128Б(128 яч.)
 	.EQU	OS_DRAM_BMASK_2B_SIZE					= 16	;Размер 256Б(128 яч.)
@@ -93,6 +97,16 @@
 	.EQU	DDRG									= 0xff
 	.EQU	PING									= 0xff
 
+	;Порт для бутлоадера (режим half duplex UART 8N0), используем RESET пин, если поддерживает GPIO.
+	;Необходима подтяжка к плюсу и включение fuse RSTDISBL
+	;Вход в бутлоадер осуществляется после старта при обнаружении низкого уровня на пине в течении ~100мс.
+	;В RTOS сброс будет программным
+	.EQU	PORT_BLDR								= PORTC
+	.EQU	DDR_BLDR								= DDRC
+	.EQU	PIN_BLDR								= PINC
+	.EQU	PINNUM_BLDR								= 0x06
+
+.IF OS_FT_BOOTLOADER_ONLY == 0x00
 .ORG 0x0000
 	JMP		_OS_INIT										; Reset Handler
 .IF OS_FT_IR_TABLE == 0x01
@@ -136,6 +150,7 @@ PCINT_TABLE:
 	.db	0x00,PCMSK0,PCMSK1,PCMSK2
 INT_TABLE:
 	.db	(1<<INT0),(1<<INT1)
+.ENDIF
 
 .MACRO MCALL
 	CALL @0

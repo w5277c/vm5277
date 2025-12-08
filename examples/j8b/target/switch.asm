@@ -1,64 +1,60 @@
-; vm5277.avr_codegen v0.1 at Wed Nov 19 06:35:49 GMT+10:00 2025
-.equ core_freq = 16
-.equ stdout_port = 18
+; vm5277.avr_codegen v0.2
+.equ CORE_FREQ = 16
+.equ STDOUT_PORT = 18
 
-.set OS_FT_DRAM = 1
 .set OS_FT_STDOUT = 1
 .set OS_FT_WELCOME = 1
 
 .include "devices/atmega328p.def"
 .include "core/core.asm"
-.include "dmem/dram.asm"
-.include "j8b/mfin.asm"
+.include "sys/mcu_halt.asm"
 .include "stdio/out_num8.asm"
-.include "sys/mcu_stop.asm"
 
 Main:
-	rjmp j8bCMainMmain
-_j8b_meta21:
-	.db 13,0
+	jmp j8b_CMainMmain
+_j8b_meta_32:
+	.db 15,0
 
-j8bCMainMmain:
+j8b_CMainMmain:
 	ldi r20,11
-	add r20,C0x01
+	add r20,c0x01
 	mov r16,r20
 	cpi r16,0
-	breq _j8b_eoc27
+	breq _j8b_eoc_38
 	cpi r16,1
-	brcs _j8b_eoc30
+	brcs _j8b_eoc_41
 	cpi r16,11
-	brcs _j8b_eoc28
-_j8b_eoc30:
+	brcs _j8b_eoc_39
+_j8b_eoc_41:
 	cpi r16,15
-	brcs _j8b_eoc31
+	brcs _j8b_eoc_42
 	cpi r16,18
-	brcs _j8b_eoc29
-_j8b_eoc31:
+	brcs _j8b_eoc_40
+_j8b_eoc_42:
 	cpi r16,20
-	brcs _j8b_eoc32
+	brcs _j8b_eoc_43
 	cpi r16,26
-	brcs _j8b_eoc29
-_j8b_eoc32:
+	brcs _j8b_eoc_40
+_j8b_eoc_43:
 	cpi r16,30
-	breq _j8b_eoc29
+	breq _j8b_eoc_40
 	cpi r16,32
-	breq _j8b_eoc29
-	rjmp _j8b_casedef_87
-_j8b_eoc27:
+	breq _j8b_eoc_40
+	rjmp _j8b_casedef__103
+_j8b_eoc_38:
 	ldi r16,0
-	rcall os_out_num8
-	rjmp _j8b_caseend86
-_j8b_eoc28:
+	call os_out_num8
+	rjmp _j8b_caseend_102
+_j8b_eoc_39:
 	ldi r16,1
-	rcall os_out_num8
-	rjmp _j8b_caseend86
-_j8b_eoc29:
+	call os_out_num8
+	rjmp _j8b_caseend_102
+_j8b_eoc_40:
 	ldi r16,2
-	rcall os_out_num8
-	rjmp _j8b_caseend86
-_j8b_casedef_87:
+	call os_out_num8
+	rjmp _j8b_caseend_102
+_j8b_casedef__103:
 	ldi r16,3
-	rcall os_out_num8
-_j8b_caseend86:
-	rcall mcu_stop
-	rjmp j8bproc_mfin
+	call os_out_num8
+_j8b_caseend_102:
+	jmp mcu_halt

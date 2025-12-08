@@ -1,0 +1,2 @@
+public exception RuntimeException extends Exception { // Unchecked exception
+}

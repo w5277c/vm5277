@@ -1,32 +1,27 @@
-; vm5277.avr_codegen v0.1 at Thu Nov 20 07:17:52 GMT+10:00 2025
-.equ core_freq = 16
-.equ stdout_port = 18
+; vm5277.avr_codegen v0.2
+.equ CORE_FREQ = 16
 
-.set OS_FT_WELCOME = 1
-.set OS_FT_TIMER1 = 1
-.set OS_FT_DRAM = 1
 
 .include "devices/atmega328p.def"
 .include "core/core.asm"
-.include "dmem/dram.asm"
-.include "j8b/mfin.asm"
+.include "sys/mcu_halt.asm"
 .include "io/port_invert.asm"
 .include "io/port_mode_out.asm"
 .include "core/wait_ms.asm"
 
 Main:
-	rjmp j8bCMainMmain
-_j8b_meta27:
-	.db 14,0
+	jmp j8b_CMainMmain
+_j8b_meta_33:
+	.db 15,0
 
-j8bCMainMmain:
+j8b_CMainMmain:
 	ldi r16,17
-	rcall port_mode_out
-_j8b_loop30:
+	call port_mode_out
+_j8b_loop_36:
 	ldi r16,250
 	ldi r17,0x00
-	rcall wait_ms
+	call wait_ms
 	ldi r16,17
-	rcall port_invert
-	rjmp _j8b_loop30
-	rjmp j8bproc_mfin
+	call port_invert
+	rjmp _j8b_loop_36
+	jmp mcu_halt

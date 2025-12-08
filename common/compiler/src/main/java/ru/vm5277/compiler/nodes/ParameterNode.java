@@ -19,11 +19,12 @@ import java.util.List;
 import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -45,6 +46,7 @@ public class ParameterNode extends AstNode {
 		
 		type = checkPrimtiveType();
 		if(null==type) type = checkClassType();
+		if(null==type) type = checkExceptionType();
 		if(null!=type) type = checkArrayType(type);
 		
 		name = (String)consumeToken(tb, TokenType.ID).getValue();
@@ -133,7 +135,7 @@ public class ParameterNode extends AstNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		return null;
 	}
 	

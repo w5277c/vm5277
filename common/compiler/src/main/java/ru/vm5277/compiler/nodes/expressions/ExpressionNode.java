@@ -27,10 +27,11 @@ import static ru.vm5277.common.Operator.PLUS;
 import ru.vm5277.common.Property;
 import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.compiler.TokenType;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -41,6 +42,7 @@ import ru.vm5277.compiler.nodes.VarNode;
 import ru.vm5277.compiler.nodes.expressions.bin.ComparisonExpression;
 import ru.vm5277.compiler.semantic.AstHolder;
 import ru.vm5277.compiler.semantic.EnumScope;
+import ru.vm5277.compiler.semantic.ExceptionScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 import ru.vm5277.compiler.semantic.VarSymbol;
@@ -491,7 +493,10 @@ public class ExpressionNode extends AstNode {
 		// Заменяем переменные на их значения из Scope (если они final и известны)
 		if (this instanceof VarFieldExpression) {
 			VarFieldExpression vfe = (VarFieldExpression)this;
-			if(vfe.getSymbol() instanceof AstHolder) {
+			if(vfe.getTargetScope() instanceof ExceptionScope) {
+				return new LiteralExpression(tb, mc, ((ExceptionScope)vfe.getTargetScope()).getValueIndex(vfe.getName()));
+			}
+			else if(vfe.getSymbol() instanceof AstHolder) {
 				AstNode node = ((AstHolder)vfe.getSymbol()).getNode();
 				if(node instanceof VarNode) {
 					VarNode vNode = (VarNode)node;
@@ -1068,6 +1073,10 @@ public class ExpressionNode extends AstNode {
 		return null;
 	}
 	
+	public String getQualifiedPath() {
+		return "";
+	}
+	
 	@Override
 	public boolean preAnalyze() {
 		return false;
@@ -1084,7 +1093,7 @@ public class ExpressionNode extends AstNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		throw new CompileException("Not supported here.");
 	}
 

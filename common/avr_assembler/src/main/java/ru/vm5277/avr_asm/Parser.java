@@ -38,7 +38,8 @@ public class Parser {
 	private	final	Map<Path, SourceType>	sourcePaths;
 	private	final	List<Node>				secondPassNodes	= new ArrayList<>();
 	
-	public Parser(List<Token> tokens, Scope scope, MessageContainer mc, Map<Path, SourceType> sourcePaths, int tabSize) throws CriticalParseException {
+	public Parser(List<Token> tokens, Scope scope, MessageContainer mc, Map<Path, SourceType> sourcePaths, int tabSize, List<String> includes)
+																																throws CriticalParseException {
 		this.tb = new TokenBuffer(tokens.iterator());
 		this.scope = scope;
 		this.mc = mc;
@@ -46,7 +47,7 @@ public class Parser {
 		
 		scope.setTabSize(tabSize);
 		
-		parse();
+		parse(includes);
 	}
 	
 	public Parser(List<Token> tokens, Scope scope, MessageContainer mc, Map<Path, SourceType> sourcePaths) throws CriticalParseException {
@@ -55,10 +56,24 @@ public class Parser {
 		this.mc = mc;
 		this.sourcePaths = sourcePaths;
 		
-		parse();
+		parse(null);
 	}
 	
-	void parse() throws CriticalParseException {
+	void parse(List<String> includes) throws CriticalParseException {
+		try {
+			if(null!=includes) {
+				for(String inclideName : includes) {
+					Parser parser = IncludeNode.parse(tb, scope, mc, sourcePaths, inclideName);
+					if(null!=parser) {
+						secondPassNodes.addAll(parser.getSecondPassNodes());
+					}
+				}
+			}
+		}
+		catch(CompileException e) {
+			mc.add(e.getErrorMessage());
+		}
+
 		while(!tb.match(TokenType.EOF)) {
 			try {
 				if(tb.match(TokenType.DIRECTIVE) && Keyword.EXIT == ((Keyword)tb.current().getValue())) {
@@ -98,7 +113,7 @@ public class Parser {
 						String kd = ((Keyword)tb.consume().getValue()).getName();
 						if(!scope.isMacroDeploy()) {
 							if(Keyword.INCLUDE.getName().equals(kd))	{
-								Parser parser = IncludeNode.parse(tb, scope, mc, sourcePaths);
+								Parser parser = IncludeNode.parse(tb, scope, mc, sourcePaths, null);
 								if(null != parser) secondPassNodes.addAll(parser.getSecondPassNodes());
 								continue;
 							}

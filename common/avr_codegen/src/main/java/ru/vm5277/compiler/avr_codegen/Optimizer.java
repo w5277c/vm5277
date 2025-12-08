@@ -17,10 +17,17 @@
 package ru.vm5277.compiler.avr_codegen;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.CodeOptimizer;
 import ru.vm5277.common.cg.items.CGIAsm;
+import ru.vm5277.common.cg.items.CGIAsmCall;
+import ru.vm5277.common.cg.items.CGIAsmCondJump;
 import ru.vm5277.common.cg.items.CGIAsmJump;
+import ru.vm5277.common.cg.items.CGIAsmLd;
+import ru.vm5277.common.cg.items.CGIAsmMv;
 import ru.vm5277.common.cg.items.CGItem;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
@@ -31,7 +38,133 @@ import ru.vm5277.common.exceptions.CompileException;
 
 
 public class Optimizer extends CodeOptimizer {
+	private	static final int RJMP_INSTR_SIZE	= 0x02;
+	
 	@Override
+	public boolean optimizeJumpInstr(List<CGItem> list) throws CompileException {
+		boolean result = false;
+		Map<String, Integer> labelsMap = new HashMap<>();
+		
+		boolean changed = true;
+		while(changed) {
+			changed = false;
+			labelsMap.clear();
+			
+			int offset = 0;
+			for(CGItem item : list) {
+				if(!item.isDisabled()) {
+					if(item instanceof CGLabelScope) {
+						labelsMap.put(((CGLabelScope)item).getName(), offset);
+					}
+					else if(item instanceof CGIAsm) {
+						offset+=((CGIAsm)item).getSizeInBytes();
+					}
+				}
+			}
+			
+			offset = 0;
+			for(CGItem item : list) {
+				if(!item.isDisabled() && item instanceof CGIAsm) {
+					if(item instanceof CGIAsmJump) {
+						CGIAsmJump aj = (CGIAsmJump)item;
+						if(!aj.isExternal() && aj.getInstr().equals("jmp")) {
+							Integer labelOffset = labelsMap.get(aj.getLabelName());
+							if(null!=labelOffset) {
+								int delta = offset-labelOffset;
+								if(delta>=-2048 && delta<=2047) {
+									aj.setInstr("rjmp");
+									aj.setSizeInBytes(RJMP_INSTR_SIZE);
+									changed = true;
+									result = true;
+								}
+							}
+						}
+					}
+					else if(item instanceof CGIAsmCall) {
+						CGIAsmCall ac = (CGIAsmCall)item;
+						if(!ac.isExternal() && ac.getInstr().equals("call")) {
+							Integer labelOffset = labelsMap.get(ac.getLabelName());
+							if(null!=labelOffset) {
+								int delta = offset-labelOffset;
+								if(delta>=-2048 && delta<=2047) {
+									ac.setInstr("rcall");
+									ac.setSizeInBytes(RJMP_INSTR_SIZE);
+									changed = true;
+									result = true;
+								}
+							}
+						}
+					}
+
+					offset+=((CGIAsm)item).getSizeInBytes();
+				}
+			}
+		}
+		
+		return result;
+	}
+
+	@Override
+	public boolean optimizeBranchInstr(List<CGItem> list) throws CompileException {
+		boolean result = false;
+		Map<String, Integer> labelsMap = new HashMap<>();
+		
+		boolean changed = true;
+		while(changed) {
+			changed = false;
+			labelsMap.clear();
+			
+			List<CGItem> asmList = new ArrayList<>();
+			int offset = 0;
+			for(CGItem item : list) {
+				if(!item.isDisabled()) {
+					if(item instanceof CGLabelScope) {
+						labelsMap.put(((CGLabelScope)item).getName(), offset);
+						asmList.add(item);
+					}
+					else if(item instanceof CGIAsm) {
+						offset+=((CGIAsm)item).getSizeInBytes();
+						asmList.add(item);
+					}
+				}
+			}
+			
+			offset = 0;
+			for(int i=0; i<asmList.size()-2; i++) {
+				CGItem item1 = list.get(i);
+				CGItem item2 = list.get(i+1);
+				CGItem item3 = list.get(i+2);
+				if(item1 instanceof CGIAsmCondJump && item2 instanceof CGIAsmJump && item3 instanceof CGLabelScope) {
+					CGIAsmCondJump acj = (CGIAsmCondJump)item1;
+					CGIAsmJump aj = (CGIAsmJump)item2;
+					String name = ((CGLabelScope)item3).getName();
+					if(!aj.isExternal() && acj.getLabelName().equals(name)) {
+						Integer labelOffset = labelsMap.get(aj.getLabelName());
+						if(null!=labelOffset) {
+							int wDelta = (labelOffset-offset)/2;
+							if(wDelta>=-64 && wDelta<=63) {
+								acj.setInstr(Utils.brInstrInvert(acj.getInstr()));
+								acj.setLabelName(aj.getLabelName());
+								aj.disable();
+								//item3 нельзя блокировать, эта метка может быть использована в других местах.
+								changed = true;
+								result = true;
+							}
+						}
+					}
+					i+=2;
+					offset+=aj.getSizeInBytes() + ((CGIAsm)item1).getSizeInBytes();
+				}
+				else if(item1 instanceof CGIAsm) {
+					offset+=((CGIAsm)item1).getSizeInBytes();
+				}
+			}
+		}
+		
+		return result;
+	}
+
+/*	@Override
 	public void optimizeBranchChains(CGScope scope) throws CompileException {
 		ArrayList<CGItem> list = new ArrayList();
 
@@ -48,13 +181,13 @@ public class Optimizer extends CodeOptimizer {
 				CGItem item1 = list.get(i);
 				CGItem item2 = list.get(i+1);
 				CGItem item3 = list.get(i+2);
-				if(item1 instanceof CGIAsmJump && item2 instanceof CGIAsmJump && item3 instanceof CGLabelScope) {
-					CGIAsmJump j1 = (CGIAsmJump)item1;
+				if(item1 instanceof CGIAsmCondJump && item2 instanceof CGIAsmJump && item3 instanceof CGLabelScope) {
+					CGIAsmCondJump j1 = (CGIAsmCondJump)item1;
 					CGIAsmJump j2 = (CGIAsmJump)item2;
 					String name = ((CGLabelScope)item3).getName();
 
-					if(j1.getText().toLowerCase().startsWith("br") && j2.getText().equalsIgnoreCase("rjmp") && j1.getLabelName().equalsIgnoreCase(name)) {
-						j1.setText(Utils.brInstrInvert(j1.getText()));
+					if(!j2.isExternal() && j1.getLabelName().equals(name)) {
+						j1.setLabelName(Utils.brInstrInvert(j1.getInstr()));
 						j1.setLabelName(j2.getLabelName());
 						j2.disable();
 						changed = true;
@@ -63,7 +196,7 @@ public class Optimizer extends CodeOptimizer {
 			}
 		}
 	}
-
+*/
 	@Override
 	public void optimizeBaseInstr(CGScope scope) throws CompileException {
 		ArrayList<CGItem> list = new ArrayList();
@@ -82,122 +215,152 @@ public class Optimizer extends CodeOptimizer {
 			}
 			if(!(item2 instanceof CGIAsm)) continue;
 			
-			String instr1 = replaceAliasToReg(((CGIAsm)item1).getText().trim().toLowerCase());
-			String instr2 = replaceAliasToReg(((CGIAsm)item2).getText().trim().toLowerCase());
-			if(instr1.startsWith("ldi r")) {
-				if(instr2.startsWith("ldi r")) {
-					int pos1 = instr1.indexOf(',');
-					int dst1 = Integer.parseInt(instr1.substring(5, pos1));
-					int pos2 = instr2.indexOf(',');
-					int dst2 = Integer.parseInt(instr2.substring(5, pos2));
-					if(dst1==dst2) {
-						item1.disable();
-					}
+			CGIAsm ai1 = (CGIAsm)item1;
+			CGIAsm ai2 = (CGIAsm)item2;
+			
+			if(ai1 instanceof CGIAsmMv && ai2 instanceof CGIAsmMv) {
+				CGIAsmMv am1 = (CGIAsmMv)item1;
+				CGIAsmMv am2 = (CGIAsmMv)item2;
+				int dstReg1 = Integer.parseInt(replaceAliasToReg(am1.getDstReg()).substring(1));
+				int srcReg1 = Integer.parseInt(replaceAliasToReg(am1.getSrcReg()).substring(1));
+				int dstReg2 = Integer.parseInt(replaceAliasToReg(am2.getDstReg()).substring(1));
+				int srcReg2 = Integer.parseInt(replaceAliasToReg(am2.getSrcReg()).substring(1));
+
+				if(0==dstReg1%2 && dstReg2==dstReg1+1 && 0==srcReg1%2 && srcReg2==srcReg1+1) {
+					((CGIAsmMv)item1).setInstr("movw");
+					((CGIAsmMv)item1).setDstReg("r"+dstReg1);
+					((CGIAsmMv)item1).setSrcReg("r"+srcReg1);
+					item2.disable();
 					continue;
 				}
+			}
+
+			if(ai1 instanceof CGIAsmLd) {
+				CGIAsmLd al1 = (CGIAsmLd)item1;
 
 				Integer k = null;
-				int pos = instr1.indexOf(',');
-				byte reg = Byte.parseByte(instr1.substring(5, pos));
-				try{k = Integer.parseInt(instr1.substring(pos+1));}catch(Exception ex) {}
+				byte reg = Byte.parseByte(replaceAliasToReg(al1.getReg()).substring(1));
+				try{
+					k = Integer.parseInt(al1.getConstant());
+				}
+				catch(Exception ex) {}
 
-				if(null == k) {
-					pos = instr1.indexOf(",low(");
+				if(null==k) {
+					int pos = al1.getConstant().indexOf(",low(");
 					if(-1!=pos) {
-						try{k = Integer.parseInt(instr1.substring(pos+5, instr1.length()-1))&0xff;}catch(Exception ex) {}
+						try{
+							k = Integer.parseInt(al1.getConstant().substring(pos+5, al1.getConstant().length()-1))&0xff;
+						}
+						catch(Exception ex) {}
 					}
 					else {
-						pos = instr1.indexOf(",high(");
+						pos = al1.getConstant().indexOf(",high(");
 						if(-1!=pos) {
-							try{k = (Integer.parseInt(instr1.substring(pos+6, instr1.length()-1))>>0x08)&0xff;}catch(Exception ex) {}
+							try{
+								k = (Integer.parseInt(al1.getConstant().substring(pos+6, al1.getConstant().length()-1))>>0x08)&0xff;
+							}
+							catch(Exception ex) {}
 						}
 					}
 				}
 
-				if(null != k && (k==0x00 || k==0x01 || k==0xff)) {
-					CGIAsm asmInstr = (CGIAsm)item2;
+				if(null!=k && (k==0x00||k==0x01||k==0xff)) {
 					String kStr = "c0x" + (0==k ? "00" : (1==k ? "01" : "ff"));
-					if((instr2.startsWith("st ") || instr2.startsWith("std ") || instr2.startsWith("sts ")) && instr2.endsWith(",r"+reg)) {
-						item1.disable();
-						pos = instr2.indexOf(',');
-						asmInstr.setText(instr2.substring(0, pos) + "," + kStr);
+					if((ai2.getInstr().equals("st") || ai2.getInstr().equals("std") || ai2.getInstr().equals("sts")) &&
+						ai2.getPostfix().endsWith(",r"+reg)) {
+
+						ai1.disable();
+						int pos = ai2.getPostfix().indexOf(',');
+						ai2.setPostfix(ai2.getPostfix().substring(0, pos) + "," + kStr);
 					}
-					else if(instr2.startsWith("push r")) {
-						int reg2 = Integer.parseInt(instr2.substring(6));
+					else if(ai2.getInstr().equals("push") && ai2.getPostfix().startsWith("r")) {
+						int reg2 = Integer.parseInt(ai2.getPostfix().substring(1));
 						//TODO Опасно, может удалить корректный код! Нужно код, сохраняющий значения в стек обернуть конетйнером, а здесь научить метод
 						//отслеживать такие контейнеры
 						if(reg==reg2) {
-							item1.disable();
-							asmInstr.setText("push " + kStr);
+							ai1.disable();
+							ai2.setPostfix(kStr);
 						}
 					}
 				}
+				continue;
 			}
-			else if(instr1.startsWith("mov r") && instr2.startsWith("mov r") && instr1.contains(",r") && instr2.contains(",r")) {
-				int pos = instr1.indexOf(',');
-				int dst1 = Integer.parseInt(instr1.substring(5, pos));
-				int src1 = Integer.parseInt(instr1.substring(pos+2));
-				pos = instr1.indexOf(',');
-				int dst2 = Integer.parseInt(instr2.substring(5, pos));
-				int src2 = Integer.parseInt(instr2.substring(pos+2));
-				if(0==dst1%2 && dst2==dst1+1 && 0==src1%2 && src2==src1+1) {
-					item1.disable();
-					((CGIAsm)item2).setText("movw r" + dst1 + ",r" + src1);
-				}
-			}
-			else if(instr1.startsWith("subi r") && instr2.startsWith("sbci r")) {
-				int pos1 = instr1.indexOf(',');
-				int dst1 = Integer.parseInt(instr1.substring(6, pos1));
-				int pos2 = instr2.indexOf(',');
-				int dst2 = Integer.parseInt(instr2.substring(6, pos2));
+			
+			if(ai1.getInstr().equals("subi") && ai2.getInstr().equals("sbci") && ai1.getPostfix().startsWith("r") && ai2.getPostfix().startsWith("r")) {
+				int pos1 = ai1.getPostfix().indexOf(',');
+				int dstReg1 = Integer.parseInt(ai1.getPostfix().substring(1, pos1));
+				int pos2 = ai2.getPostfix().indexOf(',');
+				int dstReg2 = Integer.parseInt(ai2.getPostfix().substring(1, pos2));
 				//TODO добавить проверку на записи вида rXX
-				if((26==dst1 && 27==dst2) || (28==dst1 && 29==dst2) || (30==dst1 && 31==dst2)) {
+				if((26==dstReg1 && 27==dstReg2) || (28==dstReg1 && 29==dstReg2) || (30==dstReg1 && 31==dstReg2)) {
 					Integer cnst=null;
 					Integer hConst=null;
 					Integer lConst=null;
-					int pos = instr1.indexOf("low");
+					int pos = ai1.getPostfix().indexOf("low");
 					if(-1!=pos) {
-						try {cnst = Integer.parseInt(instr1.substring(pos+4, instr1.length()-1));}catch(Exception ex){}
+						try {
+							cnst = Integer.parseInt(ai1.getPostfix().substring(pos+4, ai1.getPostfix().length()-1));
+						}
+						catch(Exception ex){}
 					}
 					else {
-						try {lConst = Integer.parseInt(instr1.substring(pos1+1));}catch(Exception ex){}
+						try {
+							lConst = Integer.parseInt(ai1.getPostfix().substring(pos1+1));
+						}
+						catch(Exception ex){}
 					}
 					if(null==cnst && null!=lConst) {
-						pos = instr2.indexOf("high");
+						pos = ai2.getPostfix().indexOf("high");
 						if(-1==pos) {
-							try {hConst = Integer.parseInt(instr2.substring(pos2+1));}catch(Exception ex){}
+							try {
+								hConst = Integer.parseInt(ai2.getPostfix().substring(pos2+1));
+							}
+							catch(Exception ex){}
 						}
 					}
-					if(null == cnst && null != lConst && null != hConst) {
+					if(null==cnst && null!=lConst && null!=hConst) {
 						cnst = hConst * 256 + lConst; //TODO проверить
 					}
-					if(null != cnst && 0>=cnst && -64<cnst) {
-						item1.disable();
-						((CGIAsm)item2).setText("adiw r" + dst1 + ","+ cnst*(-1));
+					if(null!=cnst && 0>=cnst && -64<cnst) {
+						ai1.disable();
+						ai2.setInstr("adiw");
+						ai2.setPostfix("r" + dstReg1 + ","+ cnst*(-1));
 					}
 				}
+				continue;
 			}
-			else if(instr1.startsWith("adiw r") && instr2.startsWith("adiw r")) {
-				int pos = instr1.indexOf(',');
-				int dst1 = Integer.parseInt(instr1.substring(6, pos));
+
+			if(ai1.getInstr().equals("adiw") && ai2.getInstr().equals("adiw")  && ai1.getPostfix().startsWith("r") && ai2.getPostfix().startsWith("r")) {
+				int pos = ai1.getPostfix().indexOf(',');
+				int dst1 = Integer.parseInt(ai1.getPostfix().substring(1, pos));
 				Integer k1 = null;
-				try{k1 = Integer.parseInt(instr1.substring(pos+1));}catch(Exception ex){};
-				pos = instr2.indexOf(',');
-				int dst2 = Integer.parseInt(instr2.substring(6, pos));
+				try{
+					k1 = Integer.parseInt(ai1.getPostfix().substring(pos+1));
+				}
+				catch(Exception ex){};
+				
+				pos = ai2.getPostfix().indexOf(',');
+				int dst2 = Integer.parseInt(ai2.getPostfix().substring(1, pos));
 				Integer k2 = null;
-				try{k2 = Integer.parseInt(instr2.substring(pos+1));}catch(Exception ex){};
+				try{
+					k2 = Integer.parseInt(ai2.getPostfix().substring(pos+1));
+				}
+				catch(Exception ex){};
+				
 				if(null!=k1 && null!=k2 && dst1==dst2 && (k1+k2)<64) {
 					item1.disable();
-					((CGIAsm)item2).setText("adiw r" + dst1 + ","+ (k1+k2));
+					ai2.setPostfix("r" + dst1 + ","+ (k1+k2));
 				}
 			}
-		}		
+		}
+
 	}
 
-	private String replaceAliasToReg(String instr) {
-		return	instr.replaceAll("[xX][lL]", "r26").replaceAll("[xX][hH]", "r27").replaceAll("[yY][lL]", "r28").replaceAll("[yY][hH]", "r29")
-				.replaceAll("[zZ][lL]", "r30").replaceAll("[zZ][hH]", "r31").replaceAll("result", "r20").replaceAll("flags", "r21")
+	private String replaceAliasToReg(String regStr) {
+		return	regStr.replaceAll("xl", "r26").replaceAll("xh", "r27").replaceAll("yl", "r28").replaceAll("yh", "r29")
+				.replaceAll("zl", "r30").replaceAll("zh", "r31").replaceAll("result", "r20").replaceAll("flags", "r21")
 				.replaceAll("accum_l", "r16").replaceAll("accum_h", "r17").replaceAll("accum_el", "r18").replaceAll("accum_eh", "r19")
-				.replaceAll("temp_l", "r24").replaceAll("temp_h", "r25").replaceAll("temp_el", "r22").replaceAll("temp_eh", "r23");
+				.replaceAll("temp_l", "r24").replaceAll("temp_h", "r25").replaceAll("temp_el", "r22").replaceAll("temp_eh", "r23")
+				.replaceAll("j8b_atom", "r15");
 	}
 }

@@ -17,15 +17,15 @@ package ru.vm5277.common.cg.scopes;
 
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.items.CGIText;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class CGFieldScope extends CGCellsScope {
 	private			boolean		isStatic;
 	private			CGCells		cells;
 			
-	public CGFieldScope(CGClassScope cScope, int resId, VarType type, int size, boolean isStatic, String name) {
-		super(cScope, resId, type, size, name);
+	public CGFieldScope(CGScope cgScope, int resId, VarType type, int size, boolean isStatic, String name) {
+		super(cgScope, resId, type, size, name);
 		
 		this.isStatic = isStatic;
 	}

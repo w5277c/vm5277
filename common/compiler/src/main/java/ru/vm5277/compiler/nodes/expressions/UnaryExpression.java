@@ -24,7 +24,7 @@ import ru.vm5277.common.cg.CGBranch;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
-import ru.vm5277.common.compiler.VarType;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -34,6 +34,7 @@ import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 
 public class UnaryExpression extends ExpressionNode {
@@ -197,10 +198,10 @@ public class UnaryExpression extends ExpressionNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean accumStore) throws CompileException {
-		return codeGen(cg, parent, false, false, accumStore);
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean accumStore, CGExcs excs) throws CompileException {
+		return codeGen(cg, parent, false, false, accumStore, excs);
 	}
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, boolean toAccum) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, boolean toAccum, CGExcs excs) throws CompileException {
 		CodegenResult result = null;
 		
 		CGScope cgs = null == parent ? cgScope : parent;
@@ -214,17 +215,17 @@ public class UnaryExpression extends ExpressionNode {
 		}
 
 		if(operand instanceof BinaryExpression) {
-			((BinaryExpression)operand).codeGen(cg, null, !isInvert, true, false);
+			((BinaryExpression)operand).codeGen(cg, null, !isInvert, true, false, excs);
 		}
 		else if(operand instanceof VarFieldExpression) {
 			VarFieldExpression ve = (VarFieldExpression)operand;
 			if(null!=branch && Operator.NOT==operator) { //TODO вероятно не корректно проверять по brScope(но без блока условий нужен именно emitUnary
-				ve.codeGen(cg, cgs, !isInvert, !opOr, branch);
+				ve.codeGen(cg, cgs, !isInvert, !opOr, branch, excs);
 			}
 			else {
-				ve.codeGen(cg, cgs, false);
+				ve.codeGen(cg, cgs, false, excs);
 				CGCellsScope cScope = (CGCellsScope)operand.getSymbol().getCGScope(CGCellsScope.class);
-				cg.eUnary(cgs, operator, cScope.getCells(), toAccum);
+				cg.eUnary(cgs, operator, cScope.getCells(), toAccum, excs);
 				if(toAccum)	 {
 					result = CodegenResult.RESULT_IN_ACCUM;
 				}
@@ -232,15 +233,15 @@ public class UnaryExpression extends ExpressionNode {
 		}
 		else if(operand instanceof ArrayExpression) {
 			ArrayExpression ae = (ArrayExpression)operand;
-			ae.codeGen(cg, null, false);
+			ae.codeGen(cg, null, false, excs);
 			CGCellsScope cScope = (CGCellsScope)operand.getSymbol().getCGScope(CGCellsScope.class);
-			cg.eUnary(cgs, operator, cScope.getCells(), toAccum);
+			cg.eUnary(cgs, operator, cScope.getCells(), toAccum, excs);
 			if(toAccum)	 {
 				result = CodegenResult.RESULT_IN_ACCUM;
 			}
 		}
 		else if(operand instanceof UnaryExpression) {
-			((UnaryExpression)operand).codeGen(cg, null, !isInvert, opOr, false);
+			((UnaryExpression)operand).codeGen(cg, null, !isInvert, opOr, false, excs);
 		}
 		else {
 			throw new CompileException("Unsupported operand '" + operand + " in unary expression");

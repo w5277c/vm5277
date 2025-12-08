@@ -1,5 +1,5 @@
 class Main {
-    static public int someMethod() {
+    public static int someMethod() {
         int i1 = 16909060;
         //AST>CONST final int i2 = 84281096;
         //AST>CONST final int i3 = 151653132;
@@ -10,11 +10,10 @@ class Main {
         }
         return i1+454959380;
     }
-    static public void main() {
+    public static void main() {
         System.setParam(0, 16);
         System.setParam(2, 18);
-        System.setParam(3, 1);
+        System.setParam(4, 1);
         System.out(someMethod());
-        System.stop();
     }
 }

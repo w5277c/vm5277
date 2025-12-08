@@ -19,12 +19,14 @@ public class System {
 
 	public static native void outChar(byte b);
 
-	public static native void outCStr(cstr text);
+	public static native void out(cstr text);
 	public static native void out(byte i);
 	public static native void out(short i);
 	public static native void out(int i);
 	public static native void out(fixed i);
 	public static native void out(bool i);
+	public static native void out(Exception ex);
 
-	public static native void stop();
+	public static native void halt();
+	public static native void reset();
 }
