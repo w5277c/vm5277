@@ -25,7 +25,7 @@ J8BPROC_ETRACE_ADDFIRST:
 	MCALL J8BPROC_ETRACE_CLEAR
 	STS _OS_ETRACE_BUFFER+0x00,r16							;В начале буфера записываем ид типа исключений
 	STS _OS_ETRACE_BUFFER+0x01,r17							;И код
-
+	SET
 ;-----------------------------------------------------------
 J8BPROC_ETRACE_ADD:
 ;-----------------------------------------------------------

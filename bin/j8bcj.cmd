@@ -1,1 +1,0 @@
-java -cp "%vm5277%\bin\libs\*" ru.vm5277.compiler.Main %*

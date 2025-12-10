@@ -402,7 +402,18 @@ public class PropertyExpression extends ExpressionNode {
 		
 		targetExpr.codeGen(cg, null, false, excs);
 		
-		if(null==enumScope && !targetExpr.getType().isEnum() && !targetExpr.getType().isClassType()) {
+		if(VarType.EXCEPTION==targetExpr.getType()) {
+			if(toAccum) {
+				if(Property.typeId==property) {
+					cg.exTypeIdToAcc(cgs);
+				}
+				else if(Property.code==property) {
+					cg.exCodeToAcc(cgs);
+				}
+				result = CodegenResult.RESULT_IN_ACCUM;
+			}
+		}
+		else if(null==enumScope && !targetExpr.getType().isEnum() && !targetExpr.getType().isClassType()) {
 			//TODO нужно проверить!
 			boolean isView = false;
 			AstHolder ah = (AstHolder)targetExpr.getSymbol();

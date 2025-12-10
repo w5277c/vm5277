@@ -1,18 +1,14 @@
 ; vm5277.avr_codegen v0.2
 .equ CORE_FREQ = 16
 .equ STDOUT_PORT = 18
-.set OS_ETRACE_POINT_BITSIZE = 7
 
 .set OS_FT_STDOUT = 1
 .set OS_FT_WELCOME = 1
 .set OS_FT_DRAM = 1
-.set OS_FT_ETRACE = 1
 
 .include "devices/atmega328p.def"
 .include "core/core.asm"
 .include "sys/mcu_halt.asm"
-.include "j8b/etrace_out.asm"
-.include "j8b/etrace_add.asm"
 .include "dmem/dram.asm"
 .include "j8b/instanceof.asm"
 .include "j8b/clear_fields.asm"
@@ -21,10 +17,10 @@
 .include "stdio/out_num16.asm"
 .include "stdio/out_cstr.asm"
 
-j8bD116:
+j8bD114:
 .db " is short",0x0a,0x00,0x00
 
-j8bD117:
+j8bD115:
 .db "Is short too",0x0a,0x00
 
 Main:
@@ -39,12 +35,6 @@ j8b_CShortMShort_39:
 	ldi r16,low(7)
 	ldi r17,high(7)
 	call os_dram_alloc
-	brcc _j8b_throwskip_113
-	ldi r16,4
-	call j8bproc_etrace_addfirst
-	set
-	rjmp _j8b_eob_38
-_j8b_throwskip_113:
 	std z+0,r16
 	std z+1,r17
 	std z+2,c0xff
@@ -61,7 +51,6 @@ _j8b_throwskip_113:
 	ldd r17,y+5
 	std z+5,r16
 	std z+6,r17
-_j8b_eob_38:
 	ldi r30,2
 	jmp j8bproc_mfin_sf
 
@@ -91,24 +80,14 @@ j8b_CMainMmain:
 	push r31
 	movw r30,r20
 	rcall j8b_CShortMtoShort_45
-	brtc _j8b_throwskip_115
-	ldi r18,1
-	call j8bproc_etrace_add
-	rjmp _j8b_eob_46
-_j8b_throwskip_115:
 	call os_out_num16
-	ldi r16,low(j8bD116*2)
-	ldi r17,high(j8bD116*2)
+	ldi r16,low(j8bD114*2)
+	ldi r17,high(j8bD114*2)
 	movw r30,r16
 	call os_out_cstr
-	ldi r16,low(j8bD117*2)
-	ldi r17,high(j8bD117*2)
+	ldi r16,low(j8bD115*2)
+	ldi r17,high(j8bD115*2)
 	movw r30,r16
 	call os_out_cstr
 _j8b_eoc_0:
-_j8b_eob_46:
-	brts _j8b_skip_118
-	jmp mcu_halt
-_j8b_skip_118:
-	call j8bproc_etrace_out
 	jmp mcu_halt

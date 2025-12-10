@@ -31,7 +31,7 @@ class Main {
 		return value / b;
 	}
 
-	public void test() throws MathException {
+	public static void test() throws MathException {
 		DivByZeroException.throw();
 	}
 
@@ -47,6 +47,26 @@ class Main {
 		System.setParam(RTOSParam.INIT_DELAY, 1);
 		System.setParam(RTOSParam.HALT_OK_MODE, HaltMode.HALT);
 		System.setParam(RTOSParam.HALT_ERR_MODE, HaltMode.BLINK_N_RESET);
+
+		try {
+			test();
+		}
+		catch(MathOverflowException ex) {
+			System.out(1);
+		}
+		catch(DivByZeroException ex) {
+			System.out(2);
+		}
+		catch(Test1Exception ex) {
+			System.out(3);
+		}
+		catch(MathException ex) {
+			System.out(4);
+		}
+		catch(RuntimeException ex) {
+			System.out(5);
+		}
+
 
 		try {
 			runtimeTest();
@@ -68,7 +88,7 @@ class Main {
 			System.out(1);
 		}
 
-/*		try {
+		try {
 			for(byte f=0;; f++) {
 				System.out(f);
 			}
@@ -77,19 +97,17 @@ class Main {
 			System.out(ex.typeId());
 			System.out(ex.code());
 			System.out(ex);
-		}*/
-/*
+		}
+
 		try {
 			System.out(divTest(10));
 			MathOverflowException.throw();
 		}
-		catch(DivZeroException, MathOverflowException ex) {
-			if(ex is DivByZeroException) {
-				System.out('1');
-			}
-			else {
-				System.out('0');
-			}
-		}*/
+		catch(DivByZeroException, MathOverflowException, DivByZeroException ex) {
+			System.out(10);
+		}
+		catch(MathException ex) {
+			System.out(11);
+		}
     }
 }

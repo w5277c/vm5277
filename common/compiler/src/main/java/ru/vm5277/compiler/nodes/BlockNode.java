@@ -33,6 +33,7 @@ import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Main;
@@ -281,10 +282,7 @@ public class BlockNode extends AstNode {
 		debugAST(this, POST, true, getFullInfo());
 		cgScope = cg.enterBlock(isTry);
 		
-		boolean inTryBlock = false;
-		TryNode currentTryNode = null;
-
-		for (int i = 0; i < children.size(); i++) {
+		for(int i=0; i<children.size(); i++) {
 			AstNode node = children.get(i);
 			if(node.isDisabled()) continue;
 			
@@ -303,22 +301,6 @@ public class BlockNode extends AstNode {
 						}
 					}
 					catch(Exception ex) {}
-				}
-
-				// Если нашли try-block, отмечаем начало зоны обработки исключений
-				if(node instanceof TryNode) {
-					currentTryNode = (TryNode)node;
-					inTryBlock = true;
-				}
-
-				// Проверка вызовов методов
-				if(node instanceof MethodCallExpression) {
-					MethodCallExpression call = (MethodCallExpression)node;
-					MethodSymbol methodSymbol = (MethodSymbol)call.getSymbol();
-
-					if (null != methodSymbol && methodSymbol.canThrow() && !inTryBlock) {
-						markWarning("Call to throwing method '" + methodSymbol.getName() + "' without try-catch at line " + call.getSP());
-					}
 				}
 
 				// Проверяем недостижимый код после прерывающих инструкций
@@ -348,6 +330,7 @@ public class BlockNode extends AstNode {
 	
 	public void firstCodeGen(CodeGenerator cg, CGExcs excs) throws CompileException {
 		cgDone = true;
+		int producedQnt = excs.getProduced().size();
 		
 		for(AstNode node : children) {
 			//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
@@ -362,6 +345,10 @@ public class BlockNode extends AstNode {
 		}
 		
 		((CGBlockScope)cgScope).build(cg, true, excs);
+/*		if(producedQnt!=excs.getProduced().size()) {
+			CGMethodScope mScope = (CGMethodScope)cgScope.getScope(CGMethodScope.class);
+			cg.getTargetInfoBuilder().addExcsThrowPoint(cg, sp, mScope.getSignature());
+		}*/
 	}
 
 	@Override

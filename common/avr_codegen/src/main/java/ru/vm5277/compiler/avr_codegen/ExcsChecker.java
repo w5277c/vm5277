@@ -16,9 +16,11 @@
 
 package ru.vm5277.compiler.avr_codegen;
 
+import ru.vm5277.common.ExcsThrowPoint;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.RTOSFeature;
 import ru.vm5277.common.RTOSLibs;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.items.CGIAsm;
@@ -28,6 +30,7 @@ import ru.vm5277.common.cg.items.CGIAsmJump;
 import ru.vm5277.common.cg.items.CGIAsmLd;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
+import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import static ru.vm5277.common.cg.scopes.CGScope.genId;
 import ru.vm5277.common.exceptions.CompileException;
@@ -37,8 +40,10 @@ public class ExcsChecker {
 	
 	//UNCHECKED
 	public static void stackOverflow(CodeGenerator cg, CGScope scope, CGExcs excs, int size, byte[] popRegIds) throws CompileException {
+		int id = VarType.getExceptionId("StackOverflowException");
+		if(-1==id) return;
+
 		cg.setFeature(RTOSFeature.OS_FT_ETRACE);
-		int id = CGExcs.STACK_OVERFLOW;
 		excs.getProduced().add(id);
 		
 		CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, false);
@@ -66,17 +71,18 @@ public class ExcsChecker {
 	}
 
 	public static void mathOverflow(CodeGenerator cg, CGScope scope, CGExcs excs) throws CompileException {
-		int id = CGExcs.MATH_OVERFLOW;
-		if(excs.getRuntimeChecks().containsKey(id)) {
+		int id = VarType.getExceptionId("MathOverflowException");
+		if(-1==id) return;
+		Integer throwableId = excs.getThrowable(id);
+		if(null!=throwableId) {
 			cg.setFeature(RTOSFeature.OS_FT_ETRACE);
 			excs.getProduced().add(id);
 			
-			CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, false);
-			CGLabelScope catchLbScope = excs.getRuntimeChecks().get(id);
+			CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, true);
+			CGLabelScope catchLbScope = excs.getRuntimeChecks().get(throwableId);
 			scope.append(new CGIAsmCondJump("brcc", skipLbScope));
 			scope.append(new CGIAsmLd("ldi", "r16", Integer.toString(id)));
-			RTOSLibs.ETRACE_ADD.setRequired();
-			scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_etrace_addfirst", true));		
+			etraceAdd(cg, scope, excs);
 			if(null==catchLbScope) {
 				scope.append(new CGIAsm("set"));
 				excs.getMeathodEndLabel().setUsed();
@@ -91,15 +97,18 @@ public class ExcsChecker {
 	}
 
 	public static void divByZero(CodeGenerator cg, CGScope scope, CGExcs excs, byte[] regIds, boolean popRequired) throws CompileException {
-		int id = CGExcs.DIV_BY_ZERO;
-		if(excs.getRuntimeChecks().containsKey(id)) {
+		int id = VarType.getExceptionId("DivByZeroException");
+		if(-1==id) return;
+		Integer throwableId = excs.getThrowable(id);
+		if(null!=throwableId) {
 			cg.setFeature(RTOSFeature.OS_FT_ETRACE);
 			excs.getProduced().add(id);
 			
 			CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, false);
-			CGLabelScope catchLbScope = excs.getRuntimeChecks().get(id);
+			CGLabelScope catchLbScope = excs.getRuntimeChecks().get(throwableId);
 			for(byte regId : regIds) {
 				scope.append(new CGIAsm("tst", "r" + regId));
+				skipLbScope.setUsed();
 				scope.append(new CGIAsmCondJump("brne", skipLbScope));
 			}
 			if(popRequired) {
@@ -108,8 +117,7 @@ public class ExcsChecker {
 				}
 			}
 			scope.append(new CGIAsmLd("ldi", "r16", Integer.toString(id)));
-			RTOSLibs.ETRACE_ADD.setRequired();
-			scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_etrace_addfirst", true));		
+			etraceAdd(cg, scope, excs);
 			if(null==catchLbScope) {
 				scope.append(new CGIAsm("set"));
 				excs.getMeathodEndLabel().setUsed();
@@ -125,16 +133,17 @@ public class ExcsChecker {
 
 	//UNCHECKED
 	public static void outOfMemory(CodeGenerator cg, CGScope scope, CGExcs excs) throws CompileException {
+		int id = VarType.getExceptionId("OutOfMemoryException");
+		if(-1==id) return;
+		
 		cg.setFeature(RTOSFeature.OS_FT_ETRACE);
-		int id = CGExcs.OUT_OF_MEMORY;
 		excs.getProduced().add(id);
 		
 		CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, true);
 		CGLabelScope catchLbScope = excs.getRuntimeChecks().get(id);
 		scope.append(new CGIAsmCondJump("brcc", skipLbScope));
 		scope.append(new CGIAsmLd("ldi", "r16", Integer.toString(id)));
-		RTOSLibs.ETRACE_ADD.setRequired();
-		scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_etrace_addfirst", true));		
+		etraceAdd(cg, scope, excs);
 		if(null==catchLbScope) {
 			scope.append(new CGIAsm("set"));
 			if(null==excs.getMeathodEndLabel()) {
@@ -152,19 +161,19 @@ public class ExcsChecker {
 	}
 
 	public static void arrMathOverflow(CodeGenerator cg, CGScope scope, CGExcs excs, byte[] popRegIds) throws CompileException {
-		int id = CGExcs.ARRAY_INIT;
-		if(excs.getRuntimeChecks().containsKey(id)) {
+		int id = VarType.getExceptionId("ArrayInitException");
+		if(-1==id) return;
+		Integer throwableId = excs.getThrowable(id);
+		if(null!=throwableId) {
 			cg.setFeature(RTOSFeature.OS_FT_ETRACE);
 			excs.getProduced().add(id);
 			
-			CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, false);
-			CGLabelScope catchLbScope = excs.getRuntimeChecks().get(id);
+			CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, true);
+			CGLabelScope catchLbScope = excs.getRuntimeChecks().get(throwableId);
 			scope.append(new CGIAsmCondJump("brcc", skipLbScope));
 			scope.append(new CGIAsmLd("ldi", "r16", Integer.toString(id)));
-			scope.append(new CGIAsmLd("ldi", "r17", Integer.toString(CGExcs.MATH_OVERFLOW)));
-			RTOSLibs.ETRACE_ADD.setRequired();
-			scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_etrace_addfirst", true));		
-
+			scope.append(new CGIAsmLd("ldi", "r17", Integer.toString(VarType.getExceptionId("MathOverflowException"))));
+			etraceAdd(cg, scope, excs);
 			if(null!=popRegIds) {
 				for(byte popRegId : popRegIds) {
 					scope.append(new CGIAsm("pop", "r" + popRegId));
@@ -184,19 +193,19 @@ public class ExcsChecker {
 	}
 	
 	public static void arrOutOfMemory(CodeGenerator cg, CGScope scope, CGExcs excs, byte[] popRegIds) throws CompileException {
-		int id = CGExcs.ARRAY_INIT;
-		if(excs.getRuntimeChecks().containsKey(id)) {
+		int id = VarType.getExceptionId("ArrayInitException");
+		if(-1==id) return;
+		Integer throwableId = excs.getThrowable(id);
+		if(null!=throwableId) {
 			cg.setFeature(RTOSFeature.OS_FT_ETRACE);
 			excs.getProduced().add(id);
 			
-			CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, false);
-			CGLabelScope catchLbScope = excs.getRuntimeChecks().get(id);
+			CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, true);
+			CGLabelScope catchLbScope = excs.getRuntimeChecks().get(throwableId);
 			scope.append(new CGIAsmCondJump("brcc", skipLbScope));
 			scope.append(new CGIAsmLd("ldi", "r16", Integer.toString(id)));
-			scope.append(new CGIAsmLd("ldi", "r17", Integer.toString(CGExcs.OUT_OF_MEMORY)));
-			RTOSLibs.ETRACE_ADD.setRequired();
-			scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_etrace_addfirst", true));		
-
+			scope.append(new CGIAsmLd("ldi", "r17", Integer.toString(VarType.getExceptionId("OutOfMemoryException"))));
+			etraceAdd(cg, scope, excs);
 			if(null!=popRegIds) {
 				for(byte popRegId : popRegIds) {
 					scope.append(new CGIAsm("pop", "r" + popRegId));
@@ -217,18 +226,18 @@ public class ExcsChecker {
 	}
 
 	public static void invalidIndex(CodeGenerator cg, CGScope scope, CGExcs excs) throws CompileException {
-		int id = CGExcs.INVALID_INDEX;
-		if(excs.getRuntimeChecks().containsKey(id)) {
+		int id = VarType.getExceptionId("InvalidIndexException");
+		if(-1==id) return;
+		Integer throwableId = excs.getThrowable(id);
+		if(null!=throwableId) {
 			cg.setFeature(RTOSFeature.OS_FT_ETRACE);
 			excs.getProduced().add(id);
 			
 			CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, false);
-			CGLabelScope catchLbScope = excs.getRuntimeChecks().get(id);
+			CGLabelScope catchLbScope = excs.getRuntimeChecks().get(throwableId);
 			scope.append(new CGIAsmCondJump("brcc", skipLbScope));
 			scope.append(new CGIAsmLd("ldi", "r16", Integer.toString(id)));
-			RTOSLibs.ETRACE_ADD.setRequired();
-			scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_etrace_addfirst", true));		
-
+			etraceAdd(cg, scope, excs);
 			if(null==catchLbScope) {
 				scope.append(new CGIAsm("set"));
 				excs.getMeathodEndLabel().setUsed();
@@ -241,5 +250,19 @@ public class ExcsChecker {
 			}
 			scope.append(skipLbScope);
 		}
+	}
+
+	private static void etraceAdd(CodeGenerator cg, CGScope scope, CGExcs excs) throws CompileException {
+		CGMethodScope mScope = (CGMethodScope)scope.getScope(CGMethodScope.class);
+		ExcsThrowPoint point = cg.getTargetInfoBuilder().addExcsThrowPoint(cg, excs.getSourcePosition(), null==mScope ? "" : mScope.getSignature());
+		RTOSLibs.ETRACE_ADD.setRequired();
+		CGIContainer cont7b = new CGIContainer();
+		// Нельзя применять CGAsmLd, иначе оптимизатор вырежет 'лишний' ldi
+		cont7b.append(new CGIAsm("ldi", "r18," + (point.getId()&0x7f)));
+		CGIContainer cont15b = new CGIContainer();
+		cont15b.append(new CGIAsm("ldi", "r18,low(" + (point.getId()&0x7fff) + ")"));
+		cont15b.append(new CGIAsm("ldi", "r19,high(" + (point.getId()&0x7fff) + ")"));
+		scope.append(point.makeContainer(cont7b, cont15b));
+		scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_etrace_add", true));
 	}
 }

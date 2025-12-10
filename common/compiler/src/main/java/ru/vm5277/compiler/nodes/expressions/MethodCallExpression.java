@@ -54,6 +54,7 @@ import ru.vm5277.common.cg.TargetInfoBuilder;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGTryBlockScope;
+import ru.vm5277.compiler.nodes.CatchBlock;
 import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.CIScope;
@@ -193,7 +194,8 @@ public class MethodCallExpression extends ExpressionNode {
 							Scope scope_ = scope;
 							while(null!=scope_) {
 								if(scope_ instanceof BlockScope) {
-									if(eScope.isCompatible(((BlockScope)scope_).getExceptionScopes())) {
+									BlockScope tryBlockScope = (BlockScope)scope_;
+									if(eScope.isCompatible(tryBlockScope.getHandlingExcsScopes())) {
 										break;
 									}
 								}
@@ -268,6 +270,34 @@ public class MethodCallExpression extends ExpressionNode {
 						markError("Non-static method '" + symbol.getName() + "' cannot be referenced from a static context");
 						result = false;
 					}
+				}
+			}
+			
+			if(result && ((MethodSymbol)symbol).canThrow()) {
+				l1:
+				// Перебираем все исключения перечисленные в throws вызываемого метода
+				for(ExceptionScope eScope : ((MethodSymbol)symbol).getScope().getExceptionScopes()) {
+					Scope scope_ = scope;
+					while(null!=scope_) {
+						if(scope_ instanceof BlockScope) {
+							BlockScope tryBlockScope = (BlockScope)scope_;
+							// Нашли блок кода, исключения запонены только для catch блока, проверяем на обработку
+							for(ExceptionScope catchExScope : tryBlockScope.getHandlingExcsScopes()) {
+								// Точное совпадение
+								if(catchExScope.getId()==eScope.getId()) {
+									continue l1;
+								}
+								// Проверяем потомков исключения в catch блоке на совпадение
+								for(int exId : VarType.getExceptionDescendant(catchExScope.getId())) {
+									if(exId==eScope.getId()) {
+										continue l1;
+									}
+								}
+							}
+						}
+						scope_ = scope_.getParent();
+					}
+					markError("Unhandled exception type: " + eScope.getName());
 				}
 			}
 		}
@@ -354,9 +384,7 @@ public class MethodCallExpression extends ExpressionNode {
 			ExceptionScope eScope = (ExceptionScope)cis;
 			excs.getProduced().add(eScope.getId());
 			if(0x01==args.size()) {
-				if(CodegenResult.RESULT_IN_ACCUM!=args.get(0x00).codeGen(cg, cgs, true, excs)) {
-					throw new CompileException("Accum not used for operand:" + args.get(0x00));
-				}
+				cg.exCodeToAccH(cgs, ((LiteralExpression)args.get(0)).getNumValue());
 			}
 
 			CGLabelScope lbScope = null;
@@ -366,6 +394,7 @@ public class MethodCallExpression extends ExpressionNode {
 			// Ищем подходящий обработчик исключения: блок catch или выход из метода
 			while(null!=cgScope_) {
 				if(cgScope_ instanceof CGTryBlockScope) {
+					// Нашли блок try-catch
 					for(Integer catchExceptionId : ((CGTryBlockScope)cgScope_).getExceptionIds()) {
 						if(eScope.isCompatible(catchExceptionId)) {
 							lbScope = ((CGTryBlockScope)cgScope_).getCatchLabel(catchExceptionId);
@@ -374,6 +403,7 @@ public class MethodCallExpression extends ExpressionNode {
 					}
 				}
 				if(null!=cgScope_.getParent() && cgScope_.getParent() instanceof CGMethodScope) {
+					// Нашли превый блок в методе
 					if(eScope.isUnchecked()) {
 						isMethodLeave = true;
 						lbScope = ((CGBlockScope)cgScope_).getELabel();
@@ -401,13 +431,15 @@ public class MethodCallExpression extends ExpressionNode {
 		}
 		else if(symbol.isNative()) {
 			cg.nativeMethodInit(cgs, signature);
-			for(int i=0; i<args.size(); i++) {
-				ExpressionNode argExpr = args.get(i);
-				cg.accResize(argTypes[i]);
-				if(CodegenResult.RESULT_IN_ACCUM!=argExpr.codeGen(cg, cgs, true, excs)) {
-					throw new CompileException("Accum not used for argument:" + argExpr);
+			if(!signature.equals("System.out [exception]")) {
+				for(int i=0; i<args.size(); i++) {
+					ExpressionNode argExpr = args.get(i);
+					cg.accResize(argTypes[i]);
+					if(CodegenResult.RESULT_IN_ACCUM!=argExpr.codeGen(cg, cgs, true, excs)) {
+						throw new CompileException("Accum not used for argument:" + argExpr);
+					}
+					cg.nativeMethodSetArg(cgs, signature, i);
 				}
-				cg.nativeMethodSetArg(cgs, signature, i);
 			}
 			cg.nativeMethodInvoke(cgs, signature);
 			
@@ -504,6 +536,7 @@ public class MethodCallExpression extends ExpressionNode {
 		CGLabelScope endMethodLbScope = null;
 
 		CGScope cgScope_ = cgScope;
+		Set<Integer> produced = new HashSet<>(excs.getProduced());
 		l1:				
 		while(null!=cgScope_) {
 			if(cgScope_ instanceof CGTryBlockScope) {
@@ -513,22 +546,23 @@ public class MethodCallExpression extends ExpressionNode {
 					if(tryCatchBlock.containsException(catchLabel, 0x00)) {
 						exceptionHandlers.add(new Pair<CGLabelScope, Set<Integer>>(tryCatchBlock.getCatchLabel(0x00), null));
 						// Все обрабатываемые исключения здесь обрабатаны
-						excs.getRuntimeChecks().clear();
-						excs.getProduced().clear();
+						//TODO должен делать catch блок: excs.getRuntimeChecks().clear();
+						//TODO должен делать catch блок: excs.getProduced().clear();
+						produced.clear();
 						break l1;
 					}
 
 					// Список в котором будут ид исключения, обрабатывемые текущим catch блоком
 					HashSet<Integer> exceptionIds = new HashSet<>();
 					// Перебираем произведенные исключения
-					for(int producedExceptionId : new ArrayList<>(excs.getProduced())) {
+					for(int producedExceptionId : new HashSet<>(produced)) {
 						// Анализируем в цикле текущее исключение и все от которых оно наследуется
 						boolean gotIt = false;
 						Integer exceptionId = producedExceptionId;
 						while(null!=exceptionId) {
 							// Если исключение обрабатывается в данном catch, то добавляем его в список и удаляем из ожидаемых
 							if(tryCatchBlock.containsException(catchLabel, exceptionId)) {
-								excs.getRuntimeChecks().remove(exceptionId);
+								//TODO должен делать catch блок: excs.getRuntimeChecks().remove(exceptionId);
 								exceptionIds.add(exceptionId);
 								gotIt = true;
 								// Достаточно первого найденного совместимого типа в иерархии
@@ -539,7 +573,8 @@ public class MethodCallExpression extends ExpressionNode {
 						}
 						// Удаляем исключение из списка произведенных (указываем что оно обработано)
 						if(gotIt) {
-							excs.getProduced().remove(producedExceptionId);
+							//TODO должен делать catch блок: excs.getProduced().remove(producedExceptionId);
+							produced.remove(producedExceptionId);
 						}
 					}
 

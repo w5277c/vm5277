@@ -27,6 +27,7 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Delimiter;
@@ -223,7 +224,8 @@ public class NewArrayExpression extends ExpressionNode {
 	@Override
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		CodegenResult result = null;
-
+		excs.setSourcePosition(sp);
+		
 		if(null==constDimensions) {
 			cg.pushStackReg(cgScope);
 			for(int i=arrDimensions.size()-1; i>=0; i--) {

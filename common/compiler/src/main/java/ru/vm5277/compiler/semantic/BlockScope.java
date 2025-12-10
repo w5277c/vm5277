@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.semantic;
 
 import java.util.HashMap;
@@ -25,7 +26,7 @@ import ru.vm5277.common.exceptions.CompileException;
 public class BlockScope extends Scope {
 	protected	final	Map<String, Symbol>			variables			= new HashMap<>();
 	private		final	Map<String, LabelSymbol>	labels				= new HashMap<>();
-	private		final	Set<ExceptionScope>			exceptionScopes		= new HashSet<>();
+	private		final	Set<ExceptionScope>			handlingExcsScopes	= new HashSet<>();
 	
 	public BlockScope(Scope parent) {
 		super(parent);
@@ -39,11 +40,11 @@ public class BlockScope extends Scope {
 		variables.put(name, symbol);
 	}
 
-	public void addExceptionScope(ExceptionScope eScope) {
-		exceptionScopes.add(eScope);
+	public void addHandlingExcsScope(ExceptionScope eScope) {
+		handlingExcsScopes.add(eScope);
 	}
-	public Set<ExceptionScope> getExceptionScopes() {
-		return exceptionScopes;
+	public Set<ExceptionScope> getHandlingExcsScopes() {
+		return handlingExcsScopes;
 	}
 	
 	@Override

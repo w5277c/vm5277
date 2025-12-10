@@ -506,6 +506,7 @@ public class ASTPrinter {
 				out.removeLast(2);
 				out.put(" " + cBlock.getVarName() + ") ");
 				printBody(cBlock);
+				out.print();
 			}
 		}
 		else {

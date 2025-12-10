@@ -306,6 +306,9 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract CGIContainer blockFree(int varsSize) throws CompileException ;
 	public abstract boolean normalizeIRegConst(CGMethodScope mScope, char iReg, AtomicInteger lastOffset) throws CompileException;
 	public abstract String getVersion();
+	public abstract void exTypeIdToAcc(CGScope scope) throws CompileException;
+	public abstract void exCodeToAcc(CGScope scope) throws CompileException;
+	public abstract void exCodeToAccH(CGScope scope, long numValue) throws CompileException;
 
 	public void setParam(RTOSParam sp, int valueId) {
 		params.put(sp, valueId);

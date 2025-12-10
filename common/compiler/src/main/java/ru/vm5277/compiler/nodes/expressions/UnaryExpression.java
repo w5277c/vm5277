@@ -35,6 +35,8 @@ import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.SourcePosition;
 import ru.vm5277.common.cg.CGExcs;
+import ru.vm5277.common.cg.scopes.CGClassScope;
+import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 
 public class UnaryExpression extends ExpressionNode {
@@ -203,6 +205,7 @@ public class UnaryExpression extends ExpressionNode {
 	}
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, boolean toAccum, CGExcs excs) throws CompileException {
 		CodegenResult result = null;
+		excs.setSourcePosition(sp);
 		
 		CGScope cgs = null == parent ? cgScope : parent;
 		

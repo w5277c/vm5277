@@ -36,6 +36,7 @@ import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
+import ru.vm5277.compiler.nodes.CatchBlock;
 import ru.vm5277.compiler.nodes.FieldNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.VarNode;
@@ -540,7 +541,7 @@ public class ExpressionNode extends AstNode {
 				VarFieldExpression varExpr = (VarFieldExpression)ioe.getLeft();
 				Symbol varSymbol = varExpr.getSymbol();
 
-				if (null != varSymbol && varSymbol.isFinal() && ioe.getLeftType() != null && ioe.getRightType() != null) {
+				if(null!=varSymbol && varSymbol.isFinal() && ioe.getLeftType()!=null && VarType.EXCEPTION!=ioe.getLeftType() && ioe.getRightType()!=null) {
 					VarType leftType = ioe.getLeftType();
 					if(varSymbol instanceof VarSymbol) {
 						AstNode node = ((VarSymbol)varSymbol).getNode();
@@ -555,7 +556,7 @@ public class ExpressionNode extends AstNode {
 					}
 
 					// Точное совпадение типов
-					if (leftType == ioe.getRightType()) {
+					if(leftType==ioe.getRightType()) {
 						ExpressionNode result = new LiteralExpression(tb, mc, true);
 						result.postAnalyze(scope, cg);
 						return result;

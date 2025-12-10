@@ -31,6 +31,7 @@ import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
@@ -265,7 +266,7 @@ public class ClassNode extends ObjectTypeNode {
 	
 	public void firstCodeGen(CodeGenerator cg, MethodNode methodNode, CGExcs excs) throws CompileException {
 		cgDone = true;
-
+		
 		methodNode.firstCodeGen(cg, excs);
 		
 		((CGClassScope)cgScope).build(cg, excs);
@@ -275,7 +276,7 @@ public class ClassNode extends ObjectTypeNode {
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
-
+		
 		((CGClassScope)cgScope).build(cg, excs);
 /*		if(null != importedClasses) {
 			for (ClassNode imported : importedClasses) {
@@ -283,6 +284,7 @@ public class ClassNode extends ObjectTypeNode {
 			}
 		}
 */
+
 		return null;
 	}
 	

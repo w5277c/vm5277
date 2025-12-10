@@ -17,7 +17,6 @@
 package ru.vm5277.common;
 
 import ru.vm5277.common.cg.items.CGIContainer;
-import ru.vm5277.common.cg.items.CGItem;
 
 public class ExcsThrowPoint {
 	private	Integer			id;
@@ -65,7 +64,6 @@ public class ExcsThrowPoint {
 	
 	@Override
 	public String toString() {
-		return null!=id ? id + " " + sp.toString() + " " + signature : "";
+		return null!=id ? id + " " + (null==sp ? "null" : sp.toString()) + " " + signature : "";
 	}
-
 }

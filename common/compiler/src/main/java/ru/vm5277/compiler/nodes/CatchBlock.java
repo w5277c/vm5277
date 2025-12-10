@@ -16,6 +16,7 @@
 
 package ru.vm5277.compiler.nodes;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.LabelNames;
@@ -28,10 +29,12 @@ import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGTryBlockScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
+import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.ExceptionScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.VarSymbol;
@@ -41,7 +44,7 @@ public class CatchBlock extends BlockNode {
 	private	String					varName;
 	private	BlockNode				blockNode;
 	private	BlockNode				tryBlockNode;
-	private	ExceptionScope			eScope;
+	private	Set<ExceptionScope>		eScopes			= new HashSet<>();
 	
 	public CatchBlock(TokenBuffer tb, MessageContainer mc, List<ExpressionNode> args, String varName) throws CompileException {
 		super(tb, mc);
@@ -58,7 +61,7 @@ public class CatchBlock extends BlockNode {
 	public String getVarName() {
 		return varName;
 	}
-
+	
 	@Override
 	public boolean preAnalyze() {
 		boolean result = super.preAnalyze();
@@ -109,7 +112,7 @@ public class CatchBlock extends BlockNode {
 	}
 	
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, BlockNode tryBlockNode) {
-		boolean result = super.postAnalyze(scope, cg);
+		boolean result = true;
 
 		try {
 			this.tryBlockNode = tryBlockNode;
@@ -133,8 +136,9 @@ public class CatchBlock extends BlockNode {
 						break;
 					}
 					else {
-						eScope = (ExceptionScope)((TypeReferenceExpression)expr).getScope();
-						tryBlockNode.getScope().addExceptionScope(eScope);
+						ExceptionScope eScope = (ExceptionScope)((TypeReferenceExpression)expr).getScope();
+						eScopes.add(eScope);
+						tryBlockNode.getScope().addHandlingExcsScope(eScope);
 					}
 				}
 			}
@@ -143,12 +147,14 @@ public class CatchBlock extends BlockNode {
 			markError(ex);
 			result = false;
 		}
+		
+		result&=super.postAnalyze(scope, cg);
 
 		return result;
 	}
 
-	public ExceptionScope getExceptionScope() {
-		return eScope;
+	public Set<ExceptionScope> getExceptionScopes() {
+		return eScopes;
 	}
 	
 	@Override
@@ -172,40 +178,47 @@ public class CatchBlock extends BlockNode {
 		cg.setScope(oldScope);
 	}
 	
-	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs, boolean isUsed) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 		
 		CGScope cgs = null == parent ? cgScope : parent;
+		CGLabelScope lbCatchEndScope = null;
+		if(isUsed) {
+			lbCatchEndScope = new CGLabelScope(null, CodeGenerator.genId(), LabelNames.CATCH_SKIP, true);
+			cg.jump(cgs, lbCatchEndScope);
+		}
 		
-		CGLabelScope lbCatchEndScope = new CGLabelScope(null, CodeGenerator.genId(), LabelNames.CATCH_SKIP, true);
-		cg.jump(cgs, lbCatchEndScope);
+		boolean isCatchLabelUsed = false;
 		for(int i=0; i<args.size(); i++) {
 			ExpressionNode expr = args.get(i);
 			String path = ((TypeReferenceExpression)expr).getQualifiedPath();
-			cgs.append(((CGTryBlockScope)tryBlockNode.getCGScope()).getCatchLabel(VarType.getExceptionId(path)));
+			if(!isCatchLabelUsed) {
+				cgs.append(((CGTryBlockScope)tryBlockNode.getCGScope()).getCatchLabel(VarType.getExceptionId(path)));
+				isCatchLabelUsed = true;
+			}
 		}
-		
 		
 		CGVarScope vScope = new CGVarScope(cgs, CodeGenerator.genId(), VarType.SHORT, 0x02, true, varName);
 		vScope.setCells(new CGCells(CGCells.Type.ACC));
 		((VarSymbol)symbol).setCGScope(vScope);
 		
-		for(AstNode node : children) {
-			//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
-			if(!(node instanceof VarNode)) {
-				node.codeGen(cg, cgs, false, excs);
+		if(isUsed) {
+			for(AstNode node : children) {
+				//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
+				if(!(node instanceof VarNode)) {
+					node.codeGen(cg, cgs, false, excs);
+				}
 			}
 		}
 		
-		cgs.append(lbCatchEndScope);
+		if(isUsed) {
+			cgs.append(lbCatchEndScope);
+		}
 		
 		((CGBlockScope)cgScope).build(cg, false, excs);
 		((CGBlockScope)cgScope).restoreRegsPool();
-		
-		
-		
+
 		return null;
 	}
 }

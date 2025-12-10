@@ -32,11 +32,14 @@ import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
+import ru.vm5277.compiler.nodes.CatchBlock;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.CIScope;
+import ru.vm5277.compiler.semantic.ExceptionScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
+import ru.vm5277.compiler.semantic.VarSymbol;
 
 public class InstanceOfExpression extends ExpressionNode {
 	private	ExpressionNode	leftExpr;	// Проверяемое выражение
@@ -59,6 +62,10 @@ public class InstanceOfExpression extends ExpressionNode {
 
 	public ExpressionNode getLeft() {
 		return leftExpr;
+	}
+
+	public ExpressionNode getRight() {
+		return rightExpr;
 	}
 
 	public ExpressionNode getTypeExpr() {
@@ -187,6 +194,11 @@ public class InstanceOfExpression extends ExpressionNode {
 			result = false;
 		}
 
+		if(VarType.EXCEPTION==rightType || VarType.EXCEPTION==leftType) {
+			markError("'Exception' type cannot be used with 'is' operator");
+			result = false;
+		}
+		
 		if(result) {
 			// Проверка реализации интерфейса
 			if(leftType.isClassType()) {
@@ -202,7 +214,9 @@ public class InstanceOfExpression extends ExpressionNode {
 			
 			// Просто копирую CGScope из оригинала
 			// Инкремент/декремент счетчика ссылок не нужен, так как используем один CGCells
-			varSymbol.setCGScope(getSrcSymbol().getCGScope());
+			if(null!=varName) {
+				varSymbol.setCGScope(getSrcSymbol().getCGScope());
+			}
 		}
 		
 		cg.leaveExpression();
@@ -243,20 +257,20 @@ public class InstanceOfExpression extends ExpressionNode {
 		Symbol varSymbol = getSrcSymbol();
 		if(varSymbol.isFinal()) return (isCompatibleWith(scope, varSymbol.getType(), rightType) ? CodegenResult.TRUE : CodegenResult.FALSE);
 
-		leftExpr.codeGen(cg, cgs, false, excs);
+			leftExpr.codeGen(cg, cgs, false, excs);
 
-		// TODO весь код можно вынести в RTOS j8b утилиты и просто вызывать как функцию
-		boolean heapSaved=false;
-		if(leftExpr instanceof VarFieldExpression) {
-			CGCellsScope cScope = (CGCellsScope)((VarFieldExpression)leftExpr).getSymbol().getCGScope();
-			cg.pushHeapReg(cgs);
-			heapSaved = true;
-			cg.setHeapReg(cgs, cScope.getCells());
-		}
+			// TODO весь код можно вынести в RTOS j8b утилиты и просто вызывать как функцию
+			boolean heapSaved=false;
+			if(leftExpr instanceof VarFieldExpression) {
+				CGCellsScope cScope = (CGCellsScope)((VarFieldExpression)leftExpr).getSymbol().getCGScope();
+				cg.pushHeapReg(cgs);
+				heapSaved = true;
+				cg.setHeapReg(cgs, cScope.getCells());
+			}
 
-		cg.eInstanceof(cgs, rightType);
+			cg.eInstanceof(cgs, rightType);
 
-		if(heapSaved) cg.popHeapReg(cgs);
+			if(heapSaved) cg.popHeapReg(cgs);
 
 		return CodegenResult.RESULT_IN_ACCUM;
 	}

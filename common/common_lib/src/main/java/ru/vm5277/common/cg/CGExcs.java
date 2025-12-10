@@ -20,21 +20,15 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 
 public class CGExcs {
-	public	final	static	int	DIV_BY_ZERO		= 0x01;
-	public	final	static	int	MATH_OVERFLOW	= 0x02;
-	public	final	static	int	STACK_OVERFLOW	= 0x03;
-	public	final	static	int	OUT_OF_MEMORY	= 0x04;
-	public	final	static	int	ARRAY_INIT		= 0x05;
-	public	final	static	int	INVALID_INDEX	= 0x06;
-
-	
+	private	SourcePosition				sp;
 	private	Map<Integer,CGLabelScope>	runtimeChecks	= new HashMap<>();	// Обрабатываемые (наличие try-catch) исключения для runtime проверок
 	private	Set<Integer>				produced		= new HashSet<>();	// Сгенерированные исключения throw или runtime проверками
 	private	CGLabelScope				methodEndLabel;
-	
 	
 	public CGExcs() {
 	}
@@ -53,4 +47,23 @@ public class CGExcs {
 	public void setMethodEndLabel(CGLabelScope lbScope) {
 		methodEndLabel = lbScope;
 	}
+	
+	public Integer getThrowable(int exId) {
+		Integer id = exId;
+		while(null!=id) {
+			if(runtimeChecks.containsKey(id)) {
+				return id;
+			}
+			id=VarType.getExceptionParent(id);
+		}
+		return null;
+	}
+	
+	public void setSourcePosition(SourcePosition sp) {
+		this.sp = sp;
+	}
+	public SourcePosition getSourcePosition() {
+		return sp;
+	}
+	
 }

@@ -29,6 +29,7 @@ import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -194,7 +195,8 @@ public class ArrayExpression extends ExpressionNode {
 	@Override
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		CodegenResult result = null;
-
+		excs.setSourcePosition(sp);
+		
 		CGScope cgs = (null==parent ? cgScope : parent);
 
 		// Как минимум необходим если targetExpr instanceof MethodCallExpr(MethodCallExpr на toAccum не смотрит, здесь главный тип метода(возвращаемое значение в accum))
@@ -291,6 +293,7 @@ public class ArrayExpression extends ExpressionNode {
 		if((isView || !arrCells.canComputeStatic()) && !toAccum && !makeView) {
 			//Похоже вообшще не нужно cg.popAccBE(cgs, accSize);
 		}
+
 		return result;
 	}
 	

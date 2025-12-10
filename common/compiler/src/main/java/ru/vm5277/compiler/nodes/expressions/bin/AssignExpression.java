@@ -199,6 +199,7 @@ public class AssignExpression extends BinaryExpression {
 	@Override
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, boolean toAccum, CGExcs excs) throws CompileException {
 		if(disabled) return null;
+		excs.setSourcePosition(sp);
 		
 		CGScope cgs = null == parent ? cgScope : parent;
 		

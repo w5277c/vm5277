@@ -353,6 +353,7 @@ public class MethodNode extends AstNode {
 							if(ciScope instanceof ExceptionScope) {
 								
 								methodScope.addExceptionScope((ExceptionScope)ciScope);
+								ids.add(((ExceptionScope)ciScope).getId());
 /*								// Нашли исключение, проходим по всей цепочке наследования
 								ExceptionScope eScope = (ExceptionScope)ciScope;
 								while(true) {
@@ -524,9 +525,26 @@ public class MethodNode extends AstNode {
 
 		((CGClassScope)cgScope.getParent()).addMethod((CGMethodScope)cgScope);
 		
+		
+		//В данном месте runtimeChecks должен быть сформирован на базе throws а не на базе обернутых catch
 		if(null!=blockNode) {
-			excs.setMethodEndLabel(blockNode.getCGScope().getELabel());
-			blockNode.codeGen(cg, null, false, excs);
+			CGExcs newExcs = new CGExcs();
+			
+//			Set<Integer> exIds = new HashSet<>();
+//			exIds.add(VarType.getExceptionId("RuntimeException"));
+			//newExcs.getRuntimeChecks().put(VarType.getExceptionId("RuntimeException"), blockNode.getCGScope().getELabel());
+			for(ExceptionScope eScope : methodScope.getExceptionScopes()) {
+				newExcs.getRuntimeChecks().put(eScope.getId(), blockNode.getCGScope().getELabel());
+//				exIds.add(eScope.getId());
+			}
+
+/*			for(Integer exId : VarType.getExceptionDescendants(exIds)) {
+				newExcs.getRuntimeChecks().put(exId, blockNode.getCGScope().getELabel());
+			}
+*/
+			newExcs.setMethodEndLabel(blockNode.getCGScope().getELabel());
+			blockNode.codeGen(cg, null, false, newExcs);
+			excs.getProduced().addAll(newExcs.getProduced());
 		}
 		
 		objTypeNode.codeGen(cg, null, false, excs);

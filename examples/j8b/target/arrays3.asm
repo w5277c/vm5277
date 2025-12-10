@@ -12,8 +12,6 @@
 .include "devices/atmega328p.def"
 .include "core/core.asm"
 .include "sys/mcu_halt.asm"
-.include "j8b/etrace_out.asm"
-.include "j8b/etrace_add.asm"
 .include "dmem/dram.asm"
 .include "j8b/new_array.asm"
 .include "j8b/arr_celladdr.asm"
@@ -229,10 +227,6 @@ j8b_CMainMmain:
 	call j8bproc_arr_celladdr
 	pop r16
 	st x+,r16
-	brts _j8b_skip_167
-	jmp mcu_halt
-_j8b_skip_167:
-	call j8bproc_etrace_out
 	jmp mcu_halt
 
 j8b_CMainMmethod1_35:

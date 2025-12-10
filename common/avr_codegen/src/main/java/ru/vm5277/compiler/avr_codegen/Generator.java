@@ -2579,6 +2579,7 @@ public class Generator extends CodeGenerator {
 		}
 
 		CGIContainer cont7b = new CGIContainer();
+		// Нельзя применять CGAsmLd, иначе оптимизатор вырежет 'лишний' ldi
 		cont7b.append(new CGIAsm("ldi", "r18," + (point.getId()&0x7f)));
 		CGIContainer cont15b = new CGIContainer();
 		cont15b.append(new CGIAsm("ldi", "r18,low(" + (point.getId()&0x7fff) + ")"));
@@ -2631,6 +2632,19 @@ public class Generator extends CodeGenerator {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";throwsCheck end"));
 	}
 
+	@Override
+	public void exTypeIdToAcc(CGScope scope) throws CompileException {
+		scope.append(new CGIAsmLd("lds", "r16", "_os_etrace_buffer+0x00"));
+	}
+	@Override
+	public void exCodeToAcc(CGScope scope) throws CompileException {
+		scope.append(new CGIAsmLd("lds", "r16", "_os_etrace_buffer+0x01"));
+	}
+	@Override
+	public void exCodeToAccH(CGScope scope, long numValue) throws CompileException {
+		scope.append(new CGIAsmLd("ldi", "r17", Long.toString(numValue)));
+	}
+	
 	@Override
 	public void terminate(CGScope scope, boolean systemStop, boolean excsCheck) throws CompileException {
 		Object obj = params.get(RTOSParam.HALT_OK_MODE);

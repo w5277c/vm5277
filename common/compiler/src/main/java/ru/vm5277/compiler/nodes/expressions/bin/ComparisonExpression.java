@@ -144,6 +144,7 @@ public class ComparisonExpression extends BinaryExpression {
 	@Override
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, boolean toAccum, CGExcs excs) throws CompileException {
 		if(disabled) return null;
+		excs.setSourcePosition(sp);
 		
 		//TODO операции сравнения не сохраняют результат в аккумулятор, это делают(к примеру) логические операции.
 		CodegenResult result = null;

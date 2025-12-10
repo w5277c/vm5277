@@ -139,6 +139,45 @@ public class VarType {
 	public static List<String> getExceptionTypes() {
 		return EXCEPTION_TYPES;
 	}
+	public static Set<Integer> getExceptionDescendants(Set<Integer> exIds) {
+		Set<Integer> result = new HashSet<>();
+
+		while(!exIds.isEmpty()) {
+			Set<Integer> nextIds = new HashSet<>();
+
+			for(int exId : exIds) {
+				result.add(exId);
+
+				// Ищем всех детей текущего исключения
+				for (Integer childExId : EXCEPTION_PARENTS.keySet()) {
+					int parentExId = EXCEPTION_PARENTS.get(childExId);
+
+					// Если текущее исключение - родитель для какого-то другого
+					if(parentExId==exId) {
+						nextIds.add(childExId);
+					}
+				}
+			}
+			exIds = nextIds;
+		}
+		return result;
+	}
+	
+	public static Set<Integer> getExceptionDescendant(int parentId) {
+		Set<Integer> result = new HashSet<>();
+
+		for(Map.Entry<Integer, Integer> entry : EXCEPTION_PARENTS.entrySet()) {
+			int childId = entry.getKey();
+			int childParentId = entry.getValue();
+
+			if(childParentId==parentId) {
+				result.add(childId);
+				result.addAll(getExceptionDescendant(childId));
+			}
+		}
+		return result;
+	}
+	
 	
 	public static void setUsedException(int id) {
 		USED_EXCEPTIONS.add(id);

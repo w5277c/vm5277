@@ -6,7 +6,7 @@ class Main {
         //AST>CONST final byte c = 3;
         System.out(add(3, add(3, 8)));
     }
-    private static byte add(byte b1, byte b2) {
+    static private byte add(byte b1, byte b2) {
         return b1+b2;
     }
 }

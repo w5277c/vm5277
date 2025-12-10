@@ -24,7 +24,7 @@ import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class ExceptionScope extends CIScope {
-	private	final	static	String			RUNTIME_EXCEPTION_NAME	= "RuntimeException";
+	public	final	static	String			RUNTIME_EXCEPTION_NAME	= "RuntimeException";
 	private					int				id;
 	private					ExceptionScope	extScope;
 	private					List<String>	values;

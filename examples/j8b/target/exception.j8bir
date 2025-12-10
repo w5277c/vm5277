@@ -12,7 +12,7 @@ class Main {
         b--;
         return value/b;
     }
-    public void test() throws  {
+    public static void test() throws  {
         DivByZeroException.throw();
     }
     public static void runtimeTest() {
@@ -27,22 +27,65 @@ class Main {
         System.setParam(7, 0);
         System.setParam(8, 3);
         try {
+            test();
+        }
+        catch(MathOverflowException ex) {
+            System.out(1);
+        }
+        catch(DivByZeroException ex) {
+            System.out(2);
+        }
+        catch(Test1Exception ex) {
+            System.out(3);
+        }
+        catch(MathException ex) {
+            System.out(4);
+        }
+        catch(RuntimeException ex) {
+            System.out(5);
+        }
+        
+        try {
             runtimeTest();
         }
         catch(MathException ex) {
             System.out('@');
-        }catch(RuntimeException ex) {
+        }
+        catch(RuntimeException ex) {
             System.out(' ');
-        }catch(Exception ex) {
+        }
+        catch(Exception ex) {
             System.out('!');
         }
+        
         try {
             Test2Exception.throw(2);
         }
         catch(Exception ex) {
             System.out(1);
         }
-    }
-    public Main() {
+        
+        try {
+            for(byte f = 0; ; f++) {
+                System.out(f);
+            }
+        }
+        catch(MathException ex) {
+            System.out(ex.typeid());
+            System.out(ex.code());
+            System.out(ex);
+        }
+        
+        try {
+            System.out(divTest(10));
+            MathOverflowException.throw();
+        }
+        catch(DivByZeroException, MathOverflowException, DivByZeroException ex) {
+            System.out(10);
+        }
+        catch(MathException ex) {
+            System.out(11);
+        }
+        
     }
 }

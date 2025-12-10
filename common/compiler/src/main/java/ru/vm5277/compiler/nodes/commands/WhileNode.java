@@ -30,6 +30,7 @@ import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -178,7 +179,7 @@ public class WhileNode extends CommandNode {
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
-
+				
 		CodegenResult result = null;
 		CGScope cgs = null == parent ? cgScope : parent;
 		cgs.setBranch(branch);
@@ -205,6 +206,7 @@ public class WhileNode extends CommandNode {
 		
 		((CGBlockScope)cgScope).build(cg, false, excs);
 		((CGBlockScope)cgScope).restoreRegsPool();
+
 		return result;
 	}
 	

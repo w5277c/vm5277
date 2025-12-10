@@ -1,18 +1,14 @@
 ; vm5277.avr_codegen v0.2
 .equ CORE_FREQ = 16
 .equ STDOUT_PORT = 18
-.set OS_ETRACE_POINT_BITSIZE = 7
 
 .set OS_FT_STDOUT = 1
 .set OS_FT_WELCOME = 1
 .set OS_FT_DRAM = 1
-.set OS_FT_ETRACE = 1
 
 .include "devices/atmega328p.def"
 .include "core/core.asm"
 .include "sys/mcu_halt.asm"
-.include "j8b/etrace_out.asm"
-.include "j8b/etrace_add.asm"
 .include "dmem/dram.asm"
 .include "j8b/class_refcount.asm"
 .include "j8b/clear_fields.asm"
@@ -33,12 +29,6 @@ j8b_CByteMByte_39:
 	ldi r16,low(6)
 	ldi r17,high(6)
 	call os_dram_alloc
-	brcc _j8b_throwskip_112
-	ldi r16,4
-	call j8bproc_etrace_addfirst
-	set
-	rjmp _j8b_eob_38
-_j8b_throwskip_112:
 	std z+0,r16
 	std z+1,r17
 	std z+2,c0xff
@@ -53,7 +43,6 @@ _j8b_throwskip_112:
 	lds r29,SPH
 	ldd r16,y+5
 	std z+5,r16
-_j8b_eob_38:
 	ldi r30,1
 	jmp j8bproc_mfin_sf
 
@@ -77,11 +66,6 @@ j8b_CMainMmain:
 	push r31
 	movw r30,r20
 	rcall j8b_CByteMtoByte_41
-	brtc _j8b_throwskip_113
-	ldi r18,1
-	call j8bproc_etrace_add
-	rjmp _j8b_eob_42
-_j8b_throwskip_113:
 	call os_out_num8
 	push r30
 	push r31
@@ -93,11 +77,6 @@ _j8b_throwskip_113:
 	push r31
 	movw r30,r22
 	rcall j8b_CByteMtoByte_41
-	brtc _j8b_throwskip_115
-	ldi r18,2
-	call j8bproc_etrace_add
-	rjmp _j8b_eob_42
-_j8b_throwskip_115:
 	call os_out_num8
 	push r30
 	push r31
@@ -116,11 +95,6 @@ _j8b_throwskip_115:
 	push r31
 	movw r30,r24
 	rcall j8b_CByteMtoByte_41
-	brtc _j8b_throwskip_117
-	ldi r18,3
-	call j8bproc_etrace_add
-	rjmp _j8b_eob_42
-_j8b_throwskip_117:
 	call os_out_num8
 	ldi r16,17
 	call os_out_num8
@@ -146,9 +120,4 @@ _j8b_eoc_0:
 	ldi r16,2
 	call os_out_num8
 _j8b_eoc_1:
-_j8b_eob_42:
-	brts _j8b_skip_120
-	jmp mcu_halt
-_j8b_skip_120:
-	call j8bproc_etrace_out
 	jmp mcu_halt

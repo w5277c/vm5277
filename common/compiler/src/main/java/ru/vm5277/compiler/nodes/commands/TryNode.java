@@ -28,14 +28,17 @@ import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGTryBlockScope;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.compiler.Optimization;
 import ru.vm5277.compiler.Delimiter;
 import ru.vm5277.compiler.Keyword;
 import ru.vm5277.compiler.TokenType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.Main;
 import ru.vm5277.compiler.nodes.CatchBlock;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
+import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.ExceptionScope;
 import ru.vm5277.compiler.semantic.Scope;
 
@@ -147,7 +150,6 @@ public class TryNode extends CommandNode {
 		boolean result = true;
 		cgScope = cg.enterCommand();
 		
-
 		if(result) {
 			for(CatchBlock cBlock : catchBlocks) {
 				result&=cBlock.postAnalyze(cBlock.getScope(), cg, tryBlock);
@@ -159,6 +161,8 @@ public class TryNode extends CommandNode {
 		}
 
 		if(result) {
+			BlockScope tryBlockScope = tryBlock.getScope();
+			int runtimeExceptionId = VarType.getExceptionId(ExceptionScope.RUNTIME_EXCEPTION_NAME);
 			for(CatchBlock cBlock : catchBlocks) {
 				Set<Integer> ids = new HashSet<>();
 				
@@ -168,8 +172,9 @@ public class TryNode extends CommandNode {
 				}
 				((CGTryBlockScope)tryBlock.getCGScope()).addCatchExceptions(ids);
 			}
+			
+			
 		}
-
 		
 		cg.leaveCommand();
 		return result;
@@ -206,11 +211,46 @@ public class TryNode extends CommandNode {
 		newExcs.getRuntimeChecks().putAll(excs.getRuntimeChecks());
 
 		tryBlock.codeGen(cg, cgs, false, newExcs);
-		
+
 		for(CatchBlock cBlock : catchBlocks) {
-			cBlock.codeGen(cg, cgs, false, excs);
+			if(Optimization.NONE==Main.getOptLevel()) {
+				cBlock.codeGen(cg, cgs, false, excs, true);
+				l1:
+				for(ExceptionScope eScope : cBlock.getExceptionScopes()) {
+					if(newExcs.getProduced().contains(eScope.getId())) {
+						newExcs.getProduced().remove(eScope.getId());
+						break l1;
+					}
+					for(Integer exId : VarType.getExceptionDescendant(eScope.getId())) {
+						if(newExcs.getProduced().contains(exId)) {
+							newExcs.getProduced().remove(eScope.getId());
+							break l1;
+						}
+					}
+				}
+			}
+			else {
+				boolean isUsed = false;
+				if(!newExcs.getProduced().isEmpty()) {
+					l1:
+					for(ExceptionScope eScope : cBlock.getExceptionScopes()) {
+						if(newExcs.getProduced().contains(eScope.getId())) {
+							newExcs.getProduced().remove(eScope.getId());
+							isUsed = true;
+							break l1;
+						}
+						for(Integer exId : VarType.getExceptionDescendant(eScope.getId())) {
+							if(newExcs.getProduced().contains(exId)) {
+								newExcs.getProduced().remove(eScope.getId());
+								isUsed = true;
+								break l1;
+							}
+						}
+					}
+				}
+				cBlock.codeGen(cg, cgs, false, excs, isUsed);
+			}
 		}
-		
 		excs.getProduced().addAll(newExcs.getProduced());
 		
 		return null;

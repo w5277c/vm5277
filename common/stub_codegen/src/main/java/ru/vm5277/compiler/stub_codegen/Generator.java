@@ -76,6 +76,8 @@ public class Generator extends CodeGenerator {
 	@Override public CGIContainer eReturn(CGScope scope, int argsSize, int varsSize, VarType retType) throws CompileException {return null;}
 	@Override public void eThrow(CGScope cgs, int exceptioId, boolean isMethodLeave, CGLabelScope lbScope, boolean withCode, ExcsThrowPoint point) throws CompileException {}
 	@Override public void throwCheck(CGScope scope, List<Pair<CGLabelScope, Set<Integer>>> exceptionHandlers, CGLabelScope methodEndLbScope, ExcsThrowPoint point) throws CompileException {}
+	@Override public void exTypeIdToAcc(CGScope scope) throws CompileException {}
+	@Override public void exCodeToAcc(CGScope scope) throws CompileException {}
 	@Override public int getRefSize() {return 1;}
 	@Override public int getCallSize() {return 1;}
 	@Override public ArrayList<RegPair> buildRegsPool() {return null;}
@@ -113,4 +115,5 @@ public class Generator extends CodeGenerator {
 	@Override public void nativeMethodInvoke(CGScope scope, String signature) throws CompileException {}
 	@Override public CGIContainer finMethod(VarType type, int argsSize, int varsSize, int lastStackOffset) throws CompileException {return null;}
 	@Override public void terminate(CGScope scope, boolean systemStop, boolean excsCheck) throws CompileException {}
+	@Override public void exCodeToAccH(CGScope scope, long numValue) throws CompileException {}
 }

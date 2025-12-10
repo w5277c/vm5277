@@ -2,18 +2,14 @@
 .equ CORE_FREQ = 16
 .equ STDOUT_PORT = 18
 .set OS_STAT_POOL_SIZE = 3
-.set OS_ETRACE_POINT_BITSIZE = 7
 
 .set OS_FT_STDOUT = 1
 .set OS_FT_WELCOME = 1
 .set OS_FT_DRAM = 1
-.set OS_FT_ETRACE = 1
 
 .include "devices/atmega328p.def"
 .include "core/core.asm"
 .include "sys/mcu_halt.asm"
-.include "j8b/etrace_out.asm"
-.include "j8b/etrace_add.asm"
 .include "dmem/dram.asm"
 .include "j8b/clear_fields.asm"
 .include "j8b/mfin.asm"
@@ -40,12 +36,6 @@ j8b_CClazzMClazz_41:
 	ldi r16,low(6)
 	ldi r17,high(6)
 	call os_dram_alloc
-	brcc _j8b_throwskip_115
-	ldi r16,4
-	call j8bproc_etrace_addfirst
-	set
-	rjmp _j8b_eob_40
-_j8b_throwskip_115:
 	std z+0,r16
 	std z+1,r17
 	std z+2,c0xff
@@ -55,7 +45,6 @@ _j8b_throwskip_115:
 	std z+4,r16
 	call j8bproc_clear_fields_nr
 	call _j8b_finit_33
-_j8b_eob_40:
 	jmp j8bproc_mfin
 
 j8b_CMainMmain:
@@ -79,8 +68,4 @@ j8b_CMainMmain:
 	adiw r26,5
 	ld r16,x+
 	call os_out_num8
-	brts _j8b_skip_116
-	jmp mcu_halt
-_j8b_skip_116:
-	call j8bproc_etrace_out
 	jmp mcu_halt
