@@ -3,6 +3,15 @@
 
 Universal platform for embedded development (Java-like j8b syntax + RTOS + cross-platform drivers for 8-bit MCUs)
 
+## Manifesto
+
+I am creating this toolkit because I believe embedded development can be made more convenient.
+Simply by removing C from it, replacing it with low-level programming in assembly and high-level programming in an OOP language with a Java-like syntax.
+All without sacrificing performance or control.
+
+This is an alternative for those who also think it can be simpler, more convenient, and more efficient — and who are ready to try a different way.
+Yes, it can be better without C, as Java has shown in the enterprise world, and I will strive to prove this with my project.
+
 ## Getting Started with J8B
 For a step-by-step introduction to J8B development, check out:  
 **[VM5277: Introduction to J8B Development](docs/devel_intoduction/index.md)**  
