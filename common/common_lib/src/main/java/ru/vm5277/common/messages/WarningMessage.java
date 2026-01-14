@@ -15,7 +15,7 @@
  */
 package ru.vm5277.common.messages;
 
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.SourcePosition;
 
 public class WarningMessage extends Message {
 	public WarningMessage(String text, SourcePosition sp) {

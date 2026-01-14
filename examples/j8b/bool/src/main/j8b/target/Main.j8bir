@@ -1,0 +1,49 @@
+class Main {
+    static public bool test(bool _b1, bool _b2) {
+        return _b1&&_b2;
+    }
+    static public void main() {
+        System.setParam(2, 18);
+        bool b10 = false;
+        b10=!b10;
+        bool b1 = false;
+        b1=!b1;
+        bool b2 = true;
+        b2=!b2;
+        System.out(true);
+        System.out(false);
+        System.out(false);
+        System.out(true);
+        System.out(b1);
+        System.out(b2);
+        System.out(!b1);
+        System.out(!b2);
+        bool b3 = !b1;
+        System.out(b3);
+        if (b1==b2) {
+            System.out('0');
+        }
+        if (b1) {
+            System.out('1');
+        }
+        if (b2) {
+            System.out('2');
+        }
+        if (!b2) {
+            System.out('3');
+        }
+        if (b1||b2) {
+            System.out('4');
+        }
+        if (b1&&b2) {
+            System.out('5');
+        }
+        System.out(test(b1, b2));
+        bool b4 = b1||b2||b10;
+        System.out(b4);
+        bool b5 = b1&&b2;
+        System.out(b5);
+        bool b6 = !b1;
+        System.out(b6);
+    }
+}

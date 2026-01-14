@@ -35,11 +35,10 @@ import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.VarNode;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.compiler.Keyword;
-import ru.vm5277.compiler.TokenType;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.J8BKeyword;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
-import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -79,7 +78,7 @@ public class ForNode extends CommandNode {
 				}
 				if(null != type) {
 					String name = null;
-					try {name = consumeToken(tb, TokenType.ID).getStringValue();} catch(CompileException e) {markFirstError(e);}
+					try {name = consumeToken(tb, TokenType.IDENTIFIER).getStringValue();} catch(CompileException e) {markFirstError(e);}
 					this.init = new VarNode(tb, mc, new HashSet<>(), type, name);
 				}
 				else {
@@ -139,7 +138,7 @@ public class ForNode extends CommandNode {
 		}
        
         // Блок else (если есть)
-        if(tb.match(Keyword.ELSE)) {
+        if(tb.match(J8BKeyword.ELSE)) {
 			consumeToken(tb);
 			try {
 				elseBlockNode = (tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement()));

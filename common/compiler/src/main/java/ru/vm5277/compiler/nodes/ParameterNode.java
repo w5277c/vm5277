@@ -22,8 +22,8 @@ import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.compiler.Keyword;
-import ru.vm5277.compiler.TokenType;
+import ru.vm5277.common.lexer.J8BKeyword;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -39,7 +39,7 @@ public class ParameterNode extends AstNode {
 	public ParameterNode(TokenBuffer tb, MessageContainer mc) throws CompileException {
 		super(tb, mc);
 		
-		if(tb.match(TokenType.MODIFIER, Keyword.FINAL)) {
+		if(tb.match(TokenType.MODIFIER, J8BKeyword.FINAL)) {
             consumeToken(tb); // Потребляем 'final'
 			isFinal = true;
 		}
@@ -49,7 +49,7 @@ public class ParameterNode extends AstNode {
 		if(null==type) type = checkExceptionType();
 		if(null!=type) type = checkArrayType(type);
 		
-		name = (String)consumeToken(tb, TokenType.ID).getValue();
+		name = (String)consumeToken(tb, TokenType.IDENTIFIER).getValue();
 	}
 
 	public ParameterNode(MessageContainer mc, boolean isFinal, VarType type, String name) throws CompileException {

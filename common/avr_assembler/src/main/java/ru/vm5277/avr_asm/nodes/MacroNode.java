@@ -25,14 +25,14 @@ import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.MacroDefSymbol;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
-import ru.vm5277.avr_asm.Delimiter;
-import ru.vm5277.avr_asm.TokenType;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.avr_asm.scope.MacroCallSymbol;
 import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.avr_asm.tokens.Token;
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.SourcePosition;
+import ru.vm5277.common.lexer.tokens.Token;
 
 public class MacroNode extends Node {
 	private final	MacroCallSymbol	callSymbol;
@@ -48,7 +48,7 @@ public class MacroNode extends Node {
 	public static void parseDef(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
 		try{
 			SourcePosition sp = tb.getSP();
-			String name = ((String)Node.consumeToken(tb, TokenType.ID).getValue()).toLowerCase();
+			String name = ((String)Node.consumeToken(tb, TokenType.IDENTIFIER).getValue()).toLowerCase();
 			scope.beginMacro(new MacroDefSymbol(name, sp), sp);
 
 			scope.list(".MACRO " + name);
@@ -60,7 +60,7 @@ public class MacroNode extends Node {
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}
 	
-	public static MacroNode parseCall(TokenBuffer tb, Scope scope, MessageContainer mc, Map<Path, SourceType> sourcePaths, MacroDefSymbol macro)
+	public static MacroNode parseCall(TokenBuffer tb, Scope scope, MessageContainer mc, Map<Path, SourceType> sourcePaths, MacroDefSymbol macro, int tabSize)
 																												throws CompileException, CriticalParseException {
 		SourcePosition callSP = tb.getSP();
 		MacroCallSymbol symbol = null;
@@ -81,7 +81,7 @@ public class MacroNode extends Node {
 			for(Token token : macro.getTokens()) {
 				token.getSP().setMacroOffset(callSP, macro.getName());
 			}
-			Parser parser = new Parser(macro.getTokens(), scope, mc, sourcePaths);
+			Parser parser = new Parser(macro.getTokens(), scope, mc, sourcePaths, tabSize);
 			symbol.setSecondPartNodes(parser.getSecondPassNodes());
 // TODO метка может быть после тела макроса, а значит secondPass должен отработать после первого прохода
 		}

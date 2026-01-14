@@ -15,7 +15,7 @@
  */
 package ru.vm5277.avr_asm.nodes.operands;
 
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class IReg extends Reg {

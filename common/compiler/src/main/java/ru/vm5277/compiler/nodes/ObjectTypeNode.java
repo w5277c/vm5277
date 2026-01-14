@@ -21,9 +21,9 @@ import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.compiler.Keyword;
-import ru.vm5277.compiler.TokenType;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.compiler.semantic.CIScope;
+import ru.vm5277.common.lexer.Keyword;
 
 public abstract class ObjectTypeNode extends AstNode {
 	protected			List<ObjectTypeNode>	importedClasses;
@@ -44,7 +44,7 @@ public abstract class ObjectTypeNode extends AstNode {
 		// Парсинг заголовка класса
         consumeToken(tb);	// Пропуск class токена
 		try {
-			this.name = (String)consumeToken(tb, TokenType.ID).getValue();
+			this.name = (String)consumeToken(tb, TokenType.IDENTIFIER).getValue();
 		}
 		catch(CompileException e) {markFirstError(e);} // ошибка в имени, оставляем null
 	}

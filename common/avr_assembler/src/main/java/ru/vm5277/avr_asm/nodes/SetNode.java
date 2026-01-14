@@ -19,16 +19,16 @@ import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.scope.VariableSymbol;
 import ru.vm5277.avr_asm.semantic.Expression;
-import ru.vm5277.common.Operator;
-import ru.vm5277.common.SourcePosition;
-import ru.vm5277.avr_asm.TokenType;
+import ru.vm5277.common.lexer.Operator;
+import ru.vm5277.common.lexer.SourcePosition;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class SetNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
 		SourcePosition sp = tb.getSP();
-		String name = ((String)Node.consumeToken(tb, TokenType.ID).getValue()).toLowerCase();
+		String name = ((String)Node.consumeToken(tb, TokenType.IDENTIFIER).getValue()).toLowerCase();
 		Node.consumeToken(tb, Operator.ASSIGN);
 		Expression expr = Expression.parse(tb, scope, mc);
 		Long value = Expression.getLong(expr, sp);

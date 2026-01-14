@@ -17,15 +17,15 @@ package ru.vm5277.avr_asm.scope;
 
 import java.util.ArrayList;
 import java.util.List;
-import ru.vm5277.avr_asm.tokens.Token;
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.SourcePosition;
+import ru.vm5277.common.lexer.tokens.Token;
 
 public class MacroDefSymbol extends Symbol {
 	private	SourcePosition	defineSP;
 	private	List<Token>		tokens		= new ArrayList<>();
 	
 	public MacroDefSymbol(String name, SourcePosition sp) {
-		super(name);
+		super(name.toLowerCase());
 		
 		this.defineSP = sp;
 	}

@@ -23,10 +23,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.AssemblerInterface;
-import ru.vm5277.common.Operator;
-import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.compiler.Delimiter;
+import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Main;
@@ -37,8 +35,8 @@ import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.LabelSymbol;
 import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.Scope;
-import ru.vm5277.compiler.tokens.TNumber;
-import ru.vm5277.compiler.tokens.Token;
+import ru.vm5277.common.lexer.tokens.TNumber;
+import ru.vm5277.common.lexer.tokens.Token;
 
 public abstract class CommandNode extends AstNode {
 	public static class AstCase extends AstNode {

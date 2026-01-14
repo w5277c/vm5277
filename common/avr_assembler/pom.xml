@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>ru.vm5277</groupId>
     <artifactId>avr_assembler</artifactId>
-    <version>0.2</version>
+    <version>0.3.0</version>
     <packaging>jar</packaging>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -49,13 +49,6 @@
 
         <finalName>${project.artifactId}</finalName>
     </build>
-    <dependencies>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>common</artifactId>
-            <version>[0,)</version>
-        </dependency>
-    </dependencies>
 	<profiles>
 		<profile>
 			<id>native</id>
@@ -94,5 +87,11 @@
 			</build>
 		</profile>
 	</profiles>
-
+    <dependencies>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>vm5277_common</artifactId>
+            <version>[0,)</version>
+        </dependency>
+    </dependencies>
 </project>

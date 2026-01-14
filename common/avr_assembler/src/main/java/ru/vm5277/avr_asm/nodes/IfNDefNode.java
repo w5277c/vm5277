@@ -17,8 +17,8 @@ package ru.vm5277.avr_asm.nodes;
 
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
-import ru.vm5277.avr_asm.TokenType;
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.TokenType;
+import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -26,7 +26,7 @@ import ru.vm5277.common.messages.MessageContainer;
 public class IfNDefNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException, CriticalParseException {
 		SourcePosition sp = tb.getSP();
-		String id = (String)Node.consumeToken(tb,TokenType.ID).getValue();
+		String id = (String)Node.consumeToken(tb,TokenType.IDENTIFIER).getValue();
 		scope.getIncludeSymbol().blockStart(null != scope.resolveVariable(id) || null != scope.resolveLabel(id), sp);
 
 		scope.list(".IFNDEF " + id + " # " + !scope.getIncludeSymbol().isBlockSkip());

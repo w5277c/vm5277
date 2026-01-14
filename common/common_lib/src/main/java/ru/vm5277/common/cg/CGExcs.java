@@ -20,7 +20,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 

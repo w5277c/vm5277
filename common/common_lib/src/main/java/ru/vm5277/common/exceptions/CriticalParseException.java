@@ -15,7 +15,7 @@
  */
 package ru.vm5277.common.exceptions;
 
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.messages.ErrorMessage;
 
 public class CriticalParseException extends Exception {

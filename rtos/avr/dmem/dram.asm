@@ -27,11 +27,10 @@
 
 ;Черновой набросок, выполнена базовая проверка
 ;TODO добавить директивы исключения кода блоков, если блок нулевой длины
-;TODO результат нужно помещать в флаг C, true-не достаточно памяти!
 
 .include "math/divz16by8.asm"
 .include "math/mulz16by8.asm"
-.include "math/diva16by8.asm"
+.include "math/div16p2.asm"
 .include "conv/bit_to_mask.asm"
 
 .IFNDEF OS_DRAM
@@ -39,13 +38,13 @@
 OS_DRAM_ALLOC:
 ;-----------------------------------------------------------;
 ;Выделение памяти в динамическом блоке OS_DRAM_1B
-;IN: ACCUM_H,ACCUM_L-размер блока
-;OUT: Z-адрес на выделенный блок, RESULT-OSR коды
+;IN: ACCUM_H/L-размер блока
+;OUT: Z-адрес на выделенный блок, флаг C true=OutOfMemory
 ;-----------------------------------------------------------;
-	MOV ZL,ACCUM_H
+	MOV ZL,ACCUM_H											;Проверка на нулевую длину (стоит убрать?)
 	OR ZL,ACCUM_L
 	BRNE PC+0x03
-	LDI RESULT,OSR_ALLOC_FAIL
+	SEC
 	RET
 
 	PUSH_Y
@@ -57,37 +56,33 @@ OS_DRAM_ALLOC:
 	PUSH FLAGS
 
 	LDI FLAGS,0x01
-	CPI ACCUM_H,0x00
+	CPI ACCUM_H,0x00										;Размер запрошенных данных >=5 
 	BRNE PC+0x03
 	CPI ACCUM_L,0x05
 	BRCS PC+0x01+_MCALL_SIZE+0x02
-	MCALL _OS_DRAM_ALLOC_8B
+	MCALL _OS_DRAM_ALLOC_8B									;Используем 8B пул
 	LDI FLAGS,0x08
 	RJMP _OS_DRAM_ALLOC__CALLEND
-	CPI ACCUM_L,0x01
+	CPI ACCUM_L,0x01										;Размер запрошенных данных >=2
 	BREQ PC+0x01+_MCALL_SIZE+0x02
-	MCALL _OS_DRAM_ALLOC_2B
+	MCALL _OS_DRAM_ALLOC_2B									;Используем 2B пул
 	LDI FLAGS,0x02
 	RJMP _OS_DRAM_ALLOC__CALLEND
-	MCALL _OS_DRAM_ALLOC_1B
+	MCALL _OS_DRAM_ALLOC_1B									;Иначе размер запрошенных данных = 1, используем 1B пул
 _OS_DRAM_ALLOC__CALLEND:
-	CPI RESULT,OSR_OK
-	BREQ _OS_DRAM_ALLOC__END
+	BRCC _OS_DRAM_ALLOC__END								;Завершаем работу если выделение памяти прошло успешно
 
-	SBRS FLAGS,0x00
-	MCALL _OS_DRAM_ALLOC_1B
-	CPI RESULT,OSR_OK
-	BREQ _OS_DRAM_ALLOC__END
-_OS_DRAM_ALLOC__CHECK1:
-	SBRS FLAGS,0x01
-	MCALL _OS_DRAM_ALLOC_2B
-	CPI RESULT,OSR_OK
-	BREQ _OS_DRAM_ALLOC__END
-_OS_DRAM_ALLOC__CHECK2:
-	SBRS FLAGS,0x03
+															;Не удалось выделить память по стратегии оптимального пула под размер данных
+	SBRS FLAGS,0x00											;Пропускаем, если пытались выделить из 1B пула
+	MCALL _OS_DRAM_ALLOC_1B									;Пытаемся выделить из 1B пула
+	BRCC _OS_DRAM_ALLOC__END								;Завершаем работу если выделение памяти прошло успешно
+	SBRS FLAGS,0x01											;Пропускаем, если пытались выделить из 2B пула
+	MCALL _OS_DRAM_ALLOC_2B									;Пытаемся выделить из 2B пула
+	BRCC _OS_DRAM_ALLOC__END								;Завершаем работу если выделение памяти прошло успешно
+	SBRS FLAGS,0x03											;Пропускаем, если пытались выделить из 8B пула
 	MCALL _OS_DRAM_ALLOC_8B
 
-_OS_DRAM_ALLOC__END:
+_OS_DRAM_ALLOC__END:										;На этом этапе выключенный флаг C говорит об успешной операции
 	POP FLAGS
 	POP TEMP_H
 	POP TEMP_L
@@ -97,90 +92,85 @@ _OS_DRAM_ALLOC__END:
 	POP_Y
 	RET
 
-
 ;-----------------------------------------------------------;
 _OS_DRAM_ALLOC_1B:
 ;-----------------------------------------------------------;
 ;Выделение памяти в 1 байт динамическом блоке
-;IN: ACCUM_H,ACCUM_L-размер блока
-;OUT: Z-адрес на выделенный блок, RESULT-OSR коды
+;IN: ACCUM_H/L-размер блока
+;OUT: Z-адрес на выделенный блок, флаг C true=OutOfMemory
 ;-----------------------------------------------------------;
-	LDI ACCUM_EL,OS_DRAM_BMASK_1B_SIZE
-	CPI ACCUM_EL,0x00
-	BRNE PC+0x03
-	LDI RESULT,OSR_ALLOC_FAIL
-	RET
-	LDI_Y OS_DRAM_BMASK_1B
-	MCALL _OS_DRAM_FIND_FREE_CELLS
-	CPI RESULT,OSR_OK
-	BREQ PC+0x02
-	RET
-	LDI TEMP_L,low(OS_DRAM_1B)
+	LDI ACCUM_EL,OS_DRAM_BMASK_1B_SIZE						;Загружаем размер в байтах битовой маски 1B блока 
+	CPI ACCUM_EL,0x00										;0 - блока нет, выходим с ошибкой
+	SEC
+	BREQ _OS_DRAM_ALLOC_1B__END
+	LDI_Y OS_DRAM_BMASK_1B									;Загружаем адрес битовой маски
+	MCALL _OS_DRAM_FIND_FREE_CELLS							;Вызываем функцию поиска свободной ячейки в блоке
+	BRCS _OS_DRAM_ALLOC_1B__END								;Флаг C включен - не нашли, выходим с ошибкой
+	LDI TEMP_L,low(OS_DRAM_1B)								;В Z смещение в блоке (в байтах) на свободную ячейку, добавляем адрес блока
 	ADD ZL,TEMP_L
 	LDI TEMP_L,high(OS_DRAM_1B)
 	ADC ZH,TEMP_L
+	CLC														;Успешно, выходим
 _OS_DRAM_ALLOC_1B__END:
 	RET
 ;-----------------------------------------------------------;
 _OS_DRAM_ALLOC_2B:
 ;-----------------------------------------------------------;
 ;Выделение памяти в 2 байта динамическом блоке
-;IN: ACCUM_H,ACCUM_L-размер блока
-;OUT: Z-адрес на выделенный блок, RESULT-OSR коды
+;IN: ACCUM_H/L-размер блока
+;OUT: Z-адрес на выделенный блок, флаг C true=OutOfMemory
 ;-----------------------------------------------------------;
-	LDI ACCUM_EL,OS_DRAM_BMASK_2B_SIZE
-	CPI ACCUM_EL,0x00
-	BRNE PC+0x03
-	LDI RESULT,OSR_ALLOC_FAIL
-	RET
-	LSR ACCUM_H
+	LDI ACCUM_EL,OS_DRAM_BMASK_2B_SIZE						;Загружаем размер в байтах битовой маски 2B блока 
+	CPI ACCUM_EL,0x00										;0 - блока нет, выходим с ошибкой
+	SEC
+	BREQ _OS_DRAM_ALLOC_2B__END
+	LSR ACCUM_H												;Размер данных делим на 2 с округлением в большую сторону
 	ROR ACCUM_L
 	ADC ACCUM_L,C0x00
 	ADC ACCUM_H,C0x00
-	LDI_Y OS_DRAM_BMASK_2B
-	MCALL _OS_DRAM_FIND_FREE_CELLS
-	CPI RESULT,OSR_OK
-	BREQ PC+0x02
-	RET
-	LSL ZL
+	LDI_Y OS_DRAM_BMASK_2B									;Загружаем адрес битовой маски
+	MCALL _OS_DRAM_FIND_FREE_CELLS							;Вызываем функцию поиска свободной ячейки в блоке
+	BRCS _OS_DRAM_ALLOC_2B__END								;Флаг C включен - не нашли, выходим с ошибкой
+	LSL ZL													;Преобразуем смещение в ячейках в смещение в байтах (умножаем на 2)
 	ROL ZH
-	LDI TEMP_L,low(OS_DRAM_2B)
+	LDI TEMP_L,low(OS_DRAM_2B)								;В Z смещение в блоке (в байтах) на свободную ячейку, добавляем адрес блока
 	ADD ZL,TEMP_L
 	LDI TEMP_L,high(OS_DRAM_2B)
 	ADC ZH,TEMP_L
+	CLC														;Успешно, выходим
+_OS_DRAM_ALLOC_2B__END:
 	RET
 ;-----------------------------------------------------------;
 _OS_DRAM_ALLOC_8B:
 ;-----------------------------------------------------------;
 ;Выделение памяти в 8 байт динамическом блоке
-;IN: ACCUM_H,ACCUM_L-размер блока
-;OUT: Z-адрес на выделенный блок, RESULT-OSR коды
+;IN: ACCUM_H/L-размер блока
+;OUT: Z-адрес на выделенный блок, флаг C true=OutOfMemory
 ;-----------------------------------------------------------;
-	LDI ACCUM_EL,OS_DRAM_BMASK_8B_SIZE
-	CPI ACCUM_EL,0x00
-	BRNE PC+0x03
-	LDI RESULT,OSR_ALLOC_FAIL
-	RET
-	MOV YL,ACCUM_L
-	MCALL OS_DIVA16BY8
-	ANDI YL,0b00000111
+	LDI ACCUM_EL,OS_DRAM_BMASK_8B_SIZE						;Загружаем размер в байтах битовой маски 8B блока 
+	CPI ACCUM_EL,0x00										;0 - блока нет, выходим с ошибкой
+	SEC
+	BREQ _OS_DRAM_ALLOC_8B__END
+	MOV YL,ACCUM_L											;Размер данных делим на 8
+	MCALL OS_DIV16P2_X8
+	ANDI YL,0b00000111										;Пропускаем инкремент если число было кратно 8
 	BREQ PC+0x03
-	ADD ACCUM_L,C0x01
+	ADD ACCUM_L,C0x01										;Иначе прибавляем единицу реализуя деление в большую сторону
 	ADC ACCUM_H,C0x00
-	LDI_Y OS_DRAM_BMASK_8B
-	MCALL _OS_DRAM_FIND_FREE_CELLS
-	CPI RESULT,OSR_OK
-	BREQ PC+0x02
-	RET
-	MCALL OS_MULZ16BY8
-	LDI TEMP_L,low(OS_DRAM_8B)
+	LDI_Y OS_DRAM_BMASK_8B									;Загружаем адрес битовой маски
+	MCALL _OS_DRAM_FIND_FREE_CELLS							;Вызываем функцию поиска свободной ячейки в блоке
+	BRCS _OS_DRAM_ALLOC_8B__END								;Флаг C включен - не нашли, выходим с ошибкой
+	MCALL OS_MULZ16BY8										;Преобразуем смещение в ячейках в смещение в байтах (умножаем на 8)
+	LDI TEMP_L,low(OS_DRAM_8B)								;В Z смещение в блоке (в байтах) на свободную ячейку, добавляем адрес блока
 	ADD ZL,TEMP_L
 	LDI TEMP_L,high(OS_DRAM_8B)
 	ADC ZH,TEMP_L
+	CLC														;Успешно, выходим
+_OS_DRAM_ALLOC_8B__END:
 	RET
 
 ;-----------------------------------------------------------;
-OS_DRAM_FREE:												;TODO
+OS_DRAM_FREE:												;
 ;-----------------------------------------------------------;
 ;Освобождение памяти в динамическом блоке OS_DRAM_xB
 ;IN: Z-адрес на выделенный блок, ACCUM_H/L-размер блока
@@ -194,58 +184,52 @@ OS_DRAM_FREE:												;TODO
 	PUSH TEMP_L
 	PUSH TEMP_H
 
-	CPI ZH,high(OS_DRAM_2B)
-	BRCS _OS_DRAM_FREE__1B
-	BRNE _OS_DRAM_FREE__CHECK2B
+	CPI ZH,high(OS_DRAM_2B)									;Сверяем адрес Z с адресом 2B блока
+	BRCS _OS_DRAM_FREE__1B									;Переходим на код освобождения в 1B блоке, если Z меньше
+	BRNE _OS_DRAM_FREE__CHECK2B								;Иначе переходим на проверку для 2B блока
 	CPI ZL,low(OS_DRAM_2B)
 	BRCC _OS_DRAM_FREE__CHECK2B
-_OS_DRAM_FREE__1B:
-	LDI_Y OS_DRAM_BMASK_1B
-	SUBI ZL,low(OS_DRAM_1B)
+_OS_DRAM_FREE__1B:											;Освобождение в 1B блоке
+	LDI_Y OS_DRAM_BMASK_1B									;Адрес битовой маски 1B блока
+	SUBI ZL,low(OS_DRAM_1B)									;Вычисляем смещение внутри 1B блока
 	SBCI ZH,high(OS_DRAM_1B)
-	RJMP _OS_DRAM_FREE_CELLS
+	RJMP _OS_DRAM_FREE_CELLS								;Переходим на процедуру освобождения памяти
 _OS_DRAM_FREE__CHECK2B:
-	CPI ZH,high(OS_DRAM_8B)
-	BRCS _OS_DRAM_FREE__2B
-	BRNE _OS_DRAM_FREE__8B
+	CPI ZH,high(OS_DRAM_8B)									;Сверяем адрес Z с адресом 8B блока
+	BRCS _OS_DRAM_FREE__2B									;Переходим на код освобождения в 2B блоке, если Z меньше
+	BRNE _OS_DRAM_FREE__8B									;Иначе переходим на освобождения в 8B блоке
 	CPI ZL,low(OS_DRAM_8B)
 	BRCC _OS_DRAM_FREE__8B
-_OS_DRAM_FREE__2B:
-	LDI_Y OS_DRAM_BMASK_2B
-	SUBI ZL,low(OS_DRAM_2B)
+_OS_DRAM_FREE__2B:											;Освобождение в 2B блоке
+	LDI_Y OS_DRAM_BMASK_2B									;Адрес битовой маски 2B блока
+	SUBI ZL,low(OS_DRAM_2B)									;Вычисляем смещение внутри 2B блока
 	SBCI ZH,high(OS_DRAM_2B)
-	LSR ZH
+	LSR ZH													;Преобразуем смещение в байтах в смещение в ячейках
 	ROR ZL
-	ADC ZL,C0x00
-	ADC ZH,C0x00
-	LSR ACCUM_H
+	LSR ACCUM_H												;Преобразуем размер данных в байтах в размер в ячейках (деление на 2 с округлением в большую сторону)
 	ROR ACCUM_L
 	ADC ACCUM_L,C0x00
 	ADC ACCUM_H,C0x00
-	RJMP _OS_DRAM_FREE_CELLS
-_OS_DRAM_FREE__8B:
-	LDI_Y OS_DRAM_BMASK_8B
-	SUBI ZL,low(OS_DRAM_8B)
+	RJMP _OS_DRAM_FREE_CELLS								;Переходим на процедуру освобождения памяти
+_OS_DRAM_FREE__8B:											;Освобождение в 8B блоке
+	LDI_Y OS_DRAM_BMASK_8B									;Адрес битовой маски 8B блока
+	SUBI ZL,low(OS_DRAM_8B)									;Вычисляем смещение внутри 8B блока
 	SBCI ZH,high(OS_DRAM_8B)
-	MOV RESULT,ZL
-	MCALL OS_DIVZ16BY8
-	ANDI RESULT,0x07
-	BREQ PC+0x02
-	ADIW Z,0x01
-	MOV RESULT,ACCUM_L
-	MCALL OS_DIVA16BY8
-	ANDI RESULT,0x07
-	SUBI RESULT,0x01
+	MCALL OS_DIVZ16BY8										;Преобразуем смещение в байтах в смещение в ячейках
+	MOV ACCUM_EL,ACCUM_L
+	MCALL OS_DIV16P2_X8										;Преобразуем размер данных в байтах в размер в ячейках (деление на 8 с округлением в большую сторону)
+	ANDI ACCUM_EL,0x07
+	BREQ PC+0x03
 	ADC ACCUM_L,C0x00
 	ADC ACCUM_H,C0x00
-_OS_DRAM_FREE_CELLS:
-	MOV ACCUM_EH,ZL
+_OS_DRAM_FREE_CELLS:										;Процедура освобождения памяти
+	MOV ACCUM_EH,ZL											;Вычисляю смещение в байте - номер бита с котрого нужно освобождать
 	ANDI ACCUM_EH,0x07
-	MCALL OS_DIVZ16BY8
-	ADD YL,ZL
+	MCALL OS_DIVZ16BY8										;Преобразуем смещение в ячейках в смещение в битах
+	ADD YL,ZL												;Прибавляем смещение к адресу начала блока битовой маски
 	ADC YH,ZH
-	LDI ACCUM_EL,0x00
-	MCALL _OS_DRAM_FILL_CELLS
+	LDI ACCUM_EL,0x00										;Сбрасываем биты (освобождение)
+	MCALL _OS_DRAM_FILL_CELLS								;Вызываем процедуру записи бит
 
 	POP TEMP_H
 	POP TEMP_L
@@ -256,6 +240,8 @@ _OS_DRAM_FREE_CELLS:
 	POP_Z
 	POP_Y
 	RET
+
+;TODO - проверить работу
 ;-----------------------------------------------------------;
 _OS_DRAM_FIND_FREE_CELLS:
 ;-----------------------------------------------------------;
@@ -263,7 +249,7 @@ _OS_DRAM_FIND_FREE_CELLS:
 ;IN: ACCUM_H/L-размер блока в ячейках,
 ;ACCUM_EL-размер блока(байты) бит.маски,
 ;Y-адрес на бит.маску
-;OUT: RESULT-OSR код, Z-адрес на выделенный блок
+;OUT: Z-адрес на выделенный блок, флаг C true=OutOfMemory
 ;-----------------------------------------------------------;
 	LDI FLAGS,0x00											;Нулевой бит не найден
 	LDI_X 0x0000											;Начальное смещение в блоке памяти
@@ -288,7 +274,7 @@ _OS_DRAM_FIND_FREE_CELLS__BITLOOP:
 	;Общая логика для первого и последующего нулевых бит
 	SUBI TEMP_EL,0x01										;Вычитаем 1 ячейку из необходимого размера
 	SBCI TEMP_EH,0x00
-	BREQ _OS_DRAM_FIND_FREE_CELLS__OK						;Если рвзмер стал нулевым, то блок найден
+	BREQ _OS_DRAM_FIND_FREE_CELLS__OK						;Если размер стал нулевым, то блок найден
 	RJMP _OS_DRAM_FIND_FREE_CELLS__BITLOOP_IS_NEXT
 _OS_DRAM_FIND_FREE_CELLS__BITLOOP_IS_HI:
 	LDI FLAGS,0x00											;Обрываем цепочку проверки длины блока нулевых битов
@@ -306,9 +292,8 @@ _OS_DRAM_FIND_FREE_CELLS__BYTELOOP_NEXT:
 	ADIW YL,0x01
 	DEC ACCUM_EL
 	BRNE _OS_DRAM_FIND_FREE_CELLS__BYTELOOP
-
-	LDI RESULT,OSR_ALLOC_FAIL
-	RJMP _OS_DRAM_FIND_FREE_CELLS__END
+	SEC
+	RET
 
 _OS_DRAM_FIND_FREE_CELLS__OK:
 	;Блок найден, подготавливаем данные для заполнения блока бит.маски
@@ -319,8 +304,7 @@ _OS_DRAM_FIND_FREE_CELLS__OK:
 	LDI ACCUM_EL,0x01										;Устанавливаем биты в 1
 	;Заполняем блок бит.маски
 	MCALL _OS_DRAM_FILL_CELLS
-	LDI RESULT,OSR_OK
-_OS_DRAM_FIND_FREE_CELLS__END:
+	CLC
 	RET
 
 ;-----------------------------------------------------------;
@@ -378,7 +362,7 @@ _OS_DRAM_FILL_CELLS__BITOFFSET_LOOP_DONE:
 
 	;Теперь смещение в битах всегда 0
 	MOV TEMP_H,ACCUM_L										;Сохраняю малдший байт для определения кол-ва бит в последнем байте
-	MCALL OS_DIVA16BY8										;Получаю количество полностью заполненных байт
+	MCALL OS_DIV16P2_X8										;Получаю количество полностью заполненных байт
 	BREQ _OS_DRAM_FILL_CELLS__FILLBYTES_DONE
 _OS_DRAM_FILL_CELLS__FILLBYTES_LOOP:
 	MCALL _OS_DRAM_BYTE_UPDATE								;Обновляем последующий байт

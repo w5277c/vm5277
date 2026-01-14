@@ -15,11 +15,11 @@
  */
 package ru.vm5277.avr_asm.nodes;
 
-import ru.vm5277.avr_asm.Delimiter;
+import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
-import ru.vm5277.common.SourcePosition;
-import ru.vm5277.avr_asm.TokenType;
+import ru.vm5277.common.lexer.SourcePosition;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.InfoMessage;

@@ -18,7 +18,7 @@ package ru.vm5277.compiler;
 import java.io.BufferedWriter;
 import java.util.List;
 import java.util.Set;
-import ru.vm5277.common.Operator;
+import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.VarType;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.BlockNode;
@@ -62,7 +62,8 @@ import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
 import ru.vm5277.compiler.nodes.expressions.UnaryExpression;
 import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
 import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
-import ru.vm5277.compiler.tokens.Token;
+import ru.vm5277.common.lexer.Keyword;
+import ru.vm5277.common.lexer.tokens.Token;
 
 public class ASTPrinter {
 	private class Printer {

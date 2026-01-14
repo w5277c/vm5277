@@ -27,14 +27,15 @@ import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.VarType;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.compiler.Keyword;
-import ru.vm5277.compiler.TokenType;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.J8BKeyword;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.semantic.EnumScope;
 import ru.vm5277.compiler.semantic.Scope;
+import ru.vm5277.common.lexer.Keyword;
 
 public class EnumNode extends AstNode {
 	protected	final	Set<Keyword>	modifiers;
@@ -50,13 +51,13 @@ public class EnumNode extends AstNode {
 		// Парсинг заголовка enum
         consumeToken(tb);	// Пропуск enum токена
 		try {
-			this.name = (String)consumeToken(tb, TokenType.ID).getValue();
+			this.name = (String)consumeToken(tb, TokenType.IDENTIFIER).getValue();
 
 			values = new ArrayList<>();
 			consumeToken(tb, Delimiter.LEFT_BRACE);
 
 			while (!tb.match(Delimiter.RIGHT_BRACE)) {
-				String value = (String)consumeToken(tb, TokenType.ID).getValue();
+				String value = (String)consumeToken(tb, TokenType.IDENTIFIER).getValue();
 				values.add(value);
 
 				if(!tb.match(Delimiter.COMMA)) break;
@@ -88,7 +89,7 @@ public class EnumNode extends AstNode {
 		}
 
 		try {
-			validateModifiers(modifiers, Keyword.PUBLIC, Keyword.PRIVATE);
+			validateModifiers(modifiers, J8BKeyword.PUBLIC, J8BKeyword.PRIVATE);
 		}
 		catch(CompileException e) {
 			markError(e);

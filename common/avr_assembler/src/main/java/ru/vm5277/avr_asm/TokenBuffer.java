@@ -13,12 +13,16 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.avr_asm;
 
+import ru.vm5277.common.lexer.ASMKeyword;
 import java.util.Iterator;
-import ru.vm5277.common.SourcePosition;
-import ru.vm5277.avr_asm.tokens.Token;
-import ru.vm5277.common.Operator;
+import ru.vm5277.common.lexer.SourcePosition;
+import ru.vm5277.common.lexer.Operator;
+import ru.vm5277.common.lexer.TokenType;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.tokens.Token;
 
 public class TokenBuffer {
 	private	Token	current;
@@ -43,7 +47,7 @@ public class TokenBuffer {
         return current.getType() == type;
     }
 
-	public boolean match(TokenType type, Keyword keyword) {
+	public boolean match(TokenType type, ASMKeyword keyword) {
         return type == current.getType() && current.getValue() == keyword;
     }
 

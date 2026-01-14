@@ -25,7 +25,7 @@ import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
-import ru.vm5277.compiler.tokens.Token;
+import ru.vm5277.common.lexer.tokens.Token;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CGExcs;

@@ -16,7 +16,7 @@
 package ru.vm5277.avr_asm.scope;
 
 import java.util.Stack;
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class IncludeSymbol extends Symbol {
@@ -27,7 +27,7 @@ public class IncludeSymbol extends Symbol {
 	private					IncludeSymbol							parent;
 	
 	public IncludeSymbol(String name, IncludeSymbol parent) {
-		super(name);
+		super(name.toLowerCase());
 		
 		this.parent = parent;
 	}

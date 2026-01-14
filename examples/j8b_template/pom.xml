@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>ru.vm5277.j8b.examples</groupId>
+	<artifactId>j8b-template</artifactId>
+	<version>1.0-SNAPSHOT</version>
+	<packaging>j8b</packaging>
+
+	<name>j8b_template</name>
+	<description>Template project for j8b language</description>
+
+	<licenses>
+		<license>
+			<name>Apache License, Version 2.0</name>
+			<url>http://www.apache.org/licenses/LICENSE-2.0.txt</url>
+		</license>
+	</licenses>
+
+	<properties>
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<maven.compiler.source>1.8</maven.compiler.source>
+		<maven.compiler.target>1.8</maven.compiler.target>
+		<j8b.packaging.version>0.1.0</j8b.packaging.version>
+		<j8b.plugin.version>0.1.0</j8b.plugin.version>
+		<j8b.target>avr:atmega328p</j8b.target>
+		<j8b.targetFreq>16</j8b.targetFreq>
+		<j8b.sourceDirectory>src/main/j8b</j8b.sourceDirectory>
+	</properties>
+
+	<build>
+		<extensions>
+			<extension>
+				<groupId>ru.vm5277</groupId>
+				<artifactId>j8b-packaging</artifactId>
+				<version>${j8b.packaging.version}</version>
+			</extension>
+		</extensions>
+
+		<plugins>
+			<plugin>
+				<groupId>ru.vm5277</groupId>
+				<artifactId>j8b-plugin</artifactId>
+				<version>${j8b.plugin.version}</version>
+				<executions>
+					<execution>
+						<id>compile-j8b</id>
+						<phase>compile</phase>
+						<goals>
+							<goal>compile</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<target>${j8b.target}</target>
+					<targetFreq>${j8b.targetFreq}</targetFreq>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+	
+	<pluginRepositories>
+		<pluginRepository>
+			<id>ru.vm5277</id>
+			<url>https://vm5277.ru/maven-repo</url>
+		</pluginRepository>
+	</pluginRepositories>
+</project>

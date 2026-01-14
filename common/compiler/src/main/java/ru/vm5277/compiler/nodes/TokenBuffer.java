@@ -16,13 +16,12 @@
 package ru.vm5277.compiler.nodes;
 
 import java.util.ListIterator;
-import java.util.Stack;
-import ru.vm5277.common.SourcePosition;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.common.Operator;
-import ru.vm5277.compiler.TokenType;
-import ru.vm5277.compiler.Keyword;
-import ru.vm5277.compiler.tokens.Token;
+import ru.vm5277.common.lexer.SourcePosition;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.Operator;
+import ru.vm5277.common.lexer.TokenType;
+import ru.vm5277.common.lexer.Keyword;
+import ru.vm5277.common.lexer.tokens.Token;
 
 public class TokenBuffer {
 	private	Token	current;

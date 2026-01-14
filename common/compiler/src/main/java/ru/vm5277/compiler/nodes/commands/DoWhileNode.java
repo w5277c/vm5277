@@ -18,7 +18,6 @@ package ru.vm5277.compiler.nodes.commands;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Set;
 import ru.vm5277.common.cg.CGBranch;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
@@ -29,11 +28,10 @@ import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.compiler.Keyword;
-import ru.vm5277.compiler.TokenType;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.J8BKeyword;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
-import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -60,7 +58,7 @@ public class DoWhileNode extends CommandNode {
 		catch(CompileException e) {markFirstError(e);}
 
 		try {
-			consumeToken(tb, TokenType.COMMAND, Keyword.WHILE);
+			consumeToken(tb, TokenType.COMMAND, J8BKeyword.WHILE);
 			consumeToken(tb, Delimiter.LEFT_PAREN);
 			this.condition = new ExpressionNode(tb, mc).parse();
 			consumeToken(tb, Delimiter.RIGHT_PAREN);

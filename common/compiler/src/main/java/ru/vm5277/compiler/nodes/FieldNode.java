@@ -22,9 +22,9 @@ import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import java.util.Set;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.compiler.Keyword;
-import ru.vm5277.common.Operator;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.J8BKeyword;
+import ru.vm5277.common.lexer.Operator;
 import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
@@ -53,6 +53,7 @@ import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.FieldSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.InitNodeHolder;
+import ru.vm5277.common.lexer.Keyword;
 
 public class FieldNode extends AstNode implements InitNodeHolder {
 	private	final	ObjectTypeNode	objectTypeNode;
@@ -95,11 +96,11 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 	}
 	
 	public boolean isStatic() {
-		return modifiers.contains(Keyword.STATIC);
+		return modifiers.contains(J8BKeyword.STATIC);
 	}
 
 	public boolean isFinal() {
-		return modifiers.contains(Keyword.FINAL);
+		return modifiers.contains(J8BKeyword.FINAL);
 	}
 
 	public Set<Keyword> getModifiers() {
@@ -107,7 +108,7 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 	}
 
 	public boolean isPrivate() {
-		return modifiers.contains(Keyword.PRIVATE);
+		return modifiers.contains(J8BKeyword.PRIVATE);
 	}
 
 	@Override
@@ -116,7 +117,7 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 		debugAST(this, PRE, true, getFullInfo());
 		
 		try{
-			validateModifiers(modifiers, Keyword.STATIC, Keyword.FINAL, Keyword.PRIVATE, Keyword.PUBLIC);
+			validateModifiers(modifiers, J8BKeyword.STATIC, J8BKeyword.FINAL, J8BKeyword.PRIVATE, J8BKeyword.PUBLIC);
 		}
 		catch(CompileException e) {
 			addMessage(e);
@@ -181,7 +182,7 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 		if(result) {
 			if(scope instanceof ClassScope) {
 				ClassScope classScope = (ClassScope)scope;
-				boolean isFinal = modifiers.contains(Keyword.FINAL);
+				boolean isFinal = modifiers.contains(J8BKeyword.FINAL);
 				symbol = new FieldSymbol(name, type, isFinal || VarType.CSTR == type, isStatic(), isPrivate(), classScope, this);
 
 				try{classScope.addField(symbol);}
@@ -284,7 +285,7 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 					(init instanceof VarFieldExpression && null!=((VarFieldExpression)init).getSymbol() &&
 					((VarFieldExpression)init).getSymbol().isFinal())) {
 
-					modifiers.add(Keyword.FINAL);
+					modifiers.add(J8BKeyword.FINAL);
 					symbol.setFinal(true);
 					if(type.isArray() || VarType.CSTR==type) {
 						symbol.setReassigned();

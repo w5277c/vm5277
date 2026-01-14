@@ -24,12 +24,14 @@ import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.Optimization;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.lexer.J8BKeyword;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.ObjectTypeNode;
 import ru.vm5277.compiler.semantic.GlobalScope;
 import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.Scope;
+import ru.vm5277.common.lexer.Keyword;
 
 public class SemanticAnalyzer {
 	protected SemanticAnalyzer() {
@@ -107,11 +109,11 @@ public class SemanticAnalyzer {
 	
 	public void validateName(String name) throws CompileException {
         if(name==null || name.isEmpty()) throw new CompileException("Name cannot be empty");
-        if(null!=Keyword.fromString(name)) throw new CompileException("Name cannot be a keyword");
+        if(null!=J8BKeyword.fromString(name)) throw new CompileException("Name cannot be a J8BKeyword");
     }
 	
 	protected void validateModifiers(Set<Keyword> modifiers, Keyword... allowedModifiers) throws CompileException {
-		if(modifiers.contains(Keyword.PUBLIC) && modifiers.contains(Keyword.PRIVATE)) {
+		if(modifiers.contains(J8BKeyword.PUBLIC) && modifiers.contains(J8BKeyword.PRIVATE)) {
 			throw new CompileException("Conflicting access modifiers: cannot combine 'public' and 'private'");
 		}
 

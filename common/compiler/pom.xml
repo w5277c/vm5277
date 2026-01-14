@@ -2,8 +2,8 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>ru.vm5277</groupId>
-    <artifactId>compiler</artifactId>
-    <version>0.3.2</version>
+    <artifactId>j8b_compiler</artifactId>
+    <version>0.5.0</version>
     <packaging>jar</packaging>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
@@ -11,7 +11,7 @@
         <exec.mainClass>ru.vm5277.compiler.Main</exec.mainClass>
 		<graalvm.version>21.2.0</graalvm.version>
     </properties>
-    <name>сompiler</name>
+
     <dependencies>
 		<dependency>
 			<groupId>org.junit.jupiter</groupId>
@@ -26,8 +26,8 @@
 	        <scope>test</scope>
 		</dependency>
         <dependency>
-            <groupId>ru.vm5277</groupId>
-            <artifactId>common</artifactId>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>stub_codegen</artifactId>
             <version>[0,)</version>
         </dependency>
         <dependency>
@@ -37,12 +37,7 @@
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>stub_codegen</artifactId>
-            <version>[0,)</version>
-        </dependency>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>avr_assembler</artifactId>
+            <artifactId>vm5277_common</artifactId>
             <version>[0,)</version>
         </dependency>
     </dependencies>
@@ -115,8 +110,6 @@
 							<buildArgs>
 								<arg>--no-fallback</arg>
 								<arg>-H:IncludeResources=.*</arg>
-<!--								<arg>-H:IncludeResources=ru/vm5277/compiler/version.properties</arg>
-								<arg>-H:IncludeResources=ru/vm5277/compiler/avr_codegen/version.properties</arg>-->
 							</buildArgs>
 						</configuration>
 					</plugin>

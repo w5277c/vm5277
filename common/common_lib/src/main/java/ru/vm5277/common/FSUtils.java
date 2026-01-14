@@ -15,16 +15,13 @@
  */
 package ru.vm5277.common;
 
-import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import ru.vm5277.common.exceptions.CompileException;
 
 public class FSUtils {
-	
-	public static Path getToolkitPath() throws CompileException {
+	public static Path getToolkitPath() {
 		String toolkitPath = System.getenv("vm5277");
 		if(null==toolkitPath || toolkitPath.isEmpty()) {
 			return null;

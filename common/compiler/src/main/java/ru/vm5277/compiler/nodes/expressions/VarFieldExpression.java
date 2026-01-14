@@ -17,7 +17,7 @@
 package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.Objects;
-import ru.vm5277.common.Operator;
+import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.CGBranch;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
@@ -32,7 +32,7 @@ import ru.vm5277.compiler.semantic.VarSymbol;
 import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGFieldScope;

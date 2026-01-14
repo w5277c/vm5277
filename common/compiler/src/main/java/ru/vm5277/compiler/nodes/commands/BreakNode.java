@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.nodes.commands;
 
 import java.util.List;
@@ -29,8 +30,8 @@ import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.compiler.TokenType;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.semantic.BlockScope;
@@ -46,9 +47,9 @@ public class BreakNode extends CommandNode {
         
         consumeToken(tb);
         
-		if(tb.match(TokenType.ID)) {
+		if(tb.match(TokenType.IDENTIFIER)) {
 			try {
-				label = (String)consumeToken(tb, TokenType.ID).getValue();
+				label = (String)consumeToken(tb, TokenType.IDENTIFIER).getValue();
 			}
 			catch(CompileException e) {
 				markFirstError(e);

@@ -21,8 +21,8 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
-import ru.vm5277.avr_asm.output.Builder;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.firmware.FirmwareFormatter;
 
 public class CodeSegment {
 	private			int							PCReg				= 0x0000;
@@ -101,7 +101,7 @@ public class CodeSegment {
 		System.out.println(" Total\t:  " + total + " words (" + (total*2) + " bytes) " + String.format("%.1f", 100d*total/wSize) + "%");
 	}
 
-	public void build(Builder builder) throws IOException {
+	public void build(FirmwareFormatter fwFormatter) throws IOException {
 		List<CodeBlock> sorted = new ArrayList<>(blocksByStartAddr.values());
 		Collections.sort(sorted, new Comparator<CodeBlock>() {
 			@Override
@@ -121,7 +121,7 @@ public class CodeSegment {
 		}
 
 		for(CodeBlock block : blocksByStartAddr.values()) {
-			builder.push(block.getData(), block.getStartWAddress()*2, block.getWSize()*2 - block.getOverlap()*2);
+			fwFormatter.push(block.getData(), block.getStartWAddress()*2, block.getWSize()*2 - block.getOverlap()*2);
 		}
 	}
 }

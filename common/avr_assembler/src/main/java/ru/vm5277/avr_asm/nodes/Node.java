@@ -17,15 +17,15 @@ package ru.vm5277.avr_asm.nodes;
 
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
-import ru.vm5277.avr_asm.Delimiter;
-import ru.vm5277.avr_asm.TokenType;
-import ru.vm5277.common.SourcePosition;
-import ru.vm5277.common.Operator;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.TokenType;
+import ru.vm5277.common.lexer.SourcePosition;
+import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.lexer.tokens.Token;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
-import ru.vm5277.avr_asm.tokens.Token;
 
 public class Node {
 	protected			TokenBuffer				tb;
@@ -47,12 +47,20 @@ public class Node {
 	
 	public static Token consumeToken(TokenBuffer tb, TokenType expectedType) throws CompileException {
 		if (tb.current().getType() == expectedType) return tb.consume();
-		else throw new CompileException("Expected " + expectedType + ", but got " + tb.current().getType(), tb.getSP());
+		else {
+			int t=5454;
+			return null;
+//throw new CompileException("Expected " + expectedType + ", but got " + tb.current().getType(), tb.getSP());
+		}
     }
 	public static Token consumeToken(TokenBuffer tb, Delimiter delimiter) throws CompileException {
-		if (TokenType.DELIMITER == tb.current().getType()) {
-            if(delimiter == tb.current().getValue()) return tb.consume();
-			else throw new CompileException("Expected delimiter " + delimiter + ", but got " + tb.current().getValue(), tb.getSP());
+		if(TokenType.DELIMITER == tb.current().getType()) {
+            if(delimiter == tb.current().getValue()) {
+				return tb.consume();
+			}
+			else {
+				throw new CompileException("Expected delimiter " + delimiter + ", but got " + tb.current().getValue(), tb.getSP());
+			}
         }
 		else throw new CompileException("Expected " + TokenType.DELIMITER + ", but got " + tb.current().getType(), tb.getSP());
     }

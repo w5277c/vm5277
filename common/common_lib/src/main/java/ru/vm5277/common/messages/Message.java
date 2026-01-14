@@ -16,7 +16,7 @@
 package ru.vm5277.common.messages;
 
 import java.util.Objects;
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.SourcePosition;
 
 public class Message {
 	private			String			type;

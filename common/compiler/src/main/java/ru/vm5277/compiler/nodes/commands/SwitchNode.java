@@ -19,12 +19,12 @@ package ru.vm5277.compiler.nodes.commands;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.compiler.Keyword;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.J8BKeyword;
 import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.LabelNames;
-import ru.vm5277.common.Operator;
+import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.cg.CGBranch;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CGExcs;
@@ -83,7 +83,7 @@ public class SwitchNode extends CommandNode {
 		
 		// Парсим case-блоки
 		while(!tb.match(Delimiter.RIGHT_BRACE)) {
-			if(tb.match(Keyword.CASE)) {
+			if(tb.match(J8BKeyword.CASE)) {
 				try {
 					AstCase astCase = parseCase(tb, mc);
 					if(null!=astCase) {
@@ -95,7 +95,7 @@ public class SwitchNode extends CommandNode {
 					tb.skip(Delimiter.COLON);
 				}
 			}
-			else if(tb.match(Keyword.DEFAULT)) {
+			else if(tb.match(J8BKeyword.DEFAULT)) {
 				consumeToken(tb); // Потребляем "default"
 				try {
 					consumeToken(tb, Delimiter.COLON);
@@ -113,6 +113,7 @@ public class SwitchNode extends CommandNode {
 			}
 			else {
 				markFirstError(parserError("Expected 'case' or 'default' in switch statement"));
+				break;
 			}
 		}
 		try {

@@ -25,7 +25,6 @@ package ru.vm5277.avr_asm;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
-import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -38,7 +37,7 @@ import ru.vm5277.avr_asm.nodes.MacroNode;
 import ru.vm5277.avr_asm.nodes.MnemNode;
 import ru.vm5277.avr_asm.nodes.Node;
 import ru.vm5277.common.SourceType;
-import ru.vm5277.avr_asm.output.IntelHexBuilder;
+import ru.vm5277.common.firmware.IntelHexFormatter;
 import ru.vm5277.avr_asm.scope.MacroCallSymbol;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.scope.VariableSymbol;
@@ -47,6 +46,8 @@ import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.lexer.Lexer;
+import ru.vm5277.common.lexer.LexerType;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 
@@ -56,7 +57,13 @@ public class Assembler implements AssemblerInterface {
 	public			static	boolean	isWindows;
 	public			static	Path	toolkitPath;
 	
-	public static void main(String[] args) throws IOException, Exception {
+	public static void main(String[] args) {
+		System.exit(exec(args));
+	}
+	
+	public static int exec(String[] args) {
+		showDisclaimer();
+		
 		isWindows = (null != System.getProperty("os.name") && System.getProperty("os.name").toLowerCase().contains("windows"));
 
 		toolkitPath = FSUtils.getToolkitPath();
@@ -64,12 +71,12 @@ public class Assembler implements AssemblerInterface {
 		String source = null;
 		if(0x00 == args.length) {
 			showHelp();
-			System.exit(0);
+			return 0;
 		}
 		if(0x01 == args.length) {
 			if(args[0x00].equals("--version")) {
 				System.out.println("AVR assembler version: " + VERSION);
-				System.exit(0);
+				return 0;
 			}
 		}
 
@@ -94,7 +101,7 @@ public class Assembler implements AssemblerInterface {
 				else if(arg.equals("-I") || arg.equals("--include")) {
 					if(null==toolkitPath) {
 						showInvalidToolkitDir(toolkitPath, null);
-						System.exit(1);
+						return 1;
 					}
 					sourcePaths.put(FSUtils.resolve(toolkitPath, args[i]), SourceType.LIB);
 				}
@@ -108,7 +115,7 @@ public class Assembler implements AssemblerInterface {
 					}
 					catch(Exception e) {
 						System.err.println("[ERROR] Invalid parameter " + arg + " value: " + value);
-						System.exit(1);
+						return 1;
 					}
 				}
 				else if(arg.equals("-d") || arg.equals("--device")) {
@@ -120,21 +127,21 @@ public class Assembler implements AssemblerInterface {
 					String name = parts[0x00].trim().toLowerCase();
 					if(defines.containsKey(name.toLowerCase())) {
 						System.err.println("[ERROR] define '" + name + "' already defined");
-						System.exit(1);
+						return 1;
 					}
 					long value = 1l;
 					if(0x02==parts.length) {
 						String valueStr = parts[0x01].trim().toLowerCase();
 						if(valueStr.isEmpty()) {
 							System.err.println("[ERROR] define '" + name + "' value is empty");
-							System.exit(1);
+							return 1;
 						}
 						try {
 							value = Long.parseLong(valueStr);
 						}
 						catch(Exception ex) {
 							System.err.println("[ERROR] define '" + name + "' value is not integral");
-							System.exit(1);
+							return 1;
 						}
 					}
 					defines.put(name, value);
@@ -157,27 +164,27 @@ public class Assembler implements AssemblerInterface {
 					else if(strictStr.equals("none")) stirctLevel = STRICT_NONE;
 					else if(!strictStr.equals("light")) {
 						showInvalidStrictLevel(strictStr);
-						System.exit(1);
+						return 1;
 					}
 				}
 				else if(arg.equals("-f") || arg.equals("--format")) {
 					format = args[i].toLowerCase();
 					if(!format.equals("hex") && !format.equals("bin")) {
 						showInvalidStrictLevel("-f " + format);
-						System.exit(1);
+						return 1;
 					}
 				}
 				else {
 					System.err.println("[ERROR] Invalid parameter:" + arg + "\n");
 					showHelp();
-					System.exit(1);
+					return 1;
 				}
 			}
 		}
  
 		if(null==toolkitPath) {
 			showInvalidToolkitDir(toolkitPath, null);
-			System.exit(1);
+			return 1;
 		}
 		System.out.println("Toolkit path: " + toolkitPath.toString());
 		
@@ -210,10 +217,17 @@ public class Assembler implements AssemblerInterface {
 		
 		long timestamp = System.currentTimeMillis();
 		System.out.println("Parsing " + sourcePath.toString()  + " ...");
-		boolean success = new Assembler().exec(mc, mcu, sourcePath, sourcePaths, stirctLevel, outputFileName, mapFile, listWriter, defines, includes);
+		boolean success = false;
+		try {
+			success = new Assembler().exec(mc, mcu, sourcePath, sourcePaths, stirctLevel, outputFileName, mapFile, listWriter, defines, includes);
+		}
+		catch(Exception ex) {
+			success = false;
+		}
+		
 		float time = (System.currentTimeMillis() - timestamp) / 1000f;
-		System.out.println("Total time: " + String.format(Locale.US, "%.3f", time) + " s");
-		System.exit(success ? 0 : 1);
+		System.out.println("Total time: " + String.format(Locale.US, "%.3f", time) + " s\n");
+		return  success ? 0 : 1;
 	}
 
 	@Override
@@ -235,10 +249,10 @@ public class Assembler implements AssemblerInterface {
 			}
 		}
 		
-		Lexer lexer = new Lexer(sourcePath.toFile(), scope, mc);
-		//for(Token token : lexer.getTokens()) {
-			//System.out.print(token.toString());
-		//}
+		
+		Lexer lexer = new Lexer(LexerType.ASM, sourcePath.toFile(), scope.getTokenProvider(), tabSize, false);
+		//lexer.print();
+
 		try {
 			Parser parser = new Parser(lexer.getTokens(), scope, mc, sourcePaths, tabSize, includes);
 			secondPass(scope, mc, parser.getSecondPassNodes());
@@ -261,9 +275,9 @@ public class Assembler implements AssemblerInterface {
 		else {
 			System.out.println();
 			if(!scope.getCSeg().isEmpty()) {
-				IntelHexBuilder hexBuilder = new IntelHexBuilder(new File(outputFileName + "_cseg.hex"));
-				scope.getCSeg().build(hexBuilder);
-				hexBuilder.close();
+				IntelHexFormatter formatter = new IntelHexFormatter(new File(outputFileName + "_cseg.hex"));
+				scope.getCSeg().build(formatter);
+				formatter.close();
 				scope.getCSeg().printStat();
 			}
 
@@ -294,8 +308,19 @@ public class Assembler implements AssemblerInterface {
 		}
 	}
 	
+	private static void showDisclaimer() {
+		System.out.println(";j8b AVR Assembler for vm5277 Embedded Toolkit");
+		System.out.println(";Version: " + VERSION + " | License: Apache-2.0");
+		System.out.println(";================================================================");
+		System.out.println(";WARNING: This project is under active development.");
+		System.out.println(";The primary focus is on functionality; testing is currently limited.");
+		System.out.println(";Please report any bugs found to: konstantin@5277.ru");
+		System.out.println(";================================================================");
+	}
+
+	
 	private static void showHelp() {
-		System.out.println("AVR assembler for vm5277 Embedded Toolkit");
+		System.out.println("j8b AVR assembler for vm5277 Embedded Toolkit");
 		System.out.println("Version: " + VERSION + " | License: Apache-2.0");
 		System.out.println("-------------------------------------------");
 		System.out.println();

@@ -16,6 +16,7 @@
 
 package ru.vm5277.common;
 
+import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.cg.items.CGIContainer;
 
 public class ExcsThrowPoint {

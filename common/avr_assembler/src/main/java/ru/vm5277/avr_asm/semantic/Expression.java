@@ -19,33 +19,34 @@ import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.nodes.Node;
 import ru.vm5277.avr_asm.scope.MacroCallSymbol;
 import ru.vm5277.avr_asm.scope.Scope;
-import ru.vm5277.avr_asm.Keyword;
-import ru.vm5277.avr_asm.Delimiter;
-import ru.vm5277.avr_asm.TokenType;
-import ru.vm5277.common.Operator;
+import ru.vm5277.common.lexer.ASMKeyword;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.TokenType;
+import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.lexer.Keyword;
 import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.avr_asm.tokens.Token;
-import static ru.vm5277.common.Operator.AND;
-import static ru.vm5277.common.Operator.BIT_AND;
-import static ru.vm5277.common.Operator.BIT_NOT;
-import static ru.vm5277.common.Operator.BIT_OR;
-import static ru.vm5277.common.Operator.BIT_XOR;
-import static ru.vm5277.common.Operator.DIV;
-import static ru.vm5277.common.Operator.EQ;
-import static ru.vm5277.common.Operator.GT;
-import static ru.vm5277.common.Operator.GTE;
-import static ru.vm5277.common.Operator.LT;
-import static ru.vm5277.common.Operator.LTE;
-import static ru.vm5277.common.Operator.MINUS;
-import static ru.vm5277.common.Operator.MULT;
-import static ru.vm5277.common.Operator.NEQ;
-import static ru.vm5277.common.Operator.NOT;
-import static ru.vm5277.common.Operator.OR;
-import static ru.vm5277.common.Operator.PLUS;
-import static ru.vm5277.common.Operator.SHL;
-import static ru.vm5277.common.Operator.SHR;
-import ru.vm5277.common.SourcePosition;
+import static ru.vm5277.common.lexer.Operator.AND;
+import static ru.vm5277.common.lexer.Operator.BIT_AND;
+import static ru.vm5277.common.lexer.Operator.BIT_NOT;
+import static ru.vm5277.common.lexer.Operator.BIT_OR;
+import static ru.vm5277.common.lexer.Operator.BIT_XOR;
+import static ru.vm5277.common.lexer.Operator.DIV;
+import static ru.vm5277.common.lexer.Operator.EQ;
+import static ru.vm5277.common.lexer.Operator.GT;
+import static ru.vm5277.common.lexer.Operator.GTE;
+import static ru.vm5277.common.lexer.Operator.LT;
+import static ru.vm5277.common.lexer.Operator.LTE;
+import static ru.vm5277.common.lexer.Operator.MINUS;
+import static ru.vm5277.common.lexer.Operator.MULT;
+import static ru.vm5277.common.lexer.Operator.NEQ;
+import static ru.vm5277.common.lexer.Operator.NOT;
+import static ru.vm5277.common.lexer.Operator.OR;
+import static ru.vm5277.common.lexer.Operator.PLUS;
+import static ru.vm5277.common.lexer.Operator.SHL;
+import static ru.vm5277.common.lexer.Operator.SHR;
+import ru.vm5277.common.lexer.SourcePosition;
+import ru.vm5277.common.lexer.tokens.Token;
 
 public class Expression extends Node {
 	protected Expression() {
@@ -109,7 +110,7 @@ public class Expression extends Node {
 				throw new CompileException("Got macro param without macro: " + token, tb.current().getSP());
 			}
 		}
-		else if(tb.match(TokenType.NUMBER) || tb.match(TokenType.STRING) || tb.match(TokenType.CHAR) || tb.match(TokenType.LITERAL)) {
+		else if(tb.match(TokenType.NUMBER) || tb.match(TokenType.STRING) || tb.match(TokenType.CHARACTER) || tb.match(TokenType.LITERAL)) {
 			tb.consume();
 			return new LiteralExpression(token.getValue());
 		}
@@ -121,21 +122,24 @@ public class Expression extends Node {
 		}
 		else if(tb.match(TokenType.INDEX_REG)) {
 			IRegExpression expr = new IRegExpression((String)tb.consume().getValue());
-			if((!tb.match(TokenType.ID) && !tb.match(TokenType.NUMBER)) || (!expr.isInc() && !expr.isDec())) {
+			if((!tb.match(TokenType.IDENTIFIER) && !tb.match(TokenType.NUMBER)) || (!expr.isInc() && !expr.isDec())) {
 				return expr;
 			}
 			return new BinaryExpression(tb, scope, mc, new IRegExpression(expr.getId(), false, false),
 										expr.isDec() ? Operator.MINUS : Operator.PLUS, parseBinary(tb, scope, mc, 0));
 		}
-		else if(tb.match(TokenType.ID)) {
-			String name = ((String)tb.consume().getValue()).toLowerCase();
+		else if(tb.match(TokenType.COMMAND)) {
+			String name = ((Keyword)tb.consume().getValue()).getName();
 			if(tb.match(Delimiter.LEFT_PAREN)) {
 				tb.consume();
 				Expression result = parseFunction(tb, scope, mc, name);
 				consumeToken(tb, Delimiter.RIGHT_PAREN);
 				return result;
 			}
-			return new IdExpression(tb, scope, mc, name);
+			throw new CompileException("Missing opening parenthesis '(' for command '" + name + "'", tb.current().getSP());
+		}
+		else if(tb.match(TokenType.IDENTIFIER)) {
+			return new IdExpression(tb, scope, mc, ((String)tb.consume().getValue()).toLowerCase());
 		}
 		else {
 			throw new CompileException("Unexpected token in expression: " + token, tb.current().getSP());
@@ -148,14 +152,14 @@ public class Expression extends Node {
 		Long value = null;
 		try {value = getLong(expr, null);} catch(CompileException e) {}
 		if(null != value) {
-			if(Keyword.LOW.getName().equals(name) || Keyword.BYTE1.getName().equals(name)) return new LiteralExpression(value & 0xff);
-			else if(Keyword.HIGH.getName().equals(name) || Keyword.BYTE2.getName().equals(name)) return new LiteralExpression((value >> 8) & 0xff);
-			else if(Keyword.BYTE3.getName().equals(name) || Keyword.PAGE.getName().equals(name)) return new LiteralExpression((value >> 16) & 0xff);
-			else if(Keyword.BYTE4.getName().equals(name)) return new LiteralExpression((value >> 24) & 0xff);
-			else if(Keyword.LWRD.getName().equals(name)) return new LiteralExpression(value & 0xffff);
-			else if(Keyword.HWRD.getName().equals(name)) return new LiteralExpression((value >> 16) & 0xffff);
-			else if(Keyword.EXP2.getName().equals(name)) return new LiteralExpression(1 << value);
-			else if(Keyword.LOG.getName().equals(name)) {
+			if(ASMKeyword.LOW.getName().equals(name) || ASMKeyword.BYTE1.getName().equals(name)) return new LiteralExpression(value & 0xff);
+			else if(ASMKeyword.HIGH.getName().equals(name) || ASMKeyword.BYTE2.getName().equals(name)) return new LiteralExpression((value >> 8) & 0xff);
+			else if(ASMKeyword.BYTE3.getName().equals(name) || ASMKeyword.PAGE.getName().equals(name)) return new LiteralExpression((value >> 16) & 0xff);
+			else if(ASMKeyword.BYTE4.getName().equals(name)) return new LiteralExpression((value >> 24) & 0xff);
+			else if(ASMKeyword.LWRD.getName().equals(name)) return new LiteralExpression(value & 0xffff);
+			else if(ASMKeyword.HWRD.getName().equals(name)) return new LiteralExpression((value >> 16) & 0xffff);
+			else if(ASMKeyword.EXP2.getName().equals(name)) return new LiteralExpression(1 << value);
+			else if(ASMKeyword.LOG.getName().equals(name)) {
 				long result = 0;
 				while (0x01 <= value) {
 					value = value >> 0x01;
@@ -168,14 +172,14 @@ public class Expression extends Node {
 			}
 		}
 		else {
-			if(Keyword.LOW.getName().equals(name)) {
+			if(ASMKeyword.LOW.getName().equals(name)) {
 				expr = new BinaryExpression(tb, scope, mc, expr, Operator.BIT_AND, new LiteralExpression(0xff));
 			}
-			else if(Keyword.HIGH.getName().equals(name)) {
+			else if(ASMKeyword.HIGH.getName().equals(name)) {
 				expr = new BinaryExpression(tb, scope, mc, expr, Operator.SHR, new LiteralExpression(8));
 				expr = new BinaryExpression(tb, scope, mc, expr, Operator.BIT_AND, new LiteralExpression(0xff));
 			}
-			else if(Keyword.EXP2.getName().equals(name)) {
+			else if(ASMKeyword.EXP2.getName().equals(name)) {
 				expr = new BinaryExpression(tb, scope, mc, new LiteralExpression(1), Operator.SHL, expr);
 			}
 			else {
@@ -198,7 +202,10 @@ public class Expression extends Node {
 		if(obj instanceof String && 0x01==((String)obj).length()) {
 			return ((String)obj).charAt(0);
 		}
-		throw new CompileException("TODO не поддерживаемый тип значения:" + obj, null);
+		if(obj instanceof Character) {
+			return (char)obj;
+		}
+		throw new CompileException("Unsupported value type:" + obj, null);
 	}
 
 	public static Long getLong(Expression expr, SourcePosition sp) throws CompileException {
@@ -210,7 +217,9 @@ public class Expression extends Node {
 		}
 		if (expr instanceof BinaryExpression || expr instanceof UnaryExpression) {
 			Expression folded = Expression.fold(expr);
-			if (null != folded && folded instanceof LiteralExpression) return Expression.getLong(((LiteralExpression)folded).getValue());
+			if (null != folded && folded instanceof LiteralExpression) {
+				return Expression.getLong(((LiteralExpression)folded).getValue());
+			}
 		}
 		throw new CompileException("Expression '" + expr + "' with type '" + expr.getClass().getSimpleName() + "' is not supported", sp);
 	}
@@ -277,12 +286,9 @@ public class Expression extends Node {
 			return null;
 		}
 		
-		if (expr instanceof IdExpression) {
-			try {
-				Long value = ((IdExpression)expr).getNumericValue();
-				return new LiteralExpression(value);
-			}
-			catch (CompileException e) {}
+		if(expr instanceof IdExpression) {
+			Long value = ((IdExpression)expr).getNumericValue();
+			return new LiteralExpression(value);
 		}
 		return null;
 	}

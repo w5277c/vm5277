@@ -13,14 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler;
 
+import ru.vm5277.common.lexer.Lexer;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
-import java.io.IOException;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
@@ -28,8 +28,8 @@ import static ru.vm5277.common.AssemblerInterface.STRICT_LIGHT;
 import static ru.vm5277.common.AssemblerInterface.STRICT_NONE;
 import static ru.vm5277.common.AssemblerInterface.STRICT_STRONG;
 import ru.vm5277.common.FSUtils;
+import ru.vm5277.common.Platform;
 import ru.vm5277.common.SemanticAnalyzePhase;
-import ru.vm5277.common.SourceType;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.RTOSParam;
 import ru.vm5277.common.cg.CGExcs;
@@ -43,24 +43,25 @@ import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.ClassBlockNode;
 import ru.vm5277.compiler.nodes.ClassNode;
 import ru.vm5277.compiler.nodes.MethodNode;
+import ru.vm5277.common.lexer.LexerType;
 
 public class Main {
 	public	final	static	String					VERSION				= StrUtils.readVersion(Main.class);
 	public			static	boolean					isWindows;
 	public			static	Path					toolkitPath;
 	public			static	String					launchMethodName	= "main";
-	public			static	int						tabSize				= 4;
 	private			static	int						stirctLevel			= STRICT_LIGHT;
 	private			static	int						optLevel			= Optimization.SIZE;
 	public	final	static	boolean					DEBUG_AST			= false;
 	private	final	static	Map<Object, Integer>	DEBUG_AST_CNTR_MAP	= new HashMap<>();
-	public					String					aaa					= new String("ssds");
 	
-	public static void main(String[] args) throws IOException, Exception {
+	
+	public static void main(String[] args) {
+		System.exit(exec(args));
+	}
+	
+	public static int exec(String[] args) {
 		long startTimestamp = System.currentTimeMillis();
-		showDisclaimer();
-		
-		Class<Main> aClass = Main.class;
 		
 		isWindows = (null != System.getProperty("os.name") && System.getProperty("os.name").toLowerCase().contains("windows"));
 
@@ -68,32 +69,34 @@ public class Main {
 		
 		if(0x00 == args.length) {
 			showHelp();
-			System.exit(0);
+			return 0;
 		}
 		if(0x01 == args.length) {
-			if(args[0x00].equals("--version")) {
+			if(args[0x00].equals("-v") || args[0x00].equals("--version")) {
 				System.out.println("j8b compiler version: " + VERSION);
 			}
 			else {
 				showHelp();
 			}
-			System.exit(0);
+			return 0;
 		}
 		
-		String platform = null;
+		showDisclaimer();
+		
+		Platform platform = null;
 		String mcu = null;
-		Integer	core_freq = null;
+		Float freq = null;
 		String source = null;
+		Path outputPath = null;
 		int cgVerbose = 0;
 		int maxErrors = 30;
 		boolean dumpIR = false;
-		boolean asmMap = false;
-		boolean asmList = false;
+		int tabSize = 0x04;
 		
 		if(0x02 <= args.length) {
 			String[] parts = args[0x00].split(":");
 			if(0x02 == parts.length) {
-				platform = parts[0];
+				platform = Platform.valueOf(parts[0].toUpperCase());
 				mcu = parts[1];
 			}
 			source = args[1];
@@ -105,18 +108,22 @@ public class Main {
 						toolkitPath = FSUtils.resolveWithEnv(args[++i]);
 						continue;
 					}
+					else if(arg.equals("-o") || arg.equals("--output")) {
+						outputPath = FSUtils.resolveWithEnv(args[++i]);
+						continue;
+					}
 					else if(arg.equals("-F") || arg.equals("--freq")) {
 						String value = args[++i];
 						try {
-							core_freq = Integer.parseInt(value);
-							if(0>=core_freq || 255<core_freq) {
-								System.err.println("[ERROR] Invalid parameter " + arg + " value: " + value);
-								break;
+							freq = Float.parseFloat(value);
+							if(0>=freq || 255<freq) {
+								System.err.println("[ERROR] Invalid freq parameter: " + value);
+								return 1;
 							}
 						}
 						catch(Exception e) {
-							System.err.println("[ERROR] Invalid parameter " + arg + " value: " + value);
-							break;
+							System.err.println("[ERROR] Invalid freq parameter:"  + value);
+							return 1;
 						}
 						continue;
 					}
@@ -126,7 +133,7 @@ public class Main {
 						else if(strictStr.equals("none")) stirctLevel = STRICT_NONE;
 						else if(!strictStr.equals("light")) {
 							showInvalidStrictLevel(strictStr);
-							System.exit(0);
+							return 1;
 						}
 						continue;
 					}
@@ -137,7 +144,7 @@ public class Main {
 						else if(optStr.equals("speed")) optLevel = Optimization.SPEED;
 						else if(!optStr.equals("size")) {
 							showInvalidOptLevel(optStr);
-							System.exit(0);
+							return 1;
 						}
 						continue;
 					}
@@ -175,67 +182,74 @@ public class Main {
 				else if(arg.equals("-t") || arg.equals("--tabsize")) {
 					tabSize = Integer.parseInt(args[i]);
 				}
-				else if(arg.equals("-am") || arg.equals("--asm-map")) {
-					asmMap = true;
-				}
-				else if(arg.equals("-al") || arg.equals("--ams-list")) {
-					asmList = true;
-				}
 				else {
 					System.err.println("[ERROR] Invalid parameter: " + arg);
-					System.exit(0);
+					return 1;
 				}
 			}
 		}
 		else {
 			showHelp();
-			System.exit(0);
+			return 0;
 		}
  
 		if(null==toolkitPath) {
 			showInvalidToolkitDir(toolkitPath, null);
-			System.exit(0);
+			return 1;
 		}
 		System.out.println("Toolkit path: " + toolkitPath.toString());
 		
-		if(null == platform || platform.isEmpty() || null == mcu || mcu.isEmpty()) {
+		if(null == platform || null == mcu || mcu.isEmpty()) {
 			showInvalidDeviceFormat(args[0]);
-			System.exit(0);
+			return 1;
 		}
 		
-		Path rtosPath = toolkitPath.resolve("rtos").resolve(platform).normalize();
-		if(!rtosPath.toFile().exists()) {
-			showInvalidToolkitDir(toolkitPath, rtosPath);
-			System.exit(0);
-		}
-		
-		Path libPath = toolkitPath.resolve("defs").resolve(platform).normalize();
-		if(!libPath.toFile().exists()) {
-			//TODO showInvalidLibDir(libPath);
-			System.exit(0);
-		}
-
 		MessageContainer mc = new MessageContainer(maxErrors, true, false);
 		
 		Path runtimePath = toolkitPath.resolve("runtime").normalize();
 		Path sourcePath = FSUtils.resolve(toolkitPath, source);
-		Path basePath = sourcePath.getParent();
-		
+		Path projectPath = sourcePath.getParent();
+		String sourceName = sourcePath.getFileName().toString();
+		sourceName = sourceName.substring(0, sourceName.lastIndexOf("."));
+
 		File libDir = toolkitPath.resolve("bin").resolve("libs").normalize().toFile();
 		NativeBindingsReader nbr = new NativeBindingsReader(runtimePath, mc);
 
 		Map<RTOSParam, Object> params = new HashMap<>();
 		params.put(RTOSParam.MCU, mcu);
-		if(null != core_freq) {
-			params.put(RTOSParam.CORE_FREQ, core_freq);
+		if(null!=freq) {
+			params.put(RTOSParam.CORE_FREQ, freq.intValue());
 		}
-		CodeGenerator cg = PlatformLoader.loadGenerator(platform, libDir, optLevel, nbr.getMap(), params);
+		CodeGenerator cg = null;
+		try {
+			cg = PlatformLoader.loadGenerator(platform, libDir, optLevel, nbr.getMap(), params);
+		}
+		catch(Exception ex) {
+			ex.printStackTrace();
+			return 1;
+		}
 		CodeGenerator.verbose = cgVerbose;
 		
 		long timestamp = System.currentTimeMillis();
 		System.out.println("Parsing " + sourcePath.toString()  + " ...");
-		Lexer lexer = new Lexer(sourcePath.toFile(), mc);
-		ASTParser parser = new ASTParser(runtimePath, basePath, lexer.getTokens(), mc, true);
+		Lexer lexer = null;
+		try {
+			lexer = new Lexer(LexerType.J8B, sourcePath.toFile(), null, tabSize, false);
+		}
+		catch(Exception ex) {
+			ex.printStackTrace();
+			return 1;
+		}
+
+		ASTParser parser = null;
+		try {
+			parser = new ASTParser(runtimePath, projectPath, lexer.getTokens(), mc, true, tabSize);
+		}
+		catch(Exception ex) {
+			ex.printStackTrace();
+			return 1;
+		}
+		
 		ClassNode clazz = (ClassNode)parser.getClazz();
 		float time = (System.currentTimeMillis() - timestamp) / 1000f;
 		System.out.println("Parsing done, time:" + String.format(Locale.US, "%.3f", time) + " s");
@@ -251,13 +265,16 @@ public class Main {
 
 			//ReachableAnalyzer.analyze(mc, (ClassNode)parser.getClazz(), cg);
 
-			Path targetPath = basePath.resolve("target").normalize();
-			targetPath.toFile().mkdirs();
+			if(null==outputPath) {
+				outputPath = projectPath.resolve("target").normalize();
+			}
+			if(!outputPath.toFile().exists()) {
+				outputPath.toFile().mkdirs();
+			}
 
 			if(dumpIR) {
 				try {
-					Path path = targetPath.resolve(FSUtils.getBaseName(sourcePath));
-					File dumpIrFile = new File(path.toString() + ".j8bir");
+					File dumpIrFile = outputPath.resolve(sourceName + ".j8bir").normalize().toFile();
 					dumpIrFile.setWritable(true);
 					BufferedWriter dumpIrBW = new BufferedWriter(new FileWriter(dumpIrFile));
 					new ASTPrinter(dumpIrBW, clazz);
@@ -293,43 +310,20 @@ public class Main {
 						cg.build(VarType.fromClassName(clazz.getName()), 0);
 						//System.out.println("\n" + cg.getAsm());
 
-						Map<Path, SourceType> sourcePaths	= new HashMap<>();
-						sourcePaths.put(targetPath, SourceType.BASE);
-						sourcePaths.put(rtosPath, SourceType.RTOS);
-						sourcePaths.put(libPath, SourceType.LIB);
-						Path asmPath = targetPath.resolve(FSUtils.getBaseName(sourcePath));
-						Path asmInstrPath = toolkitPath.resolve("defs").resolve(platform);
-						
-						File asmFile = new File(asmPath.toString() + ".asm");
+						File asmFile = outputPath.resolve(sourceName + ".asm").normalize().toFile();
+						Path asmInstrPath = toolkitPath.resolve("defs").resolve(platform.name().toLowerCase());
 						asmFile.createNewFile();
 						FileWriter fw = new FileWriter(asmFile);
 						fw.write(cg.getAsm(asmInstrPath, mc));
 						fw.close();
 
-						File dbgFile = new File(asmPath.toString() + ".dbg");
+						File dbgFile = outputPath.resolve(sourceName + ".dbg").normalize().toFile();
 						dbgFile.createNewFile();
 						fw = new FileWriter(dbgFile);
 						cg.getTargetInfoBuilder().write(fw);
 
-						File asmMapFile = null;
-						if(asmMap) {
-							asmMapFile = new File(asmPath.toString() + ".map");
-						}
-
-						BufferedWriter listBw = null;
-						if(asmList) {
-							listBw = new BufferedWriter(new FileWriter(new File(asmPath.toString() + ".lst")));
-						}
-
 						time = (System.currentTimeMillis() - timestamp) / 1000f;
 						System.out.println("Codegen done, time:" + String.format(Locale.US, "%.3f", time) + " s");
-
-						timestamp = System.currentTimeMillis();
-						System.out.println("Assembling...");
-						PlatformLoader.launchAssembler(platform, libDir, mc, asmFile.toPath(), sourcePaths, asmPath.toString(), asmMapFile, listBw);
-						time = (System.currentTimeMillis() - timestamp) / 1000f;
-						System.out.println("Assembling done, time:" + String.format(Locale.US, "%.3f", time) + " s");
-
 					}
 					else {
 						mc.add(new ErrorMessage("TODO Can't find launch point 'public static void main() {...'", null));
@@ -342,34 +336,34 @@ public class Main {
 		}
 		time = (System.currentTimeMillis() - startTimestamp) / 1000f;
 		System.out.println("Total time:" + String.format(Locale.US, "%.3f", time) + " s\n");
-
+		return 0;
     }
 	
 	private static void showDisclaimer() {
-		System.out.println("Version: " + VERSION + " | License: Apache-2.0");
-		System.out.println("================================================================");
-		System.out.println("WARNING: This project is under active development.");
-		System.out.println("The primary focus is on functionality; testing is currently limited.");
-		System.out.println("It is strongly recommended to carefully review the generated");
-		System.out.println("assembler code before flashing the device.");
-		System.out.println("Please report any bugs found to: konstantin@5277.ru");
-		System.out.println("================================================================");
+		System.out.println(";j8b compiler: Java-like source code compiler for vm5277 Embedded Toolkit");
+		System.out.println(";Version: " + VERSION + " | License: Apache-2.0");
+		System.out.println(";================================================================");
+		System.out.println(";WARNING: This project is under active development.");
+		System.out.println(";The primary focus is on functionality; testing is currently limited.");
+		System.out.println(";It is strongly recommended to carefully review the generated");
+		System.out.println(";assembler code before flashing the device.");
+		System.out.println(";Please report any bugs found to: konstantin@5277.ru");
+		System.out.println(";================================================================");
 	}
 	
 	private static void showHelp() {
 		System.out.println("j8b compiler: Java-like source code compiler for vm5277 Embedded Toolkit");
 		System.out.println("-------------------------------------------");
-		System.out.println();
 		System.out.println("This tool is part of the open-source project for 8-bit microcontrollers (AVR, PIC, STM8, etc.)");
 		System.out.println("Provided AS IS without warranties. Author is not responsible for any consequences of use.");
 		System.out.println();
-		System.out.println("Project home: https://github.com/w5277c/vm5277");
+		System.out.println("Project home: https://github.com/w5277c/vm5277 | Official site: https://vm5277.ru");
 		System.out.println("Contact: w5277c@gmail.com | konstantin@5277.ru");
 		System.out.println();
 		System.out.println("Usage: j8bc" + (isWindows ? ".exe" : "") + " <platform>:<mcu> <input.j8b> [options]");
 		System.out.println();
 		System.out.println("Options:");
-		System.out.println("  -o,  --output <file>    Output HEX file (default: <input>.hex)");
+		System.out.println("  -o,  --output <dir>	  Output directory");
 		System.out.println("  -F,  --freq <MHz>       MCU clock frequency in MHz (default: platform specific)");
 		System.out.println("  -P,  --path <dir>       Custom toolkit directory path");
 		System.out.println("  -I,  --include <dir>    Additional include path(s)");
@@ -380,23 +374,17 @@ public class Main {
 		System.out.println("                          strong  - Treat as error");
 		System.out.println("                          light   - Show warning (default)");
 		System.out.println("                          none    - Silent mode");
-		System.out.println("  -p,  --opt              <none|front|size|speed> Optimization high language(j8b) level");
+		System.out.println("  -p,  --opt              <none|front|size|speed> Optimization high language (j8b) level");
 		System.out.println("                          none    - No optimization");
 		System.out.println("                          front   - Frontend optimization only");
 		System.out.println("                          size    - Size(Flash) optimization (default)");
 		System.out.println("                          speed   - Execution speed optimization");
 		System.out.println("       --max-errors <num> Maximum errors before abort (default: 30)");
-		System.out.println("  -ao, --asm-output       <file> Output HEX file (default: <input>.hex)"); //TODO
-		System.out.println("  -af, --asm-format       <fmt>  Output format (hex, bin)"); //TODO
-		System.out.println("                          hex     - Intel HEX (default)");
-		System.out.println("                          bin     - Raw binary");
-		System.out.println("  -am, --asm-map          Generate asm memory map file");
-		System.out.println("  -al, --asm-list         Generate asm listing file");
 		System.out.println("  -v,  --version          Display version");
 		System.out.println("  -h,  --help             Show this help");
 		System.out.println();
 		System.out.println("Example:");
-		System.out.println("  j8bc avr:atmega328p main.j8b -f 8 -o firmware.hex -I ./libs");
+		System.out.println("  j8bc avr:atmega328p main.j8b -f 8 -I ./libs");
 	}
 	
 	private static void showInvalidDeviceFormat(String invalidParam) {
@@ -406,8 +394,7 @@ public class Main {
 		System.err.println("  stm8:stm8s003f3");
 		System.err.println("  pic:16f877a");
 		System.err.println("Detected: '" + invalidParam + "'");
-		System.err.println("Supported platforms and MCUs are listed in the 'platform' directory of the project");
-		System.err.println("Project location: " + Paths.get("").toAbsolutePath().resolve("platform"));
+		System.err.println("Supported MCUs are listed in the rtos/<platform>/devices/ directory of the project");
 	}
 	
 	private static void showInvalidToolkitDir(Path toolkitPath, Path subPath) {

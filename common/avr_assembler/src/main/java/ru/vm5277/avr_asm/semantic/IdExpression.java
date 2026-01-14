@@ -32,14 +32,16 @@ public class IdExpression extends Expression {
     }
     
 	public Long getNumericValue() throws CompileException {
-		if(null == value) {
+		if(null==value) {
 			VariableSymbol symbol = scope.resolveVariable(name);
-			if(null != symbol) {
+			if(null!=symbol) {
 				value = symbol.getValue();
 			}
 			else {
 				Integer addr = scope.resolveLabel(name);
-				if(null != addr) value = (long)addr;
+				if(null!=addr) {
+					value = (long)addr;
+				}
 			}
 		}
 		return value;

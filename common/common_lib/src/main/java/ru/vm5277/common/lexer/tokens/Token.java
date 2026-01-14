@@ -1,0 +1,125 @@
+/*
+ * Copyright 2025 konstantin@5277.ru
+ * 
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ * 
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ * 
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package ru.vm5277.common.lexer.tokens;
+
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.util.Locale;
+import ru.vm5277.common.DatatypeConverter;
+import ru.vm5277.common.lexer.TokenType;
+import ru.vm5277.common.lexer.SourceBuffer;
+import ru.vm5277.common.lexer.SourcePosition;
+import ru.vm5277.common.StrUtils;
+import ru.vm5277.common.VarType;
+import ru.vm5277.common.lexer.Keyword;
+
+public class Token {
+	private		final	static	DecimalFormat	df	= new DecimalFormat("0.####################", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
+	protected					TokenType		type;
+	protected					Object			value;
+	protected					SourceBuffer	sb;
+	protected					SourcePosition	sp;
+	protected					int				length;
+	private		final	static	String			TOKEN_DELIMETERS	= " ;,.:(){}[]@+-*/%&|^~!?<>=$#@'\"\t\r\n\f";
+
+	public Token(SourceBuffer sb) {
+		this.sb = sb;
+		this.sp = sb.snapSP();
+	}
+	public Token(SourceBuffer sb, SourcePosition sp) {
+		this.sb = sb;
+		this.sp = sp;
+		this.length = sb.getPos()-sp.getPos();
+	}
+	public Token(SourceBuffer sb, SourcePosition sp, TokenType type) {
+		this.sb = sb;
+		this.sp = sp;
+		this.type = type;
+		this.length = sb.getPos()-sp.getPos();
+	}
+	public Token(SourceBuffer sb, SourcePosition sp, TokenType type, Object value) {
+		this.sb = sb;
+		this.sp = sp;
+		this.type = type;
+		this.value = value;
+		this.length = sb.getPos()-sp.getPos();
+	}
+	
+	public Token(SourceBuffer sb, TokenType type, Object value) {
+		this.sb = sb;
+		this.sp = null == sb ? null : sb.snapSP();
+		this.type = type;
+		this.value = value;
+	}
+
+	public Object getValue() {
+		if(TokenType.LITERAL == type) {
+			Keyword kw = (Keyword)value;
+			if(Keyword.TRUE == kw) return true;
+			if(Keyword.FALSE == kw) return false;
+			if(Keyword.NULL == kw) return null;
+		}
+		return value;
+	}
+	
+	public String getStringValue() {
+		return toStringValue(value);
+	}
+	
+	public static String toStringValue(Object value) {
+		if(value instanceof Double) return Token.df.format((Double)value);
+		if(value instanceof Number) return ((Number)value).toString();
+		if(value instanceof Boolean) return ((Boolean)value).toString();
+		if(value instanceof byte[]) return "0x" + DatatypeConverter.printHexBinary((byte[])value);
+		if(value instanceof Character) {
+			return "'" + StrUtils.escapeChar((Character)value) + "'";
+		}
+		if(value instanceof Keyword) {
+			return ((Keyword)value).getName();
+		}
+		if(value instanceof VarType) {
+			return ((VarType)value).getName();
+		}
+		return (String)value;
+	}
+
+	public TokenType getType() {
+		return type;
+	}
+	public void setType(TokenType type) {
+		this.type = type;
+	}
+	
+	public SourcePosition getSP() {
+		return sp;
+	}
+	
+	public int getLength() {
+		return length;
+	}
+
+	public static void skipToken(SourceBuffer sb) {
+		while(sb.available() && -1==TOKEN_DELIMETERS.indexOf(sb.peek())) {
+			sb.next();
+		}
+	}
+	
+	@Override
+	public String toString() {
+		return type + "(" + value + ")" + sp;
+	}
+}

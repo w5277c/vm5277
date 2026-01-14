@@ -12,14 +12,14 @@
     <name>avr_codegen</name>
     <dependencies>
         <dependency>
-            <groupId>ru.vm5277</groupId>
-            <artifactId>common</artifactId>
-            <version>0.1</version>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>avr_assembler</artifactId>
+            <version>[0,)</version>
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>avr_assembler</artifactId>
-            <version>${project.version}</version>
+            <artifactId>vm5277_common</artifactId>
+            <version>[0,)</version>
         </dependency>
     </dependencies>
     <build>

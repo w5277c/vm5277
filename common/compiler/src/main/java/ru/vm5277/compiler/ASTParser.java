@@ -16,6 +16,7 @@
 
 package ru.vm5277.compiler;
 
+import ru.vm5277.common.lexer.TokenType;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -34,7 +35,9 @@ import ru.vm5277.compiler.nodes.ImportNode;
 import ru.vm5277.compiler.nodes.InterfaceNode;
 import ru.vm5277.compiler.nodes.ObjectTypeNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
-import ru.vm5277.compiler.tokens.Token;
+import ru.vm5277.common.lexer.J8BKeyword;
+import ru.vm5277.common.lexer.Keyword;
+import ru.vm5277.common.lexer.tokens.Token;
 
 public class ASTParser extends AstNode {
 	private	final	FileImporter			fileImporter;
@@ -43,10 +46,10 @@ public class ASTParser extends AstNode {
 	private			List<ObjectTypeNode>	imported		= new ArrayList<>();
 	private			ObjectTypeNode			objTypeNode;
 	
-	public ASTParser(Path runtimePath, Path basePath, List<Token> tokens, MessageContainer mc) throws IOException {
-		this(runtimePath, basePath, tokens, mc, false);
+	public ASTParser(Path runtimePath, Path basePath, List<Token> tokens, MessageContainer mc, int tabSize) throws IOException {
+		this(runtimePath, basePath, tokens, mc, false, tabSize);
 	}
-	public ASTParser(Path runtimePath, Path basePath, List<Token> tokens, MessageContainer mc, boolean firsLaunch) throws IOException {
+	public ASTParser(Path runtimePath, Path basePath, List<Token> tokens, MessageContainer mc, boolean firsLaunch, int tabSize) throws IOException {
 		this.fileImporter = new FileImporter(runtimePath, basePath, mc);
 		this.mc = mc;
 		
@@ -56,19 +59,19 @@ public class ASTParser extends AstNode {
 		
         // Автоматический импорт из runtime/autoimport.cfg
         if(firsLaunch && null!=runtimePath) {
-			importAutoConfiguredClasses(runtimePath, basePath);
+			importAutoConfiguredClasses(runtimePath, basePath, tabSize);
 		}
 		
 		// Обработка импортов		
-		while (tb.match(Keyword.IMPORT) && !tb.match(TokenType.EOF)) {
+		while (tb.match(J8BKeyword.IMPORT) && !tb.match(TokenType.EOF)) {
 			ImportNode importNode = new ImportNode(tb, mc);
 			imports.add(importNode);
 			
 			// Загрузка импортируемого файла
-			List<Token> importedTokens = fileImporter.importFile(importNode.getImportFilePath());
+			List<Token> importedTokens = fileImporter.importFile(importNode.getImportFilePath(), tabSize);
 			if(!importedTokens.isEmpty()) {
 				// Рекурсивный парсинг импортированного файла
-				ASTParser importedParser = new ASTParser(runtimePath, basePath, importedTokens, mc);
+				ASTParser importedParser = new ASTParser(runtimePath, basePath, importedTokens, mc, tabSize);
 				if(null!=importedParser.getClazz()) {
 					imported.add(importedParser.getClazz());
 				}
@@ -76,7 +79,7 @@ public class ASTParser extends AstNode {
 		}
 		
 		Set<Keyword> modifiers = collectModifiers(tb);
-		if(tb.match(TokenType.OOP, Keyword.INTERFACE)) {
+		if(tb.match(TokenType.OOP, J8BKeyword.INTERFACE)) {
 			try {
 				objTypeNode = new InterfaceNode(tb, mc, modifiers, null, imported);
 			}
@@ -85,7 +88,7 @@ public class ASTParser extends AstNode {
 				// Парсинг прерван (дальнейший парсинг файла бессмыслен)
 			}
 		}
-		else if(tb.match(TokenType.OOP, Keyword.EXCEPTION)) {
+		else if(tb.match(TokenType.OOP, J8BKeyword.EXCEPTION)) {
 			try {
 				objTypeNode = new ExceptionNode(tb, mc, modifiers, imported);
 			}
@@ -94,7 +97,7 @@ public class ASTParser extends AstNode {
 				// Парсинг прерван (дальнейший парсинг файла бессмыслен)
 			}
 		}
-		else if(tb.match(TokenType.OOP, Keyword.CLASS)) {
+		else if(tb.match(TokenType.OOP, J8BKeyword.CLASS)) {
 			try {
 				objTypeNode = new ClassNode(tb, mc, modifiers, false, imported);
 			}
@@ -127,7 +130,7 @@ public class ASTParser extends AstNode {
 	}
 	
 	//TODO реализовать кеширование на базе сериализации и хеш сумм файлов
-	private void importAutoConfiguredClasses(Path runtimePath, Path basePath) throws IOException {
+	private void importAutoConfiguredClasses(Path runtimePath, Path basePath, int tabSize) throws IOException {
 		Path autoImportConfig = runtimePath.resolve("autoimport.cfg");
 
 		if(!autoImportConfig.toFile().exists()) {
@@ -156,9 +159,9 @@ public class ASTParser extends AstNode {
 					String filePath = importPath.replace('.', File.separatorChar) + ".j8b";
 
 					// Загружаем и парсим файл
-					List<Token> importedTokens = fileImporter.importFile(filePath);
+					List<Token> importedTokens = fileImporter.importFile(filePath, tabSize);
 					if(!importedTokens.isEmpty()) {
-						ASTParser importedParser = new ASTParser(runtimePath, basePath, importedTokens, mc);
+						ASTParser importedParser = new ASTParser(runtimePath, basePath, importedTokens, mc, tabSize);
 						if(null!=importedParser.getClazz()) {
 							autoImported.add(importedParser.getClazz());
 						}

@@ -16,17 +16,18 @@
 
 package ru.vm5277.compiler;
 
+import ru.vm5277.common.lexer.Lexer;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.Test;
-import ru.vm5277.common.Operator;
+import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.FieldNode;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
-import static ru.vm5277.compiler.tokens.Token.toStringValue;
+import ru.vm5277.common.lexer.LexerType;
+import static ru.vm5277.common.lexer.tokens.Token.toStringValue;
 
 public class ParserTests {
-
 	@Test
 	public void constantFoldingTest() throws Exception {
 		String source = "class A{	int i1=5+3-4/2*10; int i2=10%3; int i3=0b11001011 & 0x0f; int i4=0b11001011 | 04; int i5= 2*(4+3); int i6=5+4*3;" +
@@ -36,9 +37,8 @@ public class ParserTests {
 								"	bool b6=!(65>3); bool b7=3<=3; bool b8=5%2==1; " +
 								"	int t1=-5; int t2=5+i1+i2-2-i3; int t3=7==10-6/2?7:2; int t4=5<3 ? 7:2; int t5=true?1:0;}";
 
-		MessageContainer mc = new MessageContainer(100, true, false);		
-		Lexer lexer = new Lexer(source, mc);
-		ASTParser parser = new ASTParser(null, null, lexer.getTokens(), mc);
+		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
+		ASTParser parser = new ASTParser(null, null, lexer.getTokens(), new MessageContainer(100, true, false), 0x04);
 
 		FieldNode field = (FieldNode)parser.getClazz().getBody().getChildren().get(0);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
@@ -170,72 +170,73 @@ public class ParserTests {
 	@Test
 	public void incrementDecrementTest() throws Exception {
 		String source = "class A{ public A() {int i=1; i++; i--; ++i; --i;}}";
-		MessageContainer mc = new MessageContainer(100);
-		Lexer lexer = new Lexer(source, mc);
-		ASTParser parser = new ASTParser(null, null, lexer.getTokens(), mc);
+		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
+		new ASTParser(null, null, lexer.getTokens(), new MessageContainer(), 0x04);
+		assertEquals(0, lexer.getInvalidTokens().size());
 	}
 	
 	@Test
 	public void ifTest() throws Exception {
 		String source = "class A{ public A() { int r=0; if(5>3) r=1; if(6>3) {r=1;} else r=2; if(5>3) {r=1;r++;} else {r=2;r++;}}}";
-		MessageContainer mc = new MessageContainer(100);
-		new ASTParser(null, null, new Lexer(source, mc).getTokens(), mc);
+		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
+		new ASTParser(null, null, lexer.getTokens(), new MessageContainer(100, true, false), 0x04);
+		assertEquals(0, lexer.getInvalidTokens().size());
 	}
 	
 	@Test
 	public void doWhileTest() throws Exception {
-		String source = "class A{ public A() { int i=0; do { i++; } while(i<10); else {i+=10;}}}";
-		MessageContainer mc = new MessageContainer(100);
-		new ASTParser(null, null, new Lexer(source, mc).getTokens(), mc);
+		String source = "class A{ public A() { int i=0; do { i++; } while(i<10);}}";
+		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
+		new ASTParser(null, null, lexer.getTokens(), new MessageContainer(100, true, false), 0x04);
+		assertEquals(0, lexer.getInvalidTokens().size());
 	}
 
 	@Test
 	public void whileTest() throws Exception {
-		String source = "class A{ public A() { int i=0; while(i<10) { i++; } else {i+=10;}}}";
-		MessageContainer mc = new MessageContainer(100);
-		new ASTParser(null, null, new Lexer(source, mc).getTokens(), mc);
+		String source = "class A{ public A() { int i=0; while(i<10) { i++; }}}";
+		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
+		new ASTParser(null, null, lexer.getTokens(), new MessageContainer(100, true, false), 0x04);
+		assertEquals(0, lexer.getInvalidTokens().size());
 	}
 
 	@Test
 	public void forTest() throws Exception {
 		String source = "class A{ public A() { int i=0; for(int f=0; f<10; f++) { if(1==f) continue; if(2==f) break; } else {i+=10;}}}";
-		MessageContainer mc = new MessageContainer(100);
-		new ASTParser(null, null, new Lexer(source, mc).getTokens(), mc);
-	}
-
-	@Test
-	public void gotoTest() throws Exception {
-		String source = "class A{ public A() { label2: int i=0; goto label1; i++; label1: i++;}}";
-		MessageContainer mc = new MessageContainer(100);
-		new ASTParser(null, null, new Lexer(source, mc).getTokens(), mc);
+		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
+		new ASTParser(null, null, lexer.getTokens(), new MessageContainer(100, true, false), 0x04);
+		assertEquals(0, lexer.getInvalidTokens().size());
 	}
 
 	@Test
 	public void returnTest() throws Exception {
 		String source = "class A{ public int A() { return 123+i;} void B() { return;}}";
-		MessageContainer mc = new MessageContainer(100);
-		new ASTParser(null, null, new Lexer(source, mc).getTokens(), mc);
+		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
+		new ASTParser(null, null, lexer.getTokens(), new MessageContainer(100, true, false), 0x04);
+		assertEquals(0, lexer.getInvalidTokens().size());
 	}
 
 	@Test
-	public void switchTest() throws Exception {
+	public void switchTest() throws Exception { //TODO
 		String source ="class A{ public int A() { int t=0; switch(t) { case 0: return 1; case 1..10: return 2; case 11: {t++; return 3;} default: return 4;}}}";
-		MessageContainer mc = new MessageContainer(100);
-		new ASTParser(null, null, new Lexer(source, mc).getTokens(), mc);
+		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
+		new ASTParser(null, null, lexer.getTokens(), new MessageContainer(100, true, false), 0x04);
+		assertEquals(0, lexer.getInvalidTokens().size());
 	}
 
 	@Test
 	public void someTest1() throws Exception {
 		String source ="class A{ public int A() { if(count %2 == 0) {} }}";
-		MessageContainer mc = new MessageContainer(100);
-		new ASTParser(null, null, new Lexer(source, mc).getTokens(), mc);
+		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
+		new ASTParser(null, null, lexer.getTokens(), new MessageContainer(100, true, false), 0x04);
+		assertEquals(0, lexer.getInvalidTokens().size());
 	}
 	
 	@Test
 	public void someTest2() throws Exception {
 		String source ="class A{ public int A() { return -a-b; }}";
-		MessageContainer mc = new MessageContainer(100);
-		new ASTParser(null, null, new Lexer(source, mc).getTokens(), mc);
+		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
+		new ASTParser(null, null, lexer.getTokens(), new MessageContainer(100, true, false), 0x04);
+		assertEquals(0, lexer.getInvalidTokens().size());
 	}
 	
 }

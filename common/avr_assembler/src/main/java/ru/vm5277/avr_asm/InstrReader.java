@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.avr_asm;
 
 import java.io.BufferedReader;
@@ -72,7 +73,7 @@ public class InstrReader {
 	public void setMCU(String mcu) {
 		if(null==supported) {
 			supported = new HashSet<>();
-			try(BufferedReader br = new BufferedReader(new FileReader(basePath.resolve(mcu + ".instr").normalize().toFile()))) {
+			try(BufferedReader br = new BufferedReader(new FileReader(basePath.resolve(mcu.toLowerCase() + ".instr").normalize().toFile()))) {
 				while(true) {
 					String line = br.readLine();
 					if(null == line) break;
@@ -96,7 +97,7 @@ public class InstrReader {
 				}
 			}
 			catch(Exception ex) {
-				mc.add(new ErrorMessage("Failed to load instruction set for " + mcu + " (file: " + basePath + ")", null));
+				mc.add(new ErrorMessage("Failed to load instruction set for " + mcu.toLowerCase() + " (file: " + basePath + ")", null));
 			}
 		}
 		else {

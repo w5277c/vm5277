@@ -27,14 +27,14 @@ import ru.vm5277.avr_asm.nodes.operands.Reg;
 import ru.vm5277.avr_asm.scope.CodeBlock;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
-import ru.vm5277.avr_asm.Delimiter;
-import ru.vm5277.avr_asm.TokenType;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.avr_asm.nodes.operands.EReg;
 import ru.vm5277.avr_asm.nodes.operands.FlashAddr;
 import ru.vm5277.avr_asm.nodes.operands.IOReg;
 import ru.vm5277.avr_asm.semantic.BinaryExpression;
 import ru.vm5277.avr_asm.semantic.IRegExpression;
-import ru.vm5277.common.Operator;
+import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
@@ -60,7 +60,7 @@ public class MnemNode extends Node {
 			}
 		}
 		if(supported.isEmpty()) {
-			throw new CompileException("//TODO не поддерживаемая мнемоника: " + mnemonic, sp);
+			throw new CompileException("Unsupported mnemonic: " + mnemonic, sp);
 		}
 
 		Instruction instr = (Instruction)supported.values().toArray()[0x00];
@@ -74,7 +74,7 @@ public class MnemNode extends Node {
 			scope.getCSeg().movePC(1);
 		}
 
-		if(!tb.match(TokenType.NEWLINE)) {
+		if(!tb.match(TokenType.NEWLINE) && !tb.match(TokenType.EOF)) {
 			expr1 = Expression.parse(tb, scope, mc);
 			if(tb.match(Delimiter.COMMA)) {
 				tb.consume();
@@ -92,7 +92,7 @@ public class MnemNode extends Node {
 			}
 		}
 		catch(Exception e) {
-			mc.add(new ErrorMessage("Failed to parse '" + mnemonic + "' instruction: " + e.getMessage(), null));
+			mc.add(new ErrorMessage("Failed to parse '" + mnemonic + "' instruction: " + e.getMessage(), sp));
 		}
 	}
 	public boolean _secondPass() throws Exception {
@@ -156,10 +156,10 @@ public class MnemNode extends Node {
 						if(null != i) {
 							if(ire.getId() == (reg.getId()&0x01) && (ire.isDec() || ire.isInc())) {
 								if(Assembler.STRICT_STRONG == Scope.getStrincLevel()) {
-									mc.add(new ErrorMessage("TODO undefined combination " + ire + " with " + expr2, sp));
+									mc.add(new ErrorMessage("Undefined combination " + ire + " with " + expr2, sp));
 								}
 								else if(Assembler.STRICT_LIGHT == Scope.getStrincLevel()) {
-									mc.add(new WarningMessage("TODO undefined combination " + ire + " with " + expr2, sp));
+									mc.add(new WarningMessage("Undefined combination " + ire + " with " + expr2, sp));
 								}
 							}
 							parse(i, reg);
@@ -176,10 +176,10 @@ public class MnemNode extends Node {
 						if(null != i) {
 							if(ire.getId() == (reg.getId()&0x01) && (ire.isDec() || ire.isInc())) {
 								if(Assembler.STRICT_STRONG == Scope.getStrincLevel()) {
-									mc.add(new ErrorMessage("TODO undefined combination " + ire + " with " + expr1, sp));
+									mc.add(new ErrorMessage("Undefined combination " + ire + " with " + expr1, sp));
 								}
 								else if(Assembler.STRICT_LIGHT == Scope.getStrincLevel()) {
-									mc.add(new WarningMessage("TODO undefined combination " + ire + " with " + expr1, sp));
+									mc.add(new WarningMessage("Undefined combination " + ire + " with " + expr1, sp));
 								}
 							}
 							parse(i, reg);

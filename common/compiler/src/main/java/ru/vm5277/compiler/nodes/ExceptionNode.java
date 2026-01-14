@@ -27,9 +27,9 @@ import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.VarType;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.compiler.Keyword;
-import ru.vm5277.compiler.TokenType;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.J8BKeyword;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -38,6 +38,7 @@ import ru.vm5277.compiler.semantic.ExceptionScope;
 import ru.vm5277.compiler.semantic.GlobalScope;
 import ru.vm5277.compiler.semantic.ImportableScope;
 import ru.vm5277.compiler.semantic.Scope;
+import ru.vm5277.common.lexer.Keyword;
 
 public class ExceptionNode extends ObjectTypeNode {
 	private			List<String>	values;
@@ -52,12 +53,12 @@ public class ExceptionNode extends ObjectTypeNode {
 		}
 		
 		try {
-			if(tb.match(TokenType.OOP, Keyword.EXTENDS)) {
+			if(tb.match(TokenType.OOP, J8BKeyword.EXTENDS)) {
 				consumeToken(tb);
 				while(true) {
 					try {
 						//TODO QualifiedPath
-						ext.add((String)consumeToken(tb, TokenType.ID).getValue());
+						ext.add((String)consumeToken(tb, TokenType.IDENTIFIER).getValue());
 					}
 					catch(CompileException e) {
 						markError(e);
@@ -73,7 +74,7 @@ public class ExceptionNode extends ObjectTypeNode {
 			consumeToken(tb, Delimiter.LEFT_BRACE);
 
 			while (!tb.match(Delimiter.RIGHT_BRACE)) {
-				String value = (String)consumeToken(tb, TokenType.ID).getValue();
+				String value = (String)consumeToken(tb, TokenType.IDENTIFIER).getValue();
 				values.add(value);
 
 				if(!tb.match(Delimiter.COMMA)) break;
@@ -105,7 +106,7 @@ public class ExceptionNode extends ObjectTypeNode {
 		}
 
 		try {
-			validateModifiers(modifiers, Keyword.PUBLIC, Keyword.PRIVATE);
+			validateModifiers(modifiers, J8BKeyword.PUBLIC, J8BKeyword.PRIVATE);
 		}
 		catch(CompileException e) {
 			markError(e);

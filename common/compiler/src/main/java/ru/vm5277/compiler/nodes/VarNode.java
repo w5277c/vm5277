@@ -21,9 +21,9 @@ import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.compiler.Keyword;
-import ru.vm5277.common.Operator;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.J8BKeyword;
+import ru.vm5277.common.lexer.Operator;
 import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
@@ -52,6 +52,7 @@ import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.VarSymbol;
 import ru.vm5277.compiler.semantic.InitNodeHolder;
+import ru.vm5277.common.lexer.Keyword;
 
 public class VarNode extends AstNode implements InitNodeHolder {
 	private	final	Set<Keyword>	modifiers;
@@ -92,11 +93,11 @@ public class VarNode extends AstNode implements InitNodeHolder {
 	}
 	
 	public boolean isStatic() {
-		return modifiers.contains(Keyword.STATIC);
+		return modifiers.contains(J8BKeyword.STATIC);
 	}
 
 	public boolean isFinal() {
-		return modifiers.contains(Keyword.FINAL);
+		return modifiers.contains(J8BKeyword.FINAL);
 	}
 
 	public Set<Keyword> getModifiers() {
@@ -109,7 +110,7 @@ public class VarNode extends AstNode implements InitNodeHolder {
 		debugAST(this, PRE, true, getFullInfo());
 		
 		try{
-			validateModifiers(modifiers, Keyword.STATIC, Keyword.FINAL);
+			validateModifiers(modifiers, J8BKeyword.STATIC, J8BKeyword.FINAL);
 		}
 		catch(CompileException e) {
 			addMessage(e);
@@ -283,7 +284,7 @@ public class VarNode extends AstNode implements InitNodeHolder {
 					(init instanceof VarFieldExpression && null!=((VarFieldExpression)init).getSymbol() &&
 					((VarFieldExpression)init).getSymbol().isFinal())) {
 
-					modifiers.add(Keyword.FINAL);
+					modifiers.add(J8BKeyword.FINAL);
 					symbol.setFinal(true);
 					if(type.isArray() || VarType.CSTR==type) {
 						symbol.setReassigned();

@@ -24,10 +24,10 @@ import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.avr_asm.semantic.LiteralExpression;
-import ru.vm5277.avr_asm.Delimiter;
-import ru.vm5277.avr_asm.TokenType;
+import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.avr_asm.semantic.IdExpression;
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.SourcePosition;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
@@ -97,7 +97,7 @@ public class DataNode extends Node {
 							throw new CompileException("Cannot resolve expression: '" + expr + "'", _sp);
 						}
 					}
-					if(value >= (1<<(valueSize*8))) {
+					if(0x08!=valueSize && value>=(1L<<(valueSize*8))) {
 						tb.skipLine();
 						throw new CompileException("Value " + value + " exceeds " + valueSize*8 + "-bit range", _sp);
 					}

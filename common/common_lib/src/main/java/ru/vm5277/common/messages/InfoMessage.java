@@ -15,7 +15,7 @@
  */
 package ru.vm5277.common.messages;
 
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.SourcePosition;
 
 public class InfoMessage extends Message {
 	public InfoMessage(String text, SourcePosition sp) {

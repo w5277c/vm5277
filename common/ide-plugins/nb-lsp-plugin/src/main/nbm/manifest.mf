@@ -1,0 +1,6 @@
+OpenIDE-Module: ru.vm5277.lsp.nb.lsp.plugin
+OpenIDE-Module-Name: J8B Language Support
+OpenIDE-Module-Specification-Version: 0.1
+OpenIDE-Module-Implementation-Version: 0.1
+OpenIDE-Module-Localizing-Bundle: ru/vm5277/lsp/nb/lsp/plugin/Bundle.properties
+OpenIDE-Module-Short-Description: Language support for J8B files

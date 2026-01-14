@@ -1,0 +1,41 @@
+[BUILTIN_TYPES]
+0 Object
+1 void
+2 bool
+3 byte
+4 short
+5 int
+6 fixed
+7 cstr
+8 null
+
+[EXCEPTION_TYPES]
+0 Exception
+1 RuntimeException : Exception
+2 MathException : Exception
+3 DivByZeroException : MathException
+4 MathOverflowException : MathException
+5 Test1Exception : Exception
+6 Test2Exception : Test1Exception
+
+[CLASS_TYPES]
+9 Runtime
+10 GPIO
+11 HaltMode
+12 RTOSParam
+13 System
+14 Thread
+15 Main
+
+[THROW_POINTS]
+1 35:9 /media/kostas/repos/w5277c/vm5277_local/examples/j8b/exception/src/main/j8b/Main.j8b	 DivByZeroException.throw []
+2 52:13 /media/kostas/repos/w5277c/vm5277_local/examples/j8b/exception/src/main/j8b/Main.j8b	 Main.test []
+3 39:9 /media/kostas/repos/w5277c/vm5277_local/examples/j8b/exception/src/main/j8b/Main.j8b	 RuntimeException.throw []
+4 72:13 /media/kostas/repos/w5277c/vm5277_local/examples/j8b/exception/src/main/j8b/Main.j8b	 Main.runtimeTest []
+5 85:13 /media/kostas/repos/w5277c/vm5277_local/examples/j8b/exception/src/main/j8b/Main.j8b	 Test2Exception.throw [byte]
+6 92:31 /media/kostas/repos/w5277c/vm5277_local/examples/j8b/exception/src/main/j8b/Main.j8b	 main()
+7 30:12 /media/kostas/repos/w5277c/vm5277_local/examples/j8b/exception/src/main/j8b/Main.j8b	 divTest(byte)
+8 31:16 /media/kostas/repos/w5277c/vm5277_local/examples/j8b/exception/src/main/j8b/Main.j8b	 divTest(byte)
+9 103:24 /media/kostas/repos/w5277c/vm5277_local/examples/j8b/exception/src/main/j8b/Main.j8b	 Main.divTest [byte]
+10 104:13 /media/kostas/repos/w5277c/vm5277_local/examples/j8b/exception/src/main/j8b/Main.j8b	 MathOverflowException.throw []
+

@@ -39,7 +39,7 @@ import ru.vm5277.common.ExcsThrowPoint;
 import ru.vm5277.common.ImplementInfo;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.NativeBinding;
-import ru.vm5277.common.Operator;
+import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.Pair;
 import ru.vm5277.common.RTOSFeature;
 import ru.vm5277.common.RTOSLibs;

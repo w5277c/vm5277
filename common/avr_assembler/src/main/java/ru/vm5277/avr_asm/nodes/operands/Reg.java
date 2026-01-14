@@ -20,7 +20,7 @@ import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.avr_asm.semantic.IRegExpression;
 import ru.vm5277.avr_asm.semantic.IdExpression;
 import ru.vm5277.avr_asm.semantic.LiteralExpression;
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class Reg {

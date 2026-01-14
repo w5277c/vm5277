@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.nodes;
 
 import java.util.ArrayList;
@@ -21,15 +22,16 @@ import java.util.Set;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.compiler.Keyword;
-import ru.vm5277.compiler.TokenType;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.J8BKeyword;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.Scope;
+import ru.vm5277.common.lexer.Keyword;
 
 public class InterfaceBodyNode extends AstNode {
 	protected List<AstNode> children = new ArrayList<>();
@@ -43,19 +45,19 @@ public class InterfaceBodyNode extends AstNode {
 			Set<Keyword> modifiers = collectModifiers(tb);
 
 			// Обработка вложенных интерфейсов
-			if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
+			if (tb.match(TokenType.OOP, J8BKeyword.INTERFACE)) {
 				InterfaceNode iNode = new InterfaceNode(tb, mc, modifiers, null, null);
 				children.add(iNode);
 				continue;
 			}
 			// Обработка exception с модификаторами
-			if (tb.match(TokenType.OOP, Keyword.EXCEPTION)) {
+			if (tb.match(TokenType.OOP, J8BKeyword.EXCEPTION)) {
 				ExceptionNode eNode = new ExceptionNode(tb, mc, modifiers, null);
 				children.add(eNode);
 				continue;
 			}
 			// Обработка enum с модификаторами
-			if (tb.match(TokenType.OOP) && Keyword.ENUM == tb.current().getValue()) {
+			if (tb.match(TokenType.OOP) && J8BKeyword.ENUM == tb.current().getValue()) {
 				markError("Enums are not allowed in interfaces");
     			EnumNode eNode = new EnumNode(tb, mc, modifiers);
 				eNode.disable();
@@ -63,11 +65,11 @@ public class InterfaceBodyNode extends AstNode {
 				continue;
 			}
 			// Обработка вложенных классов
-			if (tb.match(TokenType.OOP, Keyword.CLASS)) {
+			if (tb.match(TokenType.OOP, J8BKeyword.CLASS)) {
 				ClassNode cNode = new ClassNode(tb, mc, modifiers, true, null);
 				// Проверяем что класс статический
 				//TODO Продумать необходимость/возможность наличия статических классов в интерфейсе
-				if(!modifiers.contains(Keyword.STATIC)) {
+				if(!modifiers.contains(J8BKeyword.STATIC)) {
 					markError("Inner classes in interfaces must be static");
 					cNode.disable();
 				}
@@ -82,7 +84,7 @@ public class InterfaceBodyNode extends AstNode {
 
 			// Получаем имя поля/метода
 			String name = null;
-			if (tb.match(TokenType.ID)) {
+			if (tb.match(TokenType.IDENTIFIER)) {
 				name = consumeToken(tb).getStringValue();
 			}
 

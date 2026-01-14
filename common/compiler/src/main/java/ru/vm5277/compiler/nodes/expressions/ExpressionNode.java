@@ -13,30 +13,30 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.nodes.expressions;
 
 import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.NumUtils;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.compiler.Keyword;
-import ru.vm5277.common.Operator;
-import static ru.vm5277.common.Operator.MINUS;
-import static ru.vm5277.common.Operator.PLUS;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.J8BKeyword;
+import ru.vm5277.common.lexer.Operator;
+import static ru.vm5277.common.lexer.Operator.MINUS;
+import static ru.vm5277.common.lexer.Operator.PLUS;
 import ru.vm5277.common.Property;
 import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.compiler.TokenType;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
-import ru.vm5277.compiler.nodes.CatchBlock;
 import ru.vm5277.compiler.nodes.FieldNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.VarNode;
@@ -47,7 +47,7 @@ import ru.vm5277.compiler.semantic.ExceptionScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 import ru.vm5277.compiler.semantic.VarSymbol;
-import ru.vm5277.compiler.tokens.Token;
+import ru.vm5277.common.lexer.tokens.Token;
 
 public class ExpressionNode extends AstNode {
 	protected	VarType type;
@@ -125,10 +125,10 @@ public class ExpressionNode extends AstNode {
 					typeExpr = parseTypeReference(); // Разбираем выражение типа
 				}
 				String varName = null;
-				if(tb.match(Keyword.AS)) {
+				if(tb.match(J8BKeyword.AS)) {
 					tb.consume(); // Потребляем "as"
 					// Проверяем, что после типа идет идентификатор
-					if(tb.match(TokenType.ID)) {
+					if(tb.match(TokenType.IDENTIFIER)) {
 						varName = consumeToken(tb).getStringValue();
 					}
 					else {
@@ -964,7 +964,7 @@ public class ExpressionNode extends AstNode {
 	private ExpressionNode parsePrimary() throws CompileException {
 		Token token = tb.current();
         
-		if(tb.match(Keyword.NEW)) {
+		if(tb.match(J8BKeyword.NEW)) {
 			consumeToken(tb); // Потребляем 'new'
 
 			VarType type = checkPrimtiveType();
@@ -988,7 +988,7 @@ public class ExpressionNode extends AstNode {
 			else {
 				List<String> ids = new ArrayList<>();
 				while(true) {
-					if(tb.match(TokenType.ID)) {
+					if(tb.match(TokenType.IDENTIFIER)) {
 						ids.add(tb.consume().getStringValue());
 					}
 					else if(tb.match(Delimiter.LEFT_PAREN)) {
@@ -1021,7 +1021,7 @@ public class ExpressionNode extends AstNode {
 				return new NewExpression(tb, mc, expr, parseIndices(tb));
 			}*/
 		}
-		if(tb.match(TokenType.NUMBER) || tb.match(TokenType.STRING) || tb.match(TokenType.CHAR) || tb.match(TokenType.LITERAL)) {
+		if(tb.match(TokenType.NUMBER) || tb.match(TokenType.STRING) || tb.match(TokenType.CHARACTER) || tb.match(TokenType.LITERAL)) {
 			consumeToken(tb);
 			return new LiteralExpression(tb, mc, token.getValue());
 		}
@@ -1031,7 +1031,7 @@ public class ExpressionNode extends AstNode {
 			consumeToken(tb, Delimiter.RIGHT_PAREN);
 			return expr;
 		}
-		else if(tb.match(TokenType.ID) || tb.match(TokenType.OOP, Keyword.THIS)) {
+		else if(tb.match(TokenType.IDENTIFIER) || tb.match(TokenType.OOP, J8BKeyword.THIS)) {
 			return parseFullQualifiedExpression(tb);
 		}
 		else {

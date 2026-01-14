@@ -34,9 +34,13 @@ import ru.vm5277.avr_asm.Assembler;
 import ru.vm5277.avr_asm.InstrReader;
 import static ru.vm5277.avr_asm.Assembler.tabSize;
 import ru.vm5277.avr_asm.nodes.Node;
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.lexer.ExternalTokenProvider;
+import ru.vm5277.common.lexer.SourceBuffer;
+import ru.vm5277.common.lexer.TokenType;
+import ru.vm5277.common.lexer.tokens.Token;
 
 public class Scope {
 	protected	final	static	Map<String, Byte>			registers		= new HashMap<>();
@@ -46,7 +50,7 @@ public class Scope {
 			registers.put("r"+i, i);
 		}
 	}
-	private					String									name;
+
 	private			static	String									mcu				= null;
 	private			static	InstrReader								instrReader;
 	private	final			BufferedWriter							listWriter;
@@ -67,21 +71,47 @@ public class Scope {
 	private					MacroDefSymbol							currentMacroDef	= null;
 	private final			Set<String>								includePaths	= new HashSet<>();
 	private					IncludeSymbol							currentInclude	= null;
-
+	private					ExternalTokenProvider					tokenProvider;
+	
 	public Scope(File sourceFile, InstrReader instrReader, BufferedWriter listWriter) throws CompileException {
 		this.instrReader = instrReader;
 		addImport(sourceFile.getAbsolutePath());
 		this.listWriter = listWriter;
+		
+		
+		tokenProvider = new ExternalTokenProvider() {
+			@Override
+			public Token getExternalToken(SourceBuffer sb, SourcePosition sp, String str) {
+				if(null!=instrReader.getInstrById().get(str) || null!=instrReader.getInstrByMn().get(str)) {
+					return new Token(sb, sp, TokenType.MNEMONIC, str.toLowerCase());
+				}
+				// Проверка на индексные регистры X+,Y+,Z+
+				else if(str.equals("x") || str.equals("y") || str.equals("z")) {
+					if(sb.available() && '+'==sb.peek()) {
+						sb.next();
+						return new Token(sb, sp, TokenType.INDEX_REG, str+"+");
+					}
+					else {
+						return new Token(sb, sp, TokenType.INDEX_REG, str);
+					}
+				}
+				return null;
+			}
+		};
 	}
 	
 	public void setDevice(String device) throws CompileException {
-		if(null != this.mcu) throw new CompileException("TODO устройство уже задано", null);
-		this.mcu = device;
-		instrReader.setMCU(device);
+		if(null!=this.mcu) {
+			throw new CompileException("Device is already set", null);
+		}
+		this.mcu = device.toLowerCase();
+		instrReader.setMCU(this.mcu);
 	}
 	
 	public boolean addImport(String fullPath) throws CompileException {
-		if(null != currentMacroDef || isMacroDeploy()) throw new CompileException("Imports not allowed inside macro definitions", null);
+		if(null!=currentMacroDef || isMacroDeploy()) {
+			throw new CompileException("Imports not allowed inside macro definitions", null);
+		}
 		
 		if(!includePaths.add(fullPath)) return false;
 		
@@ -97,109 +127,118 @@ public class Scope {
 	}
 	
 	public int addLabel(String name, SourcePosition sp) throws CompileException {
-		if(labels.keySet().contains(name)) throw new CompileException("Label '" + name + "' already defined", sp); //TODO
-		if(null != registers.get(name)) throw new CompileException("TODO имя метки совпадает с регистром:" + name, sp);
-		if(regAliases.keySet().contains(name)) {
-			throw new CompileException("TODO имя метки совпадает с алиасом регистра:" + name, sp);
+		String lcName = name.toLowerCase();
+		if(null==cSeg) throw new CompileException("FLASH access detected but no .ORG directive was encountered for label '" + name);
+		if(labels.keySet().contains(lcName)) throw new CompileException("Label '" + name + "' already defined", sp);
+		if(null != registers.get(lcName)) throw new CompileException("Label name conflicts with a register:" + name, sp);
+		if(regAliases.keySet().contains(lcName)) {
+			throw new CompileException("Label name conflicts with a register alias:" + name, sp);
 		}
-		if(name.equals("pc") || variables.keySet().contains(name)) throw new CompileException("Symbol '" + name + "' already defined as variable", sp);
+		if(lcName.equals("pc") || variables.keySet().contains(lcName)) throw new CompileException("Symbol '" + name + "' already defined as variable", sp);
 		
 		int addr = cSeg.getPC();
 		if(isMacroDeploy()) {
 			MacroCallSymbol symbol = macroDeploys.getLast();
-			symbol.addLabel(name, sp, addr);
+			symbol.addLabel(lcName, sp, addr);
 		}
 		else {
-			labels.put(name, addr);
+			labels.put(lcName, addr);
 		}
 		return addr;
 	}
 	
 	public void setVariable(VariableSymbol variableSymbol, SourcePosition sp) throws CompileException {
 		String varName = variableSymbol.getName();
-		if(varName.equals("pc")) throw new CompileException("TODO нельзя использовать регистр PC в качестве переменной", sp);
-		if(null != registers.get(varName)) throw new CompileException("TODO имя переменной совпадает с регистром:" + varName, sp);
-		if(regAliases.keySet().contains(varName)) throw new CompileException("TODO имя переменной совпадает с алиасом регистра:" + varName, sp);
-		VariableSymbol vs = variables.get(varName);
-		if(null != vs && vs.isConstant()) throw new CompileException("TODO Нельзя переписать значение константы:" + varName, sp);
+		String lcName = varName.toLowerCase();
+		if(lcName.equals("pc")) throw new CompileException("Register PC cannot be used as a variable name", sp);
+		if(null != registers.get(lcName)) throw new CompileException("Variable name conflicts with a register:" + varName, sp);
+		if(regAliases.keySet().contains(lcName)) throw new CompileException("Variable name conflicts with a register alias:" + varName, sp);
+		VariableSymbol vs = variables.get(lcName);
+		if(null!=vs && vs.isConstant()) {
+			throw new CompileException("Cannot overwrite the value of a constant:" + varName, sp);
+		}
 		if(isMacroDeploy()) {
 			MacroCallSymbol symbol = macroDeploys.getLast();
-			symbol.addVariable(variableSymbol, sp, cSeg.getPC());
+			symbol.addVariable(variableSymbol, sp);
 		}
 		else {
-			variables.put(varName, variableSymbol);
+			variables.put(lcName, variableSymbol);
 		}
 	}
 
 	public VariableSymbol resolveVariable(String name) throws CompileException {
-		if(name.equals("pc")) {
-			return new VariableSymbol(name, cSeg.getPC()-1, true); //TODO Костыль?
+		String lcName = name.toLowerCase();
+		if(lcName.equals("pc")) {
+			if(null==cSeg) throw new CompileException("Cannot reference PC register: no active code segment defined");
+			return new VariableSymbol(lcName, cSeg.getPC()-1, true); //TODO Костыль?
 		}
 		if(isMacroSecondPass()) {
 			Iterator<MacroCallSymbol> it = macroDeploys.descendingIterator();
-			while (it.hasNext()) {
-				VariableSymbol result = it.next().resolveVariable(name);
-				if(null != result) return result;
+			while(it.hasNext()) {
+				VariableSymbol result = it.next().resolveVariable(lcName);
+				if(null!=result) return result;
 			}
 			it = macroSecondPass.descendingIterator();
-			while (it.hasNext()) {
-				VariableSymbol result = it.next().resolveVariable(name);
-				if(null != result) return result;
+			while(it.hasNext()) {
+				VariableSymbol result = it.next().resolveVariable(lcName);
+				if(null!=result) return result;
 			}
 		}
-		return variables.get(name);
+		return variables.get(lcName);
 	}
 
 	public Byte resolveReg(String name) {
-		Byte result = registers.get(name);
-		if(null == result) 	result = regAliases.get(name);
+		String lcName = name.toLowerCase();
+		
+		Byte result = registers.get(lcName);
+		if(null == result) {
+			result = regAliases.get(lcName);
+		}
 		return result;
 	}
 	
 	public MacroDefSymbol resolveMacro(String name) {
-		return macros.get(name);
+		return macros.get(name.toLowerCase());
 	}
 	
 	public Integer resolveLabel(String name) {
+		String lcName = name.toLowerCase();
 		if(isMacroSecondPass()) {
 			Iterator<MacroCallSymbol> it = macroDeploys.descendingIterator();
 			while (it.hasNext()) {
-				Integer result = it.next().resolveLabel(name);
+				Integer result = it.next().resolveLabel(lcName);
 				if(null != result) return result;
 			}
 			it = macroSecondPass.descendingIterator();
 			while (it.hasNext()) {
-				Integer result = it.next().resolveLabel(name);
+				Integer result = it.next().resolveLabel(lcName);
 				if(null != result) return result;
 			}
 		}
-		return labels.get(name);
+		return labels.get(lcName);
 	}
 	
 	public void addRegAlias(String alias, byte regId, SourcePosition sp) throws CompileException {
+		String lcAlias = alias.toLowerCase();
 		if(null != currentMacroDef) throw new CompileException("Regster aliases not allowed inside macro definitions", sp);
-		if(regAliases.keySet().contains(alias)) throw new CompileException("TODO алиас уже занят:" + alias, sp);
-		regAliases.put(alias, regId);
+		if(regAliases.keySet().contains(lcAlias)) throw new CompileException("Alias is already in use:" + alias, sp);
+		regAliases.put(lcAlias, regId);
 	}
 	public void removeRegAlias(String alias) {
-		regAliases.remove(alias);
+		regAliases.remove(alias.toLowerCase());
 	}
 
 	public void beginMacro(MacroDefSymbol macro, SourcePosition sp) throws CompileException {
-		if(null != currentMacroDef || isMacroDeploy()) throw new CompileException("TODO Вложенные макросы не поддерживаются", sp);
+		if(null != currentMacroDef || isMacroDeploy()) throw new CompileException("Nested macros are not supported", sp);
 		currentMacroDef = macro;
-		if(macros.keySet().contains(macro.getName())) {
-			throw new CompileException("TODO максрос с таким именем уже существует:" + macro.getName(), sp);
+		if(macros.keySet().contains(macro.getName().toLowerCase())) {
+			throw new CompileException("A macro with this name already exists:" + macro.getName(), sp);
 		}
-		macros.put(macro.getName(), macro);
+		macros.put(macro.getName().toLowerCase(), macro);
 	}
 	public void endMacro(SourcePosition sp) throws CompileException {
-		if(null == currentMacroDef) throw new CompileException("TODO Вложенные конца макроа без его начала", sp);
+		if(null == currentMacroDef) throw new CompileException("Macro end encountered without a matching begin", sp);
 		currentMacroDef = null;
-	}
-	
-	public String getName() {
-		return name;
 	}
 	
 	public void setTabSize(int size) {
@@ -248,12 +287,12 @@ public class Scope {
 	}
 	
 	public CodeSegment getCSeg() throws CompileException {
-		if(null == cSeg) {
+		if(null==cSeg) {
 			VariableSymbol vs = resolveVariable("flash_size");
-			if(null != vs) {
+			if(null!=vs) {
 				cSeg = new CodeSegment(((int)vs.getValue())/2);
 			}
-			else throw new CompileException("TODO не найдена константа FLASH_SIZE", null);
+			else throw new CompileException("FLASH_SIZE constant not found", null);
 		}
 		return cSeg;
 	}
@@ -326,5 +365,9 @@ public class Scope {
 	// TODO необходимо реализовать проверку перекрытия кода с учетом этого признака
 	public void setOverlapAllowed(boolean allowed) {
 		this.overlapAllowed = allowed;
+	}
+	
+	public ExternalTokenProvider getTokenProvider() {
+		return tokenProvider;
 	}
 }

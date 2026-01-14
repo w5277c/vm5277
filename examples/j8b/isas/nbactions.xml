@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<actions>
+	<action>
+		<actionName>run</actionName>
+		<packagings>
+			<packaging>j8b</packaging>
+		</packagings>
+		<goals>
+			<goal>j8b:run</goal>
+		</goals>
+	</action>
+	<action>
+		<actionName>debug</actionName>
+		<packagings>
+			<packaging>j8b</packaging>
+		</packagings>
+		<goals>
+			<goal>j8b:run</goal>
+		</goals>
+		<properties>
+			<j8b.debug>true</j8b.debug>
+		</properties>
+	</action>
+</actions>

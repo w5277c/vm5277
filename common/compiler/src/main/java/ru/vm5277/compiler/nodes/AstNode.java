@@ -23,13 +23,13 @@ import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.compiler.nodes.commands.IfNode;
 import ru.vm5277.compiler.nodes.commands.ReturnNode;
 import ru.vm5277.compiler.nodes.commands.WhileNode;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.compiler.Keyword;
-import ru.vm5277.common.Operator;
+import ru.vm5277.common.lexer.J8BKeyword;
+import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.VarType;
@@ -43,8 +43,8 @@ import ru.vm5277.compiler.SemanticAnalyzer;
 import ru.vm5277.common.messages.Message;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.compiler.TokenType;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.compiler.nodes.commands.CommandNode.AstCase;
 import ru.vm5277.compiler.nodes.commands.TryNode;
 import ru.vm5277.compiler.nodes.expressions.QualifiedPathExpression;
@@ -54,7 +54,8 @@ import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
-import ru.vm5277.compiler.tokens.Token;
+import ru.vm5277.common.lexer.Keyword;
+import ru.vm5277.common.lexer.tokens.Token;
 
 public abstract class AstNode extends SemanticAnalyzer {
     private				static	int						globalCntr	= 0;
@@ -92,15 +93,15 @@ public abstract class AstNode extends SemanticAnalyzer {
 
 	protected AstNode parseCommand() throws CompileException {
 		Keyword kw = (Keyword)tb.current().getValue();
-		if(Keyword.IF == kw) return new IfNode(tb, mc);
-		if(Keyword.FOR == kw) return new ForNode(tb, mc);
-		if(Keyword.DO == kw) return new DoWhileNode(tb, mc);
-		if(Keyword.WHILE == kw) return new WhileNode(tb, mc);
-		if(Keyword.CONTINUE == kw) return new ContinueNode(tb, mc);
-		if(Keyword.BREAK == kw) return new BreakNode(tb, mc);
-		if(Keyword.RETURN == kw) return new ReturnNode(tb, mc);
-		if(Keyword.SWITCH == kw) return new SwitchNode(tb, mc);
-		if(Keyword.TRY == kw) return new TryNode(tb, mc);
+		if(J8BKeyword.IF == kw) return new IfNode(tb, mc);
+		if(J8BKeyword.FOR == kw) return new ForNode(tb, mc);
+		if(J8BKeyword.DO == kw) return new DoWhileNode(tb, mc);
+		if(J8BKeyword.WHILE == kw) return new WhileNode(tb, mc);
+		if(J8BKeyword.CONTINUE == kw) return new ContinueNode(tb, mc);
+		if(J8BKeyword.BREAK == kw) return new BreakNode(tb, mc);
+		if(J8BKeyword.RETURN == kw) return new ReturnNode(tb, mc);
+		if(J8BKeyword.SWITCH == kw) return new SwitchNode(tb, mc);
+		if(J8BKeyword.TRY == kw) return new TryNode(tb, mc);
 		markFirstError(error);
 		throw new CompileException("Unexpected command token " + tb.current(), sp);
 	}
@@ -110,7 +111,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		if (tb.match(TokenType.COMMAND)) {
 			return parseCommand();
 		}
-		else if (tb.match(TokenType.ID) || tb.match(TokenType.OPERATOR) || tb.match(TokenType.OOP, Keyword.THIS)) {
+		else if (tb.match(TokenType.IDENTIFIER) || tb.match(TokenType.OPERATOR) || tb.match(TokenType.OOP, J8BKeyword.THIS)) {
 			// Делегируем всю работу парсеру выражений
 			ExpressionNode expr = new ExpressionNode(tb, mc).parse();
 			if(!tb.match(Delimiter.SEMICOLON)) {
@@ -134,12 +135,12 @@ public abstract class AstNode extends SemanticAnalyzer {
 		//TODO дублирование кода?
 		// Парсим цепочку идентификаторов через точки (для вложенных классов)
 		StringBuilder typeName = new StringBuilder();
-		Token token = consumeToken(tb, TokenType.ID);
+		Token token = consumeToken(tb, TokenType.IDENTIFIER);
 		typeName.append(token.getValue().toString());
 
 		while (tb.match(Delimiter.DOT)) {
 			consumeToken(tb); // Пропускаем точку
-			token = consumeToken(tb, TokenType.ID);
+			token = consumeToken(tb, TokenType.IDENTIFIER);
 			typeName.append(".").append(token.getValue().toString());
 		}
 
@@ -149,21 +150,21 @@ public abstract class AstNode extends SemanticAnalyzer {
 	protected VarType checkPrimtiveType() throws CompileException {
 		if(tb.match(TokenType.TYPE)) {
 			Keyword kw = (Keyword)consumeToken(tb).getValue();
-			if(Keyword.VOID == kw) return VarType.VOID;
-			if(Keyword.BOOL == kw) return VarType.BOOL;
-			if(Keyword.BYTE == kw) return VarType.BYTE;
-			if(Keyword.SHORT == kw) return VarType.SHORT;
-			if(Keyword.INT == kw) return VarType.INT;
-			if(Keyword.FIXED == kw) return VarType.FIXED;
-			if(Keyword.CSTR == kw) return VarType.CSTR;
-			if(Keyword.CLASS == kw) return VarType.CLASS;
+			if(J8BKeyword.VOID == kw) return VarType.VOID;
+			if(J8BKeyword.BOOL == kw) return VarType.BOOL;
+			if(J8BKeyword.BYTE == kw) return VarType.BYTE;
+			if(J8BKeyword.SHORT == kw) return VarType.SHORT;
+			if(J8BKeyword.INT == kw) return VarType.INT;
+			if(J8BKeyword.FIXED == kw) return VarType.FIXED;
+			if(J8BKeyword.CSTR == kw) return VarType.CSTR;
+			if(J8BKeyword.CLASS == kw) return VarType.CLASS;
 			return VarType.UNKNOWN;
 		}
 		return null;
 	}
 
 	protected boolean checkClassName(String className) {
-		if (tb.match(TokenType.ID)) {
+		if (tb.match(TokenType.IDENTIFIER)) {
 			String typeName = (String)tb.current().getValue();
 			if (typeName.equals(className)) {
 				consumeToken(tb);
@@ -173,7 +174,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		return false;
 	}
 	protected VarType checkClassType() throws CompileException {
-		if(tb.match(TokenType.ID)) {
+		if(tb.match(TokenType.IDENTIFIER)) {
 			VarType type = VarType.fromClassName((String)tb.current().getValue());
 			if(null!=type) {
 				consumeToken(tb);
@@ -183,7 +184,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		return null;
 	}
 	protected VarType checkExceptionType() throws CompileException {
-		if(tb.match(TokenType.ID)) {
+		if(tb.match(TokenType.IDENTIFIER)) {
 			if(-1!=VarType.getExceptionId((String)tb.current().getValue())) {
 				consumeToken(tb);
 				return VarType.EXCEPTION;
@@ -255,7 +256,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 			tb.consume();
 		}
 		
-		if(0x01==ids.size() && Keyword.THIS.getName().equals(ids.get(0))) {
+		if(0x01==ids.size() && J8BKeyword.THIS.getName().equals(ids.get(0))) {
 			return new ThisExpression(tb, mc);
 		}
 		if(0x02==ids.size() || 0x03==ids.size() || 0x04==ids.size()) {
@@ -328,12 +329,12 @@ public abstract class AstNode extends SemanticAnalyzer {
 		QualifiedPathExpression path = new QualifiedPathExpression(tb, mc);
 
 		// Первый идентификатор
-		if(tb.match(TokenType.OOP, Keyword.THIS)) {
+		if(tb.match(TokenType.OOP, J8BKeyword.THIS)) {
 			consumeToken(tb);
 			path.addSegment(new QualifiedPathExpression.ThisSegment());
 		}
 		else {
-			String name = consumeToken(tb, TokenType.ID).getStringValue();
+			String name = consumeToken(tb, TokenType.IDENTIFIER).getStringValue();
 			path.addSegment(new QualifiedPathExpression.QualifiedSegment(name));
 		}
 
@@ -347,7 +348,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 			}
 			else if (tb.match(Delimiter.DOT)) {
 				consumeToken(tb, Delimiter.DOT);
-				String nextName = consumeToken(tb, TokenType.ID).getStringValue();
+				String nextName = consumeToken(tb, TokenType.IDENTIFIER).getStringValue();
 				path.addSegment(new QualifiedPathExpression.QualifiedSegment(nextName));
 			}
 			else {
@@ -535,7 +536,6 @@ public abstract class AstNode extends SemanticAnalyzer {
 	}
 	
 	public Token consumeToken(TokenBuffer tb) {
-		markFirstError(tb.current().getError());
 		return tb.consume();
     }
 	public Token consumeToken(TokenBuffer tb, TokenType expectedType) throws CompileException {

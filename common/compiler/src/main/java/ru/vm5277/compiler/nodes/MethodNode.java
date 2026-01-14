@@ -32,9 +32,9 @@ import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.compiler.Keyword;
-import ru.vm5277.compiler.TokenType;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.J8BKeyword;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.ErrorMessage;
@@ -50,6 +50,7 @@ import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
+import ru.vm5277.common.lexer.Keyword;
 
 public class MethodNode extends AstNode {
 	private	final	Set<Keyword>			modifiers;
@@ -76,11 +77,11 @@ public class MethodNode extends AstNode {
         consumeToken(tb); // Потребляем ')'
 		
 		// Проверяем наличие throws
-		if (tb.match(TokenType.OOP, Keyword.THROWS)) {
+		if (tb.match(TokenType.OOP, J8BKeyword.THROWS)) {
 			consumeToken(tb);
 			this.canThrow = true;
 			
-			if(tb.match(TokenType.ID)) {
+			if(tb.match(TokenType.IDENTIFIER)) {
 				throws_.add(parseFullQualifiedExpression(tb));
 				while(tb.match(Delimiter.COMMA)) {
 					tb.consume();
@@ -109,7 +110,7 @@ public class MethodNode extends AstNode {
 		super();
 		
 		this.modifiers = new HashSet<>();
-		this.modifiers.add(Keyword.PUBLIC);
+		this.modifiers.add(J8BKeyword.PUBLIC);
 		this.returnType = null;
 		this.name = classNode.getName();
 		this.objTypeNode = classNode;
@@ -175,16 +176,16 @@ public class MethodNode extends AstNode {
 	}
 	
 	public boolean isStatic() {
-		return modifiers.contains(Keyword.STATIC);
+		return modifiers.contains(J8BKeyword.STATIC);
 	}
 	public boolean isFinal() {
-		return modifiers.contains(Keyword.FINAL);
+		return modifiers.contains(J8BKeyword.FINAL);
 	}
 	public boolean isPublic() {
-		return modifiers.contains(Keyword.PUBLIC);
+		return modifiers.contains(J8BKeyword.PUBLIC);
 	}
 	public boolean isNative() {
-		return modifiers.contains(Keyword.NATIVE);
+		return modifiers.contains(J8BKeyword.NATIVE);
 	}
 	
 	@Override
@@ -193,7 +194,7 @@ public class MethodNode extends AstNode {
 		debugAST(this, PRE, true, getFullInfo());
 
 		try{
-			validateModifiers(modifiers, Keyword.PUBLIC, Keyword.PRIVATE, Keyword.STATIC, Keyword.NATIVE);
+			validateModifiers(modifiers, J8BKeyword.PUBLIC, J8BKeyword.PRIVATE, J8BKeyword.STATIC, J8BKeyword.NATIVE);
 		}
 		catch(CompileException e) {
 			addMessage(e);
@@ -260,8 +261,8 @@ public class MethodNode extends AstNode {
 		if(result) {
 		// Создаем MethodSymbol
 			try {
-				symbol = new MethodSymbol(	name, returnType, paramSymbols, modifiers.contains(Keyword.FINAL),
-											modifiers.contains(Keyword.STATIC),	modifiers.contains(Keyword.NATIVE), canThrow, false, methodScope, this);
+				symbol = new MethodSymbol(	name, returnType, paramSymbols, modifiers.contains(J8BKeyword.FINAL),
+											modifiers.contains(J8BKeyword.STATIC),	modifiers.contains(J8BKeyword.NATIVE), canThrow, false, methodScope, this);
 				// Устанавливаем обратную ссылку
 				methodScope.setSymbol((MethodSymbol)symbol);
 
@@ -279,7 +280,7 @@ public class MethodNode extends AstNode {
 				}
 				else if(scope instanceof InterfaceScope) {
 					try{
-						validateModifiers(modifiers, Keyword.PUBLIC);
+						validateModifiers(modifiers, J8BKeyword.PUBLIC);
 					}
 					catch(CompileException e) {
 						addMessage(e);
@@ -287,7 +288,7 @@ public class MethodNode extends AstNode {
 					}
 					if(result) {
 						InterfaceScope iScope = (InterfaceScope) scope;
-						modifiers.add(Keyword.PUBLIC); // Гарантируем, что метод public
+						modifiers.add(J8BKeyword.PUBLIC); // Гарантируем, что метод public
 						iScope.addMethod((MethodSymbol)symbol);
 					}
 				}
@@ -391,7 +392,7 @@ public class MethodNode extends AstNode {
 			}
 
 
-			if(modifiers.contains(Keyword.NATIVE) && blockNode!=null) {
+			if(modifiers.contains(J8BKeyword.NATIVE) && blockNode!=null) {
 				markError("Native method cannot have a body");
 				result = false;
 			}

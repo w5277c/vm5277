@@ -27,14 +27,14 @@ import ru.vm5277.common.ExcsThrowPoint;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.NativeBinding;
 import ru.vm5277.common.NumUtils;
-import ru.vm5277.common.Operator;
-import static ru.vm5277.common.Operator.BIT_AND;
-import static ru.vm5277.common.Operator.BIT_OR;
-import static ru.vm5277.common.Operator.BIT_XOR;
-import static ru.vm5277.common.Operator.EQ;
-import static ru.vm5277.common.Operator.LT;
-import static ru.vm5277.common.Operator.MINUS;
-import static ru.vm5277.common.Operator.PLUS;
+import ru.vm5277.common.lexer.Operator;
+import static ru.vm5277.common.lexer.Operator.BIT_AND;
+import static ru.vm5277.common.lexer.Operator.BIT_OR;
+import static ru.vm5277.common.lexer.Operator.BIT_XOR;
+import static ru.vm5277.common.lexer.Operator.EQ;
+import static ru.vm5277.common.lexer.Operator.LT;
+import static ru.vm5277.common.lexer.Operator.MINUS;
+import static ru.vm5277.common.lexer.Operator.PLUS;
 import ru.vm5277.common.Pair;
 import ru.vm5277.common.compiler.Case;
 import ru.vm5277.common.cg.CodeGenerator;
@@ -2156,8 +2156,6 @@ public class Generator extends CodeGenerator {
 		}
 	};
 
-
-	// TODO Лучше вынести данный код в виде RTOS функции.
 	@Override
 	public void eNewInstance(CGScope scope, int heapSize, CGLabelScope iidLabel, VarType type, boolean launchPoint, CGExcs excs) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(launchPoint ? ";Launch " : (";eNewInstance '" + type + "', heap size:" + heapSize)));

@@ -5,13 +5,6 @@
     <artifactId>stub_codegen</artifactId>
     <version>0.1</version>
     <packaging>jar</packaging>
-    <dependencies>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>common</artifactId>
-            <version>${project.version}</version>
-        </dependency>
-    </dependencies>
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <maven.compiler.release>8</maven.compiler.release>
@@ -54,4 +47,11 @@
 
         <finalName>${project.artifactId}</finalName>
     </build>
+    <dependencies>
+        <dependency>
+            <groupId>${project.groupId}</groupId>
+            <artifactId>vm5277_common</artifactId>
+            <version>[0,)</version>
+        </dependency>
+    </dependencies>
 </project>

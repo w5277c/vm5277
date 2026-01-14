@@ -15,7 +15,7 @@
  */
 package ru.vm5277.common.messages;
 
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.SourcePosition;
 
 public class ErrorMessage extends Message {
 	public ErrorMessage(String text, SourcePosition sp) {

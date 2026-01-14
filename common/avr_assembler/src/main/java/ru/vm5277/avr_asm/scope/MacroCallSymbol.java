@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 import ru.vm5277.avr_asm.nodes.Node;
 import ru.vm5277.avr_asm.semantic.Expression;
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class MacroCallSymbol extends Symbol {
@@ -30,7 +30,7 @@ public class MacroCallSymbol extends Symbol {
 	private			List<Node>					secondPassNodes;
 	
 	public MacroCallSymbol(String name, List<Expression> params) {
-		super(name);
+		super(name.toLowerCase());
 		
 		this.params = params;
 	}
@@ -40,25 +40,26 @@ public class MacroCallSymbol extends Symbol {
 	}
 
 	public void addLabel(String name, SourcePosition sp, int address) throws CompileException {
-		if(labels.keySet().contains(name)) throw new CompileException("Label '" + name + "' already defined", sp);
-		if(variables.keySet().contains(name)) throw new CompileException("Symbol '" + name + "' already defined as variable", sp);
-		labels.put(name, address);
+		String lcName = name.toLowerCase();
+		if(labels.keySet().contains(lcName)) throw new CompileException("Label '" + name + "' already defined", sp);
+		if(variables.keySet().contains(lcName)) throw new CompileException("Symbol '" + name + "' already defined as variable", sp);
+		labels.put(lcName, address);
 	}
 
-	void addVariable(VariableSymbol variableSymbol, SourcePosition sp, int address) throws CompileException {
-		String name = variableSymbol.getName();
-		VariableSymbol vs = variables.get(name);
-		if(null != vs && vs.isConstant()) throw new CompileException("TODO Нельзя переписать значение константы:" + name, sp);
-		variables.put(name, vs);
+	void addVariable(VariableSymbol variableSymbol, SourcePosition sp) throws CompileException {
+		String lcName = variableSymbol.getName();
+		VariableSymbol vs = variables.get(lcName);
+		if(null != vs && vs.isConstant()) throw new CompileException("TODO Нельзя переписать значение константы:" + lcName, sp);
+		variables.put(lcName, vs);
 
 	}
 
 	public VariableSymbol resolveVariable(String name) {
-		return variables.get(name);
+		return variables.get(name.toLowerCase());
 	}
 
 	public Integer resolveLabel(String name) {
-		return labels.get(name);
+		return labels.get(name.toLowerCase());
 	}
 
 	public void setSecondPartNodes(List<Node> secondPassNodes) {

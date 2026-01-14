@@ -19,3 +19,8 @@
 	.DEF	YH										= r29
 	.DEF	ZL										= r30
 	.DEF	ZH										= r31
+
+	.EQU FUSE_LOW_ADDR								= 0x00
+	.EQU FUSE_LOCK_ADDR								= 0x01
+	.EQU FUSE_HIGH_ADDR								= 0x03
+	.EQU FUSE_EXT_ADDR								= 0x02

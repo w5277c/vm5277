@@ -28,9 +28,9 @@ import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.compiler.Keyword;
-import ru.vm5277.compiler.TokenType;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.J8BKeyword;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -70,10 +70,10 @@ public class IfNode extends CommandNode {
 		catch(CompileException e) {markFirstError(e);}
 
 		// Else блок
-        if (tb.match(Keyword.ELSE)) {
+        if (tb.match(J8BKeyword.ELSE)) {
 			consumeToken(tb);
         
-			if (tb.match(TokenType.COMMAND, Keyword.IF)) {
+			if (tb.match(TokenType.COMMAND, J8BKeyword.IF)) {
 				// Обработка else if
 				elseBlockNode = new BlockNode(tb, mc, new IfNode(tb, mc));
 

@@ -18,9 +18,9 @@ package ru.vm5277.avr_asm.nodes;
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
-import ru.vm5277.avr_asm.TokenType;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.avr_asm.scope.CodeSegment;
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 
@@ -34,7 +34,9 @@ public class OrgNode {
 			tb.skipLine();
 			throw new CompileException("Cannot resolve constant '" + expr + "'", sp);
 		}
-		if(0>value || value>cSeg.getWSize()) throw new CompileException("Address 0x" + Long.toHexString(value) + " exceeds flash memory size", sp);
+		if(0>value || value>cSeg.getWSize()) {
+			throw new CompileException("Address 0x" + Long.toHexString(value) + " exceeds flash memory size", sp);
+		}
 		
 		scope.getCSeg().setPC(value.intValue());
 		

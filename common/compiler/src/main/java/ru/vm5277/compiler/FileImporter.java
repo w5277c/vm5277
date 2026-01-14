@@ -15,6 +15,7 @@
  */
 package ru.vm5277.compiler;
 
+import ru.vm5277.common.lexer.Lexer;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -23,7 +24,8 @@ import java.util.List;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
-import ru.vm5277.compiler.tokens.Token;
+import ru.vm5277.common.lexer.LexerType;
+import ru.vm5277.common.lexer.tokens.Token;
 
 public class FileImporter {
 	private	final	List<String>		importedFiles	= new ArrayList<>();
@@ -38,7 +40,7 @@ public class FileImporter {
 		this.mc = mc;
 	}
 
-	public List<Token> importFile(String importPath) throws IOException {
+	public List<Token> importFile(String importPath, int tabSize) throws IOException {
 		// Проверка циклических зависимостей
 		if (importedFiles.contains(importPath)) {
 			mc.add(new WarningMessage("Circular import detected: " + importPath, null));
@@ -56,7 +58,7 @@ public class FileImporter {
 			}
 		}
 		if(null != file) {
-			Lexer lexer = new Lexer(file, mc);
+			Lexer lexer = new Lexer(LexerType.J8B, file, null, tabSize, false);
 			return lexer.getTokens();
 		}
 		return new ArrayList<>();

@@ -17,7 +17,7 @@ package ru.vm5277.avr_asm.semantic;
 
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
-import ru.vm5277.common.Operator;
+import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.messages.MessageContainer;
 
 

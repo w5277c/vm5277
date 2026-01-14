@@ -20,7 +20,8 @@
 	.SET	_MCALL_SIZE								= 0x02	;Размер макроса MCALL/MJMP: 1(RCALL)-2(CALL)
 	.SET	JMP_SUPPORT								= 0x01	;Поддержка JMP,CALL
 	.SET	MUL_SUPPORT								= 0x01	;Поддержка MUL,MULS,MULSU
-	.EQU	OS_IR_QNT								= 0x1a	;Количество перырваний(без RESET)
+	.SET	BLDRSEC_SUPPORT							= 0x01	;Аппаратная защита секции бутлоадера
+	.EQU	OS_IR_QNT								= 0x1a	;Количество перырваний
 	.EQU	OS_PCINT_PORTS_QNT						= 0x03	;Количество портов поддерживающих внешние прерывания(PCINT)
 	.EQU	OS_RAM_BORDER_SIZE						= 0x20	;Минимальное допустимое расстояние между вершинами FREE_RAM и STACK
 	.SET	OS_STACK_SIZE							= 0xc0	;Общий стек(192 байта)
@@ -101,10 +102,12 @@
 	;Необходима подтяжка к плюсу и включение fuse RSTDISBL
 	;Вход в бутлоадер осуществляется после старта при обнаружении низкого уровня на пине в течении ~100мс.
 	;В RTOS сброс будет программным
-	.EQU	PORT_BLDR								= PORTC
-	.EQU	DDR_BLDR								= DDRC
-	.EQU	PIN_BLDR								= PINC
-	.EQU	PINNUM_BLDR								= 0x06
+.IFNDEF BLDR_UART_PORT
+	.SET	BLDR_UART_PORT							= PORTC
+	.SET	BLDR_UART_DDR							= DDRC
+	.SET	BLDR_UART_PIN							= PINC
+	.SET	BLDR_UART_PINNUM						= 0x06
+.ENDIF
 
 .IF OS_FT_BOOTLOADER_ONLY == 0x00
 .ORG 0x0000

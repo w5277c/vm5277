@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.nodes.commands;
 
 import ru.vm5277.compiler.nodes.AstNode;
@@ -29,9 +30,9 @@ import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGTryBlockScope;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.compiler.Optimization;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.compiler.Keyword;
-import ru.vm5277.compiler.TokenType;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.J8BKeyword;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Main;
@@ -57,11 +58,11 @@ public class TryNode extends CommandNode {
 				tryBlock = new BlockNode(tb, mc, false, true);
 
 				// Парсим параметр catch (byte errCode)
-				while(tb.match(Keyword.CATCH)) {
+				while(tb.match(J8BKeyword.CATCH)) {
 					consumeToken(tb); // Потребляем "catch"
 					consumeToken(tb, Delimiter.LEFT_PAREN);
 
-					if(tb.match(TokenType.ID)) {
+					if(tb.match(TokenType.IDENTIFIER)) {
 						List<ExpressionNode> args = new ArrayList<>();
 						args.add(parseFullQualifiedExpression(tb));
 						while(tb.match(Delimiter.COMMA)) {
@@ -69,7 +70,7 @@ public class TryNode extends CommandNode {
 							args.add(parseFullQualifiedExpression(tb));
 						}
 
-						if(tb.match(TokenType.ID)) {
+						if(tb.match(TokenType.IDENTIFIER)) {
 							String varName = consumeToken(tb).getStringValue();
 							consumeToken(tb, Delimiter.RIGHT_PAREN);
 							

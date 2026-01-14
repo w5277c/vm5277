@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+	<modelVersion>4.0.0</modelVersion>
+
+	<groupId>${groupId}</groupId>
+	<artifactId>${artifactId}</artifactId>
+	<version>${version}</version>
+	<packaging>j8b</packaging>
+
+	<name>${artifactId}</name>
+	<description>Demo project</description>
+	<properties>
+		<j8b.target>avr:atmega328p</j8b.target>
+		<j8b.targetFreq>16</j8b.targetFreq>
+	</properties>
+
+	<build>
+		<extensions>
+			<extension>
+				<groupId>ru.vm5277</groupId>
+				<artifactId>j8b-packaging</artifactId>
+				<version>0.1.0</version>
+			</extension>
+		</extensions>
+		<sourceDirectory>src/main/j8b</sourceDirectory>
+		<plugins>
+			<plugin>
+				<groupId>ru.vm5277</groupId>
+				<artifactId>j8b-plugin</artifactId>
+				<version>0.1.0</version>
+				<executions>
+					<execution>
+						<phase>compile</phase>
+						<goals>
+							<goal>compile</goal>
+						</goals>
+					</execution>
+				</executions>
+				<configuration>
+					<target>${j8b.target}</target>
+					<targetFreq>${j8b.targetFreq}</targetFreq>
+				</configuration>
+			</plugin>
+		</plugins>
+	</build>
+
+	<pluginRepositories>
+		<pluginRepository>
+			<id>ru.vm5277</id>
+			<url>https://vm5277.ru/maven-repo</url>
+		</pluginRepository>
+	</pluginRepositories>
+</project>

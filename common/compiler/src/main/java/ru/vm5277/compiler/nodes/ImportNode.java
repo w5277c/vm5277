@@ -19,14 +19,14 @@ package ru.vm5277.compiler.nodes;
 import java.io.File;
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.compiler.Keyword;
-import ru.vm5277.compiler.TokenType;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.J8BKeyword;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.semantic.ImportableScope;
 import ru.vm5277.compiler.semantic.Scope;
-import ru.vm5277.compiler.tokens.Token;
+import ru.vm5277.common.lexer.tokens.Token;
 
 public class ImportNode extends AstNode {
 	private	boolean	isStatic;
@@ -46,7 +46,7 @@ public class ImportNode extends AstNode {
 			// Пропуск import токена
 			consumeToken(tb);
 
-			if (tb.match(Keyword.STATIC)) {
+			if (tb.match(J8BKeyword.STATIC)) {
 				consumeToken(tb);
 				this.isStatic = true;
 			}
@@ -57,21 +57,21 @@ public class ImportNode extends AstNode {
 			StringBuilder path = new StringBuilder();
 
 			// Парсим первый идентификатор
-			Token first = consumeToken(tb, TokenType.ID);
+			Token first = consumeToken(tb, TokenType.IDENTIFIER);
 			path.append(first.getValue());
 
 			// Парсим оставшиеся части пути (через точки)
 			while (tb.match(TokenType.DELIMITER) && Delimiter.DOT == tb.current().getValue()) {
 				consumeToken(tb);
-				Token part = consumeToken(tb, TokenType.ID);
+				Token part = consumeToken(tb, TokenType.IDENTIFIER);
 				path.append(".").append(part.getValue());
 			}
 
 			this.importStr = path.toString();
 
-			if (tb.match(Keyword.AS)) {
+			if (tb.match(J8BKeyword.AS)) {
 				consumeToken(tb);
-				this.alias = (String)consumeToken(tb, TokenType.ID).getValue();
+				this.alias = (String)consumeToken(tb, TokenType.IDENTIFIER).getValue();
 			}
 			else {
 				this.alias = null;

@@ -25,6 +25,7 @@ import java.nio.file.Path;
 import java.util.Map;
 import ru.vm5277.common.AssemblerInterface;
 import ru.vm5277.common.NativeBinding;
+import ru.vm5277.common.Platform;
 import ru.vm5277.common.SourceType;
 import ru.vm5277.common.RTOSParam;
 import ru.vm5277.common.cg.CodeGenerator;
@@ -33,7 +34,7 @@ import ru.vm5277.common.messages.MessageContainer;
 public class PlatformLoader {
 	private	static	final	String	LIB_CG_POSTFIX		= "_codegen";
 	private	static	final	String	LIB_CG_CLASSPREFIX	= "ru.vm5277.compiler.";
-	private	static	final	String	LIB_CG_CLASSPOSTFIX= "_codegen.Generator";
+	private	static	final	String	LIB_CG_CLASSPOSTFIX	= "_codegen.Generator";
 	private	static	final	String	LIB_ASM_POSTFIX		= "_assembler";
 	private	static	final	String	LIB_ASM_CLASSPREFIX	= "ru.vm5277.";
 	private	static	final	String	LIB_ASM_CLASSPOSTFIX= "_asm.Assembler";
@@ -50,15 +51,15 @@ public class PlatformLoader {
 		}
 	}
 
-	public static CodeGenerator loadGenerator(	String platform, File libsDir, int optLevel, Map<String, NativeBinding> nbMap,
+	public static CodeGenerator loadGenerator(	Platform platform, File libsDir, int optLevel, Map<String, NativeBinding> nbMap,
 												Map<RTOSParam, Object> params) throws Exception {
 
 		if(IS_NATIVE_IMAGE) {
-			return new ru.vm5277.compiler.avr_codegen.Generator(platform + LIB_CG_POSTFIX, optLevel, nbMap, params);
+			return new ru.vm5277.compiler.avr_codegen.Generator(platform.name().toLowerCase() + LIB_CG_POSTFIX, optLevel, nbMap, params);
 		}
 		else {
 			// Формируем имя JAR-файла (например, "codegen-avr.jar")
-			String jarName =  platform + LIB_CG_POSTFIX + ".jar";
+			String jarName =  platform.name().toLowerCase() + LIB_CG_POSTFIX + ".jar";
 			File jarFile = new File(libsDir + File.separator + jarName);
 
 			if (!jarFile.exists()) throw new RuntimeException("Library not found: " + jarFile.getAbsolutePath());
@@ -66,20 +67,20 @@ public class PlatformLoader {
 			URLClassLoader classLoader = new URLClassLoader(new URL[] {jarFile.toURI().toURL()}, PlatformLoader.class.getClassLoader());
 
 			// Загружаем класс-генератор (ожидаемое имя: ru.vm5277.compiler.PLATFORM_codegen.Generator)
-			String className = LIB_CG_CLASSPREFIX + platform + LIB_CG_CLASSPOSTFIX;
+			String className = LIB_CG_CLASSPREFIX + platform.name().toLowerCase() + LIB_CG_CLASSPOSTFIX;
 			Class<?> generatorClass = classLoader.loadClass(className);
 			Constructor<?> constructor = generatorClass.getConstructor(String.class, int.class, Map.class, Map.class);
 
 			// Создаем экземпляр, передавая параметры
-			return (CodeGenerator) constructor.newInstance(platform + LIB_CG_POSTFIX, optLevel, nbMap, params);
+			return (CodeGenerator) constructor.newInstance(platform.name().toLowerCase() + LIB_CG_POSTFIX, optLevel, nbMap, params);
 		}
 	}
 	
-	public static boolean launchAssembler(	String platform, File libsDir, MessageContainer mc, Path sourcePath, Map<Path, SourceType> sourcePaths,
+	public static boolean launchAssembler(	Platform platform, File libsDir, MessageContainer mc, Path sourcePath, Map<Path, SourceType> sourcePaths,
 											String outputFilename, File mapFile, BufferedWriter listBW) throws Exception {
 		if(IS_NATIVE_IMAGE) {
 			AssemblerInterface assembler = null;
-			if("avr".equals(platform)) {
+			if(Platform.AVR == platform) {
 				assembler = new ru.vm5277.avr_asm.Assembler();
 			}
 			if(null!=assembler) {
@@ -89,7 +90,7 @@ public class PlatformLoader {
 		}
 		else {
 			// Формируем имя JAR-файла
-			String jarName =  platform + LIB_ASM_POSTFIX + ".jar";
+			String jarName =  platform.name().toLowerCase() + LIB_ASM_POSTFIX + ".jar";
 			File jarFile = new File(libsDir + File.separator + jarName);
 
 			if (!jarFile.exists()) throw new RuntimeException("Library not found: " + jarFile.getAbsolutePath());
@@ -98,7 +99,7 @@ public class PlatformLoader {
 			URLClassLoader classLoader = new URLClassLoader(new URL[] {jarFile.toURI().toURL()}, PlatformLoader.class.getClassLoader());
 
 			// Загружаем класс (ожидаемое имя: ru.vm5277.PLATFORM_asm.Assembler)
-			String className = LIB_ASM_CLASSPREFIX + platform + LIB_ASM_CLASSPOSTFIX;
+			String className = LIB_ASM_CLASSPREFIX + platform.name().toLowerCase() + LIB_ASM_CLASSPOSTFIX;
 			Class<?> asmClass = classLoader.loadClass(className);
 			Method method = asmClass.getMethod(	"exec", MessageContainer.class, String.class, Path.class, Map.class, int.class, String.class, File.class,
 												BufferedWriter.class);

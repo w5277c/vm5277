@@ -21,20 +21,21 @@ import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import ru.vm5277.avr_asm.Assembler;
-import ru.vm5277.avr_asm.Lexer;
 import ru.vm5277.avr_asm.Parser;
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
-import ru.vm5277.common.SourcePosition;
-import ru.vm5277.avr_asm.TokenType;
+import ru.vm5277.common.lexer.SourcePosition;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.lexer.Lexer;
+import ru.vm5277.common.lexer.LexerType;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 
 public class IncludeNode {
-	public static Parser parse(TokenBuffer tb, Scope scope, MessageContainer mc, Map<Path, SourceType> sourcePaths, String includeName)
+	public static Parser parse(TokenBuffer tb, Scope scope, MessageContainer mc, Map<Path, SourceType> sourcePaths, String includeName, int tabSize)
 																											throws CompileException, CriticalParseException {
 		String importPath = (null==includeName ? (String)Node.consumeToken(tb, TokenType.STRING).getValue() : includeName);
 		Parser parser = null;
@@ -62,10 +63,10 @@ public class IncludeNode {
 			scope.list(".INCLUDE " + sourcePath.toString());
 			
 			try {
-				Lexer lexer = new Lexer(sourcePath.toFile(), scope, mc);
+				Lexer lexer = new Lexer(LexerType.ASM, sourcePath.toFile(), scope.getTokenProvider(), tabSize, false);
 				Map<Path, SourceType> innerSourcePaths = new HashMap<>(sourcePaths);
 				innerSourcePaths.put(sourcePath.getParent(), SourceType.LIB);
-				parser = new Parser(lexer.getTokens(), scope, mc, innerSourcePaths);
+				parser = new Parser(lexer.getTokens(), scope, mc, innerSourcePaths, tabSize);
 				
 			}
 			catch(IOException e) {
@@ -85,4 +86,5 @@ public class IncludeNode {
 		
 		return parser;
 	}
+	
 }

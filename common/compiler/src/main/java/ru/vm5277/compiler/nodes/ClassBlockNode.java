@@ -21,9 +21,9 @@ import java.util.Set;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.compiler.Keyword;
-import ru.vm5277.compiler.TokenType;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.J8BKeyword;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -31,6 +31,7 @@ import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
+import ru.vm5277.common.lexer.Keyword;
 
 public class ClassBlockNode extends AstNode {
 	protected	List<AstNode>	children	= new ArrayList<>();
@@ -47,25 +48,25 @@ public class ClassBlockNode extends AstNode {
 			Set<Keyword> modifiers = collectModifiers(tb);
 
 			// Обработка классов с модификаторами
-			if (tb.match(TokenType.OOP, Keyword.CLASS)) {
+			if (tb.match(TokenType.OOP, J8BKeyword.CLASS)) {
 				ClassNode cNode = new ClassNode(tb, mc, modifiers, true, null);
 				children.add(cNode);
 				continue;
 			}
 			// Обработка enum с модификаторами
-			if (tb.match(TokenType.OOP) && Keyword.ENUM == tb.current().getValue()) {
+			if (tb.match(TokenType.OOP) && J8BKeyword.ENUM == tb.current().getValue()) {
 				EnumNode eNode = new EnumNode(tb, mc, modifiers);
 				children.add(eNode);
 				continue;
 			}
 			// Обработка интерфейсов с модификаторами
-			if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
+			if (tb.match(TokenType.OOP, J8BKeyword.INTERFACE)) {
 				InterfaceNode iNode = new InterfaceNode(tb, mc, modifiers, null, null);
 				children.add(iNode);
 				continue;
 			}
 			// Обработка exception с модификаторами
-			if (tb.match(TokenType.OOP, Keyword.EXCEPTION)) {
+			if (tb.match(TokenType.OOP, J8BKeyword.EXCEPTION)) {
 				ExceptionNode eNode = new ExceptionNode(tb, mc, modifiers, null);
 				children.add(eNode);
 				continue;
@@ -83,7 +84,7 @@ public class ClassBlockNode extends AstNode {
 			
 			// Получаем имя метода/конструктора
 			String name = null;
-			if(tb.match(TokenType.ID)) {
+			if(tb.match(TokenType.IDENTIFIER)) {
 				if(isClassName) {
 					isClassName = false;
 					type = VarType.fromClassName(classNode.getName());

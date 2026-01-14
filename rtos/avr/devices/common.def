@@ -13,6 +13,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+	.EQU	PLATFORM_ID								= 0x00	;AVR
+.IFNDEF V_UID
+	.SET	V_UID									= 0x5277;Уникальный идентификатор чипа (vendor) дефолтное значение
+.ENDIF
+.IFNDEF D_UID
+	.SET	D_UID									= 0xffffffffffff; (device) дефолтное значение
+.ENDIF
+
+.IFNDEF BLDRSEC_SUPPORT										;Аппаратная защита секции bootloader от чтения (для хранения ключа шифрования)
+	.SET	BLDRSEC_SUPPORT							= 0x00
+.ENDIF
 
 ;---OS-FEATURES---------------------------------------------
 .IFNDEF OS_FT_BOOTLOADER_ONLY

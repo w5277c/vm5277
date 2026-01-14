@@ -17,16 +17,16 @@ package ru.vm5277.avr_asm.nodes;
 
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
-import ru.vm5277.common.Operator;
-import ru.vm5277.avr_asm.TokenType;
+import ru.vm5277.common.lexer.Operator;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class DefNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
-		String alias = (String)Node.consumeToken(tb, TokenType.ID).getValue();
+		String alias = (String)Node.consumeToken(tb, TokenType.IDENTIFIER).getValue();
 		Node.consumeToken(tb, Operator.ASSIGN);
-		String str = (String)Node.consumeToken(tb, TokenType.ID).getValue();
+		String str = (String)Node.consumeToken(tb, TokenType.IDENTIFIER).getValue();
 		Byte reg = scope.resolveReg(str);
 		if(null != reg) {
 			scope.addRegAlias(alias, reg, tb.getSP());

@@ -17,13 +17,13 @@ package ru.vm5277.avr_asm.nodes;
 
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
-import ru.vm5277.avr_asm.TokenType;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class DeviceNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
-		String name = (String)Node.consumeToken(tb, TokenType.ID).getValue();
+		String name = (String)Node.consumeToken(tb, TokenType.IDENTIFIER).getValue();
 		scope.setDevice(name);
 		
 		scope.list(".DEVICE " + name);

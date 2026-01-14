@@ -22,18 +22,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.AssemblerInterface;
-import ru.vm5277.common.Operator;
+import ru.vm5277.common.lexer.Operator;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.cg.scopes.CGTryBlockScope;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.compiler.Keyword;
-import ru.vm5277.compiler.TokenType;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.J8BKeyword;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
-import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Main;
@@ -44,20 +42,18 @@ import ru.vm5277.compiler.nodes.commands.ForNode;
 import ru.vm5277.compiler.nodes.commands.IfNode;
 import ru.vm5277.compiler.nodes.commands.ReturnNode;
 import ru.vm5277.compiler.nodes.commands.SwitchNode;
-import ru.vm5277.compiler.nodes.commands.TryNode;
 import ru.vm5277.compiler.nodes.commands.WhileNode;
 import ru.vm5277.compiler.nodes.expressions.ArrayInitExpression;
 import ru.vm5277.compiler.nodes.expressions.CastExpression;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.InstanceOfExpression;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
-import ru.vm5277.compiler.nodes.expressions.MethodCallExpression;
 import ru.vm5277.compiler.nodes.expressions.TernaryExpression;
 import ru.vm5277.compiler.nodes.expressions.UnaryExpression;
 import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
-import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
+import ru.vm5277.common.lexer.Keyword;
 
 public class BlockNode extends AstNode {
 	protected	List<AstNode>			children	= new ArrayList<>();
@@ -104,25 +100,25 @@ public class BlockNode extends AstNode {
 			Set<Keyword> modifiers = collectModifiers(tb);
 
 			// Обработка классов с модификаторами
-			if (tb.match(TokenType.OOP) && Keyword.CLASS == tb.current().getValue()) {
+			if (tb.match(TokenType.OOP) && J8BKeyword.CLASS == tb.current().getValue()) {
 				ClassNode cNode = new ClassNode(tb, mc, modifiers, true, null);
 				children.add(cNode);
 				continue;
 			}
 			// Обработка enum с модификаторами
-			if (tb.match(TokenType.OOP) && Keyword.ENUM == tb.current().getValue()) {
+			if (tb.match(TokenType.OOP) && J8BKeyword.ENUM == tb.current().getValue()) {
 				EnumNode eNode = new EnumNode(tb, mc, modifiers);
 				children.add(eNode);
 				continue;
 			}
 			// Обработка интерфейсов с модификаторами
-			if (tb.match(TokenType.OOP, Keyword.INTERFACE)) {
+			if (tb.match(TokenType.OOP, J8BKeyword.INTERFACE)) {
 				InterfaceNode iNode = new InterfaceNode(tb, mc, modifiers, null, null);
 				children.add(iNode);
 				continue;
 			}
 			// Обработка exception с модификаторами
-			if (tb.match(TokenType.OOP, Keyword.EXCEPTION)) {
+			if (tb.match(TokenType.OOP, J8BKeyword.EXCEPTION)) {
 				ExceptionNode eNode = new ExceptionNode(tb, mc, modifiers, null);
 				children.add(eNode);
 				continue;
@@ -145,7 +141,7 @@ public class BlockNode extends AstNode {
 					else {
 						// Получаем имя метода/конструктора
 						String name = null;
-						try {name = consumeToken(tb, TokenType.ID).getStringValue();}catch(CompileException e) {markFirstError(e);} // Нет имени сущности, пытаемся парсить дальше
+						try {name = consumeToken(tb, TokenType.IDENTIFIER).getStringValue();}catch(CompileException e) {markFirstError(e);} // Нет имени сущности, пытаемся парсить дальше
 
 						VarNode varNode = new VarNode(tb, mc, modifiers, type, name);
 						if(null!=name) children.add(varNode);

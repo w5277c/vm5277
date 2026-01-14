@@ -12,7 +12,7 @@
             <properties>
                 <exec.vmArgs></exec.vmArgs>
                 <exec.args>${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}</exec.args>
-                <exec.appArgs>~/vm5277/rtos/avr/boot/bootloader.asm -P ~/vm5277 -I rtos/avr/ -i devices/atmega328p.def -D os_ft_bootloader_only=1</exec.appArgs>
+                <exec.appArgs>/home/kostas/vm5277/rtos/avr/boot/bldr.asm -P ~/vm5277 -I rtos/avr/ -i atmega328p.inc -D os_ft_bootloader_only=1</exec.appArgs>
                 <exec.mainClass>${packageClassName}</exec.mainClass>
                 <exec.executable>java</exec.executable>
             </properties>
@@ -29,7 +29,7 @@
             <properties>
                 <exec.vmArgs>-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address}</exec.vmArgs>
                 <exec.args>${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}</exec.args>
-                <exec.appArgs>~/vm5277/rtos/avr/boot/bootloader.asm -P ~/vm5277 -I rtos/avr/ -i devices/atmega328p.def -D os_ft_bootloader_only=1</exec.appArgs>
+                <exec.appArgs>/home/kostas/vm5277/rtos/avr/boot/bldr.asm -P ~/vm5277 -I rtos/avr/ -i atmega328p.inc -D os_ft_bootloader_only=1</exec.appArgs>
                 <exec.mainClass>${packageClassName}</exec.mainClass>
                 <exec.executable>java</exec.executable>
                 <jpda.listen>true</jpda.listen>
@@ -49,7 +49,7 @@
                 <exec.args>${exec.vmArgs} -classpath %classpath ${exec.mainClass} ${exec.appArgs}</exec.args>
                 <exec.mainClass>${packageClassName}</exec.mainClass>
                 <exec.executable>java</exec.executable>
-                <exec.appArgs>~/vm5277/rtos/avr/boot/bootloader.asm -P ~/vm5277 -I rtos/avr/ -i devices/atmega328p.def -D os_ft_bootloader_only=1</exec.appArgs>
+                <exec.appArgs>/home/kostas/vm5277/rtos/avr/boot/bldr.asm -P ~/vm5277 -I rtos/avr/ -i atmega328p.inc -D os_ft_bootloader_only=1</exec.appArgs>
             </properties>
         </action>
     </actions>

@@ -27,11 +27,10 @@ import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.compiler.Keyword;
-import ru.vm5277.compiler.TokenType;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.J8BKeyword;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
-import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
@@ -41,6 +40,7 @@ import ru.vm5277.compiler.semantic.ImportableScope;
 import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
+import ru.vm5277.common.lexer.Keyword;
 
 public class ClassNode extends ObjectTypeNode {
 	private	ClassBlockNode	blockNode;
@@ -57,19 +57,19 @@ public class ClassNode extends ObjectTypeNode {
 		this.isInner = isInner;
 		
 		// Проверка на запрещенное наследование классов
-		if(tb.match(TokenType.OOP, Keyword.EXTENDS)) {
+		if(tb.match(TokenType.OOP, J8BKeyword.EXTENDS)) {
 			markError("Class inheritance is not supported. Use composition instead of extends.");
 			tb.skip(Delimiter.RIGHT_BRACE);
 			return;
 		}
 
 		// Парсинг интерфейсов (если есть)
-		if(tb.match(TokenType.OOP, Keyword.IMPLEMENTS)) {
+		if(tb.match(TokenType.OOP, J8BKeyword.IMPLEMENTS)) {
 			consumeToken(tb);
 			while(true) {
 				try {
 					//TODO QualifiedPath
-					impl.add((String)consumeToken(tb, TokenType.ID).getValue());
+					impl.add((String)consumeToken(tb, TokenType.IDENTIFIER).getValue());
 				}
 				catch(CompileException e) {
 					markFirstError(e); // встретили что-то кроме ID интерфейса
@@ -104,7 +104,7 @@ public class ClassNode extends ObjectTypeNode {
 			addMessage(new WarningMessage("Class name should start with uppercase letter:" + name, sp));
 		}
 		
-		try{validateModifiers(modifiers, Keyword.PUBLIC, Keyword.PRIVATE, Keyword.STATIC);} catch(CompileException e) {addMessage(e);}
+		try{validateModifiers(modifiers, J8BKeyword.PUBLIC, J8BKeyword.PRIVATE, J8BKeyword.STATIC);} catch(CompileException e) {addMessage(e);}
 
 		if(null!=importedClasses) {
 			for (ObjectTypeNode imported : importedClasses) {
@@ -289,16 +289,16 @@ public class ClassNode extends ObjectTypeNode {
 	}
 	
 	public boolean isStatic() {
-		return modifiers.contains(Keyword.STATIC);
+		return modifiers.contains(J8BKeyword.STATIC);
 	}
 	public boolean isFinal() {
-		return modifiers.contains(Keyword.FINAL);
+		return modifiers.contains(J8BKeyword.FINAL);
 	}
 	public boolean isPublic() {
-		return modifiers.contains(Keyword.PUBLIC);
+		return modifiers.contains(J8BKeyword.PUBLIC);
 	}
 	public boolean isPrivate() {
-		return modifiers.contains(Keyword.PRIVATE);
+		return modifiers.contains(J8BKeyword.PRIVATE);
 	}
 
 	public boolean isInner() {

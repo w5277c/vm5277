@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.nodes;
 
 import java.util.ArrayList;
@@ -22,17 +23,17 @@ import java.util.Set;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.compiler.Keyword;
+import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
-import ru.vm5277.compiler.Delimiter;
-import ru.vm5277.compiler.TokenType;
-import ru.vm5277.compiler.semantic.CIScope;
+import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.compiler.semantic.ImportableScope;
 import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
+import ru.vm5277.common.lexer.Keyword;
 
 public class InterfaceNode extends ObjectTypeNode {
 	private			InterfaceBodyNode	blockIfaceNode;
@@ -46,19 +47,19 @@ public class InterfaceNode extends ObjectTypeNode {
 		}
 
 		// Проверка на запрещенное наследование классов
-		if(tb.match(TokenType.OOP, Keyword.IMPLEMENTS)) {
+		if(tb.match(TokenType.OOP, J8BKeyword.IMPLEMENTS)) {
 			markError("Interfaces cannot implement other interfaces. Use 'extends' for interface inheritance.");
 			tb.skip(Delimiter.RIGHT_BRACE);
 			return;
 		}
 
 		// Парсинг интерфейсов (если есть)
-		if(tb.match(TokenType.OOP, Keyword.EXTENDS)) {
+		if(tb.match(TokenType.OOP, J8BKeyword.EXTENDS)) {
 			consumeToken(tb);
 			while(true) {
 				try {
 					//TODO QualifiedPath
-					impl.add((String)consumeToken(tb, TokenType.ID).getValue());
+					impl.add((String)consumeToken(tb, TokenType.IDENTIFIER).getValue());
 				}
 				catch(CompileException e) {
 					markFirstError(e); // встретили что-то кроме ID интерфейса
@@ -85,7 +86,7 @@ public class InterfaceNode extends ObjectTypeNode {
 			addMessage(new WarningMessage("Interface name should start with uppercase letter:" + name, sp));
 		}
 		
-		try{validateModifiers(modifiers, Keyword.PUBLIC);} catch(CompileException e) {addMessage(e);}
+		try{validateModifiers(modifiers, J8BKeyword.PUBLIC);} catch(CompileException e) {addMessage(e);}
 		
 		// Анализ тела интерфейса
 		blockIfaceNode.preAnalyze();
@@ -134,9 +135,9 @@ public class InterfaceNode extends ObjectTypeNode {
 			if (decl instanceof FieldNode) { // Проверка что все поля - public static final и инициализированы
 				FieldNode field = (FieldNode)decl;
 
-				if (!field.getModifiers().contains(Keyword.PUBLIC)) markError("Interface field '" + field.getName() + "' must be public");
-				if (!field.getModifiers().contains(Keyword.STATIC)) markError("Interface field '" + field.getName() + "' must be static");
-				if (!field.getModifiers().contains(Keyword.FINAL)) markError("Interface field '" + field.getName() + "' must be final");
+				if (!field.getModifiers().contains(J8BKeyword.PUBLIC)) markError("Interface field '" + field.getName() + "' must be public");
+				if (!field.getModifiers().contains(J8BKeyword.STATIC)) markError("Interface field '" + field.getName() + "' must be static");
+				if (!field.getModifiers().contains(J8BKeyword.FINAL)) markError("Interface field '" + field.getName() + "' must be final");
 
 				if (null == field.getInitializer()) markError("Interface field '" + field.getName() + "' must be initialized");
 			}

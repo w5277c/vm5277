@@ -21,6 +21,7 @@ public class VariableSymbol extends Symbol {
 	
 	public VariableSymbol(String name, long value, boolean isConstant) {
 		super(name);
+		
 		this.value = value;
 		this.isConstant = isConstant;
 	}

@@ -1,0 +1,11 @@
+class Main {
+	public static void main() {
+		System.setParam(RTOSParam.STDOUT_PORT, GPIO.PC0);
+		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
+		System.setParam(RTOSParam.HALT_OK_MODE, HaltMode.HALT);
+		System.setParam(RTOSParam.HALT_ERR_MODE, HaltMode.HALT);
+
+		cstr text="Hello world!\n";
+		System.out(text);
+	}
+}

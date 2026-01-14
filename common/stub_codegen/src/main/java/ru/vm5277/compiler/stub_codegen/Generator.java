@@ -23,7 +23,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import ru.vm5277.common.ExcsThrowPoint;
 import ru.vm5277.common.NativeBinding;
-import ru.vm5277.common.Operator;
+import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.Pair;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.RTOSParam;

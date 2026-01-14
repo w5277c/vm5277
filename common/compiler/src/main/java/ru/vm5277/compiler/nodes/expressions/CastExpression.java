@@ -29,7 +29,7 @@ import ru.vm5277.compiler.nodes.AstNode;
 import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
-import ru.vm5277.common.SourcePosition;
+import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.cg.CGExcs;
 
 public class CastExpression extends ExpressionNode {
