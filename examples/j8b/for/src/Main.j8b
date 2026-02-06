@@ -1,0 +1,83 @@
+/*
+ * Copyright 2025 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// Пример различных циклов, в том числе с else условием
+
+class Main {
+    public static void main() {
+		System.out("\nЦикл for(byte i=0; i<10; i++), с блоком else и break на 3: ");
+		for(byte i=0; i<10; i++) {
+			if(3==i) break;
+			System.out(i); System.outChar(' ');
+		}
+		else {
+			System.out("else блок: i=");System.out(i);
+		}
+
+		System.out("\nЦикл for(byte i=7; i<10; i++), с блоком else без break: ");
+		for(byte i=7; i<10; i++) {
+			System.out(i); System.outChar(' ');
+		}
+		else {
+			System.out("else блок: i=");System.out(i);
+		}
+
+
+		byte i=3;
+		System.out("\nЦикл for(; i<10; i++), i-внешняя переменная = 3:" );
+		for(; i<10; i++) {
+			System.out(i); System.outChar(' ');
+		}
+	
+		System.out("\nЦикл for(i=0; i<10; i++), i-внешняя переменная: ");
+		for(i=0; i<10; i++) {
+			System.out(i); System.outChar(' ');
+		}
+
+		byte cntr = 0;
+		System.out("\nЦикл for(byte i=0; i<10;), без инкремента, с выходом по break: ");
+		for(byte i=0; i<10;) {
+			System.out(i); System.outChar(' ');
+			cntr++;
+			if(20==cntr) break;
+		}
+
+		cntr = 0;
+		System.out("\nЦикл for(byte i=0; ; i++), без условия, с выходом по break:");
+		for(byte i=0; ; i++) {
+			System.out(i); System.outChar(' ');
+			cntr++;
+			if(20==cntr) break;
+		}
+
+		System.out("\nЦикл for(byte i=0; i<10; i++), с continue перед выводом, если i<5: ");
+		for(byte i=0; i<10; i++) {
+			if(i<5) continue;
+			System.out(i); System.outChar(' ');
+		}
+
+		System.out("\nЦикл for(byte i=0; i<5; i++), с вложенным for(byte j=0; j<3; j++) с выходом если i=2 и j=1: ");
+l1:
+		for(byte i=0; i<5; i++) {
+			for(byte j=0; j<3; j++) {
+				System.out(i); System.outChar('.'); System.out(j); System.outChar(' ');
+				if(i==2 && j==1) break l1;
+			}
+		}
+
+		System.out("\ndone");
+    }
+}

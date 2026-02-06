@@ -1,0 +1,59 @@
+/*
+ * Copyright 2025 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+class Main {
+
+	public enum EDirection {
+		LEFT,
+		RIGHT,
+		DOWN,
+		UP;
+	}
+
+	public enum EStatus {
+		OK,
+		ERROR
+	}
+
+    public static void main() {
+		System.out("\nEnum EDirection, size:"); System.out(EDirection.size());
+		System.out("\nLEFT id:"); System.out(EDirection.LEFT.index());
+		System.out("\nRIGHT id:"); System.out(EDirection.RIGHT.index());
+		System.out("\nDOWN id:"); System.out(EDirection.DOWN.index());
+		System.out("\nUP id:"); System.out(EDirection.UP.index());
+
+		System.out("\n\nEnum EStatus, size:"); System.out(EStatus.size());
+		System.out("\nOK id:"); System.out(EStatus.OK.index());
+		System.out("\nERROR id:"); System.out(EStatus.ERROR.index());
+
+		EDirection dir = EDirection.item(1);
+		System.out("\n\nIndex for variable dir:");
+		System.out(dir.index());
+		System.out("\nEdirection.UP==dir:");
+		System.out(EDirection.UP==dir);
+
+		System.out("\nIndex for EDirection.UP:");
+		System.out(EDirection.UP.index());
+
+		System.out("\nIndex for EStatus.item(EStatus.ERROR.index()):");
+		System.out(EStatus.item(EStatus.ERROR.index()).index());
+
+		System.out("\nIndex for EStatus.item(1):");
+		System.out(EStatus.item(1).index());
+
+		System.out("\n\ndone");
+  }
+}

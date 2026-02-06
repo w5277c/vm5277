@@ -24,7 +24,7 @@ import jssc.SerialPortException;
 import jssc.SerialPortList;
 import jssc.SerialPortTimeoutException;
 import ru.vm5277.common.DatatypeConverter;
-import ru.vm5277.common.Platform;
+import ru.vm5277.common.PlatformType;
 import ru.vm5277.common.bldr.BldrRequest;
 import ru.vm5277.common.bldr.BldrResult;
 import ru.vm5277.common.bldr.BldrType;
@@ -32,21 +32,30 @@ import ru.vm5277.common.firmware.Segment;
 
 public class BootloaderIface implements Closeable {
 	public static class DeviceInfo {
-		private	BldrType	bldrType;
-		private	byte		bldrVersion;
-		private	Platform	platform;
-		private	int			signature;
-		private byte[]		uid			= new byte[0x08];
-		private	short		fwVersion;
+		private	BldrType		bldrType;
+		private	byte			bldrVersion;
+		private	PlatformType	platform;
+		private	int				signature;
+		private byte[]			uid				= new byte[0x08];
+		private	short			fwVersion;
+		private	boolean			singleWireMode	= true;
+		
+		public DeviceInfo(boolean singleWireMode) {
+			this.singleWireMode = singleWireMode;
+		}
 		
 		public void parse(byte[] data, int offset) {
 			bldrType = BldrType.values()[(data[offset]>>>0x06)&0x03];
 			bldrVersion = ((byte)(data[offset++]&0x3f));
-			platform = Platform.values()[data[offset++]];
+			platform = PlatformType.values()[data[offset++]];
 			signature = ((data[offset++]&0xff)<<0x18) + ((data[offset++]&0xff)<<0x10) + ((data[offset++]&0xff)<<0x08) + (data[offset++]&0xff);
 			System.arraycopy(data, offset, uid, 0x00, 0x08);
 			offset+=0x08;
 			fwVersion = data[offset];
+		}
+		
+		public boolean isSingleWireMode() {
+			return singleWireMode;
 		}
 		
 		public BldrType getBldrType() {
@@ -61,7 +70,7 @@ public class BootloaderIface implements Closeable {
 			return uid;
 		}
 		
-		public Platform getPlatform() {
+		public PlatformType getPlatform() {
 			return platform;
 		}
 		
@@ -71,8 +80,8 @@ public class BootloaderIface implements Closeable {
 		
 		@Override
 		public String toString() {
-			return	"BLDR " + bldrType.toString() + " v." + bldrVersion + ": " + platform + ", sig:" + String.format("%08x", signature) + ", uid:" +
-					DatatypeConverter.printHexBinary(uid);
+			return	"BLDR " + bldrType.toString() + " v." + String.format("%02x", bldrVersion) + ": " +
+					platform + ", sig:" + String.format("%08x", signature) + ", uid:" + DatatypeConverter.printHexBinary(uid);
 		}
 	}
 
@@ -80,86 +89,129 @@ public class BootloaderIface implements Closeable {
 	private	final	float		cpuFreq;
 	private	final	int			baudrate;
 	private	final	String		deviceName;
+	private	final	int			waitTime;
 	private	final	int			retries;
 	private			DeviceInfo	deviceInfo;
 	
-	public BootloaderIface(float cpuFreq, String deviceName, int retries) {
+	public BootloaderIface(float cpuFreq, String deviceName, int waitTime, int retries) {
 		this.cpuFreq = cpuFreq;
 		this.baudrate = (int)(14400*cpuFreq);
 		this.deviceName = deviceName;
+		this.waitTime = waitTime;
 		this.retries = retries;
 	}
 	
 	public boolean open() {
 		int retryCntr = 1;
 		if(null!=deviceName) {
-			for(; retryCntr<=retries; retryCntr++) {
-				try {
-					serialPort = new SerialPort(deviceName);
-					if(serialPort.openPort()) {
-						serialPort.setParams(baudrate, 8, 1, SerialPort.PARITY_NONE);
-						for(; retryCntr<=retries; retryCntr++) {
-							deviceInfo = requestDevicetInfo();
-							if(null!=deviceInfo) {
-								return true;
-							}
-						}
-						Main.showErr(	"[ERROR] Bootloader handshake failed at " + cpuFreq + "MHz. Verify device " + deviceName  +
-										" has vm5277 bootloader and is connected.");
-						return false;
-					}
-					Thread.sleep(1000);
-				}
-				catch(Exception ex) {
-					ex.printStackTrace();
-					close();
-				}
+			SerialPort sp = open(deviceName, waitTime);
+			if(null!=sp) {
+				serialPort = sp;
+				Main.showMsg("\n", true);
+				return true;
 			}
-			Main.showErr("[ERROR] Can't connect to device " + deviceName);
+			else {
+				Main.showMsg("\n", true);
+				Main.showErr(	"[ERROR] Bootloader handshake failed at " + cpuFreq + "MHz. Verify device " + deviceName  +
+								" has vm5277 bootloader and is connected.");
+			}
 			return false;
 		}
 		else {
-			for(; retryCntr<=retries; retryCntr++) {
-				try {
-					String[] serialPortsNames = SerialPortList.getPortNames();
-					if(null!=serialPortsNames) {
-						for(String spn : serialPortsNames) {
-							SerialPort sp = new SerialPort(spn);
-							if(!sp.isOpened()) {
-								if(sp.openPort()) {
-									sp.setParams(baudrate, 8, 1, SerialPort.PARITY_NONE);
-									deviceInfo = requestDevicetInfo();
-									if(null!=deviceInfo) {
-										serialPort = sp;
-										return true;
-									}
-									sp.closePort();
-								}
-							}
+			boolean firstIter = true;
+			long timestamp = System.currentTimeMillis();
+			String progress = "|/-\\";
+			int progressPos=0;
+			Main.showMsg(""+progress.charAt(progressPos++), true);
+			while(firstIter || ((System.currentTimeMillis()-timestamp) < waitTime)) {
+				Main.showMsg("\b"+progress.charAt(progressPos++), true);
+				if(progressPos==progress.length()) progressPos=0;
+				firstIter = false;
+				String[] serialPortsNames = SerialPortList.getPortNames();
+				if(null!=serialPortsNames) {
+					for(String spName : serialPortsNames) {
+						SerialPort sp = open(spName, -1);
+						if(null!=sp) {
+							serialPort = sp;
+							Main.showMsg("\b", true);
+							return true;
 						}
 					}
 				}
-				catch(Exception ex) {
-				}
-				try {Thread.sleep(1000);} catch(InterruptedException ex) {}
+				try {Thread.sleep(20);}catch(Exception ex) {}
 			}
+			Main.showMsg("\b", true);
 			Main.showErr("[ERROR] No VM5277 bootloader found at " + cpuFreq + "MHz. Verify device has vm5277 bootloader and is connected");
 			return false;
 		}
 	}
-
 	
-	private DeviceInfo requestDevicetInfo() throws SerialPortException, SerialPortTimeoutException {
-		if(null!=serialPort && serialPort.isOpened()) {
+	private SerialPort open(String spName, int _waitTime) {
+		int retryCntr = 1;
+		for(; retryCntr<=retries; retryCntr++) {
+			try {
+				SerialPort _serialPort = new SerialPort(spName);
+				if(_serialPort.openPort()) {
+					long timestamp = System.currentTimeMillis();
+					_serialPort.setParams(baudrate, 8, 1, SerialPort.PARITY_NONE);
+					while(_serialPort.isOpened()) {
+						if(0==_waitTime && retryCntr>retries) {
+							try {_serialPort.closePort();}catch(Exception ex2) {}
+							return null;
+						}
+						requestBootloader(_serialPort);
+						deviceInfo = requestDevicetInfo(_serialPort);
+						if(null!=deviceInfo) {
+							return _serialPort;
+						}
+						if(-1==_waitTime) {
+							try {_serialPort.closePort();}catch(Exception ex2) {}
+							return null;
+						}
+						if(0!=_waitTime && ((System.currentTimeMillis()-timestamp)) > _waitTime) {
+							try {_serialPort.closePort();}catch(Exception ex2) {}
+							return null;
+						}
+						if(0==_waitTime) retryCntr++;
+						Thread.sleep(10);
+					}
+				}
+				Thread.sleep(50);
+			}
+			catch(Exception ex) {
+			}
+			try {serialPort.closePort();}catch(Exception ex2) {}
+		}
+		return null;
+	}
+
+
+	private void requestBootloader(SerialPort sp) throws SerialPortException, SerialPortTimeoutException {
+		if(null!=sp && sp.isOpened()) {
+			byte[] requestData = new byte[] {0x12};
+			sp.writeBytes(requestData);
+			readWithTimeout(sp, 0x01, 20);
+		}
+	}
+	
+	private DeviceInfo requestDevicetInfo(SerialPort sp) throws SerialPortException, SerialPortTimeoutException {
+		if(null!=sp && sp.isOpened()) {
 			byte[] requestData = new byte[0x05];
 			fillHeader(requestData, BldrRequest.INFO.getId(), 0x00, (byte)0x77);
-			serialPort.writeBytes(requestData);
-			byte[] recvData = readWithTimeout(serialPort, 1024, 20);
-			if(null!= recvData && requestData.length+0x14==recvData.length) {
-				if(	BldrResult.MAGIC==recvData[requestData.length] && checkXORSumm(recvData, requestData.length, 0x14) &&
+			sp.writeBytes(requestData);
+			byte[] recvData = readWithTimeout(sp, 1024, 20);
+			if(null!=recvData) {
+				if(0x14==recvData.length && BldrResult.MAGIC==recvData[0x00] && checkXORSumm(recvData, 0x00, 0x14) && 0x0f==getDataSize(recvData, 0x00,
+																																		recvData.length)) {
+					DeviceInfo dInfo = new DeviceInfo(false);
+					dInfo.parse(recvData, 0x04);
+					return dInfo;
+				}
+				if(requestData.length+0x14==recvData.length && BldrResult.MAGIC==recvData[requestData.length] &&
+					checkXORSumm(recvData, requestData.length, 0x14) &&
 					0x0f==getDataSize(recvData, requestData.length, recvData.length-requestData.length)) {
-					
-					DeviceInfo dInfo = new DeviceInfo();
+
+					DeviceInfo dInfo = new DeviceInfo(true);
 					dInfo.parse(recvData, requestData.length+0x04);
 					return dInfo;
 				}
@@ -173,14 +225,14 @@ public class BootloaderIface implements Closeable {
 	}
 
 	boolean erase(int flasSize, int pageSize) {
-		Main.showMsg(" ");
+		Main.showMsg(" ", false);
 		for(int i=0; i<flasSize/pageSize/4; i++) {
-			Main.showMsg("_");
+			Main.showMsg("_", false);
 		}
-		Main.showMsg(" \n");
+		Main.showMsg(" \n", false);
 		for(int blockNum=0; blockNum<4; blockNum++) {
 			int blockSize = flasSize/4;
-			Main.showMsg("[");
+			Main.showMsg("[", false);
 			for(int i=0; i<(blockSize/pageSize); i++) {
 				int pageAddr = blockNum*blockSize + i*pageSize;
 				
@@ -196,14 +248,28 @@ public class BootloaderIface implements Closeable {
 				for(; retryCntr<=retries; retryCntr++) {
 					try {
 						serialPort.writeBytes(requestData);
-						byte[] recvData = readWithTimeout(serialPort, requestData.length+0x05, 200);
-						if(null!=recvData && requestData.length+0x05==recvData.length) {
-							if(	BldrResult.MAGIC==recvData[requestData.length] && checkXORSumm(recvData, requestData.length, 0x05) &&
-								0x00==getDataSize(recvData, requestData.length, recvData.length-requestData.length)) {
+						if(deviceInfo.isSingleWireMode()) {
+							byte[] recvData = readWithTimeout(serialPort, requestData.length+0x05, 200);
+							if(null!=recvData && requestData.length+0x05==recvData.length) {
+								if(	BldrResult.MAGIC==recvData[requestData.length] && checkXORSumm(recvData, requestData.length, 0x05) &&
+									0x00==getDataSize(recvData, requestData.length, recvData.length-requestData.length)) {
 
-								bldrResult = BldrResult.fromByte(recvData[requestData.length+0x01]);
-								if(BldrResult.OK==bldrResult) {
-									break;
+									bldrResult = BldrResult.fromByte(recvData[requestData.length+0x01]);
+									if(BldrResult.OK==bldrResult) {
+										break;
+									}
+								}
+							}
+						}
+						else {
+							byte[] recvData = readWithTimeout(serialPort, 0x05, 200);
+							if(null!=recvData && 0x05==recvData.length) {
+								if(BldrResult.MAGIC==recvData[0x00] && checkXORSumm(recvData, 0x00, 0x05) && 0x00==getDataSize(	recvData, 0x00,
+																																recvData.length)) {
+									bldrResult = BldrResult.fromByte(recvData[0x01]);
+									if(BldrResult.OK==bldrResult) {
+										break;
+									}
 								}
 							}
 						}
@@ -213,29 +279,29 @@ public class BootloaderIface implements Closeable {
 				}
 
 				if(BldrResult.OK==bldrResult) {
-					Main.showMsg(0==retryCntr ? "e" : "E");
+					Main.showMsg(0==retryCntr ? "e" : "E", false);
 				}
 				else {
-					Main.showMsg("E\n");
+					Main.showMsg("E\n", false);
 					Main.showErr(	"[ERROR] Page erase failed, bldr result:" + bldrResult + ", address " +	String.format("0x%04X", pageAddr) +
 									", attempts: " + (retries+1));
 					return false;
 				}
 			}
-			Main.showMsg("]\n");
+			Main.showMsg("]\n", false);
 		}
 		return true;
 	}
 
 	boolean flash(List<Segment> sourceSegments, byte[] sourceData, int pageSize, boolean secureMode) {
-		Main.showMsg(" ");
+		Main.showMsg(" ", false);
 		for(int i=0; i<sourceData.length/pageSize/4; i++) {
-			Main.showMsg("_");
+			Main.showMsg("_", false);
 		}
-		Main.showMsg(" \n");
+		Main.showMsg(" \n", false);
 		for(int blockNum=0; blockNum<4; blockNum++) {
 			int blockSize = sourceData.length/4;
-			Main.showMsg("[");
+			Main.showMsg("[", false);
 			for(int i=0; i<(blockSize/pageSize); i++) {
 				int pageAddr = blockNum*blockSize + i*pageSize;
 				Segment segment = findSegment(sourceSegments, pageAddr, pageSize);
@@ -254,14 +320,28 @@ public class BootloaderIface implements Closeable {
 						for(; retryCntr<=retries; retryCntr++) {
 							try {
 								serialPort.writeBytes(requestData);
-								byte[] recvData = readWithTimeout(serialPort, requestData.length+0x05, 200);
-								if(null!=recvData && requestData.length+0x05==recvData.length) {
-									if(	BldrResult.MAGIC==recvData[requestData.length] && checkXORSumm(recvData, requestData.length, 0x05) &&
-										0x00==getDataSize(recvData, requestData.length, recvData.length-requestData.length)) {
-										
-										bldrResult = BldrResult.fromByte(recvData[requestData.length+0x01]);
-										if(BldrResult.OK==bldrResult || BldrResult.IDENTICAL==bldrResult) {
-											break;
+								if(deviceInfo.isSingleWireMode()) {
+									byte[] recvData = readWithTimeout(serialPort, requestData.length+0x05, 200);
+									if(null!=recvData && requestData.length+0x05==recvData.length) {
+										if(	BldrResult.MAGIC==recvData[requestData.length] && checkXORSumm(recvData, requestData.length, 0x05) &&
+											0x00==getDataSize(recvData, requestData.length, recvData.length-requestData.length)) {
+
+											bldrResult = BldrResult.fromByte(recvData[requestData.length+0x01]);
+											if(BldrResult.OK==bldrResult || BldrResult.IDENTICAL==bldrResult) {
+												break;
+											}
+										}
+									}
+								}
+								else {
+									byte[] recvData = readWithTimeout(serialPort, 0x05, 200);
+									if(null!=recvData && 0x05==recvData.length) {
+										if(	BldrResult.MAGIC==recvData[0x00] && checkXORSumm(recvData, 0x00, 0x05) && 0x00==getDataSize(recvData, 0x00,
+																																		recvData.length)) {
+											bldrResult = BldrResult.fromByte(recvData[0x01]);
+											if(BldrResult.OK==bldrResult || BldrResult.IDENTICAL==bldrResult) {
+												break;
+											}
 										}
 									}
 								}
@@ -271,40 +351,40 @@ public class BootloaderIface implements Closeable {
 						}
 						
 						if(BldrResult.OK==bldrResult) {
-							Main.showMsg(0==retryCntr ? "w" : "W");
+							Main.showMsg(0==retryCntr ? "w" : "W", false);
 						}
 						else if(BldrResult.IDENTICAL==bldrResult) {
-							Main.showMsg(0==retryCntr ? "i" : "I");
+							Main.showMsg(0==retryCntr ? "i" : "I", false);
 						}
 						else {
-							Main.showMsg("E\n");
+							Main.showMsg("E\n", false);
 							Main.showErr(	"[ERROR] Page write failed, bldr result:" + bldrResult + ", address " +	String.format("0x%04X", pageAddr) +
 											", attempts: " + (retries+1));
 							return false;
 						}
 					}
 					else {
-						Main.showMsg("I");
+						Main.showMsg("I", false);
 					}
 				}
 				else {
-					Main.showMsg("-");
+					Main.showMsg("-", false);
 				}
 			}
-			Main.showMsg("]\n");
+			Main.showMsg("]\n", false);
 		}
 		return true;
 	}
 
 	boolean verify(List<Segment> sourceSegments, byte[] sourceData, int pageSize, boolean secureMode) {
-		Main.showMsg(" ");
+		Main.showMsg(" ", false);
 		for(int i=0; i<sourceData.length/pageSize/4; i++) {
-			Main.showMsg("_");
+			Main.showMsg("_", false);
 		}
-		Main.showMsg(" \n");
+		Main.showMsg(" \n", false);
 		for(int blockNum=0; blockNum<4; blockNum++) {
 			int blockSize = sourceData.length/4;
-			Main.showMsg("[");
+			Main.showMsg("[", false);
 			for(int i=0; i<(blockSize/pageSize); i++) {
 				int pageAddr = blockNum*blockSize + i*pageSize;
 				Segment segment = findSegment(sourceSegments, pageAddr, pageSize);
@@ -323,14 +403,28 @@ public class BootloaderIface implements Closeable {
 						for(; retryCntr<=retries; retryCntr++) {
 							try {
 								serialPort.writeBytes(requestData);
-								byte[] recvData = readWithTimeout(serialPort, requestData.length+0x05, 200);
-								if(null!=recvData && requestData.length+0x05==recvData.length) {
-									if(	BldrResult.MAGIC==recvData[requestData.length] && checkXORSumm(recvData, requestData.length, 0x05) &&
-										0x00==getDataSize(recvData, requestData.length, recvData.length-requestData.length)) {
-										
-										bldrResult = BldrResult.fromByte(recvData[requestData.length+0x01]);
-										if(BldrResult.OK==bldrResult || BldrResult.IDENTICAL==bldrResult) {
-											break;
+								if(deviceInfo.isSingleWireMode()) {
+									byte[] recvData = readWithTimeout(serialPort, requestData.length+0x05, 200);
+									if(null!=recvData && requestData.length+0x05==recvData.length) {
+										if(	BldrResult.MAGIC==recvData[requestData.length] && checkXORSumm(recvData, requestData.length, 0x05) &&
+											0x00==getDataSize(recvData, requestData.length, recvData.length-requestData.length)) {
+
+											bldrResult = BldrResult.fromByte(recvData[requestData.length+0x01]);
+											if(BldrResult.OK==bldrResult || BldrResult.IDENTICAL==bldrResult) {
+												break;
+											}
+										}
+									}
+								}
+								else {
+									byte[] recvData = readWithTimeout(serialPort, 0x05, 200);
+									if(null!=recvData && 0x05==recvData.length) {
+										if(	BldrResult.MAGIC==recvData[0x00] && checkXORSumm(recvData, 0x00, 0x05) && 0x00==getDataSize(recvData, 0x00,
+																																		recvData.length)) {
+											bldrResult = BldrResult.fromByte(recvData[0x01]);
+											if(BldrResult.OK==bldrResult || BldrResult.IDENTICAL==bldrResult) {
+												break;
+											}
 										}
 									}
 								}
@@ -340,24 +434,24 @@ public class BootloaderIface implements Closeable {
 						}
 						
 						if(BldrResult.OK==bldrResult || BldrResult.IDENTICAL==bldrResult) {
-							Main.showMsg(0==retryCntr ? "v" : "V");
+							Main.showMsg(0==retryCntr ? "v" : "V", false);
 						}
 						else {
-							Main.showMsg("E\n");
+							Main.showMsg("E\n", false);
 							Main.showErr(	"[ERROR] Page verify failed, bldr result:" + bldrResult + ", address " +	String.format("0x%04X", pageAddr) +
 											", attempts: " + (retries+1));
 							return false;
 						}
 					}
 					else {
-						Main.showMsg("I");
+						Main.showMsg("I", false);
 					}
 				}
 				else {
-					Main.showMsg("-");
+					Main.showMsg("-", false);
 				}
 			}
-			Main.showMsg("]\n");
+			Main.showMsg("]\n", false);
 		}
 		return true;
 	}
@@ -373,14 +467,27 @@ public class BootloaderIface implements Closeable {
 		for(; retryCntr<=retries; retryCntr++) {
 			try {
 				serialPort.writeBytes(requestData);
-				byte[] recvData = readWithTimeout(serialPort, requestData.length+0x05, 200);
-				if(null!=recvData && requestData.length+0x05==recvData.length) {
-					if(	BldrResult.MAGIC==recvData[requestData.length] && checkXORSumm(recvData, requestData.length, 0x05) &&
-						0x00==getDataSize(recvData, requestData.length, recvData.length-requestData.length)) {
+				if(deviceInfo.isSingleWireMode()) {
+					byte[] recvData = readWithTimeout(serialPort, requestData.length+0x05, 200);
+					if(null!=recvData && requestData.length+0x05==recvData.length) {
+						if(	BldrResult.MAGIC==recvData[requestData.length] && checkXORSumm(recvData, requestData.length, 0x05) &&
+							0x00==getDataSize(recvData, requestData.length, recvData.length-requestData.length)) {
 
-						bldrResult = BldrResult.fromByte(recvData[requestData.length+0x01]);
-						if(BldrResult.OK==bldrResult) {
-							break;
+							bldrResult = BldrResult.fromByte(recvData[requestData.length+0x01]);
+							if(BldrResult.OK==bldrResult) {
+								break;
+							}
+						}
+					}
+				}
+				else {
+					byte[] recvData = readWithTimeout(serialPort, 0x05, 20);
+					if(null!=recvData && 0x05==recvData.length) {
+						if(	BldrResult.MAGIC==recvData[0x00] && checkXORSumm(recvData, 0x00, 0x05) && 0x00==getDataSize(recvData, 0x00, recvData.length)) {
+							bldrResult = BldrResult.fromByte(recvData[0x01]);
+							if(BldrResult.OK==bldrResult) {
+								break;
+							}
 						}
 					}
 				}
@@ -390,7 +497,7 @@ public class BootloaderIface implements Closeable {
 		}
 
 		if(BldrResult.OK!=bldrResult) {
-			Main.showMsg("E\n");
+			Main.showMsg("E\n", false);
 			Main.showErr(	"[ERROR] Go to program failed, bldr result:" + bldrResult + ", attempts: " + (retries+1));
 			return false;
 		}
@@ -497,5 +604,9 @@ public class BootloaderIface implements Closeable {
 			catch(Exception ex) {
 			}
 		}
+	}
+	
+	public SerialPort getSerialPort() {
+		return serialPort;
 	}
 }

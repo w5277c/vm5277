@@ -37,8 +37,10 @@ public class CGIContainer extends CGItem {
 	}
 
 	public void append(CGItem item) {
-		items.add(item);
-		pos = items.size()-1;
+		if(null!=item) {
+			items.add(item);
+			pos = items.size()-1;
+		}
 	}
 	
 	public void prepend(CGItem item) {

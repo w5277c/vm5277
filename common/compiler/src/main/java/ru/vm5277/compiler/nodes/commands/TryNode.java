@@ -55,7 +55,7 @@ public class TryNode extends CommandNode {
 		// Блок try
 		if(tb.match(Delimiter.LEFT_BRACE)) {
 			try {
-				tryBlock = new BlockNode(tb, mc, false, true);
+				tryBlock = new BlockNode(tb, mc, false, true, "try");
 
 				// Парсим параметр catch (byte errCode)
 				while(tb.match(J8BKeyword.CATCH)) {

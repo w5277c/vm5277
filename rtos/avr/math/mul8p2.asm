@@ -17,24 +17,29 @@
 .IFNDEF OS_MUL8P2
 ;-----------------------------------------------------------
 ;Умножение 8бит числа на степень двойки(на базе метки)
-;IN: ACCUM_L-8b число,
-;OUT: ACCUM_L-8b результат
+;IN: ACCUM_L-8b число, ACCUM_H должен быть = 0!
+;OUT: ACCUM_L/H-16b результат
 ;-----------------------------------------------------------
 OS_MUL8P2_X128:
 	LSL ACCUM_L
+	ROL ACCUM_H
 OS_MUL8P2_X64:
 	LSL ACCUM_L
+	ROL ACCUM_H
 OS_MUL8P2_X32:
 	LSL ACCUM_L
+	ROL ACCUM_H
 OS_MUL8P2_X16:
-	SWAP ACCUM_L
-	ANDI ACCUM_L,0xf0
-	RET
+	LSL ACCUM_L
+	ROL ACCUM_H
 OS_MUL8P2_X8:
 	LSL ACCUM_L
+	ROL ACCUM_H
 OS_MUL8P2_X4:
 	LSL ACCUM_L
+	ROL ACCUM_H
 OS_MUL8P2_X2:
 	LSL ACCUM_L
+	ROL ACCUM_H
 	RET
 .ENDIF

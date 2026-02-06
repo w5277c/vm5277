@@ -25,7 +25,7 @@
 	.EQU	OS_PCINT_PORTS_QNT						= 0x03	;Количество портов поддерживающих внешние прерывания(PCINT)
 	.EQU	OS_RAM_BORDER_SIZE						= 0x20	;Минимальное допустимое расстояние между вершинами FREE_RAM и STACK
 	.SET	OS_STACK_SIZE							= 0xc0	;Общий стек(192 байта)
-	.SET	OS_IO_BUFFER_SIZE						= 0x40	;Размер буфера ввода (не менее 2)
+	.SET	OS_STDIN_CBUFFER_SIZE					= 0x10	;Размер буфера ввода (не менее 4)
 
 	.SET	OS_ETRACE_BUFFER_SIZE					= 0x10	;Размер буфера для трассировки исключений
 
@@ -75,49 +75,22 @@
 	.EQU	C5_IR_TWI								= 0x18
 	.EQU	C5_IR_SPM_READY							= 0x19
 
-	;SBI/CBI/SBIS/SBIC port defines
-	.EQU	PORTA									= 0xff
-	.EQU	DDRA									= 0xff
-	.EQU	PINA									= 0xff
-	.EQU	PORTB									= 0x05
-	.EQU	DDRB									= 0x04
-	.EQU	PINB									= 0x03
-	.EQU	PORTC									= 0x08
-	.EQU	DDRC									= 0x07
-	.EQU	PINC									= 0x06
-	.EQU	PORTD									= 0x0b
-	.EQU	DDRD									= 0x0a
-	.EQU	PIND									= 0x09
-	.EQU	PORTE									= 0xff
-	.EQU	DDRE									= 0xff
-	.EQU	PINE									= 0xff
-	.EQU	PORTF									= 0xff
-	.EQU	DDRF									= 0xff
-	.EQU	PINF									= 0xff
-	.EQU	PORTG									= 0xff
-	.EQU	DDRG									= 0xff
-	.EQU	PING									= 0xff
-
-	;Порт для бутлоадера (режим half duplex UART 8N0), используем RESET пин, если поддерживает GPIO.
-	;Необходима подтяжка к плюсу и включение fuse RSTDISBL
-	;Вход в бутлоадер осуществляется после старта при обнаружении низкого уровня на пине в течении ~100мс.
-	;В RTOS сброс будет программным
-.IFNDEF BLDR_UART_PORT
-	.SET	BLDR_UART_PORT							= PORTC
-	.SET	BLDR_UART_DDR							= DDRC
-	.SET	BLDR_UART_PIN							= PINC
-	.SET	BLDR_UART_PINNUM						= 0x06
-.ENDIF
-
 .IF OS_FT_BOOTLOADER_ONLY == 0x00
 .ORG 0x0000
 	JMP		_OS_INIT										; Reset Handler
 .IF OS_FT_IR_TABLE == 0x01
 	CALL	_OS_IR_HANDLER									; External Interrupt0 Handler
 	CALL	_OS_IR_HANDLER									; External Interrupt1 Handler
+_OS_PCINT_0_VECTOR:
+.IF OS_FT_PCINT
+	CALL	_OS_PCINT_HANDLER								; Pin Change Interrupt Request 0
+	CALL	_OS_PCINT_HANDLER								; Pin Change Interrupt Request 1
+	CALL	_OS_PCINT_HANDLER								; Pin Change Interrupt Request 2
+.ELSE
 	CALL	_OS_IR_HANDLER									; Pin Change Interrupt Request 0
 	CALL	_OS_IR_HANDLER									; Pin Change Interrupt Request 1
 	CALL	_OS_IR_HANDLER									; Pin Change Interrupt Request 2
+.ENDIF
 	CALL	_OS_IR_HANDLER									; Watchdog Time-out Interrupt
 	CALL	_OS_IR_HANDLER									; Timer/Counter2 Compare Match A
 	CALL	_OS_IR_HANDLER									; Timer/Counter2 Compare Match B
@@ -126,16 +99,12 @@
 	CALL	_OS_IR_HANDLER									; Timer/Counter1 Compare Match A
 	CALL	_OS_IR_HANDLER									; Timer/Counter1 Compare Match B
 	CALL	_OS_IR_HANDLER									; Timer/Counter1 Overflow
-.IF OS_FT_TIMER1 == 0x01									; Timer/Counter0 Compare Match A
-	JMP		_OS_TIMER1_HANDLER
+.IF OS_FT_TIMER == 0x01										; Timer/Counter0 Compare Match A
+	JMP		_OS_TIMER_HANDLER
 .ELSE
 	CALL	_OS_IR_HANDLER
 .ENDIF
-.IF OS_FT_TIMER2 == 0x01									; Timer/Counter0 Compare Match B
-	JMP		_OS_TIMER2_HANDLER
-.ELSE
-	CALL	_OS_IR_HANDLER
-.ENDIF
+	CALL	_OS_IR_HANDLER									; Timer/Counter0 Compare Match B
 	CALL	_OS_IR_HANDLER									; Timer/Counter0 Overflow
 	CALL	_OS_IR_HANDLER									; SPI Serial Transfer Complete
 	CALL	_OS_IR_HANDLER									; USART Rx Complete

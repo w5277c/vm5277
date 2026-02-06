@@ -53,7 +53,10 @@ public class Expression extends Node {
 	}
 
 	public static Expression parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
-		return parseBinary(tb, scope, mc, 0);
+		Expression result = parseBinary(tb, scope, mc, 0);
+		if(null==result) return result;
+		Expression folded = fold(result, tb.getSP());
+		return null==folded ? result : folded;
 	}
 	
 	// TODO свертывание не выполняется для BinaryExpression из parseFunction
@@ -72,7 +75,7 @@ public class Expression extends Node {
 			Expression right = parseBinary(tb, scope, mc, precedence + (operator.isAssignment() ? 0 : 1));
 	
 			BinaryExpression binaryExpr = new BinaryExpression(tb, scope, mc, left, operator, right);
-			Expression folded = fold(binaryExpr);
+			Expression folded = fold(binaryExpr, tb.getSP());
         
 			left = (null != folded ? folded : binaryExpr);
 		}
@@ -87,7 +90,7 @@ public class Expression extends Node {
 
 				Expression expr = parsePrimary(tb, scope, mc);
 				UnaryExpression unaryExpr = new UnaryExpression(tb, scope, mc, operator, expr);
-				Expression folded = fold(unaryExpr);
+				Expression folded = fold(unaryExpr, tb.getSP());
 				return (null != folded ? folded : unaryExpr);
 //				return new UnaryExpression(tb, scope, mc, operator, parseUnary(tb, scope, mc));
 			}
@@ -151,7 +154,7 @@ public class Expression extends Node {
 		
 		Long value = null;
 		try {value = getLong(expr, null);} catch(CompileException e) {}
-		if(null != value) {
+		if(null!=value) {
 			if(ASMKeyword.LOW.getName().equals(name) || ASMKeyword.BYTE1.getName().equals(name)) return new LiteralExpression(value & 0xff);
 			else if(ASMKeyword.HIGH.getName().equals(name) || ASMKeyword.BYTE2.getName().equals(name)) return new LiteralExpression((value >> 8) & 0xff);
 			else if(ASMKeyword.BYTE3.getName().equals(name) || ASMKeyword.PAGE.getName().equals(name)) return new LiteralExpression((value >> 16) & 0xff);
@@ -216,46 +219,48 @@ public class Expression extends Node {
 			return Expression.getLong(((LiteralExpression)expr).getValue());
 		}
 		if (expr instanceof BinaryExpression || expr instanceof UnaryExpression) {
-			Expression folded = Expression.fold(expr);
+			Expression folded = Expression.fold(expr, sp);
 			if (null != folded && folded instanceof LiteralExpression) {
 				return Expression.getLong(((LiteralExpression)folded).getValue());
 			}
 		}
-		throw new CompileException("Expression '" + expr + "' with type '" + expr.getClass().getSimpleName() + "' is not supported", sp);
+		return null;
 	}
 
 	
-	public static Expression fold(Expression expr) throws CompileException {
+	public static Expression fold(Expression expr, SourcePosition sp) throws CompileException {
 		if (expr instanceof BinaryExpression) {
 			BinaryExpression binaryExpr = (BinaryExpression)expr;
 			Operator operator = binaryExpr.getOp();
-			Expression folded = fold(binaryExpr.getLeftExpr());
+			Expression folded = fold(binaryExpr.getLeftExpr(), sp);
 			Expression leftExpr = (null != folded ? folded : binaryExpr.getLeftExpr());
-			folded = fold(binaryExpr.getRightExpr());
+			folded = fold(binaryExpr.getRightExpr(), sp);
 			Expression rightExpr = (null != folded ? folded : binaryExpr.getRightExpr());
 			if(null == leftExpr || null == rightExpr) return null;
 			try {
-				Long leftVal = getLong(leftExpr, null);
-				Long rightVal = getLong(rightExpr, null);
-				switch (operator) {
-					case MULT:		return new LiteralExpression(leftVal * rightVal);
-					case DIV:		return new LiteralExpression(leftVal / rightVal);
-					case SHL:		return new LiteralExpression(leftVal << rightVal);
-					case SHR:		return new LiteralExpression(leftVal >>> rightVal);
-					case BIT_OR:	return new LiteralExpression(leftVal | rightVal);
-					case BIT_AND:	return new LiteralExpression(leftVal & rightVal);
-					case BIT_XOR:	return new LiteralExpression(leftVal ^ rightVal);
-					case PLUS:		return new LiteralExpression(leftVal + rightVal);
-					case MINUS:		return new LiteralExpression(leftVal - rightVal);
-					case EQ:		return new LiteralExpression(leftVal.longValue() == rightVal);
-					case NEQ:		return new LiteralExpression(leftVal.longValue() != rightVal);
-					case LT:		return new LiteralExpression(leftVal < rightVal);
-					case LTE:		return new LiteralExpression(leftVal <= rightVal);
-					case GT:		return new LiteralExpression(leftVal > rightVal);
-					case GTE:		return new LiteralExpression(leftVal >= rightVal);
-					case OR:		return new LiteralExpression((leftVal != 0) || (rightVal != 0));
-					case AND:		return new LiteralExpression((leftVal != 0) && (rightVal != 0));
-					case NOT:		return new LiteralExpression(leftVal != rightVal);
+				Long leftVal = getLong(leftExpr, sp);
+				Long rightVal = getLong(rightExpr, sp);
+				if(null!=leftVal && null!= rightVal) {
+					switch (operator) {
+						case MULT:		return new LiteralExpression(leftVal * rightVal);
+						case DIV:		return new LiteralExpression(leftVal / rightVal);
+						case SHL:		return new LiteralExpression(leftVal << rightVal);
+						case SHR:		return new LiteralExpression(leftVal >>> rightVal);
+						case BIT_OR:	return new LiteralExpression(leftVal | rightVal);
+						case BIT_AND:	return new LiteralExpression(leftVal & rightVal);
+						case BIT_XOR:	return new LiteralExpression(leftVal ^ rightVal);
+						case PLUS:		return new LiteralExpression(leftVal + rightVal);
+						case MINUS:		return new LiteralExpression(leftVal - rightVal);
+						case EQ:		return new LiteralExpression(leftVal.longValue() == rightVal);
+						case NEQ:		return new LiteralExpression(leftVal.longValue() != rightVal);
+						case LT:		return new LiteralExpression(leftVal < rightVal);
+						case LTE:		return new LiteralExpression(leftVal <= rightVal);
+						case GT:		return new LiteralExpression(leftVal > rightVal);
+						case GTE:		return new LiteralExpression(leftVal >= rightVal);
+						case OR:		return new LiteralExpression((leftVal != 0) || (rightVal != 0));
+						case AND:		return new LiteralExpression((leftVal != 0) && (rightVal != 0));
+						case NOT:		return new LiteralExpression(leftVal != rightVal);
+					}
 				}
 			}
 			catch (CompileException e) {}
@@ -264,7 +269,7 @@ public class Expression extends Node {
 		
 		if (expr instanceof UnaryExpression) {
 			UnaryExpression unaryExpr = (UnaryExpression)expr;
-			Expression folded = fold(unaryExpr.getOperand());
+			Expression folded = fold(unaryExpr.getOperand(), sp);
 			Expression operandExpr = (null != folded ? folded : unaryExpr.getOperand());
 			if(null == operandExpr) return null;
 			if(operandExpr instanceof LiteralExpression) {
@@ -288,7 +293,9 @@ public class Expression extends Node {
 		
 		if(expr instanceof IdExpression) {
 			Long value = ((IdExpression)expr).getNumericValue();
-			return new LiteralExpression(value);
+			if(null!=value) {
+				return new LiteralExpression(value);
+			}
 		}
 		return null;
 	}

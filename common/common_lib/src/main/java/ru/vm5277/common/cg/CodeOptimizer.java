@@ -30,6 +30,7 @@ import ru.vm5277.common.cg.items.CGIAsmLd;
 import ru.vm5277.common.cg.items.CGIAsmLdLabel;
 import ru.vm5277.common.cg.items.CGIAsmSkipInstr;
 import ru.vm5277.common.cg.items.CGIContainer;
+import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.cg.items.CGItem;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
@@ -91,7 +92,7 @@ public abstract class CodeOptimizer {
 						if(item2 instanceof CGLabelScope) {
 							break;
 						}
-						if(!item2.isDisabled()) {
+						if(!(item2 instanceof CGIText) && !item2.isDisabled()) {
 							item2.disable();
 							changed=true;
 						}
@@ -219,7 +220,7 @@ public abstract class CodeOptimizer {
 					if(list.get(i-1) instanceof CGIAsmJump) {
 						CGItem nextItem = list.get(i+1);
 						if(nextItem instanceof CGIAsmJump) {
-							if(!name.equals(((CGIAsmJump)nextItem).getLabelName())) {
+							if(!((CGIAsmJump)nextItem).isExternal() && !name.equals(((CGIAsmJump)nextItem).getLabelName())) {
 								replacementMap.put(name, ((CGIAsmJump)nextItem).getLabelName());
 								item.disable();
 								nextItem.disable();

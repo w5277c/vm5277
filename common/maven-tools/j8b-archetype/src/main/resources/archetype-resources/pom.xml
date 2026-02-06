@@ -10,26 +10,66 @@
 	<name>${artifactId}</name>
 	<description>Demo project</description>
 	<properties>
-		<j8b.target>avr:atmega328p</j8b.target>
+		<j8b.packaging.version>0.1.0</j8b.packaging.version>
+		<j8b.plugin.version>0.1.0</j8b.plugin.version>
+		<j8b.target>avr:atmega168p</j8b.target>
 		<j8b.targetFreq>16</j8b.targetFreq>
+		<j8b.targetStdio>PB5</j8b.targetStdio>
+		<j8b.verboseOutput>true</j8b.verboseOutput>
+		<j8b.sourceDirectory>src/main/j8b</j8b.sourceDirectory>
+		<j8b.output.base>${project.build.directory}</j8b.output.base>
 	</properties>
+	
+	<profiles>
+		<profile>
+			<id>default</id>
+			<activation>
+				<activeByDefault>true</activeByDefault>
+			</activation>
+			<properties>
+				<j8b.target>avr:atmega168p</j8b.target>
+				<j8b.targetFreq>16</j8b.targetFreq>
+				<j8b.targetStdio>PD3/PD4</j8b.targetStdio>
+				<j8b.output.subdir>default</j8b.output.subdir>
+			</properties>
+		</profile>
+		<profile>
+		<id>1w</id>
+			<properties>
+				<j8b.target>avr:atmega168p</j8b.target>
+				<j8b.targetFreq>16</j8b.targetFreq>
+				<j8b.targetStdio>PC4</j8b.targetStdio>
+				<j8b.output.subdir>default-1w</j8b.output.subdir>
+			</properties>
+		</profile>
 
+		<profile>
+			<id>arduino-uno</id>
+			<properties>
+				<j8b.target>avr:atmega328p</j8b.target>
+				<j8b.targetFreq>16</j8b.targetFreq>
+				<j8b.targetStdio>PD0/PD1</j8b.targetStdio>
+				<j8b.output.subdir>arduino-uno</j8b.output.subdir>
+			</properties>
+		</profile>
+	</profiles>
 	<build>
 		<extensions>
 			<extension>
 				<groupId>ru.vm5277</groupId>
 				<artifactId>j8b-packaging</artifactId>
-				<version>0.1.0</version>
+				<version>${j8b.packaging.version}</version>
 			</extension>
 		</extensions>
-		<sourceDirectory>src/main/j8b</sourceDirectory>
+		<sourceDirectory>${j8b.sourceDirectory}</sourceDirectory>
 		<plugins>
 			<plugin>
 				<groupId>ru.vm5277</groupId>
 				<artifactId>j8b-plugin</artifactId>
-				<version>0.1.0</version>
+				<version>${j8b.plugin.version}</version>
 				<executions>
 					<execution>
+						<id>compile-j8b</id>
 						<phase>compile</phase>
 						<goals>
 							<goal>compile</goal>
@@ -39,11 +79,13 @@
 				<configuration>
 					<target>${j8b.target}</target>
 					<targetFreq>${j8b.targetFreq}</targetFreq>
+					<targetStdio>${j8b.targetStdio}</targetStdio>
+					<outputDirectory>${j8b.output.base}/${j8b.output.subdir}</outputDirectory>
+					<verboseOutput>${j8b.verboseOutput}</verboseOutput>
 				</configuration>
 			</plugin>
 		</plugins>
 	</build>
-
 	<pluginRepositories>
 		<pluginRepository>
 			<id>ru.vm5277</id>

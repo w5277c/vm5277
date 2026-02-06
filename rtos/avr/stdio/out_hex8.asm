@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-.include "stdio/out_char.asm"
+.include "stdio/stdout.asm"
 
 .IFNDEF OS_OUT_HEX8
 ;-----------------------------------------------------------
@@ -23,26 +23,46 @@ OS_OUT_HEX8:
 ;Вывод в шестнадцатеричной форме числа(8 бит)
 ;IN: ACCUM_L-8b число
 ;-----------------------------------------------------------
+.IF OS_FT_STDOUT == 0x01
 	PUSH ACCUM_L
 	
-	ANDI ACCUM_L,0x0f
-	CPI ACCUM_L,0x0a
-	BRCS PC+0x02
-	SUBI ACCUM_L,low(-0x27)									;+0x27
-	SUBI ACCUM_L,low(-0x30)									;+0x30
-	MCALL OS_OUT_CHAR
-
-	POP ACCUM_L
-	PUSH ACCUM_L
-
+.IFDEF STDIO_PORT_REGID
+.IF OS_FT_STDIN == 0x01
+	MCALL OS_STDIO_SEND_MODE_NR
+.ENDIF
+.ENDIF
 	SWAP ACCUM_L
 	ANDI ACCUM_L,0x0f
 	CPI ACCUM_L,0x0a
 	BRCS PC+0x02
 	SUBI ACCUM_L,low(-0x27)									;+0x27
 	SUBI ACCUM_L,low(-0x30)									;+0x30
-	MCALL OS_OUT_CHAR
+.IF OS_FT_DEV_MODE
+	MCALL PROC__BLDR_UART_SEND_BYTE_NR
+.ELSE
+	MCALL OS_STDOUT_SEND_BYTE
+.ENDIF
 
 	POP ACCUM_L
+	PUSH ACCUM_L
+
+	ANDI ACCUM_L,0x0f
+	CPI ACCUM_L,0x0a
+	BRCS PC+0x02
+	SUBI ACCUM_L,low(-0x27)									;+0x27
+	SUBI ACCUM_L,low(-0x30)									;+0x30
+.IF OS_FT_DEV_MODE
+	MCALL PROC__BLDR_UART_SEND_BYTE_NR
+.ELSE
+	MCALL OS_STDOUT_SEND_BYTE
+.ENDIF
+.IFDEF STDIO_PORT_REGID
+.IF OS_FT_STDIN == 0x01
+	MCALL OS_STDIO_RECV_MODE_NR
+.ENDIF
+.ENDIF
+
+	POP ACCUM_L
+.ENDIF
 	RET
 .ENDIF

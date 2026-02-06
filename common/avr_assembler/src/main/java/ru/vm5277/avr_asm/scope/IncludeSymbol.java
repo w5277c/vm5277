@@ -50,6 +50,9 @@ public class IncludeSymbol extends Symbol {
 			elseIfSkip = skip;
 			blockSuccess |= !skip;
 		}
+		else {
+			blockSkip.add(skip);
+		}
 	}
 
 	public int getBlockCntr() {

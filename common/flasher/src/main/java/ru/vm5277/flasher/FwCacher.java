@@ -23,12 +23,12 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Scanner;
 import ru.vm5277.common.DatatypeConverter;
-import ru.vm5277.common.Platform;
+import ru.vm5277.common.PlatformType;
 import ru.vm5277.common.firmware.IntelHex.IntelHexParser;
 
 public class FwCacher {
 
-	public static boolean updateByCache(Path _cachePath, Platform _platform, int _signature, byte[] _uid, List<Segment> _segments, byte[] _data,
+	public static boolean updateByCache(Path _cachePath, PlatformType _platform, int _signature, byte[] _uid, List<Segment> _segments, byte[] _data,
 										int _maxFlashSize) {
 		File file = _cachePath.resolve(buildFilename(_platform, _signature, _uid)).normalize().toFile();
 		if(file.exists()) {
@@ -64,7 +64,7 @@ public class FwCacher {
 		return false;
 	}
 
-	static boolean clearCache(Path _cachePath, Platform _platform, int _signature, byte[] _UId) {
+	static boolean clearCache(Path _cachePath, PlatformType _platform, int _signature, byte[] _UId) {
 		File file = _cachePath.resolve(buildFilename(_platform, _signature, _UId)).toFile();
 		if(file.exists()) {
 			return file.delete();
@@ -72,7 +72,7 @@ public class FwCacher {
 		return true;
 	}
 
-	static boolean putCache(Path _cachePath, Platform _platform, int _signature, byte[] _UId, byte[] _sourceData) {
+	static boolean putCache(Path _cachePath, PlatformType _platform, int _signature, byte[] _UId, byte[] _sourceData) {
 		File file = _cachePath.resolve(buildFilename(_platform, _signature, _UId)).toFile();
 		if(!file.exists()) {
 			try {
@@ -92,7 +92,7 @@ public class FwCacher {
 	}
 	
 
-	private static String buildFilename(Platform _platform, int _signature, byte[] _uid) {
+	private static String buildFilename(PlatformType _platform, int _signature, byte[] _uid) {
 		return	_platform.toString().toLowerCase() + "-" + String.format("%08X", _signature) + File.separator +
 				DatatypeConverter.printHexBinary(_uid) + ".bin";
 	}

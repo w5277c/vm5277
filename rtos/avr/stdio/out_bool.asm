@@ -28,8 +28,8 @@ OS_OUT_BOOL:
 ;Вывод bool значения
 ;IN: ACCUM_L(младший бит)-значение(1-true)
 ;--------------------------------------------------------
-	PUSH ZL
-	PUSH ZH
+.IF OS_FT_STDOUT == 0x01
+	PUSH_Z
 
 	SBRC ACCUM_L,0x00
 	LDI ZL,low(_OS_OUT_BOOL_STR_TRUE*2)
@@ -41,7 +41,7 @@ OS_OUT_BOOL:
 	LDI ZH,high(_OS_OUT_BOOL_STR_FALSE*2)
 	MCALL OS_OUT_CSTR
 
-	POP ZH
-	POP ZL
+	POP_Z
+.ENDIF
 	RET
 .ENDIF

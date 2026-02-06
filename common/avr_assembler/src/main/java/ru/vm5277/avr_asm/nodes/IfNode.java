@@ -22,7 +22,6 @@ import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class IfNode {
@@ -33,8 +32,9 @@ public class IfNode {
 		Expression expr = Expression.parse(tb, scope, mc);
 		if(!scope.getIncludeSymbol().isBlockSkip()) {
 			Long _value = Expression.getLong(expr, sp);
-			if(null == _value) {
-				mc.add(new ErrorMessage("Could not resolve condition: '" + expr + "'", sp));
+			if(null==_value) {
+				tb.skipLine();
+				throw new CompileException("Cannot resolve condition: '" + expr + "'", sp);
 			}
 			else {
 				value = _value;

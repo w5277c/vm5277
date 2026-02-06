@@ -16,6 +16,7 @@
 
 package ru.vm5277.compiler.nodes.expressions;
 
+import ru.vm5277.common.NumUtils;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
@@ -27,13 +28,17 @@ import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.lexer.tokens.Token;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.VarType.FIXED_MAX;
+import static ru.vm5277.common.VarType.FIXED_MIN;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CGExcs;
 
 public class LiteralExpression extends ExpressionNode {
-    private Object value;
-    
-    public LiteralExpression(TokenBuffer tb, MessageContainer mc, Object value) {
+    private Object	value;
+	private	boolean	fromVarField	= false; // Получен из переменной или свойства т.е. имеет фиксированный тип не зависимый от значения
+	private	boolean	isOverflow		= false; // Включен если при вычислении с final VarField значение превысило диапазон типа переменной или свойства
+	
+	public LiteralExpression(TokenBuffer tb, MessageContainer mc, Object value) {
         super(tb, mc);
         
 		this.value = value;
@@ -45,10 +50,19 @@ public class LiteralExpression extends ExpressionNode {
 		else if(value instanceof String) type = VarType.CSTR;
 		else if(value instanceof VarType) type = (VarType)value;
 		else if(value instanceof Number)  {
-			if(value instanceof Double && ((double)value)!=((Double)value).longValue()) type = VarType.FIXED;
+			if(value instanceof Double) {
+				double doubleValue = ((Number)value).doubleValue();
+				if(doubleValue>=FIXED_MIN && doubleValue<=FIXED_MAX) {
+					type = VarType.FIXED;
+				}
+			}
 			else {
 				long l = ((Number)value).longValue();
-				if(l<0) type = VarType.FIXED;
+				if(l<0) {
+					if(l>=FIXED_MIN) {
+						type = VarType.FIXED;
+					}
+				}
 				else if(l<=255) type = VarType.BYTE;
 				else if(l<=65535) type = VarType.SHORT;
 				else type = VarType.INT;
@@ -56,6 +70,24 @@ public class LiteralExpression extends ExpressionNode {
 		}
     }
 
+	public LiteralExpression(TokenBuffer tb, MessageContainer mc, Number value, VarType type, boolean isOverflow) {
+        super(tb, mc);
+        
+		this.value = value;
+		this.type = type;
+		this.fromVarField = true;
+		this.isOverflow = isOverflow;
+	}
+	
+	void setVarFieldType(VarType type) {
+		this.type = type;
+		fromVarField = true;
+	}
+
+	public boolean fromVarField() {
+		return fromVarField;
+	}
+	
 	public Object getValue() {
 		return value;
 	}
@@ -74,9 +106,13 @@ public class LiteralExpression extends ExpressionNode {
 	
 	public long getFixedValue() {
 		if(value instanceof Double) {
-			return Math.round(((Double)value)*256.0) & 0xffffl;
+			return (long)Math.floor(((Double)value)*256.0) & 0xffffl;
 		}
-		return (getNumValue()*256l) & 0xffffl;
+		long result = ((Number)value).longValue();
+		if(0>result) {
+			return (result * 256L) & 0xffffl;
+		}
+		return (result*256l) & 0xffffl;
 	}
 	
 	public boolean isBoolean() {
@@ -98,7 +134,7 @@ public class LiteralExpression extends ExpressionNode {
 			return ((VarType)value).getId();
 		}
 		else if(value instanceof Double) {
-			return Math.round(((Double)value));
+			return (long)Math.floor((Double)value);
 		}
 		else {
 			long result = ((Number)value).longValue();
@@ -167,12 +203,18 @@ public class LiteralExpression extends ExpressionNode {
 		if(toAccum) {
 			//cg.constToAcc(cgScope, returnType.getSize(), isFixed() ? getFixedValue() : getNumValue(), isFixed());
 			if(isString()) {
-				cg.cellsToAcc(cgs, new CGCells(cg.defineData(cg.genId(), -1, value).getLabel()));
+				cg.cellsToAcc(cgs, new CGCells(cg.defineData(cg.genId(), -1, value).getLabel()), false);
 			}
 			else {
 				long v = isFixed() ? getFixedValue() : getNumValue();
 				// LiteralExpression не должен задавать размер аккумулятору!
 				cg.constToAcc(cgs, -1, v, isFixed());
+				if(isOverflow) {
+					Integer exceptionId = cg.getExcsChecker().getHandled(excs, "MathOverflowException");
+					if(null!=exceptionId) {
+						cg.getExcsChecker().makeException(cg, cgs, excs, exceptionId);
+					}
+				}
 			}
 			return CodegenResult.RESULT_IN_ACCUM;
 		}

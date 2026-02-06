@@ -1,0 +1,76 @@
+/*
+ * Copyright 2025 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+class Main {
+	public static void main() {
+		System.outChar('#');
+		System.outChar('\n');
+
+		System.out("Constant string");
+		System.outChar('\n');
+
+		System.out("Константная строка в кодировке KOI8-r");
+		System.outChar('\n');
+
+		System.out(0xff);
+		System.outChar('\n');
+		
+		System.out(0xffff);
+		System.outChar('\n');
+
+		System.out(0xffffffff);
+		System.outChar('\n');
+
+		System.out(1.99);
+		System.outChar('\n');
+
+		System.out(1.01);
+		System.outChar('\n');
+
+		System.out(1.09);
+		System.outChar('\n');
+		System.out(1.10);
+		System.outChar('\n');
+		System.out(1.11);
+		System.outChar('\n');
+
+		System.out(127.99);
+		System.outChar('\n');
+
+		System.out(10.991);
+		System.outChar('\n');
+
+		System.out(-1.9);
+		System.outChar('\n');
+
+		System.out(-127.99);
+		System.outChar('\n');
+
+		System.out(-128);
+		System.outChar('\n');
+
+		System.out(true);
+		System.outChar('\n');
+
+		System.out(false);
+		System.outChar('\n');
+
+		System.out(12==3*4);
+		System.outChar('\n');
+
+
+	}
+}

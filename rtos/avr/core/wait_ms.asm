@@ -13,8 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-.IFNDEF WAIT_MS
-WAIT_MS:
+.IFNDEF OS_WAIT_MS
+OS_WAIT_MS:
 ;--------------------------------------------------------
 ;Ждем истечения времени с момента прошлого сна или
 ;с момента вызова C5_TIMER_MARK
@@ -25,31 +25,31 @@ WAIT_MS:
 	PUSH ACCUM_H
 	PUSH ACCUM_L
 	PUSH_T16
-.IF OS_FT_TIMER1 == 0x01
+.IF OS_FT_TIMER == 0x01
 	LDS TEMP_H,_OS_UPTIME+0x05
-_WAIT_MS__LOOP:
+_OS_WAIT_MS__LOOP:
 	LDS TEMP_L,_OS_UPTIME+0x05
 	CP TEMP_H,TEMP_L
-	BREQ _WAIT_MS__LOOP
+	BREQ _OS_WAIT_MS__LOOP
 	LDS TEMP_L,_OS_UPTIME+0x05
 	SUB ACCUM_L,TEMP_L
 	SBC ACCUM_H,C0x00
-	BRCC _WAIT_MS__LOOP
+	BRCC _OS_WAIT_MS__LOOP
 .ELSE
-_WAIT_MS__LOOP1:
+_OS_WAIT_MS__LOOP1:
 	LDI TEMP_H,(29*CORE_FREQ)/10
-_WAIT_MS__LOOP2:
-	LDI TEMP_L,0x4f
-_WAIT_MS__LOOP3:
+_OS_WAIT_MS__LOOP2:
+	LDI TEMP_L,0x56
+_OS_WAIT_MS__LOOP3:
 	NOP
 	DEC TEMP_L
-	BRNE _WAIT_MS__LOOP3
+	BRNE _OS_WAIT_MS__LOOP3
 	DEC TEMP_H
-	BRNE _WAIT_MS__LOOP2
+	BRNE _OS_WAIT_MS__LOOP2
 
 	SUBI ACCUM_L,0x01
 	SBCI ACCUM_H,0x00
-	BRCC _WAIT_MS__LOOP1
+	BRCC _OS_WAIT_MS__LOOP1
 .ENDIF
 
 	POP_T16

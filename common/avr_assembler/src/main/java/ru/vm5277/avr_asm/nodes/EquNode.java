@@ -32,9 +32,9 @@ public class EquNode {
 		SourcePosition sp = tb.getSP();
 		Expression expr = Expression.parse(tb, scope, mc);
 		Long value = Expression.getLong(expr, tb.getSP());
-		if(null == value) {
+		if(null==value) {
 			tb.skipLine();
-			throw new CompileException("Unable to resolve constant: '" + expr + "'", sp);
+			throw new CompileException("Cannot resolve constant: '" + expr + "'", sp);
 		}
 		scope.setVariable(new VariableSymbol(name, value, true), tb.getSP());
 		

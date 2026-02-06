@@ -31,8 +31,8 @@ public class CGTryBlockScope extends CGBlockScope {
 	private			List<CGLabelScope>				catchLabels		= new ArrayList<>();
 	private			Map<CGLabelScope, Set<Integer>>	catches			= new HashMap<>();
 	
-	public CGTryBlockScope(CodeGenerator cg, CGScope parent, int id) {
-		super(cg, parent, id);
+	public CGTryBlockScope(CodeGenerator cg, CGScope parent, int id, String comment) {
+		super(cg, parent, id, comment);
 	}
 
 	public void addCatchExceptions(Set<Integer> ids) {

@@ -50,7 +50,8 @@ import ru.vm5277.compiler.semantic.VarSymbol;
 import ru.vm5277.common.lexer.tokens.Token;
 
 public class ExpressionNode extends AstNode {
-	protected	VarType type;
+	private		static	final	double	CMP_TOLERANCE = 0.0001;
+	protected					VarType type;
 	
 	public ExpressionNode(TokenBuffer tb, MessageContainer mc) {
 		super(tb, mc);
@@ -176,12 +177,12 @@ public class ExpressionNode extends AstNode {
 			else if (op.isComparison() && leftVal instanceof Number && rightVal instanceof Number) {
 				double delta = ((Number)leftVal).doubleValue() - ((Number)rightVal).doubleValue();
 				switch(op) {
-					case EQ:	return new LiteralExpression(tb, mc, 0d == delta);
-					case NEQ:	return new LiteralExpression(tb, mc, 0d != delta);
+					case EQ:	return new LiteralExpression(tb, mc, Math.abs(delta) < CMP_TOLERANCE);
+					case NEQ:	return new LiteralExpression(tb, mc, Math.abs(delta) >= CMP_TOLERANCE);
 					case LT:	return new LiteralExpression(tb, mc, 0d > delta);
 					case GT:	return new LiteralExpression(tb, mc, 0d < delta);
-					case LTE:	return new LiteralExpression(tb, mc, 0d <= delta);
-					case GTE:	return new LiteralExpression(tb, mc, 0d >= delta);
+					case LTE:	return new LiteralExpression(tb, mc, 0d >= delta);
+					case GTE:	return new LiteralExpression(tb, mc, 0d <= delta);
 					default: throw parserError("Invalid comparision operator: " + op);
 				}
 			}
@@ -234,7 +235,7 @@ public class ExpressionNode extends AstNode {
 		
 	}
 
-	private ExpressionNode optimizeAdditiveChain(ExpressionNode left, Operator op, ExpressionNode right) {
+	private ExpressionNode optimizeAdditiveChain(ExpressionNode left, Operator op, ExpressionNode right) throws CompileException {
 		if (Operator.PLUS==op) {
 			boolean leftIsString = (left instanceof LiteralExpression && ((LiteralExpression)left).getValue() instanceof String);
 			boolean rightIsString = (right instanceof LiteralExpression && ((LiteralExpression)right).getValue() instanceof String);
@@ -245,20 +246,77 @@ public class ExpressionNode extends AstNode {
 		}
 		
 		if (left instanceof LiteralExpression && right instanceof LiteralExpression) {
-			Object leftVal = ((LiteralExpression)left).getValue();
-			Object rightVal = ((LiteralExpression)right).getValue();
+			LiteralExpression lle = (LiteralExpression)left;
+			LiteralExpression rle = (LiteralExpression)right;
+			Object leftVal = lle.getValue();
+			Object rightVal = rle.getValue();
 
+			boolean varFiledCast = (lle.fromVarField() | rle.fromVarField());
+			VarType type_ = lle.getType().getSize() > rle.getType().getSize() ? lle.getType() : rle.getType();
 			if (leftVal instanceof Number && rightVal instanceof Number) {
 				if (leftVal instanceof Double || rightVal instanceof Double) {
 					double a = ((Number)leftVal).doubleValue();
 					double b = ((Number)rightVal).doubleValue();
 					double result = op == Operator.PLUS ? a + b : a - b;
+					
+					if(varFiledCast) {
+						boolean overflow = false;
+						try {
+							type_.checkRange(result);
+							return new LiteralExpression(tb, mc, result, type_, overflow);
+						}
+						catch(CompileException ex) {
+							overflow = true;
+							if(VarType.BYTE==type_) return new LiteralExpression(tb, mc, ((long)result) & 0xff, type_, overflow);
+							else if(VarType.SHORT==type_) return new LiteralExpression(tb, mc, ((long)result) & 0xff, type_, overflow);
+							else if(VarType.INT==type_) return new LiteralExpression(tb, mc, ((long)result) & 0xff, type_, overflow);
+							else if(VarType.FIXED==type_) {
+								//TODO работает, но глупо, можно упростить
+								int tmp = (int)(result * 256d);
+								if(0!=(tmp&0x8000)) {
+									return new LiteralExpression(tb, mc, ((~tmp+0x1) & 0x7fff)/-256d, type_, overflow);
+								}
+								else {
+									return new LiteralExpression(tb, mc, (tmp & 0x7fff)/256d, type_, overflow);
+								}
+							}
+							else {
+								throw new CompileException("COMPILER BUG: Unsupported VarType in optimizeAdditiveChain");
+							}
+						}
+					}
 					return new LiteralExpression(tb, mc, result);
 				}
 				else {
 					long a = ((Number)leftVal).longValue();
 					long b = ((Number)rightVal).longValue();
 					long result = op == Operator.PLUS ? a + b : a - b;
+					if(varFiledCast) {
+						boolean overflow = false;
+						try {
+							type_.checkRange(result);
+							return new LiteralExpression(tb, mc, result, type_, overflow);
+						}
+						catch(CompileException ex) {
+							overflow = true;
+							if(VarType.BYTE==type_) return new LiteralExpression(tb, mc, result & 0xff, type_, overflow);
+							else if(VarType.SHORT==type_) return new LiteralExpression(tb, mc, result & 0xffff, type_, overflow);
+							else if(VarType.INT==type_) return new LiteralExpression(tb, mc, result & 0xffffffffl, type_, overflow);
+							else if(VarType.FIXED==type_) {
+								//TODO работает, но глупо, можно упростить
+								int tmp = (int)(result * 256d);
+								if(0!=(tmp&0x8000)) {
+									return new LiteralExpression(tb, mc, ((~tmp+0x1) & 0x7fff)/-256d, type_, overflow);
+								}
+								else {
+									return new LiteralExpression(tb, mc, (tmp & 0x7fff)/256d, type_, overflow);
+								}
+							}
+							else {
+								throw new CompileException("COMPILER BUG: Unsupported VarType in optimizeAdditiveChain");
+							}
+						}
+					}
 					return new LiteralExpression(tb, mc, result);
 				}
 			}
@@ -413,9 +471,9 @@ public class ExpressionNode extends AstNode {
 					value = (long)(le.getNumValue() & ((1l<<(newType.getSize()*8))-1));
 				}
 				else if(VarType.FIXED == newType) {
-					double tmp = le.getValue() instanceof Double ? (Double)le.getValue() : (double)le.getNumValue();
+					double tmp = le.getValue() instanceof Double ? (Double)le.getValue() : ((Number)le.getValue()).doubleValue();
 					// Ограничиваем целую часть диапазоном FIXED (Q7.8)
-					value = Math.max(-128.0, Math.min(127.99609375, tmp));
+					value = Math.max(VarType.FIXED_MIN, Math.min(VarType.FIXED_MAX, tmp));
 				}
 				if(null != value) {
 					return new LiteralExpression(tb, mc, value);
@@ -505,6 +563,9 @@ public class ExpressionNode extends AstNode {
 						(	vNode.getType().isEnum() || vNode.getInitializer() instanceof LiteralExpression ||
 							vNode.getInitializer() instanceof ArrayExpression || vNode.getInitializer() instanceof VarFieldExpression) ) {
 						
+						if(vNode.getInitializer() instanceof LiteralExpression) {
+							((LiteralExpression)vNode.getInitializer()).setVarFieldType(vNode.getType());
+						}
 						return vNode.getInitializer();
 					}
 				}
@@ -514,6 +575,9 @@ public class ExpressionNode extends AstNode {
 						(	fNode.getType().isEnum() || fNode.getInitializer() instanceof LiteralExpression ||
 							fNode.getInitializer() instanceof ArrayExpression || fNode.getInitializer() instanceof VarFieldExpression)) {
 						
+						if(fNode.getInitializer() instanceof LiteralExpression) {
+							((LiteralExpression)fNode.getInitializer()).setVarFieldType(fNode.getType());
+						}
 						return fNode.getInitializer();
 					}
 				}
@@ -649,18 +713,51 @@ public class ExpressionNode extends AstNode {
 		return null;
 	}
 
-	private ExpressionNode optimizeMultiplicativeChain(ExpressionNode left, Operator op, ExpressionNode right) {
+	private ExpressionNode optimizeMultiplicativeChain(ExpressionNode left, Operator op, ExpressionNode right) throws CompileException {
 		if (left instanceof LiteralExpression && right instanceof LiteralExpression) {
-			Object leftVal = ((LiteralExpression)left).getValue();
-			Object rightVal = ((LiteralExpression)right).getValue();
+			LiteralExpression lle = ((LiteralExpression)left);
+			LiteralExpression rle = ((LiteralExpression)right);
+			Object leftVal = lle.getValue();
+			Object rightVal = rle.getValue();
 
+			boolean varFiledCast = (lle.fromVarField() | rle.fromVarField());
+			VarType type_ = lle.getType().getSize() > rle.getType().getSize() ? lle.getType() : rle.getType();
+			
 			if (leftVal instanceof Number && rightVal instanceof Number) {
 				if (leftVal instanceof Double || rightVal instanceof Double) {
 					double a = ((Number)leftVal).doubleValue();
 					double b = ((Number)rightVal).doubleValue();
 					
 					switch (op) {
-						case MULT: return new LiteralExpression(tb, mc, a * b);
+						case MULT:
+							double result = a * b;
+							if(varFiledCast) {
+								boolean overflow = false;
+								try {
+									type_.checkRange(result);
+									return new LiteralExpression(tb, mc, result, type_, overflow);
+								}
+								catch(CompileException ex) {
+									overflow = true;
+									if(VarType.BYTE==type_) return new LiteralExpression(tb, mc, ((long)result) & 0xff, type_, overflow);
+									else if(VarType.SHORT==type_) return new LiteralExpression(tb, mc, ((long)result) & 0xff, type_, overflow);
+									else if(VarType.INT==type_) return new LiteralExpression(tb, mc, ((long)result) & 0xff, type_, overflow);
+									else if(VarType.FIXED==type_) {
+										//TODO работает, но глупо, можно упростить
+										int tmp = (int)(result * 256d);
+										if(0!=(tmp&0x8000)) {
+											return new LiteralExpression(tb, mc, ((~tmp+0x1) & 0x7fff)/-256d, type_, overflow);
+										}
+										else {
+											return new LiteralExpression(tb, mc, (tmp & 0x7fff)/256d, type_, overflow);
+										}
+									}
+									else {
+										throw new CompileException("COMPILER BUG: Unsupported VarType in optimizeAdditiveChain");
+									}
+								}
+							}
+							return new LiteralExpression(tb, mc, result);
 						case DIV:  return new LiteralExpression(tb, mc, a / b);
 						case MOD:  return new LiteralExpression(tb, mc, a % b);
 						default: throw new IllegalArgumentException();
@@ -670,7 +767,35 @@ public class ExpressionNode extends AstNode {
 					long a = ((Number)leftVal).longValue();
 					long b = ((Number)rightVal).longValue();
 					switch (op) {
-						case MULT: return new LiteralExpression(tb, mc, a * b);
+						case MULT:
+							long result = a * b;
+							if(varFiledCast) {
+								boolean overflow = false;
+								try {
+									type_.checkRange(result);
+									return new LiteralExpression(tb, mc, result, type_, overflow);
+								}
+								catch(CompileException ex) {
+									overflow = true;
+									if(VarType.BYTE==type_) return new LiteralExpression(tb, mc, result & 0xff, type_, overflow);
+									else if(VarType.SHORT==type_) return new LiteralExpression(tb, mc, result & 0xffff, type_, overflow);
+									else if(VarType.INT==type_) return new LiteralExpression(tb, mc, result & 0xffffffffl, type_, overflow);
+									else if(VarType.FIXED==type_) {
+										//TODO работает, но глупо, можно упростить
+										int tmp = (int)(result * 256d);
+										if(0!=(tmp&0x8000)) {
+											return new LiteralExpression(tb, mc, ((~tmp+0x1) & 0x7fff)/-256d, type_, overflow);
+										}
+										else {
+											return new LiteralExpression(tb, mc, (tmp & 0x7fff)/256d, type_, overflow);
+										}
+									}
+									else {
+										throw new CompileException("COMPILER BUG: Unsupported VarType in optimizeAdditiveChain");
+									}
+								}
+							}
+							return new LiteralExpression(tb, mc, result);
 						case DIV:  return new LiteralExpression(tb, mc, a / b);
 						case MOD:  return new LiteralExpression(tb, mc, a % b);
 						default: throw new IllegalArgumentException();

@@ -22,6 +22,7 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.Platform;
+import ru.vm5277.common.PlatformType;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.Optimization;
 import ru.vm5277.compiler.ASTParser;
@@ -65,7 +66,8 @@ public class Test {
     void test2() throws CompileException, IOException, CompileException, Exception {
 		Path toolkitPath = FSUtils.getToolkitPath();
 		File libDir = toolkitPath.resolve("bin").resolve("libs").normalize().toFile();
-		CodeGenerator cg = PlatformLoader.loadGenerator(Platform.STUB, libDir, Optimization.SIZE, null, null);
+		CodeGenerator cg = PlatformLoader.loadGenerator(new Platform(PlatformType.STUB, null, null, null, Optimization.SIZE), libDir);
+
 		MessageContainer mc = new MessageContainer(100, true, false);
 		Lexer lexer = new Lexer(LexerType.J8B, "class Clazz{ void method() { byte b1 = -1; byte b2=0; byte b3=255; byte b4 = 256; byte B5=128; }}",
 								false, 0x04);

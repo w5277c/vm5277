@@ -37,7 +37,7 @@ public class GPIO {
 	public	final	static	byte	PC1	= 0x21;
 	public	final	static	byte	PC2	= 0x22;
 	public	final	static	byte	PC3	= 0x23;
-	public	final	static	byte	BC4	= 0x24;
+	public	final	static	byte	PC4	= 0x24;
 	public	final	static	byte	PC5	= 0x25;
 	public	final	static	byte	PC6	= 0x26;
 	public	final	static	byte	PC7	= 0x27;

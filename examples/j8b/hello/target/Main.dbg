@@ -11,19 +11,32 @@
 
 [EXCEPTION_TYPES]
 0 Exception
-1 RuntimeException : Exception
-2 MathException : Exception
-3 DivByZeroException : MathException
-4 MathOverflowException : MathException
+1 IOException : Exception
+2 TimeoutException : IOException
+3 RuntimeException : Exception
+4 MathException : Exception
+5 DivByZeroException : MathException
+6 MathOverflowException : MathException
+7 NativeException
+
+[EXCEPTION_CODES]
+7 0 NOT_SUPPORTED
 
 [CLASS_TYPES]
 9 Runtime
-10 GPIO
-11 HaltMode
-12 RTOSParam
-13 System
-14 Thread
-15 Main
+10 Primitive
+11 Bool
+12 Byte
+13 Short
+14 Int
+15 Fixed
+16 Math
+17 GPIO
+18 HaltMode
+19 RTOSParam
+20 System
+21 Thread
+22 Main
 
 [THROW_POINTS]
 

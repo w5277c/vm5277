@@ -24,8 +24,8 @@ public class CGLoopBlockScope extends CGBlockScope {
 	private	CGLabelScope	nextLbScope;
 	private	CGLabelScope	endLbScope;
 	
-	public CGLoopBlockScope(CodeGenerator cg, CGScope parent, int id) {
-		super(cg, parent, id);
+	public CGLoopBlockScope(CodeGenerator cg, CGScope parent, int id, String comment) {
+		super(cg, parent, id, comment);
 		
 		startLbScope = new CGLabelScope(null, null, LabelNames.LOOP, true);
 		nextLbScope = new CGLabelScope(null, null, LabelNames.LOOP_NEXT, false);

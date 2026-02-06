@@ -24,12 +24,34 @@
 	.EQU FLASH_SIZE									= 0x8000; 32KB(16K words)
 	.EQU FLASH_PAGESIZE								= 0x80	; 128B
 	.EQU EEPROM_SIZE								= 0x0400; 1KB
-	.EQU EEPROM_PAGESIZE							= 0x4	; 4B
+	.EQU EEPROM_PAGESIZE							= 0x04	; 4B
 	.EQU SRAM_START									= 0x0100; 256B
 	.EQU SRAM_SIZE									= 0x0800; 2KB
 
 	.EQU BOOT_256W_ADDR								= 0x3f00; Начальный адрес полукилобайтного бутлоадера В СЛОВАХ
 	.EQU BOOT_512W_ADDR								= 0x3e00; Начальный адрес килобайтного бутлоадера В СЛОВАХ
+
+	;---SBI/CBI/SBIS/SBIC-port-defines----------------------
+	.EQU	PORTA									= 0xff
+	.EQU	DDRA									= 0xff
+	.EQU	PINA									= 0xff
+	.EQU	PORTB									= 0x05
+	.EQU	DDRB									= 0x04
+	.EQU	PINB									= 0x03
+	.EQU	PORTC									= 0x08
+	.EQU	DDRC									= 0x07
+	.EQU	PINC									= 0x06
+	.EQU	PORTD									= 0x0b
+	.EQU	DDRD									= 0x0a
+	.EQU	PIND									= 0x09
+	.EQU	PORTE									= 0xff
+	.EQU	DDRE									= 0xff
+	.EQU	PINE									= 0xff
+	.EQU	PORTF									= 0xff
+	.EQU	DDRF									= 0xff
+	.EQU	PINF									= 0xff
+	.EQU	PORTG									= 0xff
+	.EQU	DDRG									= 0xff
 
 	;---IO-REGISTERS---------------------------------------
 	.EQU	SREG									= 0x5f

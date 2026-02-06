@@ -16,6 +16,8 @@
 
 package ru.vm5277.common;
 
+import java.io.File;
+import java.nio.file.Path;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.cg.items.CGIContainer;
 
@@ -36,6 +38,10 @@ public class ExcsThrowPoint {
 
 	public Integer getId() {
 		return id;
+	}
+
+	public SourcePosition getSp() {
+		return sp;
 	}
 
 	public void apply(int id) {
@@ -63,8 +69,29 @@ public class ExcsThrowPoint {
 		}
 	}
 	
-	@Override
-	public String toString() {
-		return null!=id ? id + " " + (null==sp ? "null" : sp.toString()) + " " + signature : "";
+	public String toString(Path sourcePath) {
+		if(null==sp || null==id || null==sp.getSourceFile()) return "";
+		
+		StringBuilder sb = new StringBuilder();
+		sb.append(id);
+		sb.append(" ");
+		
+		String filePathStr = sp.getSourceFile().getPath().toString();
+		String sourcePathStr = sourcePath.toString();
+		int pos = sourcePathStr.lastIndexOf(File.separator);
+		if(-1!=pos) {
+			sourcePathStr = sourcePathStr.substring(0, pos+1);
+			if(filePathStr.startsWith(sourcePathStr)) {
+				filePathStr = filePathStr.substring(sourcePathStr.length());
+			}
+		}
+		sb.append(filePathStr);
+		
+		sb.append(":");
+		sb.append(sp.getLine());
+		sb.append(" ");
+		sb.append(signature);
+		
+		return sb.toString();
 	}
 }

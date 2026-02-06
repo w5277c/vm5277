@@ -15,6 +15,7 @@
  */
 package ru.vm5277.avr_asm.nodes.operands;
 
+import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.lexer.SourcePosition;
@@ -24,7 +25,12 @@ public class IOReg {
 	private	int	id;
 
 	public IOReg(Scope scope, SourcePosition sp, Expression expr) throws CompileException {
-		id = Expression.getLong(expr, sp).intValue();
+		Integer _value = Expression.getLong(expr, sp).intValue();
+		if(null==_value) {
+			throw new CompileException("Cannot resolve value '" + expr + "'", sp);
+		}
+		
+		id = _value;
 		if(0>id || 0x1f<id) {
 			throw new CompileException("TODO ожидаем IO регистр(0-31), получили " + id, sp);
 		}

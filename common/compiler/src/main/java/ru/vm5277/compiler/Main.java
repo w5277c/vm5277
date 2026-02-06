@@ -29,6 +29,7 @@ import static ru.vm5277.common.AssemblerInterface.STRICT_NONE;
 import static ru.vm5277.common.AssemblerInterface.STRICT_STRONG;
 import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.Platform;
+import ru.vm5277.common.PlatformType;
 import ru.vm5277.common.SemanticAnalyzePhase;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.RTOSParam;
@@ -54,7 +55,7 @@ public class Main {
 	private			static	int						optLevel			= Optimization.SIZE;
 	public	final	static	boolean					DEBUG_AST			= false;
 	private	final	static	Map<Object, Integer>	DEBUG_AST_CNTR_MAP	= new HashMap<>();
-	
+	private			static	boolean					quiet				= false;
 	
 	public static void main(String[] args) {
 		System.exit(exec(args));
@@ -81,28 +82,41 @@ public class Main {
 			return 0;
 		}
 		
-		showDisclaimer();
-		
-		Platform platform = null;
+		PlatformType platformType = null;
 		String mcu = null;
 		Float freq = null;
 		String source = null;
 		Path outputPath = null;
+		boolean devMode = false;
 		int cgVerbose = 0;
 		int maxErrors = 30;
 		boolean dumpIR = false;
 		int tabSize = 0x04;
+		Map<RTOSParam, Object> params = new HashMap<>();
 		
 		if(0x02 <= args.length) {
 			String[] parts = args[0x00].split(":");
 			if(0x02 == parts.length) {
-				platform = Platform.valueOf(parts[0].toUpperCase());
+				platformType = PlatformType.valueOf(parts[0].toUpperCase());
 				mcu = parts[1];
 			}
 			source = args[1];
 			
-			for(int i=2; i< args.length; i++) {
+			for(int i=2; i<args.length; i++) {
 				String arg = args[i];
+				if(arg.equals("--dump-ir")) {
+					dumpIR = true;
+					continue;
+				}
+				if(arg.equals("-d") || arg.equals("-dev-mode")) {
+					devMode = true;
+					continue;
+				}
+				if(arg.equals("-q") || arg.equals("--quiet")) {
+					quiet = true;
+					continue;
+				}
+
 				if(args.length > i+1) {
 					if(arg.equals("-P") || arg.equals("--path")) {
 						toolkitPath = FSUtils.resolveWithEnv(args[++i]);
@@ -124,6 +138,35 @@ public class Main {
 						catch(Exception e) {
 							System.err.println("[ERROR] Invalid freq parameter:"  + value);
 							return 1;
+						}
+						continue;
+					}
+					else if(arg.equals("-D") || arg.equals("--define")) {
+						parts = args[++i].split("=", 2);
+						String name = parts[0x00].trim().toUpperCase();
+						RTOSParam param = RTOSParam.valueOf(name);
+						if(null==param) {
+							System.err.println("[ERROR] Unlnown RTOSParam.name: " + name);
+							return 1;
+						}
+						
+						if(parts[0x01].startsWith("0x")) {
+							try {
+								int value = Integer.parseInt(parts[0x01].substring(0x02), 0x10);
+								params.put(param, value);
+							}
+							catch(Exception ex) {
+								params.put(param, parts[0x01]);
+							}
+						}
+						else {
+							try {
+								int value = Integer.parseInt(parts[0x01]);
+								params.put(param, value);
+							}
+							catch(Exception ex) {
+								params.put(param, parts[0x01]);
+							}
 						}
 						continue;
 					}
@@ -174,18 +217,21 @@ public class Main {
 						}
 						continue;
 					}
+					else if(arg.equals("-t") || arg.equals("--tabsize")) {
+						String value = args[++i];
+						try {
+							tabSize = Integer.parseInt(value);
+						}
+						catch(Exception e) {
+							System.err.println("[ERROR] Invalid parameter " + arg + " value: " + value);
+							break;
+						}
+						continue;
+					}
 				}
 				
-				if(arg.equals("--dump-ir")) {
-					dumpIR = true;
-				}
-				else if(arg.equals("-t") || arg.equals("--tabsize")) {
-					tabSize = Integer.parseInt(args[i]);
-				}
-				else {
-					System.err.println("[ERROR] Invalid parameter: " + arg);
-					return 1;
-				}
+				System.err.println("[ERROR] Invalid parameter: " + arg);
+				return 1;
 			}
 		}
 		else {
@@ -193,13 +239,15 @@ public class Main {
 			return 0;
 		}
  
+		if(!quiet) showDisclaimer();
+		
 		if(null==toolkitPath) {
 			showInvalidToolkitDir(toolkitPath, null);
 			return 1;
 		}
-		System.out.println("Toolkit path: " + toolkitPath.toString());
+		if(!quiet) System.out.println("Toolkit path: " + toolkitPath.toString());
 		
-		if(null == platform || null == mcu || mcu.isEmpty()) {
+		if(null == platformType || null == mcu || mcu.isEmpty()) {
 			showInvalidDeviceFormat(args[0]);
 			return 1;
 		}
@@ -215,14 +263,20 @@ public class Main {
 		File libDir = toolkitPath.resolve("bin").resolve("libs").normalize().toFile();
 		NativeBindingsReader nbr = new NativeBindingsReader(runtimePath, mc);
 
-		Map<RTOSParam, Object> params = new HashMap<>();
+		Path asmDefsPath = toolkitPath.resolve("defs").resolve(platformType.name().toLowerCase());
+		
 		params.put(RTOSParam.MCU, mcu);
 		if(null!=freq) {
 			params.put(RTOSParam.CORE_FREQ, freq.intValue());
 		}
+		if(devMode) {
+			params.put(RTOSParam.DEVEL_MODE, 1);
+		}
+		
 		CodeGenerator cg = null;
 		try {
-			cg = PlatformLoader.loadGenerator(platform, libDir, optLevel, nbr.getMap(), params);
+			Platform platform = new Platform(platformType, nbr.getMap(), params, asmDefsPath.resolve(mcu + ".inc"), optLevel);
+			cg = PlatformLoader.loadGenerator(platform, libDir);
 		}
 		catch(Exception ex) {
 			ex.printStackTrace();
@@ -231,7 +285,7 @@ public class Main {
 		CodeGenerator.verbose = cgVerbose;
 		
 		long timestamp = System.currentTimeMillis();
-		System.out.println("Parsing " + sourcePath.toString()  + " ...");
+		if(!quiet) System.out.println("Parsing " + sourcePath.toString()  + " ...");
 		Lexer lexer = null;
 		try {
 			lexer = new Lexer(LexerType.J8B, sourcePath.toFile(), null, tabSize, false);
@@ -250,18 +304,19 @@ public class Main {
 			return 1;
 		}
 		
+		boolean result = false;
 		ClassNode clazz = (ClassNode)parser.getClazz();
 		float time = (System.currentTimeMillis() - timestamp) / 1000f;
-		System.out.println("Parsing done, time:" + String.format(Locale.US, "%.3f", time) + " s");
+		if(!quiet) System.out.println("Parsing done, time:" + String.format(Locale.US, "%.3f", time) + " s");
 		timestamp = System.currentTimeMillis();
 		if(null == clazz) {
 			mc.add(new ErrorMessage("Main class or interface not found", null));
 		}
 		else {
-			System.out.println("Semantic...");
+			if(!quiet) System.out.println("Semantic...");
 			SemanticAnalyzer.analyze(clazz, cg, parser.getAutoImported());
 			time = (System.currentTimeMillis() - timestamp) / 1000f;
-			System.out.println("Semantic done, time:" + String.format(Locale.US, "%.3f", time) + " s");
+			if(!quiet) System.out.println("Semantic done, time:" + String.format(Locale.US, "%.3f", time) + " s");
 
 			//ReachableAnalyzer.analyze(mc, (ClassNode)parser.getClazz(), cg);
 
@@ -302,7 +357,7 @@ public class Main {
 
 					if(null != launchNode) {
 						timestamp = System.currentTimeMillis();
-						System.out.println("Codegen...");
+						if(!quiet) System.out.println("Codegen...");
 
 						CGExcs excs = new CGExcs();
 						clazz.firstCodeGen(cg, launchNode, excs);
@@ -311,19 +366,21 @@ public class Main {
 						//System.out.println("\n" + cg.getAsm());
 
 						File asmFile = outputPath.resolve(sourceName + ".asm").normalize().toFile();
-						Path asmInstrPath = toolkitPath.resolve("defs").resolve(platform.name().toLowerCase());
 						asmFile.createNewFile();
 						FileWriter fw = new FileWriter(asmFile);
-						fw.write(cg.getAsm(asmInstrPath, mc));
+						fw.write(cg.getAsm(asmDefsPath, mc));
 						fw.close();
 
+						//TODO обозвать fwreport.txt - будет хранить все тех. описание сгенерированной прошивки (ресурсы, метки, типы, исключения,
+						//выделенные пулы памяти, вероятный размер испольуемых ресурсов, включенные фичи и т.п.
 						File dbgFile = outputPath.resolve(sourceName + ".dbg").normalize().toFile();
 						dbgFile.createNewFile();
 						fw = new FileWriter(dbgFile);
-						cg.getTargetInfoBuilder().write(fw);
+						cg.getTargetInfoBuilder().write(sourcePath, fw);
 
 						time = (System.currentTimeMillis() - timestamp) / 1000f;
-						System.out.println("Codegen done, time:" + String.format(Locale.US, "%.3f", time) + " s");
+						if(!quiet) System.out.println("Codegen done, time:" + String.format(Locale.US, "%.3f", time) + " s");
+						result = true;
 					}
 					else {
 						mc.add(new ErrorMessage("TODO Can't find launch point 'public static void main() {...'", null));
@@ -334,9 +391,17 @@ public class Main {
 				}
 			}
 		}
+
+		if(result) {
+			System.out.println("Compile SUCCESS, warnings:" + mc.getWarningCntr());
+		}
+		else {
+			System.out.println("Compile FAIL, warnings:" + mc.getWarningCntr() + ", errors:" + mc.getErrorCntr() + "/" + mc.getMaxErrorQnt());
+		}
+
 		time = (System.currentTimeMillis() - startTimestamp) / 1000f;
-		System.out.println("Total time:" + String.format(Locale.US, "%.3f", time) + " s\n");
-		return 0;
+		if(!quiet) System.out.println("Total time:" + String.format(Locale.US, "%.3f", time) + " s\n");
+		return result ? 0x00 : 0x01;
     }
 	
 	private static void showDisclaimer() {
@@ -365,8 +430,12 @@ public class Main {
 		System.out.println("Options:");
 		System.out.println("  -o,  --output <dir>	  Output directory");
 		System.out.println("  -F,  --freq <MHz>       MCU clock frequency in MHz (default: platform specific)");
+		System.out.println("  -d,  --dev-mode         Enable development mode (vm5277 bootloader on chip required)");
+		System.out.println("                          Automatically enables STDIN/STDOUT via bootloader");
+		System.out.println("                          Supports software reboot to bootloader for firmware update");
 		System.out.println("  -P,  --path <dir>       Custom toolkit directory path");
 		System.out.println("  -I,  --include <dir>    Additional include path(s)");
+		System.out.println("  -D, --define name=value Define RTOSParam.name=value");
 		System.out.println("  -t,  --tabsize <num>    Tab size in spaces (default: 4)");
 		System.out.println("       --dump-ir          Output intermediate representation after frontend processing");
 		System.out.println("       --cg-verbose 0-2   Generate detailed codegen info");
@@ -380,11 +449,13 @@ public class Main {
 		System.out.println("                          size    - Size(Flash) optimization (default)");
 		System.out.println("                          speed   - Execution speed optimization");
 		System.out.println("       --max-errors <num> Maximum errors before abort (default: 30)");
+		System.out.println();
+		System.out.println("  -q,  --quiet            Quiet mode (minimal output)");
 		System.out.println("  -v,  --version          Display version");
 		System.out.println("  -h,  --help             Show this help");
 		System.out.println();
 		System.out.println("Example:");
-		System.out.println("  j8bc avr:atmega328p main.j8b -f 8 -I ./libs");
+		System.out.println("  j8bc avr:atmega328p main.j8b -F 8 -I ./libs");
 	}
 	
 	private static void showInvalidDeviceFormat(String invalidParam) {

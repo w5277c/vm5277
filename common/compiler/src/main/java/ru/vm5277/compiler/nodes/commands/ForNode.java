@@ -131,7 +131,7 @@ public class ForNode extends CommandNode {
 		
         // Основной блок
 		try {
-			blockNode = (tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement()));
+			blockNode = (tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "for.body") : new BlockNode(tb, mc, parseStatement(), "for.body"));
 		}
 		catch(CompileException e) {
 			markFirstError(e);
@@ -141,7 +141,7 @@ public class ForNode extends CommandNode {
         if(tb.match(J8BKeyword.ELSE)) {
 			consumeToken(tb);
 			try {
-				elseBlockNode = (tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement()));
+				elseBlockNode = (tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "for.else") : new BlockNode(tb, mc, parseStatement(), "for.else"));
 			}
 			catch(CompileException e) {
 				markFirstError(e);
@@ -271,7 +271,7 @@ public class ForNode extends CommandNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
-		cgScope = cg.enterLoopBlock();
+		cgScope = cg.enterLoopBlock("for");
 		
 		// Для метка на next блок используется для ForNode 
 		((CGLoopBlockScope)cgScope).getNextLbScope().setUsed();

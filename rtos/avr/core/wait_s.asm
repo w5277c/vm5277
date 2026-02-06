@@ -14,9 +14,9 @@
  * limitations under the License.
  */
 .include "./core/wait_ms.asm"
-.IFNDEF WAIT_S
+.IFNDEF OS_WAIT_S
 ;--------------------------------------------------------
-WAIT_S:
+OS_WAIT_S:
 ;--------------------------------------------------------
 ;Ждем
 ;IN ACCUM_H, ACCUM_L - время в 1s
@@ -30,14 +30,14 @@ WAIT_S:
 	LDI ACCUM_H,high(1000);
 	LDI ACCUM_L,low(1000);
 
-_WAIT_S__LOOP:
+_OS_WAIT_S__LOOP:
 	SUBI TEMP_L,0x01
 	SBCI TEMP_H,0x00
-	BRCS _WAIT_S__END
-	MCALL WAIT_MS
-	RJMP _WAIT_S__LOOP
+	BRCS _OS_WAIT_S__END
+	MCALL OS_WAIT_MS
+	RJMP _OS_WAIT_S__LOOP
 
-_WAIT_S__END:
+_OS_WAIT_S__END:
 	POP_T16
 	POP ACCUM_L
 	POP ACCUM_H

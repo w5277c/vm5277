@@ -49,8 +49,8 @@ public class CGBlockScope extends CGScope {
 	private				boolean						isFirstBlock;
 	private				Set<String>					labels		= new HashSet<>();
 	
-	public CGBlockScope(CodeGenerator cg, CGScope parent, int id) {
-		super(parent, id, "");
+	public CGBlockScope(CodeGenerator cg, CGScope parent, int id, String comment) {
+		super(parent, id, comment);
 		
 /*		CGBlockScope bScope = parent.getBlockScope();
 		if(null != bScope) {
@@ -68,7 +68,7 @@ public class CGBlockScope extends CGScope {
 	
 	public void build(CodeGenerator cg, boolean isLaunchPoint, CGExcs excs) throws CompileException {
 		CGIContainer cont = new CGIContainer();
-		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";build block"));
+		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";build " + this.getClass().getSimpleName() + " '" + name + "'"));
 
 		if(0!=mScope.getArgsStackSize() || 0!=stackOffset) {
 			cont.append(cg.stackPrepare(isFirstBlock, mScope.getArgsStackSize(), stackOffset, excs));
@@ -129,7 +129,7 @@ public class CGBlockScope extends CGScope {
 		//	append(cg.popStackReg(null));
 		//}
 		
-		if(Optimization.FRONT<cg.getOptLevel()) {
+		if(Optimization.FRONT<cg.getPlatform().getOptLevel()) {
 			CodeOptimizer co = cg.getOptimizer();
 			if(null != co) {
 				co.optimizeJumpChains(this);

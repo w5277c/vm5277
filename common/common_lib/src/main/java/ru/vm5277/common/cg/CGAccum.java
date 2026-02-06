@@ -17,20 +17,26 @@ package ru.vm5277.common.cg;
 
 public class CGAccum {
 	private	int		size	= 1;
+	private	boolean	isFixed;
 	
 	public CGAccum() {
 	}
 	
-	public void setSize(int size)  {
+	public void set(int size, boolean isFixed)  {
 		this.size = size;
-		
+		this.isFixed = isFixed;
 	}
+	
 	public int getSize() {
 		return size;
+	}
+
+	public boolean isFixed() {
+		return isFixed;
 	}
 	
 	@Override
 	public String toString() {
-		return "acc, size:" + size;
+		return "acc" + (isFixed ? "[FIXED]" : "") + ", size:" + size;
 	}
 }

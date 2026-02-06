@@ -92,7 +92,7 @@ public class MethodNode extends AstNode {
 
 		if(tb.match(Delimiter.LEFT_BRACE)) {
 			try {
-				blockNode = new BlockNode(tb, mc);
+				blockNode = new BlockNode(tb, mc, "method '" + name + "'");
 			}
 			catch(CompileException e) {}
 		}
@@ -116,7 +116,7 @@ public class MethodNode extends AstNode {
 		this.objTypeNode = classNode;
 		this.parameters = new ArrayList<>();
 		
-		blockNode = new BlockNode();
+		blockNode = new BlockNode("method '" + name + "'");
 	}
 			
 	public boolean canThrow() {
@@ -414,7 +414,7 @@ public class MethodNode extends AstNode {
 			if(result) {
 				// Для не-void методов проверяем наличие return
 				// TODO переосмыслить после ConstantFolding
-				if(null!=returnType && !returnType.equals(VarType.VOID)) {
+				if(null!=returnType && !returnType.equals(VarType.VOID) && !isNative()) {
 					if(!BlockNode.hasReturnStatement(blockNode)) {
 						markError("Method '" + name + "' must return a value");
 						result = false;

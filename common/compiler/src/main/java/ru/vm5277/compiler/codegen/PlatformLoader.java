@@ -26,6 +26,7 @@ import java.util.Map;
 import ru.vm5277.common.AssemblerInterface;
 import ru.vm5277.common.NativeBinding;
 import ru.vm5277.common.Platform;
+import ru.vm5277.common.PlatformType;
 import ru.vm5277.common.SourceType;
 import ru.vm5277.common.RTOSParam;
 import ru.vm5277.common.cg.CodeGenerator;
@@ -51,15 +52,14 @@ public class PlatformLoader {
 		}
 	}
 
-	public static CodeGenerator loadGenerator(	Platform platform, File libsDir, int optLevel, Map<String, NativeBinding> nbMap,
-												Map<RTOSParam, Object> params) throws Exception {
+	public static CodeGenerator loadGenerator(Platform platform, File libsDir) throws Exception {
 
 		if(IS_NATIVE_IMAGE) {
-			return new ru.vm5277.compiler.avr_codegen.Generator(platform.name().toLowerCase() + LIB_CG_POSTFIX, optLevel, nbMap, params);
+			return new ru.vm5277.compiler.avr_codegen.Generator(platform);
 		}
 		else {
 			// Формируем имя JAR-файла (например, "codegen-avr.jar")
-			String jarName =  platform.name().toLowerCase() + LIB_CG_POSTFIX + ".jar";
+			String jarName =  platform.getType().name().toLowerCase() + LIB_CG_POSTFIX + ".jar";
 			File jarFile = new File(libsDir + File.separator + jarName);
 
 			if (!jarFile.exists()) throw new RuntimeException("Library not found: " + jarFile.getAbsolutePath());
@@ -67,20 +67,20 @@ public class PlatformLoader {
 			URLClassLoader classLoader = new URLClassLoader(new URL[] {jarFile.toURI().toURL()}, PlatformLoader.class.getClassLoader());
 
 			// Загружаем класс-генератор (ожидаемое имя: ru.vm5277.compiler.PLATFORM_codegen.Generator)
-			String className = LIB_CG_CLASSPREFIX + platform.name().toLowerCase() + LIB_CG_CLASSPOSTFIX;
+			String className = LIB_CG_CLASSPREFIX + platform.getType().name().toLowerCase() + LIB_CG_CLASSPOSTFIX;
 			Class<?> generatorClass = classLoader.loadClass(className);
-			Constructor<?> constructor = generatorClass.getConstructor(String.class, int.class, Map.class, Map.class);
+			Constructor<?> constructor = generatorClass.getConstructor(Platform.class);
 
 			// Создаем экземпляр, передавая параметры
-			return (CodeGenerator) constructor.newInstance(platform.name().toLowerCase() + LIB_CG_POSTFIX, optLevel, nbMap, params);
+			return (CodeGenerator) constructor.newInstance(platform);
 		}
 	}
 	
-	public static boolean launchAssembler(	Platform platform, File libsDir, MessageContainer mc, Path sourcePath, Map<Path, SourceType> sourcePaths,
+	public static boolean launchAssembler(	PlatformType platform, File libsDir, MessageContainer mc, Path sourcePath, Map<Path, SourceType> sourcePaths,
 											String outputFilename, File mapFile, BufferedWriter listBW) throws Exception {
 		if(IS_NATIVE_IMAGE) {
 			AssemblerInterface assembler = null;
-			if(Platform.AVR == platform) {
+			if(PlatformType.AVR == platform) {
 				assembler = new ru.vm5277.avr_asm.Assembler();
 			}
 			if(null!=assembler) {

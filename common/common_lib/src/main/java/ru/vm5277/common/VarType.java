@@ -118,11 +118,12 @@ public class VarType {
 		return CLASS_TYPES;
 	}
 	
-	public static void addException(String exceptionPath) throws CompileException {
+	public static int addException(String exceptionPath) throws CompileException {
 		if(EXCEPTION_TYPES.contains(exceptionPath)) {
 			throw new CompileException("Duplicate exception declaration: '" + exceptionPath + "'");
 		}
 		EXCEPTION_TYPES.add(exceptionPath);
+		return EXCEPTION_TYPES.size()-1;
 	}
 	public static int getExceptionId(String exceptionPath) {
 		return EXCEPTION_TYPES.indexOf(exceptionPath);
@@ -238,13 +239,13 @@ public class VarType {
 		return this.isClassType() || this.isArray();
 	}
 
-	public void checkRange(Number num) throws CompileException {
-		if(null==num) {
+	public void checkRange(Number value) throws CompileException {
+		if(null==value) {
 			throw new CompileException("Value cannot be null");
 		}
 		
 		if(isIntegral()) {
-			long l = num.longValue();
+			long l = value.longValue();
 			if(this==BYTE && (l<0 || l> 0xff)) {
 				throw new CompileException("byte value out of range (0..255). Given:" + l);
 			}
@@ -256,7 +257,7 @@ public class VarType {
 			}
 		}
 		else if(this==FIXED) {
-			double d = (num instanceof Double ? ((Double)num) : (num.doubleValue()));
+			double d = (value instanceof Double ? ((Double)value) : (value.doubleValue()));
 			if(d<FIXED_MIN || d>FIXED_MAX) {
 				throw new CompileException(	String.format("fixed value out of range (" + FIXED_MIN + ".." + FIXED_MAX + "). Given: %.8f", d));
 			}

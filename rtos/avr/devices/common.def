@@ -13,6 +13,10 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+	.include "devices/features.def"
+	.include "devices/ftdepchck.asm"
+	
 	.EQU	PLATFORM_ID								= 0x00	;AVR
 .IFNDEF V_UID
 	.SET	V_UID									= 0x5277;Уникальный идентификатор чипа (vendor) дефолтное значение
@@ -25,49 +29,10 @@
 	.SET	BLDRSEC_SUPPORT							= 0x00
 .ENDIF
 
-;---OS-FEATURES---------------------------------------------
-.IFNDEF OS_FT_BOOTLOADER_ONLY
-	.SET	OS_FT_BOOTLOADER_ONLY					= 0x00	;Режим сьорки только бутлоадера
-.ENDIF
-.IFNDEF OS_FT_IR_TABLE
-	.SET	OS_FT_IR_TABLE							= 0x00	;Таблица прерываний
-.ENDIF
-.IFNDEF OS_FT_STDOUT
-	.SET	OS_FT_STDOUT							= 0x00	;Вывод
-.ENDIF
-.IFNDEF OS_FT_WELCOME
-	.SET	OS_FT_WELCOME							= 0x00	;Логировать приветственное сообщение
-.ENDIF
-.IFNDEF OS_FT_HEARTBEAT
-	.SET	OS_FT_HEARTBEAT							= 0x00	;Индикация работы RTOS
-.ENDIF
-.IFNDEF OS_FT_DIAG
-	.SET	OS_FT_DIAG								= 0x00	;Логировать диагностику при инициализации
-.ENDIF
-.IFNDEF OS_FT_TIMER1
-	.SET	OS_FT_TIMER1							= 0x00	;Таймер системного тика и механизма Threading
-.ENDIF
-.IFNDEF OS_FT_TIMER2
-	.SET	OS_FT_TIMER2							= 0x00	;Таймер для реализации программных таймеров драйверов
-.ENDIF
-.IFNDEF OS_FT_DRAM
-	.SET	OS_FT_DRAM								= 0x00	;Функционал динамического выделения памяти
-.ENDIF
-.IFNDEF OS_FT_ETRACE
-	.SET	OS_FT_ETRACE							= 0x00	;Поддержка механизма исключений
-.ENDIF
-
 	.SET	OS_ETRACE_POINT_BITSIZE					= 0x07	;По умолчанию 7 бит для идентификаторов точек прохода для трассировки исключений
 															;Старший бит выделен под признак переполнения буфера
 
 	.SET	OS_ETRACE_BUFFER_SIZE					= 0x08	;Размер буфера для трассировки исключений. Размер от 0x04 до 0xff.
-
-.IF OS_FT_WELCOME == 0x01
-	.SET	OS_FT_STDOUT 							= 0x01
-.ENDIF
-.IF OS_FT_TIMER1 == 0x01 || OS_FT_TIMER2 == 0x01
-	.SET	OS_FT_IR_TABLE							= 0x01
-.ENDIF
 
 ;---OS-RESULT-CODES-----------------------------------------; Универсальны коды ответов
 	.EQU	OSR_OK									= 0x00	;Успешно выполнено
@@ -80,6 +45,7 @@
 	.EQU	CORE_FREQ								= 8
 .ENDIF
 
+	.EQU	_OS_STDIO_BITDELAY_CONST				= 0x13
 	.EQU	_OS_TIMER_FREQ							= (3125*CORE_FREQ*2)/1000
 
 	.EQU	PINx									= 0x00
@@ -165,8 +131,7 @@
 	.DEF	ATOM_H									= r3
 	.DEF	ATOM_EL									= r4
 	.DEF	ATOM_EH									= r5
-	.DEF	_CORE_REG_L								= r6
-	.DEF	_CORE_REG_H								= r7
+	.DEF	_CORE_IR_ADDR							= r6	;Используется для сохранения адреса прерывания
 	.DEF	C0x00									= r8	;Константа 0x00
 	.DEF	C0x01									= r9	;Константа 0x01
 	.DEF	C0xff									= r10	;Константа 0xff
@@ -186,6 +151,21 @@
 	.DEF	TEMP_L									= r24	;Заданы после TEMP_EL/EH, специально для ADIW/SBIW инструкций
 	.DEF	TEMP_H									= r25
 
+	;Порт ввода/вывода (режим half duplex UART 8N0), можем использовать RESET пин.
+	;Необходима подтяжка к плюсу и включение fuse RSTDISBL
+	;После ввода поддержки двухпинового режима не может быть дефолтным
+;.IFNDEF STDIO_PORT
+;	.SET	STDIO_PORT								= PORTB
+;.ENDIF
+;.IFNDEF STDIO_DDR
+;	.SET	STDIO_DDR								= DDRB
+;.ENDIF
+;.IFNDEF STDIO_DDR
+;	.SET	STDIO_PIN								= PINB
+;.ENDIF
+;.IFNDEF STDIO_DDR
+;	.SET	STDIO_PINNUM							= 0x00
+;.ENDIF
 
 .MACRO PUSH_X
 	PUSH XL
@@ -251,8 +231,8 @@
 .MACRO POP_T32
 	POP TEMP_EH
 	POP TEMP_EL
-	POP TEMP_L
 	POP TEMP_H
+	POP TEMP_L
 .ENDMACRO
 .MACRO LDI_A16
 	LDI ACCUM_L,low(@0)

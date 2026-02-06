@@ -18,10 +18,12 @@ package ru.vm5277.mkboot;
 
 import ru.vm5277.common.DefReader;
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
@@ -47,12 +49,13 @@ import ru.vm5277.common.AssemblerLoader;
 import ru.vm5277.common.SourceType;
 import ru.vm5277.common.messages.MessageContainer;
 
+//TODO добавить поддержку RST и TX0/RX0
 
 public class Main {
 	public	final	static	String					VERSION				= StrUtils.readVersion(Main.class);
 	public			static	boolean					isWindows;
 	public			static	Path					toolkitPath;
-
+	
 	public static void main(String[] args) throws CompileException {
 		showDisclaimer();
 		
@@ -78,21 +81,44 @@ public class Main {
 		byte[] authId = null;
 		String authPassword = null;
 		UIDMode uidMode = UIDMode.LOCAL;
-		int pin = -1;
+		Integer stdio = null;
+		Integer stdin = null;
+		Integer stdout = null;
 		boolean allowOverrideUID = false;
+		boolean makeASMList = false;
 		
-		
-		if(0x01<=args.length) {
+		if(0x02<=args.length) {
 			String[] parts = args[0x00].split(":");
 			if(0x02 == parts.length) {
 				platform = parts[0];
 				mcu = parts[1];
 			}
 			
-			for(int i=1; i<args.length; i++) {
+			String port = args[0x01].toUpperCase();
+			if(!port.replaceFirst("(P[A-Z][0-7]\\/P[A-Z][0-7])|(P[A-Z][0-7])", "").isEmpty()) {
+				System.err.println("[ERROR] Invalid port value: " + port + ", expected something like PB5 or PD0/PD1");
+				System.exit(1);
+			}
+			if(!port.contains("/")) {
+				stdio = (port.charAt(0x01)-'A')*0x10 + (port.charAt(0x02)-'0');
+			}
+			else {
+				String portParts[] = port.split("\\/", 0x02);
+				if(0x02!= portParts.length) {
+					System.err.println("[ERROR] Invalid port value: " + port + ", expected something like PB5 or PD0/PD1");
+					System.exit(1);
+				}
+				stdin = (portParts[0].charAt(0x01)-'A')*0x10 + (portParts[0].charAt(0x02)-'0');
+				stdout = (portParts[1].charAt(0x01)-'A')*0x10 + (portParts[1].charAt(0x02)-'0');
+			}
+
+			for(int i=0x02; i<args.length; i++) {
 				String arg = args[i];
 				if(arg.equals("-o") || arg.equals("--overwrite")) {
 					allowOverrideUID=true;
+				}
+				else if(arg.equals("-l") || arg.equals("--list")) {
+					makeASMList = true;
 				}
 				else if(args.length>i+1 && (arg.equals("-P") || arg.equals("--path"))) {
 					toolkitPath = FSUtils.resolveWithEnv(args[++i]);
@@ -137,21 +163,6 @@ public class Main {
 						System.exit(1);
 					}
 				}
-				else if(args.length>i+1 && (arg.equals("-p") || arg.equals("--pin"))) {
-					String tmp = args[++i].toUpperCase();
-					if(tmp.equalsIgnoreCase("rst") || tmp.equalsIgnoreCase("reset")) {
-						pin = -1;
-					}
-					else if(	0x03==tmp.length() && tmp.startsWith("P") &&
-						'A'<=tmp.charAt(0x01) && 'Z'>=tmp.charAt(0x01) && '0'<=tmp.charAt(0x02) && '7'>=tmp.charAt(0x02)) {
-						
-						pin = (tmp.charAt(0x01)-'A')*0x10 + (tmp.charAt(0x02)-'0');
-					}
-					else {
-						System.err.println("[ERROR] Invalid pin value");
-						System.exit(1);
-					}
-				}
 				else if(args.length>i+2 && (arg.equals("-a") || arg.equals("--auth"))) {
 					authId = null;
 					try {
@@ -176,7 +187,7 @@ public class Main {
 		}
 		
 		if(null==toolkitPath) {
-			showInvalidToolkitDir(toolkitPath, null);
+			System.err.println("[ERROR] Toolkit directory not found or empty");
 			System.exit(1);
 		}
 		System.out.println("Toolkit path: " + toolkitPath.toString());
@@ -197,19 +208,19 @@ public class Main {
 		
 		Path rtosPath = toolkitPath.resolve("rtos").resolve(platform).normalize();
 		if(!rtosPath.toFile().exists()) {
-			showInvalidToolkitDir(toolkitPath, rtosPath);
+			System.err.println("[ERROR] RTOS directory not found");
 			System.exit(1);
 		}
 
 		Path incPath = toolkitPath.resolve("defs").resolve(platform).resolve(mcu + ".inc");
 		if(!incPath.toFile().exists()) {
-			showInvalidToolkitDir(toolkitPath, incPath);
+			System.err.println("[ERROR] File " + incPath.toString() + " not found");
 			System.exit(1);
 		}
 
 		Path defPath = rtosPath.resolve("devices").resolve(mcu + ".def");
 		if(!defPath.toFile().exists()) {
-			showInvalidToolkitDir(toolkitPath, defPath);
+			System.err.println("[ERROR] File " + defPath.toString() + " not found");
 			System.exit(1);
 		}
 
@@ -241,7 +252,7 @@ public class Main {
 			String source = (1024>=flashSize ? "bldrtiny.asm" : "bldr.asm");
 			Path bldrPath = rtosPath.resolve("boot").resolve(source);
 			if(!bldrPath.toFile().exists()) {
-				showInvalidToolkitDir(toolkitPath, bldrPath);
+				System.err.println("[ERROR] File " + bldrPath.toString() + " not found");
 				System.exit(1);
 			}
 
@@ -249,7 +260,7 @@ public class Main {
 			if(null!=secureSource) {
 				securePath = rtosPath.resolve("boot").resolve(secureSource);
 				if(!securePath.toFile().exists()) {
-					showInvalidToolkitDir(toolkitPath, securePath);
+					System.err.println("[ERROR] File " + securePath.toString() + " not found");
 					System.exit(1);
 				}
 			}
@@ -310,7 +321,7 @@ public class Main {
 						System.exit(1);
 					}
 				}
-				props.put(uidStr, makeUIDInfoStr("global", uid, platform, mcu, signature, key));
+				props.put(uidStr, makeUIDInfoStr("global", uid, stdio, stdin, stdout, platform, mcu, signature, key));
 			}
 			else if(UIDMode.LOCAL==uidMode) {
 				SecureRandom rnd = new SecureRandom();
@@ -331,7 +342,7 @@ public class Main {
 						System.exit(1);
 					}
 				}
-				props.put(uidStr, makeUIDInfoStr("local", uid, platform, mcu, signature, key));
+				props.put(uidStr, makeUIDInfoStr("local", uid, stdio, stdout, stdout, platform, mcu, signature, key));
 			}
 			else {
 				String uidStr = DatatypeConverter.printHexBinary(uid);
@@ -346,7 +357,7 @@ public class Main {
 						System.exit(1);
 					}
 				}
-				props.put(uidStr, makeUIDInfoStr("param", uid, platform, mcu, signature, key));
+				props.put(uidStr, makeUIDInfoStr("param", uid, stdio, stdin, stdout, platform, mcu, signature, key));
 			}
 
 			try (OutputStream out = new FileOutputStream(uidsPath.normalize().toFile())) {
@@ -381,46 +392,113 @@ public class Main {
 					}
 				}
 				
-				if(-1!=pin) {
-					Long num = dReader.getNum("PORT" + ('A'+(pin>>0x04)));
-					if(null==num) {
-						showNotDefined("PORT" + ('A'+(pin>>0x04)));
-						System.exit(1);
-					}
-					defines.put("BLDR_UART_PORT".toLowerCase(), num);
-					
-					num = dReader.getNum("DDR" + ('A'+(pin>>0x04)));
-					if(null==num) {
-						showNotDefined("DDR" + ('A'+(pin>>0x04)));
-						System.exit(1);
-					}
-					defines.put("BLDR_UART_DDR".toLowerCase(), num);
+				if(null!=stdio) {
+					if(-1!=stdio) {
+						Long num = dReader.getNum("PORT" + (char)('A'+(stdio>>0x04)));
+						if(null==num) {
+							showNotDefined("PORT" + (char)('A'+(stdio>>0x04)));
+							System.exit(1);
+						}
+						defines.put("STDIO_PORT_REGID".toLowerCase(), num);
 
-					num = dReader.getNum("PIN" + ('A'+(pin>>0x04)));
-					if(null==num) {
-						showNotDefined("PIN" + ('A'+(pin>>0x04)));
-						System.exit(1);
-					}
-					defines.put("BLDR_UART_PIN".toLowerCase(), num);
+						num = dReader.getNum("DDR" + (char)('A'+(stdio>>0x04)));
+						if(null==num) {
+							showNotDefined("DDR" + (char)('A'+(stdio>>0x04)));
+							System.exit(1);
+						}
+						defines.put("STDIO_DDR_REGID".toLowerCase(), num);
 
-					defines.put("BLDR_UART_PINNUM".toLowerCase(), (long)(pin&0x0f));
+						num = dReader.getNum("PIN" + (char)('A'+(stdio>>0x04)));
+						if(null==num) {
+							showNotDefined("PIN" + (char)('A'+(stdio>>0x04)));
+							System.exit(1);
+						}
+						defines.put("STDIO_PIN_REGID".toLowerCase(), num);
+
+						defines.put("STDIO_PORTNUM".toLowerCase(), (long)(stdio>>0x04));
+						defines.put("STDIO_PINNUM".toLowerCase(), (long)(stdio&0x0f));
+					}
 				}
+				else {
+					if(-1!=stdout) {
+						Long num = dReader.getNum("PORT" + (char)('A'+(stdout>>0x04)));
+						if(null==num) {
+							showNotDefined("PORT" + (char)('A'+(stdout>>0x04)));
+							System.exit(1);
+						}
+						defines.put("STDOUT_PORT_REGID".toLowerCase(), num);
 
+						num = dReader.getNum("DDR" + (char)('A'+(stdout>>0x04)));
+						if(null==num) {
+							showNotDefined("DDR" + (char)('A'+(stdout>>0x04)));
+							System.exit(1);
+						}
+						defines.put("STDOUT_DDR_REGID".toLowerCase(), num);
+
+						num = dReader.getNum("PIN" + (char)('A'+(stdout>>0x04)));
+						if(null==num) {
+							showNotDefined("PIN" + (char)('A'+(stdout>>0x04)));
+							System.exit(1);
+						}
+						defines.put("STDOUT_PIN_REGID".toLowerCase(), num);
+
+						defines.put("STDOUT_PORTNUM".toLowerCase(), (long)(stdout>>0x04));
+						defines.put("STDOUT_PINNUM".toLowerCase(), (long)(stdout&0x0f));
+					}
+					if(-1!=stdin) {
+						Long num = dReader.getNum("PORT" + (char)('A'+(stdin>>0x04)));
+						if(null==num) {
+							showNotDefined("PORT" + (char)('A'+(stdin>>0x04)));
+							System.exit(1);
+						}
+						defines.put("STDIN_PORT_REGID".toLowerCase(), num);
+
+						num = dReader.getNum("DDR" + (char)('A'+(stdin>>0x04)));
+						if(null==num) {
+							showNotDefined("DDR" + (char)('A'+(stdin>>0x04)));
+							System.exit(1);
+						}
+						defines.put("STDIN_DDR_REGID".toLowerCase(), num);
+
+						num = dReader.getNum("PIN" + (char)('A'+(stdin>>0x04)));
+						if(null==num) {
+							showNotDefined("PIN" + (char)('A'+(stdin>>0x04)));
+							System.exit(1);
+						}
+						defines.put("STDIN_PIN_REGID".toLowerCase(), num);
+
+						defines.put("STDIN_PORTNUM".toLowerCase(), (long)(stdin>>0x04));
+						defines.put("STDIN_PINNUM".toLowerCase(), (long)(stdin&0x0f));
+					}
+				}
 				
 				dReader.parse(bldrPath);
 				Long bldrVersion = dReader.getNum("BLDR_VERSION");
 				
 				MessageContainer mc = new MessageContainer(5, true, false);
-				boolean result = ai.exec(mc, mcu, bldrPath, sourcePaths, AssemblerInterface.STRICT_NONE, "bldr", null, null, defines, includes);
+				BufferedWriter listBW = null;
+				if(makeASMList) {
+					File listFile = new File("bldr.lst");
+					listBW = new BufferedWriter(new FileWriter(listFile));
+				}
+				boolean result = ai.exec(mc, mcu, bldrPath, sourcePaths, AssemblerInterface.STRICT_NONE, "bldr", null, listBW, defines, includes);
+				if(null!=listBW) listBW.close();
+				
 				if(result) {
 					System.out.println();
 					System.out.println("#-------------------------------------------------------------------------------------------");
 					System.out.println("#    *** CRITICAL INFORMATION ***");
 					System.out.println("#-------------------------------------------------------------------------------------------");
+					System.out.println("# Connection port:          " + (null!=stdio ?
+																		("P" + (char)('A'+(stdio>>0x04)) + (stdio&0x0f)) :
+																		("P" + (char)('A'+(stdin>>0x04)) + (stdin&0x0f)) + "/" +
+																		("P" + (char)('A'+(stdout>>0x04)) + (stdout&0x0f))));
 					System.out.println("# Platform:                 " + platform);
 					System.out.println("# MCU:                      " + mcu);
 					System.out.println("# Device signature:         " + (null==signature ? "null" : String.format("%08x", signature)));
-					System.out.println("# Bootloader version:       " + (null==bldrVersion ? "null" :  bldrVersion));
+					System.out.println("# Bootloader type|version:  " + (	null==bldrVersion ?
+																			"null" :
+																			String.format("%01x|%02x", bldrVersion>>0x06, bldrVersion&0x3f)));
 					System.out.println("# Device unique identifier: " + DatatypeConverter.printHexBinary(uid));
 					if(null!=key) {
 						System.out.println("# Decryption key:           " + DatatypeConverter.printHexBinary(key));
@@ -466,11 +544,16 @@ public class Main {
     }
 	
 	
-	private static String makeUIDInfoStr(String srcType, byte[] uid, String platform, String mcu, Long signature, byte[] secureKey)
-																														throws UnsupportedEncodingException {
+	private static String makeUIDInfoStr(	String srcType, byte[] uid, Integer stdio, int stdout, int stdin, String platform, String mcu, Long signature,
+											byte[] secureKey)															throws UnsupportedEncodingException {
+		
 		return	"timestamp:" + Long.toString(System.currentTimeMillis()) +
 				",srcType:" + URLEncoder.encode(srcType, "UTF-8") +
 				",uid:" + DatatypeConverter.printHexBinary(uid) +
+				",port:" + (null!=stdio ?
+							(-1==stdio ? "RESET" : ("P" + (char)('A'+(stdio>>0x04)) + (stdio&0x0f))) :
+							(-1==stdout ? "TX0" : ("P" + (char)('A'+(stdout>>0x04)) + (stdout&0x0f)))  + "/" +
+							(-1==stdin ? "RX0" : ("P" + (char)('A'+(stdin>>0x04)) + (stdin&0x0f)))) +
 				",platform:" + URLEncoder.encode(platform, "UTF-8") +
 				",mcu:" + URLEncoder.encode(mcu, "UTF-8") +
 				",signature:" + (null==signature ? "null" : String.format("%08x", signature)) +
@@ -530,7 +613,7 @@ public class Main {
 		System.out.println("Project home: https://github.com/w5277c/vm5277");
 		System.out.println("Contact: w5277c@gmail.com | konstantin@5277.ru");
 		System.out.println();
-		System.out.println("Usage: mkboot" + (isWindows ? ".exe" : "") + " <platform>:<mcu> [options]");
+		System.out.println("Usage: mkboot" + (isWindows ? ".exe" : "") + " <platform>:<mcu> <mcu port> [options]");
 		System.out.println();
 		System.out.println("Options:");
 		System.out.println("  -P,  --path <dir>       Custom toolkit directory path");
@@ -546,14 +629,18 @@ public class Main {
 		System.out.println("                          local   - use local file uids.db (default, can be overridden with -i)");
 		System.out.println("                          param   - set manually (requires -u)");
 		System.out.println("  -o,  --overwrite        Overwrite existing UID in local database");
-		System.out.println("  -p   --pin <name>       MCU pin for bootloader ('format: 'PA0', default: RESET pin if supports GPIO)");
+		System.out.println("  -p,  --port <spec>      Bootloader communication pin configuration:");
+		System.out.println("                          Single-wire:  'PB0' (bidirectional, uses RESET if supports GPIO)");
+		System.out.println("                          Two-wire:     'PB0/PB1' (RX/TX separate)");
+		System.out.println("  -l, --list              Generate assembly listing file 'bldr.lst'");
 		System.out.println("  -v,  --version          Display version");
 		System.out.println("  -h,  --help             Show this help");
 		System.out.println();
 		System.out.println("Examples:");
-		System.out.println("  mkboot avr:atmega328p");
-		System.out.println("  mkboot avr:atmega328p -k fe73...89 -s bldrsecure.asm -m local");
-		System.out.println("  mkboot avr:attiny85 -u 2d849f626c42ff33f29a054bcae564e79f753a7e89a4761b1ed5f2680ac7 -p PB3");
+		System.out.println("  mkboot avr:atmega328p pb5 - for single-wire connection port");
+		System.out.println("  mkboot avr:atmega328p pd0/pd1 - for two-wire connection port");
+		System.out.println("  mkboot avr:atmega328p pb5 -k fe73...89 -s bldrsecure.asm -m local");
+		System.out.println("  mkboot avr:attiny85 pb5 -u 2d849f626c42ff33f29a054bcae564e79f753a7e89a4761b1ed5f2680ac7");
 	}
 	
 	private static void showServerCommunicationFailed() {
@@ -591,18 +678,5 @@ public class Main {
 	
 	private static void showNotDefined(String defName) {
 		System.err.println("[ERROR] " + defName + " definition not found in MCU headers.");
-	}
-	
-	private static void showInvalidToolkitDir(Path toolkitPath, Path subPath) {
-		System.err.println("[ERROR] Toolkit directory not found or empty");
-		System.err.println();
-		if(null!=subPath) {
-			System.err.println("Tried to access: " + subPath.toString());
-			System.err.println();
-		}
-		System.err.println("Possible solutions:");
-		System.err.println("1. Specify custom path with --path (-P) option");
-		System.err.println("2. Add toolkit directory(vm5277) to system environment variables");
-		System.err.println("3. Check project source or documentation at https://github.com/w5277c/vm5277");
 	}
 }

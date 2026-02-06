@@ -18,6 +18,10 @@ package ru.vm5277.compiler.nodes.commands;
 
 import java.util.Arrays;
 import java.util.List;
+import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.CGBranch;
@@ -30,8 +34,10 @@ import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
+import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
@@ -54,7 +60,7 @@ public class WhileNode extends CommandNode {
 		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(CompileException e) {markFirstError(e);}
 
 		try {
-			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
+			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "while.body") : new BlockNode(tb, mc, parseStatement(), "while.body");
 		}
 		catch(CompileException e) {markFirstError(e);}
 	}
@@ -74,6 +80,8 @@ public class WhileNode extends CommandNode {
 	@Override
 	public boolean preAnalyze() {
 		boolean result = true;
+		debugAST(this, PRE, true, getFullInfo());
+
 		// Проверка условия цикла
 		if(null!=condition) {
 			result&=condition.preAnalyze();
@@ -87,12 +95,14 @@ public class WhileNode extends CommandNode {
 			result&=blockNode.preAnalyze();
 		}
 		
+		debugAST(this, PRE, false, result, getFullInfo());
 		return result;
 	}
 
 	@Override
 	public boolean declare(Scope scope) {
 		boolean result = true;
+		debugAST(this, DECLARE, true, getFullInfo());
 		
 		// Объявление переменных условия (если нужно)
 		result&=condition.declare(scope);
@@ -104,13 +114,16 @@ public class WhileNode extends CommandNode {
 			result&=blockNode.declare(blockScope);
 		}
 
+		debugAST(this, DECLARE, false, result, getFullInfo() + (declarationPendingNodes.containsKey(this) ? " [DP]" : ""));
 		return result;
 	}
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		boolean result = true;
-		cgScope = cg.enterLoopBlock();
+		debugAST(this, POST, true, getFullInfo());
+		
+		cgScope = cg.enterLoopBlock("while");
 
 		result&=condition.postAnalyze(blockScope, cg);
 		if(result) {
@@ -147,6 +160,7 @@ public class WhileNode extends CommandNode {
 //		}
 
 		cg.leaveLoopBlock();
+		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 	
@@ -184,14 +198,15 @@ public class WhileNode extends CommandNode {
 		cgs.setBranch(branch);
 		
 		if(!alwaysFalse) {
-			cgs.append(((CGLoopBlockScope)cgScope).getStartLbScope());
+			//cgScope.prepend(((CGLoopBlockScope)cgScope).getStartLbScope());
+			condition.getCGScope().append(((CGLoopBlockScope)cgScope).getStartLbScope());
 			if(!alwaysTrue) {
-				condition.codeGen(cg, cgs, false, excs);
+				condition.codeGen(cg, null, false, excs);
 			}
 		}
 
 		if(null!=blockNode && !alwaysFalse) {
-			blockNode.codeGen(cg, cgs, false, excs);
+			blockNode.codeGen(cg, null, false, excs);
 		}
 
 		if(!alwaysFalse) {
@@ -212,5 +227,14 @@ public class WhileNode extends CommandNode {
 	@Override
 	public List<AstNode> getChildren() {
 		return Arrays.asList(blockNode);
+	}
+
+	@Override
+	public String toString() {
+		return condition.toString();
+	}
+	
+	public String getFullInfo() {
+		return getClass().getSimpleName() + " " + toString();
 	}
 }

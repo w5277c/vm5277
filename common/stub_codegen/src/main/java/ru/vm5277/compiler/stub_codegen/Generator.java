@@ -18,15 +18,13 @@ package ru.vm5277.compiler.stub_codegen;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import ru.vm5277.common.ExcsThrowPoint;
-import ru.vm5277.common.NativeBinding;
 import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.Pair;
+import ru.vm5277.common.Platform;
 import ru.vm5277.common.StrUtils;
-import ru.vm5277.common.RTOSParam;
 import ru.vm5277.common.cg.CGArrCells;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
@@ -47,8 +45,8 @@ import ru.vm5277.common.exceptions.CompileException;
 public class Generator extends CodeGenerator {
 	private	final	static	String				VERSION		= StrUtils.readVersion(Generator.class);
 
-	public Generator(String platform, int optLevel, Map<String, NativeBinding> nbMap, Map<RTOSParam, Object> params) {
-		super(platform, optLevel, nbMap, params);
+	public Generator(Platform platform) {
+		super(platform);
 	}
 	
 	@Override public CGIContainer accCast(VarType accType, VarType opType) throws CompileException {return null;}
@@ -60,6 +58,7 @@ public class Generator extends CodeGenerator {
 	@Override public void cellsAction(CGScope scope, CGCells cells, Operator op, boolean isFixed, CGExcs excs) throws CompileException {}
 	@Override public void constAction(CGScope scope, Operator op, long k, boolean isFixed, CGExcs excs) throws CompileException {}
 	@Override public CGIContainer pushAccBE(CGScope scope, Integer size) {return null;}
+	@Override public CGIContainer pushAccLE(CGScope scope, Integer size) {return null;}
 	@Override public void popAccBE(CGScope scope, Integer size) {}
 	@Override public CGIContainer pushHeapReg(CGScope scope) {return null;}
 	@Override public CGIContainer popHeapReg(CGScope scope) {return null;}
@@ -73,6 +72,7 @@ public class Generator extends CodeGenerator {
 	@Override public CGIContainer eNewArray(VarType type, int depth, int[] cDims, CGExcs excs) throws CompileException {return null;}
 	@Override public CGIContainer eNewArrView(int depth, CGExcs excs) throws CompileException {return null;}
 	@Override public void eTry(CGBlockScope blockScope, List<Case> cases, CGBlockScope defaultBlockScope) {}
+	@Override public void eCatch(CGScope scope) throws CompileException {};
 	@Override public CGIContainer eReturn(CGScope scope, int argsSize, int varsSize, VarType retType) throws CompileException {return null;}
 	@Override public void eThrow(CGScope cgs, int exceptioId, boolean isMethodLeave, CGLabelScope lbScope, boolean withCode, ExcsThrowPoint point) throws CompileException {}
 	@Override public void throwCheck(CGScope scope, List<Pair<CGLabelScope, Set<Integer>>> exceptionHandlers, CGLabelScope methodEndLbScope, ExcsThrowPoint point) throws CompileException {}
@@ -89,7 +89,7 @@ public class Generator extends CodeGenerator {
 	@Override public CGIContainer jump(CGScope scope, CGLabelScope lScope) throws CompileException {return null;}
 	@Override public void pushLabel(CGScope scope, String label) {}
 	@Override public void cellsCond(CGScope scope, CGCells cells, Operator op, boolean isNot, boolean isOr, CGBranch branchScope) throws CompileException {}
-	@Override public void constCond(CGScope scope, CGCells cells, Operator op, long k, boolean isNot, boolean isOr, CGBranch branchScope) throws CompileException {}
+	@Override public void constCond(CGScope scope, CGCells cells, Operator op, long k, boolean isLFixed, boolean isRFixed, boolean isNot, boolean isOr, CGBranch branchScope) throws CompileException {}
 	@Override public void boolCond(CGScope scope, CGBranch branchScope, boolean byBit0) throws CompileException {}
 	@Override public CGIContainer call(CGScope scope, CGLabelScope lScope) throws CompileException {return null;}
 	@Override public int getCallStackSize() {return 0;}
@@ -108,7 +108,7 @@ public class Generator extends CodeGenerator {
 	@Override public void arrRegToAcc(CGScope scope) throws CompileException {}
 	@Override public void accToArrReg(CGScope scope) throws CompileException {}
 	@Override public void accResize(VarType opType) throws CompileException {}
-	@Override public void cellsToAcc(CGScope scope, CGCells cells) throws CompileException {}
+	@Override public void cellsToAcc(CGScope scope, CGCells cells, boolean isFixed) throws CompileException {}
 	@Override public void thisToAcc(CGScope scope) throws CompileException {}
 	@Override public void nativeMethodInit(CGScope scope, String signature) throws CompileException {}
 	@Override public void nativeMethodSetArg(CGScope scope, String signature, int index) throws CompileException {}

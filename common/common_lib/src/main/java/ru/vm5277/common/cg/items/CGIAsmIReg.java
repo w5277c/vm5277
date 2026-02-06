@@ -21,28 +21,29 @@ import ru.vm5277.common.exceptions.CompileException;
 public class CGIAsmIReg extends CGIAsm {
 	private CGIContainer	prefCont	= new CGIContainer();
 	private CGIContainer	postCont	= new CGIContainer();
+	private	boolean			isLdInstr;
 	private	char			ireg;
-	private	String			prefix;
-	private	String			postfix;
+	private	String			reg;
 	private	int				offset;
 	private	CGBlockScope	curBScope;
 	private	CGBlockScope	varBScope;
 	private	boolean			isArg;
 	
-	public CGIAsmIReg(char ireg, String instr, String prefix, int offset, String postfix) throws CompileException {
-		super(instr, null);
+	public CGIAsmIReg(char ireg, boolean isLDInstr, String reg, int offset) throws CompileException {
+		super(isLDInstr ? "ldd" : "std", null);
 		
 		this.ireg = ireg;
-		this.prefix = (null==prefix ? null : prefix.toLowerCase());
+		this.isLdInstr = isLDInstr;
+		this.reg = reg.toLowerCase();
 		this.offset = offset;
-		this.postfix = (null==postfix ? null : postfix.toLowerCase());
 	}
 
-	public CGIAsmIReg(char ireg, String instr, String prefix, int offset, String postfix, CGBlockScope curBScope, CGBlockScope varBScope, boolean isArg)
+	public CGIAsmIReg(char ireg, boolean isLDInstr, String reg, int offset, CGBlockScope curBScope, CGBlockScope varBScope, boolean isArg)
 																																	throws CompileException {
-		super(instr, null);
+		super(isLDInstr ? "ldd" : "std", null);
 		this.ireg = ireg;
-		this.prefix = (null==prefix ? null : prefix.toLowerCase());
+		this.isLdInstr = isLDInstr;
+		this.reg = reg.toLowerCase();
 		this.offset = offset;
 		this.postfix = (null==postfix ? null : postfix.toLowerCase());
 		this.curBScope = curBScope;
@@ -52,6 +53,14 @@ public class CGIAsmIReg extends CGIAsm {
 
 	public char getIreg() {
 		return ireg;
+	}
+	
+	public String getReg() {
+		return reg;
+	}
+	
+	public boolean isLDInstr() {
+		return isLdInstr;
 	}
 	
 	public int getOffset() {
@@ -83,7 +92,12 @@ public class CGIAsmIReg extends CGIAsm {
 	
 	@Override
 	public String getText() {
-		return instr + " " + prefix + offset + postfix;
+		if(isLdInstr) {
+			return "ldd " + reg + "," + ireg + "+" + offset;
+		}
+		else {
+			return "std " + ireg + "+" + offset + "," + reg;
+		}
 	}
 	
 	@Override
@@ -92,7 +106,7 @@ public class CGIAsmIReg extends CGIAsm {
 		if(!prefCont.isEMpty()) {
 			result.append(prefCont.getSource()).append("\n");
 		}
-		result.append(prefix).append(offset).append(postfix).append("\n");
+		result.append(getText()).append("\n");
 		result.append("[").append(ireg).append("]");
 		if(isArg) {
 			result.append("[ARG]");

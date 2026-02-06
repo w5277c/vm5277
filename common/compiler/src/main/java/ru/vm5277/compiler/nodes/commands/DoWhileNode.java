@@ -53,7 +53,7 @@ public class DoWhileNode extends CommandNode {
 		consumeToken(tb);
 		// Тело цикла
 		try {
-			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
+			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "do-while1") : new BlockNode(tb, mc, parseStatement(), "do-while2");
 		}
 		catch(CompileException e) {markFirstError(e);}
 
@@ -113,7 +113,7 @@ public class DoWhileNode extends CommandNode {
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		boolean result = true;
-		cgScope = cg.enterLoopBlock();
+		cgScope = cg.enterLoopBlock("do-while3");
 
 		// Анализ тела цикла
 		result&=blockNode.postAnalyze(blockScope, cg);

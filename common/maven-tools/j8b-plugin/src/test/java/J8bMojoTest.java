@@ -64,8 +64,8 @@ public class J8bMojoTest {
 		rule.setVariableValueToObject(mojo, "mainFile", "Main.j8b");
 		rule.setVariableValueToObject(mojo, "target", "avr:atmega328p");
 		rule.setVariableValueToObject(mojo, "targetFreq", "16.0");
-		rule.setVariableValueToObject(mojo, "sourceDirectory", new File(projectDir.toString() + File.separator + "src" + File.separator + "main" +
-																		File.separator + "j8b"));
+		rule.setVariableValueToObject(mojo, "targetStdio", "PC4");
+		rule.setVariableValueToObject(mojo, "sourceDirectory", new File(projectDir.toString() + File.separator + "src"));
 		rule.setVariableValueToObject(mojo, "outputDirectory", new File(projectDir.toString() + File.separator + "target"));
 		rule.setVariableValueToObject(mojo, "autoDownload", true);
 		rule.setVariableValueToObject(mojo, "downloadUrl", "https://vm5277.ru/release.zip");

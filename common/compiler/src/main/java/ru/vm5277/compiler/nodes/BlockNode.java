@@ -60,23 +60,27 @@ public class BlockNode extends AstNode {
 	private		Map<String, LabelNode>	labels		= new HashMap<>();
 	private		boolean					isTry		= false;
 	protected	BlockScope				blockScope;
+	private		String					comment		= "";
 	
-	public BlockNode() {
+	public BlockNode(String comment) {
+		this.comment = comment;
 	}
 	
-	public BlockNode(TokenBuffer tb, MessageContainer mc, AstNode singleStatement) {
+	public BlockNode(TokenBuffer tb, MessageContainer mc, AstNode singleStatement, String comment) {
 		super(tb, mc);
 		
+		this.comment = comment;
 		children.add(singleStatement);
 	}
 
-	public BlockNode(TokenBuffer tb, MessageContainer mc) throws CompileException {
-		this(tb, mc, false, false);
+	public BlockNode(TokenBuffer tb, MessageContainer mc, String comment) throws CompileException {
+		this(tb, mc, false, false, comment);
 	}
-	public BlockNode(TokenBuffer tb, MessageContainer mc, boolean leftBraceConsumed, boolean isTry) throws CompileException {
+	public BlockNode(TokenBuffer tb, MessageContainer mc, boolean leftBraceConsumed, boolean isTry, String comment) throws CompileException {
 		super(tb, mc);
         
 		this.isTry = isTry;
+		this.comment = comment;
 		
 		if(!leftBraceConsumed) consumeToken(tb, Delimiter.LEFT_BRACE); //Наличие токена должно быть гарантировано вызывающим
 
@@ -276,7 +280,7 @@ public class BlockNode extends AstNode {
 		postResult = true;
 
 		debugAST(this, POST, true, getFullInfo());
-		cgScope = cg.enterBlock(isTry);
+		cgScope = cg.enterBlock(isTry, comment);
 		
 		for(int i=0; i<children.size(); i++) {
 			AstNode node = children.get(i);
@@ -353,7 +357,7 @@ public class BlockNode extends AstNode {
 		cgDone = true;
 		
 		CGScope cgs = null == parent ? cgScope : parent;
-		
+
 		for(AstNode node : children) {
 			//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
 			if(!(node instanceof VarNode)) {

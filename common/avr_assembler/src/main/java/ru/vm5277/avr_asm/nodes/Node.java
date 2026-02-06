@@ -48,9 +48,7 @@ public class Node {
 	public static Token consumeToken(TokenBuffer tb, TokenType expectedType) throws CompileException {
 		if (tb.current().getType() == expectedType) return tb.consume();
 		else {
-			int t=5454;
-			return null;
-//throw new CompileException("Expected " + expectedType + ", but got " + tb.current().getType(), tb.getSP());
+			throw new CompileException("Expected " + expectedType + ", but got " + tb.current().getType(), tb.getSP());
 		}
     }
 	public static Token consumeToken(TokenBuffer tb, Delimiter delimiter) throws CompileException {

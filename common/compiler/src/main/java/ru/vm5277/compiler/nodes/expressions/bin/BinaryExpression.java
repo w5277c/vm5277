@@ -333,14 +333,15 @@ public class BinaryExpression extends ExpressionNode {
 					result = null;
 				}
 				else if(expr1 instanceof UnaryExpression) {
-					((CGBranch)branch).pushEnd(new CGLabelScope(null, null, LabelNames.LOCGIC_NOT_END, true));
+					// Работа с branch - похоже артефак который в добавок ломал логику
+//					((CGBranch)branch).pushEnd(new CGLabelScope(null, null, LabelNames.LOCGIC_NOT_END, true));
 					((UnaryExpression)expr1).codeGen(cg, null, isInvert, Operator.OR == operator, false, excs);
-					CGLabelScope lbScope = ((CGBranch)branch).popEnd();
+//					CGLabelScope lbScope = ((CGBranch)branch).popEnd();
 					//TODO проверить(не стандартный CGScope)
 					//cg.jump(expr1.getCGScope(), ((CGBranchScope)brScope).getEnd());
 					//expr1.getCGScope().append(lbScope);
-					cg.jump(cgs, ((CGBranch)branch).getEnd());
-					cgs.append(lbScope);
+//					cg.jump(cgs, ((CGBranch)branch).getEnd());
+//					cgs.append(lbScope);
 				}
 				else {
 					expr1.codeGen(cg, cgs, false, excs);
@@ -357,14 +358,15 @@ public class BinaryExpression extends ExpressionNode {
 					result = null;
 				}
 				else if(expr2 instanceof UnaryExpression) {
-					((CGBranch)branch).pushEnd(new CGLabelScope(null, null, LabelNames.LOCGIC_NOT_END, true));
+					// Работа с branch - похоже артефак который в добавок ломал логику
+//					((CGBranch)branch).pushEnd(new CGLabelScope(null, null, LabelNames.LOCGIC_NOT_END, true));
 					((UnaryExpression)expr2).codeGen(cg, null, isInvert, Operator.OR == operator, false, excs);
-					CGLabelScope lbScope = ((CGBranch)branch).popEnd();
+//					CGLabelScope lbScope = ((CGBranch)branch).popEnd();
 					//TODO проверить(не стандартный CGScope)
 					//cg.jump(expr2.getCGScope(), ((CGBranchScope)brScope).getEnd());
 					//expr2.getCGScope().append(lbScope);
-					cg.jump(cgs, ((CGBranch)branch).getEnd());
-					cgs.append(lbScope);
+//					cg.jump(cgs, ((CGBranch)branch).getEnd());
+//					cgs.append(lbScope);
 
 				}
 				else {

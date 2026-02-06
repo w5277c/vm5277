@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler;
 
 import java.io.BufferedWriter;
@@ -20,6 +21,7 @@ import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.CatchBlock;
@@ -230,9 +232,12 @@ public class ASTPrinter {
 	}
 
 	void printModifiers(Set<Keyword> modifiers) {
-		for(Keyword kw : modifiers) {
-			out.put(kw.getName().toLowerCase() + " ");
-		}
+		if(modifiers.contains(J8BKeyword.PRIVATE)) out.put(J8BKeyword.PRIVATE.getName().toLowerCase() + " ");
+		if(modifiers.contains(J8BKeyword.PUBLIC)) out.put(J8BKeyword.PUBLIC.getName().toLowerCase() + " ");
+		if(modifiers.contains(J8BKeyword.FINAL)) out.put(J8BKeyword.FINAL.getName().toLowerCase() + " ");
+		if(modifiers.contains(J8BKeyword.STATIC)) out.put(J8BKeyword.STATIC.getName().toLowerCase() + " ");
+		if(modifiers.contains(J8BKeyword.NATIVE)) out.put(J8BKeyword.NATIVE.getName().toLowerCase() + " ");
+		if(modifiers.contains(J8BKeyword.ATOMIC)) out.put(J8BKeyword.ATOMIC.getName().toLowerCase() + " ");
 	}
 	
 	void printMethod(MethodNode method) {

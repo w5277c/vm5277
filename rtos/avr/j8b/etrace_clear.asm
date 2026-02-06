@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-.include "mem/ram_clear.asm"
+.include "mem/ram_clear16.asm"
 
 .IFNDEF J8BPROC_ETRACE_CLEAR
 ;-----------------------------------------------------------
@@ -27,7 +27,7 @@ J8BPROC_ETRACE_CLEAR:
 	LDI_Y _OS_ETRACE_BUFFER
 	LDI TEMP_L,low(OS_ETRACE_BUFFER_SIZE)
 	LDI TEMP_H,high(OS_ETRACE_BUFFER_SIZE)
-	MCALL OS_RAM_CLEAR_NR
+	MCALL OS_RAM_CLEAR16_NR
 	POP_T16
 	POP_Y
 	RET

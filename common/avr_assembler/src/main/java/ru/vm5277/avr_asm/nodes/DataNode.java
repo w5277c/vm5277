@@ -74,7 +74,7 @@ public class DataNode extends Node {
 				}
 				else {
 					Long value = Expression.getLong(expr, tb.getSP());
-					if(null != value) {
+					if(null!=value) {
 						if(scope.isListEnabled()) listSB.append(value).append(",");
 					}
 					else {

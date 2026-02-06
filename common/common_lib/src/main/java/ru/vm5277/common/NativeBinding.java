@@ -35,7 +35,7 @@ public class NativeBinding {
 		this.rtosFunction = nb.getRTOSFunction();
 		this.regs = nb.getRegs();
 		this.rtosFeatures = nb.getRTOSFeatures();
-		signature = path + " " + (null==paramTypes ? "[]" : Arrays.toString(paramTypes));
+		signature = path + " " + (null==paramTypes ? "()" : Arrays.toString(paramTypes));
 	}
 	
 	public NativeBinding(String line) throws ParseException {
@@ -112,7 +112,18 @@ public class NativeBinding {
 				rtosFeatures[i] = feature;
 			}
 		}
-		signature = path + " " + (null==paramTypes ? "[]" : Arrays.toString(paramTypes));
+		signature = path + "(";
+		
+		if(null!=paramTypes) {
+			for(int i=0; i<paramTypes.length; i++) {
+				VarType argType = paramTypes[i];
+				signature += argType.getName();
+				if(i!=(paramTypes.length-1)) {
+					signature+=",";
+				}
+			}
+		}
+		signature+=")";
 	}
 	
 	private byte[] getSeparated(String str) {

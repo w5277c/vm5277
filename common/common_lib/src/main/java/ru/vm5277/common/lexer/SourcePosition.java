@@ -81,7 +81,6 @@ public class SourcePosition implements Cloneable {
 		if(null != sourceFile) sb.append(sourceFile.getPath());
 		sb.append("\t");
 		return sb.toString();
-		
 	}
 
 	@Override

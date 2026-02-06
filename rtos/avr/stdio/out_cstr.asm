@@ -13,7 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-.include "stdio/out_char.asm"
+
+	.include "stdio/stdout.asm"
+
 .IFNDEF OS_OUT_CSTR
 ;--------------------------------------------------------
 OS_OUT_CSTR:
@@ -21,19 +23,38 @@ OS_OUT_CSTR:
 ;Логирование строки, конец определяется по 0x00
 ;IN: Z-адрес FLASH на строку
 ;--------------------------------------------------------
-	PUSH ACCUM_L
+.IF OS_FT_STDOUT == 0x01
 	PUSH_Z
+	PUSH ACCUM_L
+
+.IFDEF STDIO_PORT_REGID
+.IF OS_FT_STDIN == 0x01
+	MCALL OS_STDIO_SEND_MODE_NR
+.ENDIF
+.ENDIF
 
 _OS_OUT_CSTR__LOOP:
 	;Считываем байт
 	LPM ACCUM_L,Z+
 	CPI ACCUM_L,0x00
 	BREQ _OS_OUT_CSTR__END
-	MCALL OS_OUT_CHAR
+.IF OS_FT_DEV_MODE
+	MCALL PROC__BLDR_UART_SEND_BYTE_NR
+.ELSE
+	MCALL OS_STDOUT_SEND_BYTE
+.ENDIF
 	RJMP _OS_OUT_CSTR__LOOP
 
 _OS_OUT_CSTR__END:
-	POP_Z
+
+.IFDEF STDIO_PORT_REGID
+.IF OS_FT_STDIN == 0x01
+	MCALL OS_STDIO_RECV_MODE_NR
+.ENDIF
+.ENDIF
+
 	POP ACCUM_L
+	POP_Z
+.ENDIF
 	RET
 .ENDIF

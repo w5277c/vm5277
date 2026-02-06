@@ -38,6 +38,9 @@ import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.lexer.Keyword;
 import ru.vm5277.common.lexer.tokens.Token;
+import ru.vm5277.compiler.nodes.ClassBlockNode;
+import ru.vm5277.compiler.nodes.MethodNode;
+import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 
 public class ASTParser extends AstNode {
 	private	final	FileImporter			fileImporter;
@@ -55,13 +58,12 @@ public class ASTParser extends AstNode {
 		
 		if(tokens.isEmpty()) return;
 		
-		tb = new TokenBuffer(tokens.listIterator());
-		
         // Автоматический импорт из runtime/autoimport.cfg
         if(firsLaunch && null!=runtimePath) {
 			importAutoConfiguredClasses(runtimePath, basePath, tabSize);
 		}
-		
+
+		tb = new TokenBuffer(tokens.listIterator());
 		// Обработка импортов		
 		while (tb.match(J8BKeyword.IMPORT) && !tb.match(TokenType.EOF)) {
 			ImportNode importNode = new ImportNode(tb, mc);

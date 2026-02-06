@@ -3,7 +3,7 @@
 	<id>j8b-archetype</id>
 	<resources>
 		<resource>pom.xml</resource>
-		<resource>src/main/j8b/Main.j8b</resource>
+		<resource>src/Main.j8b</resource>
 		<resource>nbactions.xml</resource>
 	</resources>
 	<testSources></testSources>

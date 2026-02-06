@@ -30,7 +30,7 @@ import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.avr_asm.nodes.operands.EReg;
-import ru.vm5277.avr_asm.nodes.operands.FlashAddr;
+import ru.vm5277.avr_asm.nodes.operands.RelativeAddr;
 import ru.vm5277.avr_asm.nodes.operands.IOReg;
 import ru.vm5277.avr_asm.semantic.BinaryExpression;
 import ru.vm5277.avr_asm.semantic.IRegExpression;
@@ -91,6 +91,9 @@ public class MnemNode extends Node {
 				mc.add(new ErrorMessage("Unsupported insctruction '" + mnemonic + "'", sp));
 			}
 		}
+		catch(CompileException e) {
+			mc.add(e.getErrorMessage());
+		}
 		catch(Exception e) {
 			mc.add(new ErrorMessage("Failed to parse '" + mnemonic + "' instruction: " + e.getMessage(), sp));
 		}
@@ -112,8 +115,8 @@ public class MnemNode extends Node {
 					case Instruction.OPERAND_R:		parse(instr, new Reg(scope, sp, expr1)); return true;
 					case Instruction.OPERAND_RH:	parse(instr, new HReg(scope, sp, expr1)); return true;
 					case Instruction.OPERAND_RR:	parse(instr, new Reg(scope, sp, expr1), new Reg(scope, sp, expr1)); return true;
-					case Instruction.OPERAND_K7S:	parse(instr, new FlashAddr(mc, scope, sp, expr1, -64, 63, 7, addr)); return true;
-					case Instruction.OPERAND_K12S:	parse(instr, new FlashAddr(mc, scope, sp, expr1, -2048, 2047, 12, addr)); return true;
+					case Instruction.OPERAND_K7S:	parse(instr, new RelativeAddr(mc, scope, sp, expr1, -64, 63, 7, addr)); return true;
+					case Instruction.OPERAND_K12S:	parse(instr, new RelativeAddr(mc, scope, sp, expr1, -2048, 2047, 12, addr)); return true;
 					case Instruction.OPERAND_K22:	parse(instr, new Const(mc, scope, sp, expr1, 0, 0x3fffff, 22)); return true; // JMP и CALL
 				}
 				return false;

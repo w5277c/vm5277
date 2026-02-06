@@ -182,7 +182,8 @@ public class ComparisonExpression extends BinaryExpression {
 			if(expr1 instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)expr1;
 				expr2.codeGen(cg, cgs, false, excs);
-				cg.constCond(cgs, cScope2.getCells(), operator, le.getNumValue(), isInvert, opOr, (CGBranch)branch);
+				cg.constCond(	cgs, cScope2.getCells(), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), expr2.getType().isFixedPoint(),
+								le.isFixed(), isInvert, opOr, (CGBranch)branch);
 			}
 			//================ VarFieldExpression ==== ARRAY ================================
 /*TODO вроде как попаадает под универсальный случай, надо проверить
@@ -212,19 +213,22 @@ public class ComparisonExpression extends BinaryExpression {
 			if(expr1 instanceof VarFieldExpression) {
 				expr1.codeGen(cg, cgs, false, excs);
 				CGCellsScope cScope = (CGCellsScope)expr1.getSymbol().getCGScope();
-				cg.constCond(cgs, cScope.getCells(), operator, le.getNumValue(), isInvert, opOr, branch);
+				cg.constCond(	cgs, cScope.getCells(), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), expr1.getType().isFixedPoint(),
+								le.isFixed(), isInvert, opOr, branch);
 			}
 			else if(expr1 instanceof ArrayExpression) {
 				expr1.codeGen(cg, cgs, false, excs);
 				CGCellsScope cScope = (CGCellsScope)expr1.getSymbol().getCGScope();
-				cg.constCond(cgs, cScope.getCells(), operator, le.getNumValue(), isInvert, opOr, branch);
+				cg.constCond(	cgs, cScope.getCells(), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), expr1.getType().isFixedPoint(),
+								le.isFixed(), isInvert, opOr, branch);
 			}
 			//================ LiteralExpression ==== OTHER ================================
 			else {
 				if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgs, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr1);
 				}
-				cg.constCond(cgs, new CGCells(CGCells.Type.ACC), operator, le.getNumValue(), isInvert, opOr, branch);
+				cg.constCond(	cgs, new CGCells(	CGCells.Type.ACC), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(),
+													expr1.getType().isFixedPoint(), le.isFixed(), isInvert, opOr, branch);
 			}
 		}
 		//================ ArrayExpression ================================
@@ -235,7 +239,8 @@ public class ComparisonExpression extends BinaryExpression {
 				LiteralExpression le = (LiteralExpression)expr1;
 				expr2.codeGen(cg, cgs, false, excs);
 				CGCellsScope cScope = (CGCellsScope)expr2.getSymbol().getCGScope();
-				cg.constCond(cgs, cScope.getCells(), operator, le.getNumValue(), isInvert, opOr, (CGBranch)branch);
+				cg.constCond(	cgs, cScope.getCells(), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), expr2.getType().isFixedPoint(),
+								le.isFixed(), isInvert, opOr, (CGBranch)branch);
 			}
 			//================ ArrayExpression ==== VAR/FIELD ================================
 			else if(expr1 instanceof VarFieldExpression) {

@@ -1,0 +1,59 @@
+/*
+ * Copyright 2025 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+class Main {
+	public static void main() {
+		byte b0;		b0=0;
+		byte b1;		b1=1;
+		byte b2;		b2=2;
+		byte b3;		b3=3;
+		byte b4;		b4=4;
+		byte b5;		b5=5;
+		
+		System.out("\n1. Цепочка AND с разными условиями[true]:");
+		System.out(b1 == 1 && b2 != 1 && b3 < 4 && b4 > 3 && b5 <= 5);
+
+		System.out("\n2. Цепочка OR с разными условиями[true]:");
+		System.out(b1 == 0 || b2 == 2 || b3 > 5 || b4 != 4 || b5 < 0);
+
+		System.out("\n3. Комбинация AND/OR с приоритетами[true]:");
+		System.out(b1 == 1 && (b2 == 2 || b3 == 0) && b4 == 4);
+
+		System.out("\n4. Вложенные выражения[true]:");
+		System.out((b1 == 1 && b2 == 2) || (b3 == 3 && b4 == 4));
+
+		System.out("\n5. С отрицаниями[true]:");
+		System.out(!(b1==0) && !(b2!=2));//true
+		
+		System.out("\n6. Сравнения с арифметикой[true]:");
+		System.out(b1 + b2 == 3 && b3 * b4 == 12);
+
+		System.out("\n7. Смешанные типы сравнений[true]:");
+		System.out(b1 < b2 && b2 <= b3 && b3 > b1 && b4 >= b2);
+
+		System.out("\n8. Тройная вложенность[true]:");
+		System.out((b1 == 1 || b2 == 0) && (b3 == 3 || (b4 == 4 && b5 == 5)));
+
+		System.out("\n9. Короткое замыкание (деление на ноль в false ветке)[false]:");
+		System.out(b1 != 1 && b2 / b0 == b0);
+
+		System.out("\n10. Многоуровневое условие[true]:");
+		System.out(b1 == 1 && (b2 == 2 || b3 == 3) && (b4 == 4 || b5 == 5) && !(b1 == b2));		
+		
+		System.out("\n11. Более сложное условие[true]:");
+		System.out(!((b1 == 0 && b2 != 2) || (b3 < b4 && !(b5 > 1))) && (!!(b1 == b2) || (!(b3 == 0) && b4 != 0)));
+	}
+}

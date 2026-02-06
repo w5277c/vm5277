@@ -22,11 +22,6 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.common.lexer.Operator;
-import static ru.vm5277.common.lexer.Operator.DIV;
-import static ru.vm5277.common.lexer.Operator.MINUS;
-import static ru.vm5277.common.lexer.Operator.MOD;
-import static ru.vm5277.common.lexer.Operator.MULT;
-import static ru.vm5277.common.lexer.Operator.PLUS;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.cg.CGCells;
@@ -35,7 +30,6 @@ import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.VarType;
-import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -161,10 +155,15 @@ public class ArithmeticExpression extends BinaryExpression {
 
 		if(result) {
 			// Проверки для численных типов
-			if(leftExpr instanceof LiteralExpression && rightExpr instanceof LiteralExpression) {
+			// TODO константы еще не собраны, мы не можем здесь проверять, так как теперь проверяем наличие финальной переменной или свойства
+/*			if(leftExpr instanceof LiteralExpression && rightExpr instanceof LiteralExpression) {
 				LiteralExpression leftLE = (LiteralExpression)leftExpr;
 				LiteralExpression rightLE = (LiteralExpression)rightExpr;
+				
+				boolean varFiledCast = (leftLE.fromVarField() | rightLE.fromVarField());
+				VarType type_ = leftLE.getType().getSize() > rightLE.getType().getSize() ? leftLE.getType() : rightLE.getType();
 
+				
 				if(leftType.isFixedPoint() || rightType.isFixedPoint()) {
 					double leftVal = leftLE.getValue() instanceof Double ? ((Double)leftLE.getValue()) : ((Number)leftLE.getValue()).doubleValue();
 					double rightVal = rightLE.getValue() instanceof Double ? ((Double)rightLE.getValue()) : ((Number)rightLE.getValue()).doubleValue();
@@ -200,7 +199,7 @@ public class ArithmeticExpression extends BinaryExpression {
 						result = false;
 					}
 				}
-			}
+			}*/
 		}
 
 		cg.leaveExpression();
@@ -262,16 +261,19 @@ public class ArithmeticExpression extends BinaryExpression {
 		if(expr2 instanceof VarFieldExpression) {
 			CGCellsScope cScope2 = (CGCellsScope)expr2.getSymbol().getCGScope();
 			//================ VarFieldExpression ==== LITERAL ================================
-			if(expr1 instanceof LiteralExpression) {
+/*			if(expr1 instanceof LiteralExpression) {
+				// Чушь собачья, я не могу просто взять и загрузить первым операндом expr2 (ломает деление и вычитание!)
 				LiteralExpression le = (LiteralExpression)expr1;
 				if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgs, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr1);
 				}
-				if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
+//TODO!!! похоже ошибочная логика во многих местах - нужны тесты fixed с не fixed значениями
+				boolean isFixed = expr1.getType().isFixedPoint() || expr2.getType().isFixedPoint();
+				if(isFixed && !expr2.getType().isFixedPoint()) {
 					cgs.append(cg.accCast(expr2.getType(), expr1.getType()));
 				}
 				cg.constAction(cgs, operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed(), excs);
-			}
+			}*/
 			//================ VarFieldExpression ==== ARRAY ================================
 /*TODO вроде как попаадает под универсальный случай, надо проверить
 			else if(expr1 instanceof ArrayExpression) {
@@ -283,15 +285,16 @@ public class ArithmeticExpression extends BinaryExpression {
 			}
 */
 			//================ VarFieldExpression ==== OTHER ================================
-			else {
+//			else {
 				if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgs, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr1);
 				}
-				if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
+				boolean isFixed = expr1.getType().isFixedPoint() || expr2.getType().isFixedPoint();
+				if(isFixed && !expr1.getType().isFixedPoint()) {
 					cgs.append(cg.accCast(expr1.getType(), expr2.getType()));
 				}
-				cg.cellsAction(cgs, cScope2.getCells(), operator, VarType.FIXED == expr2.getType(), excs);
-			}
+				cg.cellsAction(cgs, cScope2.getCells(), operator, expr2.getType().isFixedPoint(), excs);
+//			}
 		}
 		//================ LiteralExpression ================================
 		else if(expr2 instanceof LiteralExpression) {
@@ -300,7 +303,8 @@ public class ArithmeticExpression extends BinaryExpression {
 			if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgs, true, excs)) {
 				throw new CompileException("Accum not used for operand:" + expr1);
 			}
-			if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
+			boolean isFixed = expr1.getType().isFixedPoint() || expr2.getType().isFixedPoint();
+			if(isFixed && !expr1.getType().isFixedPoint()) {
 				cgs.append(cg.accCast(expr1.getType(), expr2.getType()));
 			}
 			cg.constAction(cgs, operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed(), excs);
@@ -336,7 +340,7 @@ public class ArithmeticExpression extends BinaryExpression {
 				if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
 					cgs.append(cg.accCast(expr1.getType(), expr2.getType()));
 				}
-				cg.cellsAction(cgs, new CGCells(CGCells.Type.STACK, size), operator, VarType.FIXED == expr2.getType(), excs);
+				cg.cellsAction(cgs, new CGCells(CGCells.Type.STACK, size), operator, expr2.getType().isFixedPoint(), excs);
 			}
 		}
 		//================ Other ================================
@@ -358,7 +362,7 @@ public class ArithmeticExpression extends BinaryExpression {
 			if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
 				cgs.append(cg.accCast(expr1.getType(), expr2.getType()));
 			}
-			cg.cellsAction(cgs, new CGCells(CGCells.Type.STACK, size), operator, VarType.FIXED == expr2.getType(), excs);
+			cg.cellsAction(cgs, new CGCells(CGCells.Type.STACK, size), operator, expr2.getType().isFixedPoint(), excs);
 		}
 		
 		return CodegenResult.RESULT_IN_ACCUM;

@@ -124,7 +124,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 			return expr;
 		}
 		else if (tb.match(Delimiter.LEFT_BRACE)) {
-			return new BlockNode(tb, mc);
+			return new BlockNode(tb, mc, "statement");
 		}
 		CompileException e = parserError("Unexpected statement token: " + tb.current());
 		tb.skip(Delimiter.SEMICOLON, Delimiter.LEFT_BRACE);
@@ -486,10 +486,13 @@ public abstract class AstNode extends SemanticAnalyzer {
 		}
 		
 		// Специальные случаи для NULL
-		if(VarType.NULL==left || VarType.NULL==right) {
-			return left.isReferenceType() || right.isReferenceType();
+		if(VarType.NULL==left) {
+			return right.isReferenceType();
 		}
-
+		if(VarType.NULL==right) {
+			return left.isReferenceType();
+		}
+		
 		//TODO РАЗВЕ? Большинство типов можно объединить со строковой константой
 		//if(VarType.CSTR == left && VarType.VOID != right) return true;
 		if(VarType.CSTR==left || VarType.CSTR==right) {
@@ -519,7 +522,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 			if(left.getClassName().equals(right.getClassName())) {
 				return true;
 			}
-			CIScope cis = scope.getThis().resolveCI(right.getName(), false);
+			CIScope cis = scope.getThis().resolveCI(left.getName(), false);
 			return null!=cis && cis instanceof InterfaceScope;
 		}
 		
@@ -640,9 +643,6 @@ public abstract class AstNode extends SemanticAnalyzer {
 	
 	// Формирует код AST ноды единожды(см. cgDone), загружает результат в аккумулятор, если включен toAccum
 	// Код записываем в parent, но если null, то записываем в cg.getScope() он содержит текущий cgScope AST ноды
-//	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum) throws CompileException {
-//		return codeGen(cg, parent, true, null);
-//	}
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException { 
 		throw new UnsupportedOperationException(this.toString());
 	}
@@ -655,9 +655,10 @@ public abstract class AstNode extends SemanticAnalyzer {
 			AstNode node = ((AstHolder)symbol).getNode();
 			if(null != node) {
 				// Генерация кода зависимостей не должна влиять на текущий размер аккумулятора
-				int accSize = cg.getAccumSize();
+				int accSize = cg.getAccum().getSize();
+				boolean isFixed = cg.getAccum().isFixed();
 				Object obj = node.codeGen(cg, null, false, excs);
-				cg.setAccumSize(accSize);
+				cg.getAccum().set(accSize, isFixed);
 				if(null != obj) return symbol.getCGScope();
 			}
 		}

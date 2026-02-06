@@ -329,7 +329,7 @@ public class AssignExpression extends BinaryExpression {
 				if(CodegenResult.RESULT_IN_ACCUM!=rightExpr.codeGen(cg, cgs, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + rightExpr);
 				}
-				int accumSize = cg.getAccumSize();
+				int accumSize = cg.getAccum().getSize();
 				cg.pushAccBE(cgs, accumSize);
 				leftExpr.codeGen(cg, cgs, false, excs);
 				cg.popAccBE(cgs, accumSize);

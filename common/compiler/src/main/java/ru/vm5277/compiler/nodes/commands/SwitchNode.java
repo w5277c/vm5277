@@ -105,7 +105,8 @@ public class SwitchNode extends CommandNode {
 				}
 				
 				try {
-					defaultBlock = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
+					defaultBlock = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "switch.default") :
+																	new BlockNode(tb, mc, parseStatement(), "switch.default");
 				}
 				catch(CompileException e) {
 					markFirstError(e);
@@ -303,7 +304,7 @@ public class SwitchNode extends CommandNode {
 		
 		if(null==constantValue) {
 			// Генерируем выражение switch
-			cg.setAccumSize(-1==expression.getType().getSize() ? cg.getRefSize() : expression.getType().getSize());
+			cg.getAccum().set(-1==expression.getType().getSize() ? cg.getRefSize() : expression.getType().getSize(), false);
 			if(CodegenResult.RESULT_IN_ACCUM!=expression.codeGen(cg, cgs, true, excs)) {
 				throw new CompileException("Accum not used for expr:" + expression);
 			}
@@ -339,15 +340,15 @@ public class SwitchNode extends CommandNode {
 
 					if(from==to) {
 						// Одиночное значение
-						cg.constCond(cgs, new CGCells(CGCells.Type.ACC), Operator.EQ, from, false, true, branch); 
+						cg.constCond(cgs, new CGCells(CGCells.Type.ACC), Operator.EQ, from, false, false, false, true, branch); 
 					} else {
 						CGBranch endBranch = new CGBranch();
 						// Диапазон значений
-						cg.constCond(cgs, new CGCells(CGCells.Type.ACC), Operator.LT, from, false, true, endBranch);
+						cg.constCond(cgs, new CGCells(CGCells.Type.ACC), Operator.LT, from, false, false,false, true, endBranch);
 						if(255 > to) {
-							cg.constCond(cgs, new CGCells(CGCells.Type.ACC), Operator.LT, to + 1, false, true, branch);
+							cg.constCond(cgs, new CGCells(CGCells.Type.ACC), Operator.LT, to + 1, false, false, false, true, branch);
 						} else {
-							cg.constCond(cgs, new CGCells(CGCells.Type.ACC), Operator.LTE, to, false, true, branch);
+							cg.constCond(cgs, new CGCells(CGCells.Type.ACC), Operator.LTE, to, false, false, false, true, branch);
 						}
 						cgs.append(endBranch.getEnd());						
 					}

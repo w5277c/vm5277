@@ -25,7 +25,7 @@ OS_DIVA8BY10:
 ;--------------------------------------------------------
 	PUSH ACCUM_H
 
-	LDI ACCUM_L,205													;204.8
+	LDI ACCUM_H,205													;204.8
 	MCALL OS_MUL8
 	MOV ACCUM_L,ACCUM_H
 	LSR ACCUM_L

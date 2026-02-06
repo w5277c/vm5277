@@ -17,29 +17,37 @@
 .IFNDEF OS_MUL16P2
 ;-----------------------------------------------------------
 ;Умножение 16бит числа на степень двойки(на базе метки)
-;IN: ACCUM_L/H-16b число,
-;OUT: ACCUM_L/H-16b результат
+
+;IN: ACCUM_L/H-16b число, ACCUM_EL должен быть = 0!
+;OUT: ACCUM_L/H/EL-24b результат
 ;-----------------------------------------------------------
 OS_MUL16P2_X128:
 	LSL ACCUM_L
 	ROL ACCUM_H
+	ROL ACCUM_EL
 OS_MUL16P2_X64:
 	LSL ACCUM_L
 	ROL ACCUM_H
+	ROL ACCUM_EL
 OS_MUL16P2_X32:
 	LSL ACCUM_L
 	ROL ACCUM_H
+	ROL ACCUM_EL
 OS_MUL16P2_X16:
 	LSL ACCUM_L
 	ROL ACCUM_H
+	ROL ACCUM_EL
 OS_MUL16P2_X8:
 	LSL ACCUM_L
 	ROL ACCUM_H
+	ROL ACCUM_EL
 OS_MUL16P2_X4:
 	LSL ACCUM_L
 	ROL ACCUM_H
+	ROL ACCUM_EL
 OS_MUL16P2_X2:
 	LSL ACCUM_L
 	ROL ACCUM_H
+	ROL ACCUM_EL
 	RET
 .ENDIF

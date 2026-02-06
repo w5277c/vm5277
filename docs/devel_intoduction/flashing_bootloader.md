@@ -74,11 +74,12 @@ Build SUCCESS, warnings:0
 #-------------------------------------------------------------------------------------------
 #    *** CRITICAL INFORMATION ***
 #-------------------------------------------------------------------------------------------
+# Connection port:          PC2
 # Platform:                 avr
 # MCU:                      atmega328p
 # Device signature:         001e950f
-# Bootloader version:       64
-# Device unique identifier: 30e06d7c2c9c673a
+# Bootloader type|version:  1|00
+# Device unique identifier: 0e47b7fcff....ae
 
 #-------------------------------------------------------------------------------------------
 #    *** CRITICAL SECURITY WARNINGS ***
@@ -93,7 +94,6 @@ Build SUCCESS, warnings:0
 # 3. INFORMATION LOCALLY STORED:
 #    Critical information has been saved to: /home/kostas/vm5277/var/uids.db
 #    Keep this file secure - contains sensitive device identification data.
-------------------------------------------------------------------------
 ```
 Более подробную информацию смотрите [утилиту j8bmb](j8bmb.md) — работа с утилитой формирования бутлоадера, флаги, настройка, режимы работы.
 
@@ -127,8 +127,44 @@ j8bmb avr:atmega328p -p PC2
 
 **Для AVR через USBasp:**
 ```bash
-avrdude -p atmega328p -c usbasp -P usb -U flash:w:target/bootloader.hex:i
+avrdude -p atmega328p -c usbasp -P usb -U flash:w:bldr_cseg.hex:i
 ```
+### Пример успешного выполнения:
+```bash
+kostas@work:~/vm5277$ avrdude -p atmega328pb -c usbasp -P usb -U flash:w:bldr_cseg.hex:i
+
+avrdude: AVR device initialized and ready to accept instructions
+avrdude: device signature = 0x1e950f (probably m328p)
+avrdude: Note: flash memory has been specified, an erase cycle will be performed.
+         To disable this feature, specify the -D option.
+avrdude: erasing chip
+avrdude: reading input file bldr_cseg.hex for flash
+         with 798 bytes in 1 section within [0x7c00, 0x7f1d]
+         using 7 pages and 98 pad bytes
+avrdude: writing 798 bytes flash ...
+
+Writing | ################################################## | 100% 0.03 s 
+
+avrdude: 798 bytes of flash written
+avrdude: verifying flash memory against bldr_cseg.hex
+
+Reading | ################################################## | 100% 0.00 s 
+
+avrdude: 798 bytes of flash verified
+
+avrdude done.  Thank you.
+```
+
+### Вероятная ошибка
+Скорее всего у вас не будет прав на использование этого устройства. Попробуйте добавить файл-правило для udev, и перезапустить udev:
+```bash
+cd /etc/udev/rules.d
+sudo touch 99-USBasp.rules
+sudo sh -c 'echo "SUBSYSTEM==\"usb\", ATTR{product}==\"USBasp\", ATTR{idProduct}==\"05dc\", ATTRS{idVendor}==\"16c0\", MODE=\"0666\"" >> 99-USBasp.rules'
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+```
+
 Вот описание работы с [стандартными утилитами](flashing_external.md)  
 
 ### Шаг 4: Установка Fuse битов

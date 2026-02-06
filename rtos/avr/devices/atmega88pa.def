@@ -1,0 +1,168 @@
+/*
+ * Copyright 2025 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+	.include "atmega88pa.inc"
+	.include "devices/common.def"
+
+;---CONSTANTS-----------------------------------------------
+	.SET	_MCALL_SIZE								= 0x01	;Размер макроса MCALL/MJMP: 1(RCALL)-2(CALL)
+	.SET	JMP_SUPPORT								= 0x00	;Поддержка JMP,CALL
+	.SET	MUL_SUPPORT								= 0x01	;Поддержка MUL,MULS,MULSU
+	.SET	BLDRSEC_SUPPORT							= 0x01	;Аппаратная защита секции бутлоадера
+	.EQU	OS_IR_QNT								= 0x1a	;Количество перырваний
+	.EQU	OS_PCINT_PORTS_QNT						= 0x03	;Количество портов поддерживающих внешние прерывания(PCINT)
+	.EQU	OS_RAM_BORDER_SIZE						= 0x10	;Минимальное допустимое расстояние между вершинами FREE_RAM и STACK
+	.SET	OS_STACK_SIZE							= 0xc0	;Общий стек(192 байта)
+	.SET	OS_STDIN_CBUFFER_SIZE					= 0x08	;Размер буфера ввода (не менее 4)
+
+	.SET	OS_ETRACE_BUFFER_SIZE					= 0x10	;Размер буфера для трассировки исключений
+
+	.EQU	OS_DRAM_BMASK_1B_SIZE					= 8		;Размер 64Б(64 яч.) //TODO рассчитать
+	.EQU	OS_DRAM_BMASK_2B_SIZE					= 6		;Размер 96Б(48 яч.)
+	.EQU	OS_DRAM_BMASK_8B_SIZE					= 10	;Размер 640Б(80 яч.)
+
+	.EQU	SDA										= PC4
+	.EQU	SCL										= PC5
+	.EQU	RXD										= PD0
+	.EQU	TXD										= PD1
+	.EQU	RXD0									= RXD
+	.EQU	TXD0									= TXD
+	.EQU	SCK										= PB5
+	.EQU	MISO									= PB4
+	.EQU	MOSI									= PB3
+	.EQU	SS										= PB2
+	.EQU	OC2A									= PB3
+
+	.SET	INT0_PORT								= PD2
+	.SET	INT1_PORT								= PD3
+
+	;---IR---
+	.EQU	C5_IR_INT0								= 0x01
+	.EQU	C5_IR_INT1								= 0x02
+	.EQU	C5_IR_PCINT0							= 0x03
+	.EQU	C5_IR_PCINT1							= 0x04
+	.EQU	C5_IR_PCINT2							= 0x05
+	.EQU	C5_IR_WDT								= 0x06
+	.EQU	C5_IR_TIMER2_COMPA						= 0x07
+	.EQU	C5_IR_TIMER2_COMPB						= 0x08
+	.EQU	C5_IR_TIMER2_OVF						= 0x09
+	.EQU	C5_IR_TIMER1_CAPT						= 0x0a
+	.EQU	C5_IR_TIMER1_COMPA						= 0x0b
+	.EQU	C5_IR_TIMER1_COMPB						= 0x0c
+	.EQU	C5_IR_TIMER1_OVF						= 0x0d
+	.EQU	C5_IR_RESERVED_CORE_TIMER1				= 0x0e
+	.EQU	C5_IR_RESERVED_CORE_TIMER2				= 0x0f
+	.EQU	C5_IR_TIMER0_OVF						= 0x10
+	.EQU	C5_IR_SPI								= 0x11
+	.EQU	C5_IR_UART_RX							= 0x12
+	.EQU	C5_IR_UART_UDRE							= 0x13
+	.EQU	C5_IR_UART_TX							= 0x14
+	.EQU	C5_IR_ADC								= 0x15
+	.EQU	C5_IR_EE_READY							= 0x16
+	.EQU	C5_IR_ANALOG_COMP						= 0x17
+	.EQU	C5_IR_TWI								= 0x18
+	.EQU	C5_IR_SPM_READY							= 0x19
+
+.IF OS_FT_BOOTLOADER_ONLY == 0x00							; Пропускаем блок для сборки только бутлоадера
+.ORG 0x0000
+	JMP		_OS_INIT										; Reset Handler
+.IF OS_FT_IR_TABLE == 0x01
+	CALL	_OS_IR_HANDLER									; External Interrupt0 Handler
+	CALL	_OS_IR_HANDLER									; External Interrupt1 Handler
+_OS_PCINT_0_VECTOR:
+.IF OS_FT_PCINT
+	CALL	_OS_PCINT_HANDLER								; Pin Change Interrupt Request 0
+	CALL	_OS_PCINT_HANDLER								; Pin Change Interrupt Request 1
+	CALL	_OS_PCINT_HANDLER								; Pin Change Interrupt Request 2
+.ELSE
+	CALL	_OS_IR_HANDLER									; Pin Change Interrupt Request 0
+	CALL	_OS_IR_HANDLER									; Pin Change Interrupt Request 1
+	CALL	_OS_IR_HANDLER									; Pin Change Interrupt Request 2
+.ENDIF
+	CALL	_OS_IR_HANDLER									; Watchdog Time-out Interrupt
+	CALL	_OS_IR_HANDLER									; Timer/Counter2 Compare Match A
+	CALL	_OS_IR_HANDLER									; Timer/Counter2 Compare Match B
+	CALL	_OS_IR_HANDLER									; Timer/Counter2 Overflow
+	CALL	_OS_IR_HANDLER									; Timer/Counter1 Capture Event
+	CALL	_OS_IR_HANDLER									; Timer/Counter1 Compare Match A
+	CALL	_OS_IR_HANDLER									; Timer/Counter1 Compare Match B
+	CALL	_OS_IR_HANDLER									; Timer/Counter1 Overflow
+.IF OS_FT_TIMER == 0x01										; Timer/Counter0 Compare Match A
+	JMP		_OS_TIMER_HANDLER
+.ELSE
+	CALL	_OS_IR_HANDLER
+.ENDIF
+	CALL	_OS_IR_HANDLER									; Timer/Counter0 Compare Match B
+	CALL	_OS_IR_HANDLER									; Timer/Counter0 Overflow
+	CALL	_OS_IR_HANDLER									; SPI Serial Transfer Complete
+	CALL	_OS_IR_HANDLER									; USART Rx Complete
+	CALL	_OS_IR_HANDLER									; USART, Data Register Empty
+	CALL	_OS_IR_HANDLER									; USART, Tx Complete
+	CALL	_OS_IR_HANDLER									; ADC Conversion Complete
+	CALL	_OS_IR_HANDLER									; EEPROM Ready
+	CALL	_OS_IR_HANDLER									; Analog Comparator
+	CALL	_OS_IR_HANDLER									; 2-wire Serial Interface
+	CALL	_OS_IR_HANDLER									; Store Program Memory Ready
+.ENDIF
+PORTS_TABLE:												;Таблица из адресов IO PINx регистров (-,B,C,D)
+	.db	0x00,0x23,0x26,0x29
+PCINT_TABLE:
+	.db	0x00,PCMSK0,PCMSK1,PCMSK2
+INT_TABLE:
+	.db	(1<<INT0),(1<<INT1)
+.ENDIF
+
+.MACRO MCALL
+	CALL @0
+.ENDMACRO
+.MACRO MJMP
+	JMP @0
+.ENDMACRO
+
+;ATOMIC_REQUIRED
+.MACRO _OS_POWER_ON
+	PUSH TEMP_L
+	LDS TEMP_L,PRR
+	ANDI TEMP_L,low(~(1<<@0))
+	STS PRR,TEMP_L
+	POP TEMP_L
+.ENDMACRO
+;ATOMIC_REQUIRED
+.MACRO _OS_POWER_OFF
+	PUSH TEMP_L
+	LDS TEMP_L,PRR
+	ORI TEMP_L,low(1<<@0)
+	STS PRR,TEMP_L
+	POP TEMP_L
+.ENDMACRO
+
+;ATOMIC_REQUIRED
+.MACRO _OS_TIMERS_RESTART									;TODO добавить инициализацию для 0B таймера
+	_OS_POWER_ON PRTIM0										;Подпитываю TIMER0
+	PUSH TEMP_L
+	LDI TEMP_L,(0<<WGM01)|(0<<WGM00)
+	STS TCCR0A,TEMP_L
+	LDI TEMP_L,(0<<CS02)|(1<<CS01)|(0<<CS00)				;/8 - for 16MHz
+	STS TCCR0B,TEMP_L
+	STS TCNT0,C0x00
+	LDI TEMP_L,_OS_TIMER_FREQ-0x01							;0x64 - 100(16MHz)
+	STS OCR0A,TEMP_L
+	LDI TEMP_L,(1<<OCF0A)
+	STS TIFR0,TEMP_L
+
+	LDI TEMP_L,(1<<OCIE0A)
+	STS TIMSK0,TEMP_L										; TODO проверить
+	POP TEMP_L
+.ENDMACRO

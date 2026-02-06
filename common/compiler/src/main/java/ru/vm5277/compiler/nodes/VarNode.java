@@ -378,6 +378,7 @@ public class VarNode extends AstNode implements InitNodeHolder {
 					cgs.append(lbScope);
 					cg.accToCells(cgs, vScope);
 				}
+				cg.accToCells(cgs, vScope);
 				accUsed = true;
 				cg.setScope(oldScope);
 			}

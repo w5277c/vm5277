@@ -17,11 +17,11 @@
 package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.ExcsThrowPoint;
+import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.Pair;
 import ru.vm5277.common.RTOSFeature;
 import ru.vm5277.common.cg.CodeGenerator;
@@ -49,18 +49,26 @@ import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.RTOSParam;
+import static ru.vm5277.common.RTOSParam.DEVEL_MODE;
+import ru.vm5277.common.cg.CGBranch;
 import ru.vm5277.common.cg.CGExcs;
-import ru.vm5277.common.cg.TargetInfoBuilder;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGTryBlockScope;
-import ru.vm5277.compiler.nodes.CatchBlock;
 import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.ExceptionScope;
 import ru.vm5277.compiler.semantic.MethodScope;
+
+//TODO не работает проверка в postAnalyze (или ранее)
+//[INFO] Main source file: /media/kostas/repos/w5277c/vm5277_local/examples/j8b/bool/src/main/j8b/Main.j8b
+//ru.vm5277.common.exceptions.CompileException: Not found native method binding for method: System.outChar [bool]
+//	at ru.vm5277.compiler.avr_codegen.Generator.nativeMethodInit(Generator.java:2331)
+//	at ru.vm5277.compiler.nodes.expressions.MethodCallExpression.codeGen(MethodCallExpression.java:432)
+//	at ru.vm5277.compiler.nodes.BlockNode.codeGen(BlockNode.java:365)
+
 
 public class MethodCallExpression extends ExpressionNode {
 	private			ExpressionNode			targetExpr;
@@ -142,7 +150,9 @@ public class MethodCallExpression extends ExpressionNode {
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		boolean result = true;
+		if(null!=postResult) return postResult;
+		postResult = true;
+
 		debugAST(this, POST, true, getFullInfo());
 		cgScope = cg.enterExpression(toString());
 
@@ -165,8 +175,8 @@ public class MethodCallExpression extends ExpressionNode {
 			argTypes = new VarType[args.size()];
 			for(int i=0; i<args.size(); i++) {
 				ExpressionNode arg = args.get(i);
-				result&=arg.postAnalyze(scope, cg);
-				if(result) {
+				postResult&=arg.postAnalyze(scope, cg);
+				if(postResult) {
 					ExpressionNode optimizedExpr = arg.optimizeWithScope(scope, cg);
 					if(null!=optimizedExpr) {
 						args.set(i, optimizedExpr);
@@ -176,7 +186,7 @@ public class MethodCallExpression extends ExpressionNode {
 				}
 			}
 			
-			if(result) {
+			if(postResult) {
 				if(null==targetExpr) {
 					cis = scope.getThis();
 					symbol = cis.resolveMethod(methodName, argTypes, false);
@@ -209,7 +219,7 @@ public class MethodCallExpression extends ExpressionNode {
 
 							if(null==scope_) {
 								markError("Unhandled exception '" + eScope.getName() + "'");
-								result = false;
+								postResult = false;
 							}
 						}
 					}
@@ -226,11 +236,11 @@ public class MethodCallExpression extends ExpressionNode {
 				if(null==symbol) {
 					markError(	"Method " + (null==type ? VarType.VOID : type) + " " + getQualifiedPath() +
 								"(" + StrUtils.toString(argTypes) + ") not found");
-					result = false;
+					postResult = false;
 				}
 			}
 			
-			if(result) {
+			if(postResult) {
 				isThisMethodCall = (scope.getThis()==cis);
 				type = symbol.getType();
 				symbol.setCGScope(cgScope);
@@ -262,18 +272,18 @@ public class MethodCallExpression extends ExpressionNode {
 				}*/
 			}
 			
-			if(result) {
+			if(postResult) {
 				if(isThisMethodCall) {
 					MethodScope mScope = scope.getMethod();
 					if(!symbol.isStatic() && null!=mScope && mScope.getSymbol().isStatic()) {
 						//TODO не корректный номер строки в сообщении
 						markError("Non-static method '" + symbol.getName() + "' cannot be referenced from a static context");
-						result = false;
+						postResult = false;
 					}
 				}
 			}
 			
-			if(result && ((MethodSymbol)symbol).canThrow()) {
+			if(postResult && ((MethodSymbol)symbol).canThrow()) {
 				l1:
 				// Перебираем все исключения перечисленные в throws вызываемого метода
 				for(ExceptionScope eScope : ((MethodSymbol)symbol).getScope().getExceptionScopes()) {
@@ -303,12 +313,12 @@ public class MethodCallExpression extends ExpressionNode {
 		}
 		catch (CompileException e) {
 			markError(e.getMessage());
-			result = false;
+			postResult = false;
 		}
 
 		cg.leaveExpression();
-		debugAST(this, POST, false, result, getFullInfo());
-		return result;
+		debugAST(this, POST, false, postResult, getFullInfo());
+		return postResult;
 	}
 	
 	@Override
@@ -343,9 +353,26 @@ public class MethodCallExpression extends ExpressionNode {
 
 		String classNameStr = cis.getName();
 
-		String signature = cis.getName() + "." + methodName + " " + Arrays.toString(argTypes);
-
-		if(signature.equals("System.setParam [byte, byte]")) {
+		// Тип аргумента в вызове и в методе могут отличаться например methos(short s) также подходит для аргуметна типа byte
+		// Модифицирую типы аргументов
+		List<VarType> methodArgTypes = ((MethodSymbol)symbol).getParameterTypes();
+		for(int i=0; i<argTypes.length; i++) {
+			if(argTypes[i].getSize()<methodArgTypes.get(i).getSize()) {
+				argTypes[i] = methodArgTypes.get(i);
+			}
+		}
+		
+		String signature = cis.getName() + "." + methodName + "(";
+		for(int i=0; i<argTypes.length; i++) {
+			VarType argType = argTypes[i];
+			signature += argType.getName();
+			if(i!=(argTypes.length-1)) {
+				signature+=",";
+			}
+		}
+		signature+=")";
+		
+		if(signature.equals("System.setParam(byte,byte)")) {
 			if(	0x02!=args.size() ||
 				!(args.get(0) instanceof LiteralExpression) || !(args.get(1) instanceof LiteralExpression) ||
 				VarType.BYTE!=argTypes[0] || VarType.BYTE!=argTypes[1]) {
@@ -360,10 +387,11 @@ public class MethodCallExpression extends ExpressionNode {
 				case ACTLED_PORT:
 					cg.setFeature(RTOSFeature.OS_FT_HEARTBEAT);
 				case CORE_FREQ:
-				case STDOUT_PORT:
+				case DEVEL_MODE:
+				case STDIO_PORT:
 				case HALT_OK_MODE:
 				case HALT_ERR_MODE:
-					cg.setParam(sp, valueId);
+					cg.getPlatform().setParam(sp, valueId);
 					break;
 				case MULTITHREADING:
 					if(0x00!=valueId) {
@@ -374,13 +402,10 @@ public class MethodCallExpression extends ExpressionNode {
 					if(0x00!=valueId) {
 						cg.setFeature(RTOSFeature.OS_FT_WELCOME);
 					}
-					else {
-						cg.resetFeature(RTOSFeature.OS_FT_WELCOME);
-					}
 					break;
 			}
 		}
-		else if(cis instanceof ExceptionScope && (signature.endsWith(".throw []") || signature.endsWith(".throw [byte]"))) {
+		else if(cis instanceof ExceptionScope && (signature.endsWith(".throw()") || signature.endsWith(".throw(byte)"))) {
 			ExceptionScope eScope = (ExceptionScope)cis;
 			excs.getProduced().add(eScope.getId());
 			if(0x01==args.size()) {
@@ -431,12 +456,45 @@ public class MethodCallExpression extends ExpressionNode {
 		}
 		else if(symbol.isNative()) {
 			cg.nativeMethodInit(cgs, signature);
-			if(!signature.equals("System.out [exception]")) {
+			if(!signature.equals("System.out(exception)")) {
 				for(int i=0; i<args.size(); i++) {
 					ExpressionNode argExpr = args.get(i);
 					cg.accResize(argTypes[i]);
-					if(CodegenResult.RESULT_IN_ACCUM!=argExpr.codeGen(cg, cgs, true, excs)) {
-						throw new CompileException("Accum not used for argument:" + argExpr);
+
+					if(argExpr instanceof BinaryExpression) {
+						CGBranch branch = new CGBranch();
+						cgs.setBranch(branch);
+
+						argExpr.codeGen(cg, cgs, true, excs);
+
+						if(branch.isUsed()) {
+							cg.constToAcc(cgs, 1, 1, false);
+							CGLabelScope lbScope = new CGLabelScope(null, null, LabelNames.LOCGIC_END, true);
+							cg.jump(cgs, lbScope);
+							cgs.append(((CGBranch)branch).getEnd());
+							cg.constToAcc(cgs, 1, 0, false);
+							cgs.append(lbScope);
+						}
+					}
+					else if(argExpr instanceof UnaryExpression) {
+						CGBranch branch = new CGBranch();
+						cgs.setBranch(branch);
+
+						argExpr.codeGen(cg, cgs, false, excs);
+
+						if(branch.isUsed()) {
+							cg.constToAcc(cgs, 1, 1, false);
+							CGLabelScope lbScope = new CGLabelScope(null, null, LabelNames.LOCGIC_END, true);
+							cg.jump(cgs, lbScope);
+							cgs.append(((CGBranch)branch).getEnd());
+							cg.constToAcc(cgs, 1, 0, false);
+							cgs.append(lbScope);
+						}
+					}
+					else {	
+						if(CodegenResult.RESULT_IN_ACCUM!=argExpr.codeGen(cg, cgs, true, excs)) {
+							throw new CompileException("Accum not used for argument:" + argExpr);
+						}
 					}
 					cg.nativeMethodSetArg(cgs, signature, i);
 				}
@@ -682,10 +740,9 @@ public class MethodCallExpression extends ExpressionNode {
 					throw new CompileException("Unsupported alias:" + vSymbol.toString());
 				}
 				else {
-					int exprTypeSize = argTypes[i].getSize();
-					if(-1 == exprTypeSize) exprTypeSize = cg.getRefSize();
 					// Создаем новую область видимости переменной в вызываемом методе
-					int varSize = paramVarType.isObject() ? refTypeSize + cg.getRefSize() : exprTypeSize;
+					//TODO для чего было refTypeSize + cg.getRefSize()?
+					int varSize = paramVarType.isObject() ? refTypeSize : paramVarType.getSize();
 
 					CGScope oldCGScope = cg.setScope(symbol.getCGScope(CGMethodScope.class));
 					CGVarScope dstVScope = cg.enterLocal(vSymbol.getType(), varSize, false, vSymbol.getName());
@@ -699,19 +756,31 @@ public class MethodCallExpression extends ExpressionNode {
 						// Выполняем зависимость
 						argExpr.codeGen(cg, cgs, false, excs);
 						LiteralExpression le = (LiteralExpression)argExpr;
-						cg.pushConst(cgs, exprTypeSize, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed());
+						cg.pushConst(cgs, varSize, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed());
 					}
 					else if(argExpr instanceof VarFieldExpression) {
 						argExpr.codeGen(cg, cgs, false, excs);
-						cg.pushCells(cgs, exprTypeSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells());
+						cg.pushCells(cgs, varSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells());
 					}
 					else if(argExpr instanceof MethodCallExpression) {
 						argExpr.codeGen(cg, cgs, true, excs);
 						cg.pushAccBE(cgs, paramVarType.getSize());
 					}
 					else if(argExpr instanceof BinaryExpression) {
+						CGBranch branch = new CGBranch();
+						cgs.setBranch(branch);
+
 						argExpr.codeGen(cg, cgs, true, excs);
-						cg.pushAccBE(cgs, paramVarType.getSize());
+
+						if(branch.isUsed()) {
+							cg.constToAcc(cgs, 1, 1, false);
+							CGLabelScope lbScope = new CGLabelScope(null, null, LabelNames.LOCGIC_END, true);
+							cg.jump(cgs, lbScope);
+							cgs.append(((CGBranch)branch).getEnd());
+							cg.constToAcc(cgs, 1, 0, false);
+							cgs.append(lbScope);
+						}
+						cg.pushAccLE(cgs, paramVarType.getSize());
 					}
 					else if(argExpr instanceof EnumExpression) {
 						cg.pushConst(cgs, 0x01, ((EnumExpression)argExpr).getIndex(), false);

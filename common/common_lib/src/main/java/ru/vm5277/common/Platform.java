@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 konstantin@5277.ru
+ * Copyright 2026 konstantin@5277.ru
  * 
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,10 +16,53 @@
 
 package ru.vm5277.common;
 
-public enum Platform {
-	AVR,
-	STM8,
-	PIC,
+import java.io.IOException;
+import java.nio.file.Path;
+import java.util.Map;
+
+public class Platform {
+	private	PlatformType				type;
+	private	int							optLevel;
+	private	Map<String, NativeBinding>	nbMap;
+	private	Map<RTOSParam, Object>		params;
+	private	DefReader					defReader;
 	
-	STUB;
+	public Platform(PlatformType type, Map<String, NativeBinding> nbMap, Map<RTOSParam, Object> params, Path asmDefsPath, int optLevel) throws IOException {
+		this.type = type;
+		this.nbMap = nbMap;
+		this.params = params;
+		this.optLevel = optLevel;
+		this.defReader = new DefReader();
+		if(null!=asmDefsPath) {
+			defReader.parse(asmDefsPath);
+		}
+	}
+
+	public PlatformType getType() {
+		return type;
+	}
+
+	public void setParam(RTOSParam param, int value) {
+		params.put(param, value);
+	}
+
+	public boolean containsParam(RTOSParam param) {
+		return params.keySet().contains(param);
+	}
+
+	public Object getParam(RTOSParam param) {
+		return params.get(param);
+	}
+
+	public int getOptLevel() {
+		return optLevel;
+	}
+
+	public NativeBinding getNativeBinding(String signature) {
+		return nbMap.get(signature);
+	}
+	
+	public DefReader getDefReader() {
+		return defReader;
+	}
 }

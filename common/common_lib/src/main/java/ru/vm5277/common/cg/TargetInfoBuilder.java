@@ -18,18 +18,21 @@ package ru.vm5277.common.cg;
 
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import ru.vm5277.common.ExcsThrowPoint;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.VarType;
 
 public class TargetInfoBuilder {
 
-	
-	private	List<ExcsThrowPoint>	excsThrowPoints			= new ArrayList<>();
+	private	Map<Integer, List<String>>	exceptionCodes		= new HashMap<>();
+	private	List<ExcsThrowPoint>		excsThrowPoints		= new ArrayList<>();
 	
 	public ExcsThrowPoint addExcsThrowPoint(CodeGenerator cg, SourcePosition sp, String signature) {
 		int id = excsThrowPoints.size()+1;
@@ -38,6 +41,10 @@ public class TargetInfoBuilder {
 		return result;
 	}
 
+	public void addException(int exceptionId, List<String> codes) {
+		exceptionCodes.put(exceptionId, codes);
+	}
+	
 	public void chooseExcsThrowPointContainer() {
 		for(ExcsThrowPoint point : excsThrowPoints) {
 			point.chooseContainer(128>excsThrowPoints.size());
@@ -48,7 +55,7 @@ public class TargetInfoBuilder {
 		return excsThrowPoints.size();
 	}
 	
-	public void write(FileWriter fw) throws IOException {
+	public void write(Path sourcePath, FileWriter fw) throws IOException {
 		fw.write("[BUILTIN_TYPES]\n");
 		fw.write("0 Object\n");
 		fw.write(VarType.VOID.getId() + " " + VarType.VOID.getName() + "\n");
@@ -75,6 +82,22 @@ public class TargetInfoBuilder {
 		}
 		fw.write("\n");
 
+		fw.write("[EXCEPTION_CODES]\n");
+		for(int i=0; i<VarType.getExceptionTypes().size(); i++) {
+			List<String> codes = exceptionCodes.get(i);
+			if(null!=codes && !codes.isEmpty()) {
+				for(int j=0; j<codes.size(); j++) {
+					fw.write(Integer.toString(i));
+					fw.write(" ");
+					fw.write(Integer.toString(j));
+					fw.write(" ");
+					fw.write(codes.get(j));
+					fw.write("\n");
+				}
+			}
+		}
+		fw.write("\n");
+
 		fw.write("[CLASS_TYPES]\n");
 		List<VarType> list = new ArrayList<>(VarType.getClassTypes().values());
 		Collections.sort(list, new Comparator<VarType>() {
@@ -96,8 +119,10 @@ public class TargetInfoBuilder {
 		fw.write("[THROW_POINTS]\n");
 		for(int i=0; i<excsThrowPoints.size(); i++) {
 			ExcsThrowPoint point = excsThrowPoints.get(i);
-			fw.write(point.toString());
-			fw.write("\n");
+			if(null!=point.getSp()) {
+				fw.write(point.toString(sourcePath));
+				fw.write("\n");
+			}
 		}
 		fw.write("\n");
 		fw.flush();

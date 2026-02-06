@@ -1,0 +1,54 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+ 
+;---OS-FEATURES---------------------------------------------
+.IFNDEF OS_FT_BOOTLOADER_ONLY
+	.SET	OS_FT_BOOTLOADER_ONLY					= 0x00	;Режим для сборки только бутлоадера
+.ENDIF
+.IFNDEF OS_FT_DEV_MODE
+	.SET	OS_FT_DEV_MODE							= 0x00	;Режим разработки. Если включен - используем бутлоадер
+.ENDIF
+.IFNDEF OS_FT_IR_TABLE
+	.SET	OS_FT_IR_TABLE							= 0x00	;Используем таблицу прерываний
+.ENDIF
+.IFNDEF OS_FT_STDIN
+	.SET	OS_FT_STDIN								= 0x00	;Используем ввод
+.ENDIF
+.IFNDEF OS_FT_STDOUT
+	.SET	OS_FT_STDOUT							= 0x00	;Используем вывод
+.ENDIF
+.IFNDEF OS_FT_WELCOME
+	.SET	OS_FT_WELCOME							= 0x00	;Выводить приветственное сообщение при инициализации ядра
+.ENDIF
+.IFNDEF OS_FT_HEARTBEAT
+	.SET	OS_FT_HEARTBEAT							= 0x00	;Индикация работы RTOS
+.ENDIF
+.IFNDEF OS_FT_DIAG
+	.SET	OS_FT_DIAG								= 0x00	;Логировать диагностику при инициализации ядра
+.ENDIF
+.IFNDEF OS_FT_TIMER
+	.SET	OS_FT_TIMER								= 0x00	;Таймер системного тика
+.ENDIF
+.IFNDEF OS_FT_DRAM
+	.SET	OS_FT_DRAM								= 0x00	;Функционал динамического выделения памяти
+.ENDIF
+.IFNDEF OS_FT_ETRACE
+	.SET	OS_FT_ETRACE							= 0x00	;Поддержка механизма трассировки исключений
+.ENDIF
+.IFNDEF OS_FT_PCINT
+	.SET	OS_FT_PCINT								= 0x00	;Поддержка внешних прерываний PIN Change interrupts
+.ENDIF
+

@@ -29,12 +29,10 @@ import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGTryBlockScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.VarType;
-import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
-import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.ExceptionScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.VarSymbol;
@@ -47,7 +45,7 @@ public class CatchBlock extends BlockNode {
 	private	Set<ExceptionScope>		eScopes			= new HashSet<>();
 	
 	public CatchBlock(TokenBuffer tb, MessageContainer mc, List<ExpressionNode> args, String varName) throws CompileException {
-		super(tb, mc);
+		super(tb, mc, "catch");
 		
 		this.args = args;
 		this.varName = varName;
@@ -204,6 +202,7 @@ public class CatchBlock extends BlockNode {
 		((VarSymbol)symbol).setCGScope(vScope);
 		
 		if(isUsed) {
+			cg.eCatch(cgs);
 			for(AstNode node : children) {
 				//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
 				if(!(node instanceof VarNode)) {

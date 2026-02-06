@@ -14,6 +14,9 @@
  * limitations under the License.
  */
 
+// Можно было бы проверять на пустой TEMP но это не эффективно, лучше дать возможность на выском уровне использовать
+// функции типа mul32x8 или вообще FLAGS сделать входным параметром!
+
 ;Черновой вариант
 .IFNDEF OS_MUL32_NR
 ;-----------------------------------------------------------
@@ -21,12 +24,13 @@ OS_MUL32_NR:												;NR-NO_RESTORE - не восстанавливаю ре�
 ;-----------------------------------------------------------
 ;Умножение 32бит числа на 32бит число
 ;IN: ACCUM_L/H/EL/EH-32b число, TEMP_L/H/EL/EH-32b число
-;OUT: ACCUM_L/H/EL/EH-32b результат
+;OUT: ACCUM_L/H/EL/EH-32b результат, флаг C=1-переполнение
 ;-----------------------------------------------------------
 	PUSH XL
 	PUSH XH
 	PUSH YL
 	PUSH YH
+	PUSH RESULT
 
 	MOVW XL,ACCUM_L
 	MOVW YL,ACCUM_EL
@@ -35,6 +39,7 @@ OS_MUL32_NR:												;NR-NO_RESTORE - не восстанавливаю ре�
 	CLR ACCUM_H
 	CLR ACCUM_EL
 	CLR ACCUM_EH
+	CLR RESULT
 
 	LDI FLAGS,0x20
 _OS_MUL32_NR__LOOP:
@@ -47,15 +52,21 @@ _OS_MUL32_NR__LOOP:
 	ADC ACCUM_H,XH
 	ADC ACCUM_EL,YL
 	ADC ACCUM_EH,YH
+	BRCC PC+0x02
+	ORI RESULT,0x01
+
 _OS_MUL32_NR__NO_ADD:
-	LSL YH
-	ROL YL
+	LSL XL
 	ROL XH
-	ROL XL
+	ROL YL
+	ROL YH
 
 	DEC FLAGS
 	BRNE _OS_MUL32_NR__LOOP
 
+	LSR RESULT
+	
+	POP RESULT
 	POP YH
 	POP YL
 	POP XH

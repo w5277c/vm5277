@@ -176,7 +176,7 @@ public abstract class CommandNode extends AstNode {
 		consumeToken(tb, Delimiter.COLON);
 		
 		BlockNode blockNode = null;
-		blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
+		blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "command") : new BlockNode(tb, mc, parseStatement(), "command");
 		
 		return new AstCase(values, blockNode);
 	}

@@ -118,8 +118,9 @@ public class CastExpression extends ExpressionNode {
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		CGScope cgs = (null==parent ? cgScope : parent);
 		
-		// Для констант, переменных и полей мы можем задать размер аккумулятора изначально, это даст оптимальный код
-		if(operand instanceof LiteralExpression || operand instanceof VarFieldExpression) {
+		// Для констант мы можем задать размер аккумулятора изначально, это даст оптимальный код
+		// TODO точно? Проверить!
+		if(operand instanceof LiteralExpression) {
 			if(sourceType!=type) {
 				cgs.append(cg.accCast(sourceType, type));
 			}
@@ -127,6 +128,7 @@ public class CastExpression extends ExpressionNode {
 		}
 		else {
 			// В остальных случаев обработка выражений не может быть построена с учетом определенного размера аккумулятора, поэтому используем пост приведение
+			cg.getAccum().set(-1==operand.getType().getSize() ? cg.getRefSize() : operand.getType().getSize(), operand.getType().isFixedPoint());
 			Object result = operand.codeGen(cg, cgs, toAccum, excs);
 			if(sourceType!=type) {
 				cgs.append(cg.accCast(sourceType, type));

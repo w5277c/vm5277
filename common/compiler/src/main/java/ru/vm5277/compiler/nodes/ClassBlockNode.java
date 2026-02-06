@@ -109,7 +109,7 @@ public class ClassBlockNode extends AstNode {
 
 			if(tb.match(Delimiter.LEFT_BRACE)) {
 				try {
-					children.add(new BlockNode(tb, mc));
+					children.add(new BlockNode(tb, mc, "class '" + name + "'"));
 				}
 				catch(CompileException e) {}
 				continue;

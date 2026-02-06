@@ -37,7 +37,7 @@ public class CGClassScope extends CGScope {
 	private	final	Map<String, CGMethodScope>	methods			= new HashMap<>();
 	private			int							fieldsOffset	= 0;
 	private	final	boolean						isImported;
-	private			CGLabelScope				lbFiledsInitScope;
+//	private			CGLabelScope				lbFiledsInitScope;
 	private			CGLabelScope				lbIIDSScope;
 	private			CGIContainer				cont			= new CGIContainer();
 	private			CGIContainer				fieldsInitCont	= new CGIContainer();
@@ -52,8 +52,9 @@ public class CGClassScope extends CGScope {
 		
 		fieldsOffset = CodeGenerator.CLASS_HEADER_SIZE;
 		
-		lbFiledsInitScope = new CGLabelScope(null, null, LabelNames.FIELDS_INIT, true);
-		fieldsInitCont.append(lbFiledsInitScope);
+//		lbFiledsInitScope = new CGLabelScope(null, null, LabelNames.FIELDS_INIT, true);
+//		fieldsInitCont.append(lbFiledsInitScope);
+		cg.getStaticInitContaier().append(fieldsInitCont);
 		lbIIDSScope = new CGLabelScope(null, null, LabelNames.META, true);
 		
 		Collections.sort(impl);
@@ -116,9 +117,9 @@ public class CGClassScope extends CGScope {
 	public CGLabelScope getIIDLabel() {
 		return lbIIDSScope;
 	}
-	public CGLabelScope getFieldInitLabel() {
-		return lbFiledsInitScope;
-	}
+//	public CGLabelScope getFieldInitLabel() {
+//		return lbFiledsInitScope;
+//	}
 	
 	@Override
 	public String toString() {

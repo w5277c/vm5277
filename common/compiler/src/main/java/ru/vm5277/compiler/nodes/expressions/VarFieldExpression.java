@@ -122,7 +122,9 @@ public class VarFieldExpression extends ExpressionNode {
 
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		boolean result = true;
+		if(null!=postResult) return postResult;
+		postResult = true;
+
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 		cgScope = cg.enterExpression(toString());
 
@@ -151,23 +153,23 @@ public class VarFieldExpression extends ExpressionNode {
 			}
 			catch(CompileException ex) {
 				markError(ex);
-				result = false;
+				postResult = false;
 			}
 		}
 		
-		if(result && null!=symbol && symbol instanceof VarSymbol) {
+		if(postResult && null!=symbol && symbol instanceof VarSymbol) {
 			if(getSN()<((AstHolder)symbol).getNode().getSN()) {
 				markError("Var '" + symbol.getName() + "' cannot be used before declaration");
-				result = false;
+				postResult = false;
 			}
 		}
 		
-		if(result && null!=symbol && symbol instanceof FieldSymbol) {
+		if(postResult && null!=symbol && symbol instanceof FieldSymbol) {
 			FieldSymbol fSymbol = (FieldSymbol)symbol;
 			MethodScope mScope = scope.getMethod();
 			if(!isInliningMode && mScope.getSymbol().isStatic() && !fSymbol.isStatic()) {
 				markError("Non-static field '" + fSymbol.getName() + "' cannot be referenced from a static context");
-				result = false;
+				postResult = false;
 			}
 
 			// Проверка приватного доступа
@@ -177,8 +179,8 @@ public class VarFieldExpression extends ExpressionNode {
 		}
 
 		cg.leaveExpression();
-		debugAST(this, POST, false, result, getFullInfo());
-		return result;
+		debugAST(this, POST, false, postResult, getFullInfo());
+		return postResult;
 	}
 	
 	@Override
@@ -200,8 +202,7 @@ public class VarFieldExpression extends ExpressionNode {
 		// Актуализируем symbol
 		//getSymbol();
 		
-		// Выполняет запись значения в аккумулятор. Но зачастую это не требуется, достаточно вызвать depCodeGen
-		if(null==depCodeGen(cg, excs)) {
+		depCodeGen(cg, excs);
 /*			if(symbol instanceof AliasSymbol) {
 				Symbol vfSymbol = scope.resolveVFSymbol(value);
 				while(vfSymbol instanceof AliasSymbol) {
@@ -245,7 +246,6 @@ public class VarFieldExpression extends ExpressionNode {
 //				else {
 //					throw new CompileException("Unsupported scope: " + symbol.getCGScope());
 //				}
-			}
 //		}
 
 		return (toAccum ? CodegenResult.RESULT_IN_ACCUM : null);
@@ -258,7 +258,7 @@ public class VarFieldExpression extends ExpressionNode {
 		
 		if(null!=brScope) {
 			CGCellsScope cScope = (CGCellsScope)symbol.getCGScope();
-			cg.constCond(cgs, cScope.getCells(), Operator.NEQ, 0, isInvert, opOr, brScope); // NEQ, так как проверяем на 0
+			cg.constCond(cgs, cScope.getCells(), Operator.NEQ, 0, symbol.getType().isFixedPoint(), false, isInvert, opOr, brScope); // NEQ, так как проверяем на 0
 		}
 	}
 

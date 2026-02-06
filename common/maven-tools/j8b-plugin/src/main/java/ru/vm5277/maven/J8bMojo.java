@@ -19,7 +19,6 @@ package ru.vm5277.maven;
 import org.apache.maven.plugin.AbstractMojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Parameter;
-
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
@@ -33,6 +32,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Properties;
@@ -52,6 +52,12 @@ public abstract class J8bMojo extends AbstractMojo {
 
 	@Parameter(property = "j8b.targetFreq", defaultValue = "8.0")
 	protected String targetFreq;
+	
+	@Parameter(property = "j8b.targetStdio", defaultValue = "")
+	protected String targetStdio;
+	
+	@Parameter(property = "j8b.verboseOutput", defaultValue = "false")
+	protected boolean verboseOutput;
 
 	@Parameter(defaultValue = "Main.j8b")
 	protected String mainFile;
@@ -62,7 +68,7 @@ public abstract class J8bMojo extends AbstractMojo {
 	@Parameter(defaultValue = "${project.basedir}", readonly = true, required = true)
 	protected File projectBaseDir;
 
-	@Parameter(defaultValue = "${project.basedir}/src/main/j8b")
+	@Parameter(defaultValue = "${project.basedir}/src")
 	protected File sourceDirectory;
 
 	@Parameter(defaultValue = "${project.basedir}/target/")
@@ -71,15 +77,131 @@ public abstract class J8bMojo extends AbstractMojo {
 	@Parameter(defaultValue = "size")
 	protected String optimization;
 
-	@Parameter(property = "j8b.runAfterCompile", defaultValue = "false")
-	protected boolean runAfterCompile;
-
 	@Parameter(property = "j8b.autoDownload", defaultValue = "true")
 	protected boolean autoDownload;
 	
 	@Parameter(property = "j8b.downloadUrl", defaultValue = "https://vm5277.ru/releases/vm5277-release-latest.zip")
 	protected String downloadUrl;
 	
+	public void doCompile(boolean devMode) throws MojoExecutionException {
+		if(skip) {
+			getLog().info("J8B compilation is skipped");
+			return;
+		}
+		
+		if("pom".equals(project.getPackaging())) {
+			getLog().info("Skipping j8b compilation for parent POM project");
+			return;
+		}
+		checkToolkit(devMode);
+		if(!devMode) getLog().info("=== J8B Maven plugin v" + readVersion() + " - COMPILE ===");
+		
+		if(null==target || target.isEmpty() || !target.contains(":")) {
+			throw new MojoExecutionException("[ERROR] Target parameter is absent or incorrect, please specify j8b.target parameter. Example: avr:atmega328p");
+		}
+
+		int index = target.indexOf(":");
+		String platformStr = target.substring(0x00, index);
+		String mcuStr = target.substring(index+0x01);
+
+		File mainJ8bFile = new File(sourceDirectory, mainFile);
+		if(!mainJ8bFile.exists()) {
+			throw new MojoExecutionException(	"Main source file not found: " + mainJ8bFile.getAbsolutePath() + 
+												"\nCreate " + mainFile + " in directory: " + sourceDirectory);
+		}
+
+		getLog().info("Main source file: " + mainJ8bFile.getAbsolutePath());
+
+		// 4. Создаем выходную директорию
+		if (!outputDirectory.exists()) {
+			outputDirectory.mkdirs();
+		}
+
+		String mainName = mainFile.substring(0, mainFile.lastIndexOf("."));
+
+		Path libsPath = Paths.get(toolkitPath, "bin", "libs");
+
+		//getLog().info("Compilation...");
+		int exitCode = 1;
+		try {
+			List<String> args = new ArrayList<>();
+			args.add(target);
+			args.add(mainJ8bFile.getAbsolutePath());
+			args.add("-P");
+			args.add(toolkitPath);
+			args.add("-F");
+			args.add(targetFreq);
+			args.add("-o");
+			args.add(outputDirectory.getAbsolutePath());
+			if(devMode) {
+				args.add("-d");
+				args.add("-q");
+			}
+			if(verboseOutput || devMode) {
+				args.add("--dump-ir");
+			}
+			if(!targetStdio.isEmpty()) {
+				args.add("-D");
+				args.add("STDIO_PORT=" + targetStdio);
+			}
+			
+			exitCode = runJ8BTool(libsPath, "ru.vm5277.compiler.Main", args);
+		}
+		catch(Exception ex) {
+			ex.printStackTrace();
+		}
+		if(0!=exitCode) {
+			throw new MojoExecutionException("Compilation failed with exit code: " + exitCode);
+		}
+
+		//getLog().info("Assembling...");
+		File mainAsmFile = new File(outputDirectory, mainName + ".asm");
+		if(!mainAsmFile.exists()) {
+			throw new MojoExecutionException("Main asm file not found: " + mainAsmFile.getAbsolutePath() + "\n");
+		}
+
+		Path rtosPath = Paths.get(toolkitPath, "rtos", platformStr);
+		if(!rtosPath.toFile().exists()) {
+			throw new MojoExecutionException("RTOS directory not found: " + rtosPath.toString() + "\n");
+		}
+
+		Path defsPath = Paths.get(toolkitPath, "defs", platformStr);
+		if(!defsPath.toFile().exists()) {
+			throw new MojoExecutionException("defs directory not found: " + defsPath.toString() + "\n");
+		}
+
+		try {
+			List<String> args = new ArrayList<>();
+			args.add(mainAsmFile.getAbsolutePath());
+			args.add("-P");
+			args.add(toolkitPath);
+			args.add("-I");
+			args.add(defsPath.toAbsolutePath().toString());
+			args.add("-I");
+			args.add(rtosPath.toAbsolutePath().toString());
+
+			if(verboseOutput || devMode) {
+				String mapFileName = mainName + ".map";
+				String listFileName = mainName + ".lst";
+
+				args.add("-m");
+				args.add(mapFileName);
+				args.add("-l");
+				args.add(listFileName);
+				args.add("-q");
+			}
+			
+			exitCode = runJ8BTool(libsPath, "ru.vm5277." + platformStr + "_asm.Assembler", args);
+		}
+		catch(Exception ex) {
+		}
+		if(0!=exitCode) {
+			throw new MojoExecutionException("Assembling failed with exit code: " + exitCode);
+		}
+
+		if(!devMode) getLog().info("=== Compilation finished successfully ===");
+	}
+
 	public String readVersion() {
 		Class<?> clazz = this.getClass();
 		String packagePath = clazz.getPackage().getName().replace('.', '/');
@@ -96,7 +218,7 @@ public abstract class J8bMojo extends AbstractMojo {
 		return " UNKNOWN";
 	}
 
-	protected void checkToolkit() throws MojoExecutionException{
+	protected void checkToolkit(boolean quiet) throws MojoExecutionException{
 		File toolkitDir = new File(toolkitPath);
 		if(!toolkitDir.exists()) {
 			String env = System.getenv("vm5277");
@@ -120,7 +242,7 @@ public abstract class J8bMojo extends AbstractMojo {
 			}
 		}
 
-		getLog().info("Using toolkit at: " + toolkitDir.getAbsolutePath());
+		if(!quiet) getLog().info("Using toolkit at: " + toolkitDir.getAbsolutePath());
 	}
 
 	protected void downloadAndExtractToolkit(File targetDir) throws MojoExecutionException {
@@ -258,8 +380,8 @@ public abstract class J8bMojo extends AbstractMojo {
 		}
 	}
 	
-	protected int runJ8BTool(Path libsPath, String mainClassName, String... args) throws Exception {
-		getLog().debug("Running " + mainClassName + " with args: " + String.join(" ", args));
+	protected int runJ8BTool(Path libsPath, String mainClassName, List<String> args) throws Exception {
+		getLog().debug("Running " + mainClassName + " with args: " + args.toString());
 
 		File libsDir = libsPath.toFile();
 		if(!libsDir.exists() || !libsDir.isDirectory()) {
@@ -307,7 +429,7 @@ public abstract class J8bMojo extends AbstractMojo {
 		}
 
 		// Вызываем метод
-		Object result = execMethod.invoke(null, (Object) args);
+		Object result = execMethod.invoke(null, (Object) args.toArray(new String[0]));
 		return (int) result;
 	}
 

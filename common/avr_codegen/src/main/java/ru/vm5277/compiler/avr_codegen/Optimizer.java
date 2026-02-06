@@ -25,6 +25,7 @@ import ru.vm5277.common.cg.CodeOptimizer;
 import ru.vm5277.common.cg.items.CGIAsm;
 import ru.vm5277.common.cg.items.CGIAsmCall;
 import ru.vm5277.common.cg.items.CGIAsmCondJump;
+import ru.vm5277.common.cg.items.CGIAsmIReg;
 import ru.vm5277.common.cg.items.CGIAsmJump;
 import ru.vm5277.common.cg.items.CGIAsmLd;
 import ru.vm5277.common.cg.items.CGIAsmMv;
@@ -200,160 +201,191 @@ public class Optimizer extends CodeOptimizer {
 	@Override
 	public void optimizeBaseInstr(CGScope scope) throws CompileException {
 		ArrayList<CGItem> list = new ArrayList();
-		CodeGenerator.treeToList(scope, list);
-		optimizeBaseInstrLoopLabel:
-		for(int i=0; i<list.size()-1; i++) {
-			CGItem item1 = list.get(i);
-			if(item1.isDisabled() || !(item1 instanceof CGIAsm)) {
-				continue;
-			}
-			CGItem item2 = list.get(i+1);
-			while(item2.isDisabled()) {
-				i++;
-				if(i==list.size()-1) break optimizeBaseInstrLoopLabel;
-				item2 = list.get(i+1);
-			}
-			if(!(item2 instanceof CGIAsm)) continue;
-			
-			CGIAsm ai1 = (CGIAsm)item1;
-			CGIAsm ai2 = (CGIAsm)item2;
-			
-			if(ai1 instanceof CGIAsmMv && ai2 instanceof CGIAsmMv) {
-				CGIAsmMv am1 = (CGIAsmMv)item1;
-				CGIAsmMv am2 = (CGIAsmMv)item2;
-				int dstReg1 = Integer.parseInt(replaceAliasToReg(am1.getDstReg()).substring(1));
-				int srcReg1 = Integer.parseInt(replaceAliasToReg(am1.getSrcReg()).substring(1));
-				int dstReg2 = Integer.parseInt(replaceAliasToReg(am2.getDstReg()).substring(1));
-				int srcReg2 = Integer.parseInt(replaceAliasToReg(am2.getSrcReg()).substring(1));
+		boolean isChanged = false;
+		boolean isFirst = true;
+		while(isFirst || isChanged) {
+			isFirst = false;
+			isChanged = false;
+			list.clear();
 
-				if(0==dstReg1%2 && dstReg2==dstReg1+1 && 0==srcReg1%2 && srcReg2==srcReg1+1) {
-					((CGIAsmMv)item1).setInstr("movw");
-					((CGIAsmMv)item1).setDstReg("r"+dstReg1);
-					((CGIAsmMv)item1).setSrcReg("r"+srcReg1);
-					item2.disable();
+			CodeGenerator.treeToList(scope, list);
+			optimizeBaseInstrLoopLabel:
+			for(int i=0; i<list.size()-1; i++) {
+				CGItem item1 = list.get(i);
+				if(item1.isDisabled() || !(item1 instanceof CGIAsm)) {
 					continue;
 				}
-			}
-
-			if(ai1 instanceof CGIAsmLd) {
-				CGIAsmLd al1 = (CGIAsmLd)item1;
-
-				Integer k = null;
-				byte reg = Byte.parseByte(replaceAliasToReg(al1.getReg()).substring(1));
-				try{
-					k = Integer.parseInt(al1.getConstant());
+				CGItem item2 = list.get(i+1);
+				while(item2.isDisabled()) {
+					i++;
+					if(i==list.size()-1) break optimizeBaseInstrLoopLabel;
+					item2 = list.get(i+1);
 				}
-				catch(Exception ex) {}
+				if(!(item2 instanceof CGIAsm)) continue;
 
-				if(null==k) {
-					int pos = al1.getConstant().indexOf(",low(");
-					if(-1!=pos) {
-						try{
-							k = Integer.parseInt(al1.getConstant().substring(pos+5, al1.getConstant().length()-1))&0xff;
-						}
-						catch(Exception ex) {}
+				CGIAsm ai1 = (CGIAsm)item1;
+				CGIAsm ai2 = (CGIAsm)item2;
+
+				if(ai1 instanceof CGIAsmMv && ai2 instanceof CGIAsmMv) {
+					CGIAsmMv am1 = (CGIAsmMv)item1;
+					CGIAsmMv am2 = (CGIAsmMv)item2;
+					int dstReg1 = Integer.parseInt(replaceAliasToReg(am1.getDstReg()).substring(1));
+					int srcReg1 = Integer.parseInt(replaceAliasToReg(am1.getSrcReg()).substring(1));
+					int dstReg2 = Integer.parseInt(replaceAliasToReg(am2.getDstReg()).substring(1));
+					int srcReg2 = Integer.parseInt(replaceAliasToReg(am2.getSrcReg()).substring(1));
+
+					if(0==dstReg1%2 && dstReg2==dstReg1+1 && 0==srcReg1%2 && srcReg2==srcReg1+1 && am1.getInstr().equals("mov") && am2.getInstr().equals("mov")) {
+						am1.setInstr("movw");
+						am1.setDstReg("r"+dstReg1);
+						am1.setSrcReg("r"+srcReg1);
+						am2.disable();
+						isChanged = true;						
+						continue;
 					}
-					else {
-						pos = al1.getConstant().indexOf(",high(");
+
+					if(dstReg1==srcReg2 && srcReg1==dstReg2 &&
+						((am1.getInstr().equals("mov") && am2.getInstr().equals("mov")) || am1.getInstr().equals("movw") && am2.getInstr().equals("movw"))) {
+						item2.disable();
+						isChanged = true;
+						continue;
+					}
+				}
+				
+				if(ai1 instanceof CGIAsmIReg && ai2 instanceof CGIAsmIReg) {
+					CGIAsmIReg air1 = (CGIAsmIReg)item1;
+					CGIAsmIReg air2 = (CGIAsmIReg)item2;
+					if(	air1.getIreg() == air2.getIreg() && air1.getOffset()==air2.getOffset() && air1.getReg().equals(air2.getReg()) &&
+						((air1.isLDInstr() && !air2.isLDInstr()) || (!air1.isLDInstr() && air2.isLDInstr()))) {
+						
+						air2.disable();
+						isChanged = true;
+						continue;
+					}
+				}
+
+				if(ai1 instanceof CGIAsmLd && null!=ai2.getPostfix()) {
+					CGIAsmLd al1 = (CGIAsmLd)item1;
+
+					Integer k = null;
+					byte reg = Byte.parseByte(replaceAliasToReg(al1.getReg()).substring(1));
+					try{
+						k = Integer.parseInt(al1.getConstant());
+					}
+					catch(Exception ex) {}
+
+					if(null==k) {
+						int pos = al1.getConstant().indexOf(",low(");
 						if(-1!=pos) {
 							try{
-								k = (Integer.parseInt(al1.getConstant().substring(pos+6, al1.getConstant().length()-1))>>0x08)&0xff;
+								k = Integer.parseInt(al1.getConstant().substring(pos+5, al1.getConstant().length()-1))&0xff;
 							}
 							catch(Exception ex) {}
 						}
+						else {
+							pos = al1.getConstant().indexOf(",high(");
+							if(-1!=pos) {
+								try{
+									k = (Integer.parseInt(al1.getConstant().substring(pos+6, al1.getConstant().length()-1))>>0x08)&0xff;
+								}
+								catch(Exception ex) {}
+							}
+						}
 					}
-				}
 
-				if(null!=k && (k==0x00||k==0x01||k==0xff)) {
-					String kStr = "c0x" + (0==k ? "00" : (1==k ? "01" : "ff"));
-					if((ai2.getInstr().equals("st") || ai2.getInstr().equals("std") || ai2.getInstr().equals("sts")) &&
-						ai2.getPostfix().endsWith(",r"+reg)) {
+					if(null!=k && (k==0x00||k==0x01||k==0xff)) {
+						String kStr = "c0x" + (0==k ? "00" : (1==k ? "01" : "ff"));
+						if((ai2.getInstr().equals("st") || ai2.getInstr().equals("std") || ai2.getInstr().equals("sts")) &&
+							ai2.getPostfix().endsWith(",r"+reg)) {
 
-						ai1.disable();
-						int pos = ai2.getPostfix().indexOf(',');
-						ai2.setPostfix(ai2.getPostfix().substring(0, pos) + "," + kStr);
-					}
-					else if(ai2.getInstr().equals("push") && ai2.getPostfix().startsWith("r")) {
-						int reg2 = Integer.parseInt(ai2.getPostfix().substring(1));
-						//TODO Опасно, может удалить корректный код! Нужно код, сохраняющий значения в стек обернуть конетйнером, а здесь научить метод
-						//отслеживать такие контейнеры
-						if(reg==reg2) {
 							ai1.disable();
-							ai2.setPostfix(kStr);
+							int pos = ai2.getPostfix().indexOf(',');
+							ai2.setPostfix(ai2.getPostfix().substring(0, pos) + "," + kStr);
+							isChanged = true;
+						}
+						else if(ai2.getInstr().equals("push") && ai2.getPostfix().startsWith("r")) {
+							int reg2 = Integer.parseInt(ai2.getPostfix().substring(1));
+							//TODO Опасно, может удалить корректный код! Нужно код, сохраняющий значения в стек обернуть конетйнером, а здесь научить метод
+							//отслеживать такие контейнеры
+							if(reg==reg2) {
+								ai1.disable();
+								ai2.setPostfix(kStr);
+								isChanged = true;
+							}
 						}
 					}
+					continue;
 				}
-				continue;
-			}
-			
-			if(ai1.getInstr().equals("subi") && ai2.getInstr().equals("sbci") && ai1.getPostfix().startsWith("r") && ai2.getPostfix().startsWith("r")) {
-				int pos1 = ai1.getPostfix().indexOf(',');
-				int dstReg1 = Integer.parseInt(ai1.getPostfix().substring(1, pos1));
-				int pos2 = ai2.getPostfix().indexOf(',');
-				int dstReg2 = Integer.parseInt(ai2.getPostfix().substring(1, pos2));
-				//TODO добавить проверку на записи вида rXX
-				if((26==dstReg1 && 27==dstReg2) || (28==dstReg1 && 29==dstReg2) || (30==dstReg1 && 31==dstReg2)) {
-					Integer cnst=null;
-					Integer hConst=null;
-					Integer lConst=null;
-					int pos = ai1.getPostfix().indexOf("low");
-					if(-1!=pos) {
-						try {
-							cnst = Integer.parseInt(ai1.getPostfix().substring(pos+4, ai1.getPostfix().length()-1));
-						}
-						catch(Exception ex){}
-					}
-					else {
-						try {
-							lConst = Integer.parseInt(ai1.getPostfix().substring(pos1+1));
-						}
-						catch(Exception ex){}
-					}
-					if(null==cnst && null!=lConst) {
-						pos = ai2.getPostfix().indexOf("high");
-						if(-1==pos) {
+
+				if(ai1.getInstr().equals("subi") && ai2.getInstr().equals("sbci") && ai1.getPostfix().startsWith("r") && ai2.getPostfix().startsWith("r")) {
+					int pos1 = ai1.getPostfix().indexOf(',');
+					int dstReg1 = Integer.parseInt(ai1.getPostfix().substring(1, pos1));
+					int pos2 = ai2.getPostfix().indexOf(',');
+					int dstReg2 = Integer.parseInt(ai2.getPostfix().substring(1, pos2));
+					//TODO добавить проверку на записи вида rXX
+					if((26==dstReg1 && 27==dstReg2) || (28==dstReg1 && 29==dstReg2) || (30==dstReg1 && 31==dstReg2)) {
+						Integer cnst=null;
+						Integer hConst=null;
+						Integer lConst=null;
+						int pos = ai1.getPostfix().indexOf("low");
+						if(-1!=pos) {
 							try {
-								hConst = Integer.parseInt(ai2.getPostfix().substring(pos2+1));
+								cnst = Integer.parseInt(ai1.getPostfix().substring(pos+4, ai1.getPostfix().length()-1));
 							}
 							catch(Exception ex){}
 						}
+						else {
+							try {
+								lConst = Integer.parseInt(ai1.getPostfix().substring(pos1+1));
+							}
+							catch(Exception ex){}
+						}
+						if(null==cnst && null!=lConst) {
+							pos = ai2.getPostfix().indexOf("high");
+							if(-1==pos) {
+								try {
+									hConst = Integer.parseInt(ai2.getPostfix().substring(pos2+1));
+								}
+								catch(Exception ex){}
+							}
+						}
+						if(null==cnst && null!=lConst && null!=hConst) {
+							cnst = hConst * 256 + lConst; //TODO проверить
+						}
+						if(null!=cnst && 0>=cnst && -64<cnst) {
+							ai1.disable();
+							ai2.setInstr("adiw");
+							ai2.setPostfix("r" + dstReg1 + ","+ cnst*(-1));
+							isChanged = true;
+						}
 					}
-					if(null==cnst && null!=lConst && null!=hConst) {
-						cnst = hConst * 256 + lConst; //TODO проверить
-					}
-					if(null!=cnst && 0>=cnst && -64<cnst) {
-						ai1.disable();
-						ai2.setInstr("adiw");
-						ai2.setPostfix("r" + dstReg1 + ","+ cnst*(-1));
-					}
+					continue;
 				}
-				continue;
-			}
 
-			if(ai1.getInstr().equals("adiw") && ai2.getInstr().equals("adiw")  && ai1.getPostfix().startsWith("r") && ai2.getPostfix().startsWith("r")) {
-				int pos = ai1.getPostfix().indexOf(',');
-				int dst1 = Integer.parseInt(ai1.getPostfix().substring(1, pos));
-				Integer k1 = null;
-				try{
-					k1 = Integer.parseInt(ai1.getPostfix().substring(pos+1));
-				}
-				catch(Exception ex){};
-				
-				pos = ai2.getPostfix().indexOf(',');
-				int dst2 = Integer.parseInt(ai2.getPostfix().substring(1, pos));
-				Integer k2 = null;
-				try{
-					k2 = Integer.parseInt(ai2.getPostfix().substring(pos+1));
-				}
-				catch(Exception ex){};
-				
-				if(null!=k1 && null!=k2 && dst1==dst2 && (k1+k2)<64) {
-					item1.disable();
-					ai2.setPostfix("r" + dst1 + ","+ (k1+k2));
+				if(ai1.getInstr().equals("adiw") && ai2.getInstr().equals("adiw")  && ai1.getPostfix().startsWith("r") && ai2.getPostfix().startsWith("r")) {
+					int pos = ai1.getPostfix().indexOf(',');
+					int dst1 = Integer.parseInt(ai1.getPostfix().substring(1, pos));
+					Integer k1 = null;
+					try{
+						k1 = Integer.parseInt(ai1.getPostfix().substring(pos+1));
+					}
+					catch(Exception ex){};
+
+					pos = ai2.getPostfix().indexOf(',');
+					int dst2 = Integer.parseInt(ai2.getPostfix().substring(1, pos));
+					Integer k2 = null;
+					try{
+						k2 = Integer.parseInt(ai2.getPostfix().substring(pos+1));
+					}
+					catch(Exception ex){};
+
+					if(null!=k1 && null!=k2 && dst1==dst2 && (k1+k2)<64) {
+						item1.disable();
+						ai2.setPostfix("r" + dst1 + ","+ (k1+k2));
+						isChanged = true;
+					}
 				}
 			}
 		}
-
 	}
 
 	private String replaceAliasToReg(String regStr) {

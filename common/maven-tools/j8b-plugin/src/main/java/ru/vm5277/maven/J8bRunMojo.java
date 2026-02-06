@@ -23,10 +23,11 @@ import org.apache.maven.plugins.annotations.LifecyclePhase;
 import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import org.apache.maven.plugins.annotations.Execute;
+import java.util.ArrayList;
+import java.util.List;
 
 @Mojo(name = "run", defaultPhase = LifecyclePhase.VERIFY)
-@Execute(phase = LifecyclePhase.COMPILE, goal = "compile")
+//@Execute(phase = LifecyclePhase.COMPILE, goal = "compile")
 public class J8bRunMojo extends J8bMojo {
 	@Override
 	public void execute() throws MojoExecutionException {
@@ -36,18 +37,20 @@ public class J8bRunMojo extends J8bMojo {
 			getLog().warn("Please run 'mvn j8b:run' from a specific module directory instead.");
 			return;
 		}
-		checkToolkit();
 		getLog().info("=== J8B Maven plugin  - RUN ===");
-
+		checkToolkit(false);
+		
 		if(null==target || target.isEmpty() || !target.contains(":")) {
 			throw new MojoExecutionException("[ERROR] Target parameter is absent or incorrect, please specify j8b.target parameter. Example: avr:atmega328p");
 		}
 
+        doCompile(true);
+		
 		String mainName = mainFile.substring(0, mainFile.lastIndexOf("."));
 
 		Path libsPath = Paths.get(toolkitPath, "bin", "libs");
 
-		getLog().info("Flashing...");
+		//getLog().info("Flashing...");
 		File mainHexFile = new File(outputDirectory, mainName + "_cseg.hex");
 		if(!mainHexFile.exists()) {
 			throw new MojoExecutionException("Main hex file not found: " + mainHexFile.getAbsolutePath() + "\n");
@@ -55,15 +58,20 @@ public class J8bRunMojo extends J8bMojo {
 
 		int exitCode = 1;
 		try {
-			exitCode = runJ8BTool(	libsPath, "ru.vm5277.flasher.Main",
-									target,
-									targetFreq,
-									mainHexFile.getAbsolutePath(),
-									"-P", toolkitPath,
-									"-s",
-									"-F",
-									"-V",
-									"-R");
+			List<String> args = new ArrayList<>();
+			args.add(target);
+			args.add(targetFreq);
+			args.add(mainHexFile.getAbsolutePath());
+			args.add("-P");
+			args.add(toolkitPath);
+			args.add("-s");
+			args.add("-F");
+			//args.add("-V");
+			args.add("-R");
+			args.add("-I");
+			args.add("-w");
+			//args.add("-q");
+			exitCode = runJ8BTool(libsPath, "ru.vm5277.flasher.Main", args);
 		}
 		catch(Exception ex) {
 		}

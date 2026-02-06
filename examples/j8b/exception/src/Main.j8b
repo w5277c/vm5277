@@ -1,0 +1,120 @@
+/*
+ * Copyright 2025 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+class Main {
+
+	exception TestException {
+		FIRST,
+		SECOND;
+	}
+
+	public static void main() {
+		final byte b1 = 200;
+		//byte b2; b2= = 200; - не выдало ошибки!
+		byte b2; b2 = 200;
+		byte b3; b3=0;
+		final byte b4=0;
+		
+		System.out("\nСложение с переполнением вне обработчика искючения(статика): "); System.out(b1+100);
+		System.out("\nСложение с переполнением вне обработчика искючения(runtime): "); System.out(b2+100);
+		try {
+			System.out("\nСложение с переполнением в обработчике искючения(статика): "); System.out(b1+100);
+		}
+		catch(MathOverflowException ex) {
+			System.out("MathOverflowException");
+		}
+		try {
+			System.out("\nСложение с переполнением в обработчике искючения(runtime): "); System.out(b2+100);
+		}
+		catch(MathOverflowException ex) {
+			System.out("MathOverflowException");
+		}
+
+//		System.out("\nДеление на 0 вне обработчика искючения(статика): "); System.out(b1/0); // Не выйдет - компилятор выдает ошибку Division by zero
+//		System.out("\nДеление на 0 вне обработчика искючения(статика): "); System.out(b1/b4); // Не выйдет - компилятор выдает ошибку Division by zero
+		System.out("\nДеление на 0 вне обработчика искючения(runtime): "); System.out(b1/b3);
+//		try {
+//			System.out("\nДеление на 0 в обработчике искючения(статика): "); System.out(b1/0); // Не выйдет - компилятор выдает ошибку Division by zero или стоит генерировать исключение а вне блока вообще игнорировать ошибку?
+//		}
+//		catch(DivByZeroException ex) {
+//			System.out("DivByZeroException");
+//		}
+
+		try {
+			System.out("\nДеление на 0 в обработчике искючения(runtime): "); System.out(b1/b3);
+		}
+		catch(DivByZeroException ex) {
+			System.out("DivByZeroException");
+		}
+
+
+		try {
+			System.out("\nIOException.throw(): ");
+			IOException.throw();
+		}
+		catch(Exception ex) {
+			System.out("IOException");
+		}
+
+		System.out("\nОбрабчик MathException для цикла for(byte f=5;;f--):");
+		try {
+			for(byte f=5;;f--) {
+				System.out(f); System.outChar(' '); 
+			}
+		}
+		catch(MathException ex) {
+			System.out("MathException, typeId:"); System.out(ex.typeId()); System.out(", code:"); System.out(ex.code());
+		}
+		
+		System.out("\nВызов цепочки методов, последний сгенерирует TestException с кодом CODE_SECOND: ");		
+		try {
+			method1();
+		}
+		catch(TestException ex) {
+			System.out(ex);
+		}
+		
+		System.out("\nБросаем Runtime исключение - выход из программы с трассировкой исключения: ");		
+		RuntimeException.throw();
+		
+		System.out("\ndone");
+	}
+
+	public static void method1() throws TestException  {
+		method2();
+	}
+	public static void method2() throws TestException {
+		method3();
+	}
+	public static void method3() throws TestException {
+		method4();
+	}
+	public static void method4() throws TestException {
+		method5();
+	}
+	public static void method5() throws TestException {
+		method6();
+	}
+	public static void method6() throws TestException {
+		method7();
+	}
+	public static void method7() throws TestException {
+		method8();
+	}
+	public static void method8() throws TestException {
+		TestException.throw(TestException.SECOND);
+	}
+}

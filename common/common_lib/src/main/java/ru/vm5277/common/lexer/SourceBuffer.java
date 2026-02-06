@@ -23,32 +23,33 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 
 public class SourceBuffer extends SourcePosition implements Closeable {
-	private	InputStream				is;
+	private	InputStreamReader		isr;
 	private	ArrayList<Character>	queue	= new ArrayList<>(1024);
 	private	int						tabSize	= 0x04;
 	
 	public SourceBuffer(File sourceFile, int tabSize) throws FileNotFoundException {
 		super(sourceFile);
 		
-		is = new FileInputStream(sourceFile);
+		isr = new InputStreamReader(new FileInputStream(sourceFile), StandardCharsets.UTF_8);
 		this.tabSize = tabSize;
 	}
 	
 	public SourceBuffer(InputStream is, int tabSize) {
 		super(null);
 		
-		this.is = is;
+		this.isr = new InputStreamReader(is, StandardCharsets.UTF_8);
 		this.tabSize = tabSize;
 	}
 
 	public SourceBuffer(String sourceCode, int tabSize) {
 		super(null);
 		
-		this.is = new ByteArrayInputStream(sourceCode.getBytes(StandardCharsets.UTF_8));
+		this.isr = new InputStreamReader(new ByteArrayInputStream(sourceCode.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
 		this.tabSize = tabSize;
 	}
 
@@ -60,7 +61,7 @@ public class SourceBuffer extends SourcePosition implements Closeable {
 				result = queue.remove(0);
 			}
 			else {
-				int b = is.read();
+				int b = isr.read();
 				result = (-1==b) ? '\0' : (char)b;
 			}
 
@@ -86,7 +87,7 @@ public class SourceBuffer extends SourcePosition implements Closeable {
 				return queue.get(0);
 			}
 
-			int b = is.read();
+			int b = isr.read();
 			if(b==-1) return '\0';
 
 			char c = (char) b;
@@ -121,7 +122,7 @@ public class SourceBuffer extends SourcePosition implements Closeable {
 			int needed = size-queue.size();
 
 			for(int i=0; i<needed; i++) {
-				int b = is.read();
+				int b = isr.read();
 				if(-1==b) return false;
 				queue.add((char)b);
 			}
@@ -135,7 +136,7 @@ public class SourceBuffer extends SourcePosition implements Closeable {
 	public boolean available() {
 		try {
 			if(queue.isEmpty()) {
-				int b = is.read();
+				int b = isr.read();
 				if(-1==b) return false;
 				queue.add((char)b);
 				return true;
@@ -188,6 +189,6 @@ public class SourceBuffer extends SourcePosition implements Closeable {
 	
 	@Override
 	public void close() throws IOException {
-		is.close();
+		isr.close();
 	}
 }

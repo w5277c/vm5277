@@ -16,8 +16,10 @@
 package ru.vm5277.avr_asm.nodes.operands;
 
 import ru.vm5277.avr_asm.Assembler;
+import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
+import ru.vm5277.avr_asm.semantic.IdExpression;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.ErrorMessage;
@@ -34,7 +36,7 @@ public class Const {
 	public Const(MessageContainer mc, Scope scope, SourcePosition sp, Expression expr, int min, int max, int bits) throws CompileException {
 		this.bits = bits;
 		Long _value = Expression.getLong(expr, sp);
-		if(null == _value) {
+		if(null==_value) {
 			throw new CompileException("Cannot resolve constant '" + expr + "'", sp);
 		}
 

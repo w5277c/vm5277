@@ -47,7 +47,7 @@ VM5277 позволяет писать код на Java-подобном язы�
 	```java
 	class Main {
 		public static void main() {
-			System.setParam(RTOSParam.STDOUT_PORT, GPIO.PC2);
+			System.setParam(RTOSParam.STDIO_PORT, GPIO.PC2);
 			cstr text="READY!\n";
 			System.out(text);
 		}

@@ -30,7 +30,7 @@ public class OrgNode {
 		CodeSegment cSeg = scope.getCSeg();
 		Expression expr = Expression.parse(tb, scope, mc);
 		Long value = Expression.getLong(expr, sp);
-		if(null == value) {
+		if(null==value) {
 			tb.skipLine();
 			throw new CompileException("Cannot resolve constant '" + expr + "'", sp);
 		}

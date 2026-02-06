@@ -38,11 +38,11 @@ J8BPROC_ETRACE_ADD:
 .IF OS_ETRACE_POINT_BITSIZE==0x07
 	PUSH ACCUM_L
 	PUSH ACCUM_EL
-	LDI TEMP_L,OS_ETRACE_BUFFER_SIZE						;Количество итераций без последнего элемента
+	LDI TEMP_L,OS_ETRACE_BUFFER_SIZE-0x02					;Количество итераций без последнего элемента
 _J8BPROC_ETRACE_ADD__LOOP:
 	LD ACCUM_L,X+											;Считываем первую точку
 	CPI ACCUM_L,0x00										;Проверяем, если свободна - переходим на запись
-	BREQ PC+0x05
+	BREQ PC+0x04
 	DEC TEMP_L												;Иначе продолжаем итерации
 	BRNE _J8BPROC_ETRACE_ADD__LOOP
 	ORI ACCUM_EL,0x80										;Все элементы заполнены, пишем в последний включив признак переполнения
@@ -54,7 +54,7 @@ _J8BPROC_ETRACE_ADD__LOOP:
 	PUSH ACCUM_H
 	PUSH ACCUM_L
 	PUSH ACCUM_EH
-	LDI TEMP_L,OS_ETRACE_BUFFER_SIZE/2						;Аналогичная логика только для 15 битных элементов
+	LDI TEMP_L,(OS_ETRACE_BUFFER_SIZE-0x02)/2				;Аналогичная логика только для 15 битных элементов
 _J8BPROC_ETRACE_ADD__LOOP:
 	LD ACCUM_H,X+
 	LD ACCUM_L,X+

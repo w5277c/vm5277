@@ -1,0 +1,115 @@
+/*
+ * Copyright 2025 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// Пример работы с примитивами
+// TODO кодогенерация еще сырая. Особенно недоработано runtime сравнение с Fixed (не учитываю разницу в знаках)
+
+
+class Main {
+	public static void main() {
+		bool bTrue; bTrue = true;
+		bool bFalse; bFalse = false;
+		byte bVal; bVal = 125;
+		short sVal; sVal = 32767;
+		int iVal; iVal = 0x7fffffff;
+		fixed fVal; fVal = -1.56;
+		fixed fx1; fx1 = 10.75;
+		fixed fx2; fx2 = 3.5;
+		fixed fx3;fx3 = 125.0;
+
+		System.out("\n1. bool: ");
+		System.out("True="); System.out(bTrue);
+		System.out(",False="); System.out(bFalse);
+		System.out(",!True="); System.out(!bTrue);
+		System.out(",True&&False="); System.out(bTrue && bFalse);
+		System.out(",True||False="); System.out(bTrue || bFalse);
+
+		System.out("\n2. byte: ");
+		System.out("Min[0]="); System.out(Primitive.Byte.MIN);
+		System.out(", Max[255]="); System.out(Primitive.Byte.MAX);
+		System.out(", Val[125]="); System.out(bVal);
+		System.out(", Val+1[126]="); System.out(bVal+1);
+		System.out(", Min-1[255]="); System.out(Primitive.Byte.MIN-1);
+		System.out(", Max+1[0]="); System.out(Primitive.Byte.MAX+1);
+//Exception здесь не нужен, вынесу в пример с исключенями
+//		try {System.out(",Val-130[Exc]="); System.out(bVal-130);} catch(MathOverflowException ex) {System.out("Exc");}
+//		try {System.out(",Max+1[Exc]="); System.out(Primitive.Byte.MAX+1);} catch(MathOverflowException ex) {System.out("Exc");}
+	
+		System.out("\n3. short: ");
+		System.out("Min[0]="); System.out(Primitive.Short.MIN);
+		System.out(", Max[65535]="); System.out(Primitive.Short.MAX);
+		System.out(", Val[32767]="); System.out(sVal);
+		System.out(", Val+1[32768]="); System.out(sVal+1);
+		System.out(", Min-1[65535]="); System.out(Primitive.Short.MIN-1);
+		System.out(", Max+1[0]="); System.out(Primitive.Short.MAX+1);
+//		try {System.out(",Val-32768[Exc]="); System.out(sVal-32768);} catch(MathOverflowException ex) {System.out("Exc");}
+//		try {System.out(",Max+1[Exc]="); System.out(Primitive.Short.MAX+1);} catch(MathOverflowException ex) {System.out("Exc");}
+
+		System.out("\n4. int: ");
+		System.out("Min[0]="); System.out(Primitive.Int.MIN);
+		System.out(", Max[4294967295]="); System.out(Primitive.Int.MAX);
+		System.out(", Val[2147483647]="); System.out(iVal);
+		System.out(", Val+1[2147483648]="); System.out(iVal+1);
+		System.out(", Min-1[4294967295]="); System.out(Primitive.Int.MIN-1);
+		System.out(", Max+1[0]="); System.out(Primitive.Int.MAX+1);
+//		try {System.out(",Val-2147483648[Exc]="); System.out(iVal-2147483648);} catch(MathOverflowException ex) {System.out("Exc");}
+//		try {System.out(",Max+1[Exc]="); System.out(Primitive.Int.MAX+1);} catch(MathOverflowException ex) {System.out("Exc");}
+
+		System.out("\n5. fixed: ");
+		System.out("Min[-128.00]="); System.out(Primitive.Fixed.MIN);
+		System.out(", Max[127.99]="); System.out(Primitive.Fixed.MAX);
+		System.out(", Val[-1.56]="); System.out(fVal);
+		System.out(", Val+1[-0.56]="); System.out(fVal+1);
+		System.out(", Min-1[127.00]="); System.out(Primitive.Fixed.MIN-1);
+		System.out(", Max+1[-127.00]="); System.out(Primitive.Fixed.MAX+1);
+//		try {System.out(",Val-200[Exc]="); System.out(fVal-200);} catch(MathOverflowException ex) {System.out("Exc");}
+//		try {System.out(",Max+1[Exc]="); System.out(Primitive.Fixed.MAX+1);} catch(MathOverflowException ex) {System.out("Exc");}
+
+		System.out("\n6. Явные приведения:");
+		byte fromShort = (byte)sVal;
+		System.out("(byte)"); System.out(sVal); System.outChar('='); System.out(fromShort);
+		System.out(", (short)"); System.out(iVal); System.outChar('='); System.out((short)iVal);
+		System.out(", (fixed)"); System.out(bVal); System.outChar('='); System.out((fixed)bVal);
+		System.out(", (byte)"); System.out(-12.34); System.outChar('='); System.out((byte)-12.34);
+		System.out(", (byte)"); System.out(fVal); System.outChar('='); System.out((byte)fVal);
+		System.out(", (byte)"); System.out(127.50); System.outChar('='); System.out((byte)127.50);
+
+		System.out("\n7. Смешанные выражения:");
+		System.out("byte+short[32892]="); System.out(bVal + sVal);
+		System.out(", short+int[2147516414]="); System.out(sVal + iVal);
+		System.out(", byte+fixed[123.44]="); System.out(bVal + fVal);
+
+		System.out("\n8. Арифметика fixed:");
+		System.out("fx1="); System.out(fx1);
+		System.out(", fx2="); System.out(fx2);
+		System.out(", fx1+fx2[14.25]="); System.out(fx1 + fx2);
+		System.out(", fx1-fx2[7.25]="); System.out(fx1 - fx2);
+		System.out(", fx1*fx2[37.63]="); System.out(fx1 * fx2);
+		System.out(", fx1/fx2[3.07]="); System.out(fx1 / fx2);
+
+		System.out("\n9. Сравнение разных типов:");
+		System.out("fx3="); System.out(fx3);
+		System.out(", fx1>10="); System.out(fx1>10);
+		System.out(", bVal==fx3="); System.out(bVal==fx3);
+		System.out(", fx1<=-1="); System.out(fx1<=-1);
+
+		System.out("\n10. Сложное условие:");
+		System.out("((bVal>100) && ((fVal+1)>0) || (sVal==32767) && !bFalse)[true]=");
+		System.out((bVal>100) && ((fVal+1)>0) || (sVal==32767) && !bFalse);
+
+		System.out("\ndone");
+	}
+}

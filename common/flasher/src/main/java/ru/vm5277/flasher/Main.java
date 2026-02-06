@@ -16,6 +16,7 @@
 
 package ru.vm5277.flasher;
 
+import java.io.File;
 import java.nio.file.Path;
 import java.security.SecureRandom;
 import java.util.Arrays;
@@ -24,13 +25,14 @@ import java.util.Locale;
 import java.util.Scanner;
 import ru.vm5277.common.DefReader;
 import ru.vm5277.common.FSUtils;
-import ru.vm5277.common.Platform;
+import ru.vm5277.common.PlatformType;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.firmware.IntelHex.IntelHexParser;
 import ru.vm5277.common.firmware.Segment;
 
 public class Main {
 	public	final	static	String					VERSION				= StrUtils.readVersion(Main.class);
+	private	final	static	int						WAIT_TIME			= 15*1000;
 	public			static	boolean					isWindows;
 	public			static	Path					toolkitPath;
 	private			static	boolean					quiet;
@@ -41,8 +43,7 @@ public class Main {
 	
 	public static int exec(String[] args) {
 		long startTimestamp = System.currentTimeMillis();
-		showDisclaimer();
-		
+	
 		isWindows = (null != System.getProperty("os.name") && System.getProperty("os.name").toLowerCase().contains("windows"));
 		
 		toolkitPath = FSUtils.getToolkitPath();
@@ -61,7 +62,7 @@ public class Main {
 			return 0;
 		}
 		
-		Platform platform = null;
+		PlatformType platform = null;
 		String mcu = null;
 		Float cpuFreq = null;
 		String source = null;
@@ -70,6 +71,8 @@ public class Main {
 		String serialDeviceName = null;
 		boolean isEncryptedFw = false;
 		boolean smartMode = false;
+		int	waitTime = 0;
+		boolean	interactiveMode = false;
 		
 		boolean doClearCache = false;
 		boolean doFlash = false;
@@ -77,10 +80,10 @@ public class Main {
 		boolean doErase = false;
 		boolean doReboot = false;
 		
-		if(0x03 <= args.length) {
+		if(0x02<=args.length) {
 			String[] parts = args[0x00].split(":");
 			if(0x02 == parts.length) {
-				platform = Platform.valueOf(parts[0].toUpperCase());
+				platform = PlatformType.valueOf(parts[0].toUpperCase());
 				mcu = parts[1];
 			}
 			try {
@@ -95,64 +98,72 @@ public class Main {
 				return 1;
 			}
 			
-			source = args[0x02];
-			
-			for(int i=3; i<args.length; i++) {
-				String arg = args[i];
-				if(args.length>i+1 && (arg.equals("-P") || arg.equals("--path"))) {
-					toolkitPath = FSUtils.resolveWithEnv(args[++i]);
-				}
-				else if(args.length>i+1 && (arg.equals("-S") || arg.equals("--serial"))) {
-					serialDeviceName = args[++i];
-				}
-				else if(args.length>i+1 && (arg.equals("-f") || arg.equals("--fwversion"))) {
-					try {
-						fwVersion = Integer.parseInt(args[++i]);
+			if(0x03<=args.length) {
+				source = args[0x02];
+
+				for(int i=3; i<args.length; i++) {
+					String arg = args[i];
+					if(args.length>i+1 && (arg.equals("-P") || arg.equals("--path"))) {
+						toolkitPath = FSUtils.resolveWithEnv(args[++i]);
 					}
-					catch(Exception ex) {}
-					if(0>fwVersion||255<fwVersion) {
-						System.err.println("[ERROR] Invalid fwversion parameter value");
-						return 1;
+					else if(args.length>i+1 && (arg.equals("-S") || arg.equals("--serial"))) {
+						serialDeviceName = args[++i];
 					}
-				}
-				else if(args.length>i+1 && (arg.equals("-r") || arg.equals("--retries"))) {
-					retries = -1;
-					try {
-						retries = Integer.parseInt(args[++i]);
+					else if(args.length>i+1 && (arg.equals("-f") || arg.equals("--fwversion"))) {
+						try {
+							fwVersion = Integer.parseInt(args[++i]);
+						}
+						catch(Exception ex) {}
+						if(0>fwVersion||255<fwVersion) {
+							System.err.println("[ERROR] Invalid fwversion parameter value");
+							return 1;
+						}
 					}
-					catch(Exception ex) {}
-					if(0>retries) {
-						System.err.println("[ERROR] Invalid retries parameter value");
-						return 1;
+					else if(args.length>i+1 && (arg.equals("-r") || arg.equals("--retries"))) {
+						retries = -1;
+						try {
+							retries = Integer.parseInt(args[++i]);
+						}
+						catch(Exception ex) {}
+						if(0>retries) {
+							System.err.println("[ERROR] Invalid retries parameter value");
+							return 1;
+						}
 					}
-				}
-				else if(arg.equals("-s") || arg.equals("--smart")) {
-					smartMode = true;
-				}
-				else if(arg.equals("-C") || arg.equals("--clear-cache")) {
-					doClearCache = true;
-				}
-				else if(arg.equals("-E") || arg.equals("--erase")) {
-					doErase = true;
-				}
-				else if(arg.equals("-F") || arg.equals("--flash")) {
-					doFlash = true;
-				}
-				else if(arg.equals("-V") || arg.equals("--verify")) {
-					doVerify = true;
-				}
-				else if(arg.equals("-R") || arg.equals("--reboot")) {
-					doReboot = true;
-				}
-				else if(arg.equals("-q") || arg.equals("--quiet")) {
-					quiet = true;
-				}
-				else if(arg.equals("-e") || arg.equals("--encrypted")) {
-					isEncryptedFw = true;
-				}
-				else {
-					System.err.println("[ERROR] Invalid parameter: " + arg);
-					return 0;
+					else if(arg.equals("-s") || arg.equals("--smart")) {
+						smartMode = true;
+					}
+					else if(arg.equals("-w") || arg.equals("--wait")) {
+						waitTime = WAIT_TIME;
+					}
+					else if(arg.equals("-C") || arg.equals("--clear-cache")) {
+						doClearCache = true;
+					}
+					else if(arg.equals("-E") || arg.equals("--erase")) {
+						doErase = true;
+					}
+					else if(arg.equals("-F") || arg.equals("--flash")) {
+						doFlash = true;
+					}
+					else if(arg.equals("-V") || arg.equals("--verify")) {
+						doVerify = true;
+					}
+					else if(arg.equals("-R") || arg.equals("--reboot")) {
+						doReboot = true;
+					}
+					else if(arg.equals("-q") || arg.equals("--quiet")) {
+						quiet = true;
+					}
+					else if(arg.equals("-e") || arg.equals("--encrypted")) {
+						isEncryptedFw = true;
+					}
+					else if(arg.equals("-I") || arg.equals("--interactive")) {
+						interactiveMode = true;
+					}
+					else {
+						System.err.println("[ERROR] Invalid parameter: " + arg);
+						return 0;
+					}
 				}
 			}
 		}
@@ -161,11 +172,13 @@ public class Main {
 			return 0;
 		}
 		
+		if(!quiet) showDisclaimer();
+		
 		if(null==toolkitPath) {
 			showInvalidToolkitDir(null);
 			return 1;
 		}
-		System.out.println("Toolkit path: " + toolkitPath.toString());
+		if(!quiet) System.out.println("Toolkit path: " + toolkitPath.toString());
 		
 		if(null==platform || null==mcu || mcu.isEmpty()) {
 			showInvalidDeviceFormat(args[0]);
@@ -190,13 +203,6 @@ public class Main {
 			return 1;
 		}
 
-		Path sourcePath = FSUtils.resolve(toolkitPath, source);
-		if(!sourcePath.toFile().exists()) {
-			showInvalidToolkitDir(sourcePath);
-			return 1;
-		}
-
-		
 		if(smartMode && isEncryptedFw) {
 			System.err.println("[ERROR] Smartmode can't be realized with encrypted firmware.");
 			return 1;
@@ -253,51 +259,136 @@ public class Main {
 		
 		byte[] sourceData = null;
 		List<Segment> sourceSegments = null;
-		try (Scanner scan = new Scanner(sourcePath)) {
-			int total = 0;
-			IntelHexParser ihp = new IntelHexParser(scan);
-			sourceData = new byte[bootWAddr.intValue()*2];
-			if(isEncryptedFw) { //Заполняем случайными данными для пустых блоков
-				SecureRandom srnd = new SecureRandom(); //TODOCOM реализовать более безопасный механизм
-				srnd.nextBytes(sourceData);
+		if(doFlash || doVerify) {
+			Path sourcePath = FSUtils.resolve(toolkitPath, source);
+			if(!sourcePath.toFile().exists()) {
+				showInvalidToolkitDir(sourcePath);
+				return 1;
 			}
-			else {
-				Arrays.fill(sourceData, (byte)0xff);
-			}
-			
-			sourceData[sourceData.length-0x01] = (byte)fwVersion;	// Записываем в последний байт прошивки версию прошивки, если прошивка занимает всю память
-																	// то версия будет заменена кодом прошивки.
-			sourceSegments = ihp.parse(sourceData);	
-			ihp.appendSegment(sourceData.length-0x01, 0x01, sourceSegments);
 
-			if(!quiet) {
-				System.out.println("Source: " + sourcePath.toString());
-				System.out.println(" ----- Source segments ----- ");
-				for(Segment segment : sourceSegments) {
-					System.out.println(	" Start\t= " + String.format("0x%04X", segment.getAddr()) + ", Length = " + String.format("0x%04X", segment.getSize()) +
-										" bytes");
-					total += segment.getSize();
+			try (Scanner scan = new Scanner(sourcePath)) {
+				int total = 0;
+				IntelHexParser ihp = new IntelHexParser(scan);
+				sourceData = new byte[bootWAddr.intValue()*2];
+				if(isEncryptedFw) { //Заполняем случайными данными для пустых блоков
+					SecureRandom srnd = new SecureRandom(); //TODOCOM реализовать более безопасный механизм
+					srnd.nextBytes(sourceData);
 				}
-				System.out.println(" -----");
-				System.out.println(" Total\t:  " + total + " bytes " + String.format("%.1f", 100d*total/sourceData.length) + "%");
+				else {
+					Arrays.fill(sourceData, (byte)0xff);
+				}
+
+				sourceData[sourceData.length-0x01] = (byte)fwVersion;	// Записываем в последний байт прошивки версию прошивки, если прошивка занимает всю память
+																		// то версия будет заменена кодом прошивки.
+				sourceSegments = ihp.parse(sourceData);	
+				ihp.appendSegment(sourceData.length-0x01, 0x01, sourceSegments);
+
+				if(!quiet) {
+					System.out.println("Source: " + sourcePath.toString());
+					System.out.println(" ----- Source segments ----- ");
+					for(Segment segment : sourceSegments) {
+						System.out.println(	" Start\t= " + String.format("0x%04X", segment.getAddr()) + ", Length = " + String.format("0x%04X", segment.getSize()) +
+											" bytes");
+						total += segment.getSize();
+					}
+					System.out.println(" -----");
+					System.out.println(" Total\t:  " + total + " bytes " + String.format("%.1f", 100d*total/sourceData.length) + "%");
+				}
+				else {
+					for(Segment segment : sourceSegments) {
+						total += segment.getSize();
+					}
+					System.out.println("Firmware size: " + total + " bytes " + String.format("%.1f", 100d*total/sourceData.length) + "%");
+				}
 			}
-		}
-		catch(Exception ex) {
-			System.err.println("[ERROR] " + ex.getMessage());
-			return 1;
+			catch(Exception ex) {
+				System.err.println("[ERROR] " + ex.getMessage());
+				return 1;
+			}
 		}
 		
 		if(!quiet) {
 			System.out.println();
-			System.out.println("Connecting to device: " + (null==serialDeviceName ? " auto detect" : serialDeviceName));
+			System.out.print("Connecting to device: " + (null==serialDeviceName ? "auto detect" : serialDeviceName));
 		}
-		BootloaderIface bIface = new BootloaderIface(cpuFreq, serialDeviceName, retries);
+		
+		ServiceMessageHandler serviceMessageHandler = null;
+		if(interactiveMode) { // В инерактивном режиме может потребоваться обработка сервисных сообщений
+			// В том числе трассировка исключений
+			
+			final TargetInfoParser parser = new TargetInfoParser();
+			if(null!=source) {
+				int pos = source.lastIndexOf(".");
+				if(-1 != pos) {
+					String targetInfo = source.substring(0, pos);
+					if(targetInfo.endsWith("_cseg")) {
+						targetInfo = targetInfo.substring(0, targetInfo.length()-0x05);
+					}
+					File file = new File(targetInfo + ".dbg");
+					if(file.exists()) {
+						parser.parse(file);
+					}
+				}
+			}
+			
+			serviceMessageHandler = new ServiceMessageHandler() {
+				@Override
+				public String handle(String message) {
+					if(parser.isReady()) {
+						if(message.startsWith("ETRC:")) {
+							StringBuilder sb = new StringBuilder();
+							int pos = 0x05;
+							int endNumPos = getHexNumEndPos(message, pos);
+							int exId = Integer.parseInt(message.substring(pos, endNumPos), 0x10);
+							String exName = parser.getException(exId);
+							pos=endNumPos+1;
+							endNumPos = getHexNumEndPos(message, pos);
+							int code = Integer.parseInt(message.substring(pos, endNumPos), 0x10);
+							String codeName = parser.getExceptionCode(exId, code);
+							pos=endNumPos+1;
+							//sb.append(">").append(message).append("<");
+							sb.append("Stacktrace for ").append(exName).append(", code:").append(null==codeName ? code : codeName).append("\n");
+							
+							
+							while(pos<message.length()) {
+								if(message.substring(pos).startsWith("..")) {
+									sb.append("...\n");
+									pos+=0x03;
+								}
+								else {
+									endNumPos = getHexNumEndPos(message, pos);
+									sb.append(parser.getThrowPoint(Integer.parseInt(message.substring(pos, endNumPos), 0x10))).append("\n");
+									pos=endNumPos+1;
+								}
+							}
+							sb.append("End stacktrace\n");
+							return sb.toString();
+						}	
+					}
+					return null;
+				}
+				
+				public int getHexNumEndPos(String str, int startPos) {
+					for(int i=startPos; i<str.length(); i++) {
+						char ch = str.charAt(i);
+						if(!(Character.isDigit(ch) || ((ch|0x20)>='a' && (ch|0x20)<='f'))) {
+							return i;
+						}
+					}
+					return str.length();
+				}
+			};
+			
+		}
+		
+		
+		BootloaderIface bIface = new BootloaderIface(cpuFreq, serialDeviceName, waitTime, retries);
 		if(bIface.open()) {
 			boolean result = true;
 
-			if(!quiet) {
-				System.out.println("Device info:" + bIface.getDeviceInfo());
-			}
+			System.out.println("Serial port: " + (null==bIface.getSerialPort() ? "null" : bIface.getSerialPort().getPortName()));
+			System.out.println("Connection mode:" + (bIface.getDeviceInfo().isSingleWireMode() ? "1" : "2") + " wire mode");
+			System.out.println("Device info:" + bIface.getDeviceInfo());
 
 			if(bIface.checkSignature(signature.intValue())) {
 
@@ -404,6 +495,27 @@ public class Main {
 						result = false;
 					}
 				}
+				
+				if(result && interactiveMode) {
+					try {
+						System.out.println("\nEntering interactive mode. Press Ctrl+C to exit.");
+						SerialTerminal terminal = new SerialTerminal(bIface.getSerialPort(), serviceMessageHandler);
+
+						Runtime.getRuntime().addShutdownHook(new Thread() {
+							@Override
+							public void run() {
+								terminal.disable();
+								System.out.println("\nExiting terminal mode...");
+							}
+						});
+						terminal.start();
+						terminal.join();
+					}
+					catch (Exception e) {
+						System.err.println("[ERROR] Failed to start interactive mode: " + e.getMessage());
+						result = false;
+					}
+				}
 			}
 			else {
 				result = false;
@@ -418,10 +530,13 @@ public class Main {
 					System.out.println("All operations successfully executed");
 					System.out.println("Total time: " + String.format(Locale.US, "%.3f", time) + " s\n");
 				}
+				else {
+					System.out.println("Firmware flash SUCCESS");
+				}
 				return 0;
 			}
 			else {
-				System.err.println("Operations aborted");
+				System.err.println("Firmware flash FAIL");
 				return 1;
 			}
 		}
@@ -430,8 +545,8 @@ public class Main {
 		}
     }
 	
-	public static void showMsg(String str) {
-		if(!quiet) {
+	public static void showMsg(String str, boolean always) {
+		if(!quiet || always) {
 			System.out.print(str);
 		}
 	}
@@ -472,8 +587,12 @@ public class Main {
 		System.out.println("  -F,  --flash            Flash HEX file to device");
 		System.out.println("  -V,  --verify           Verify device against HEX file");
 		System.out.println("  -R,  --reboot           Reboot device");
+		System.out.println("  -I,  --interactive      Enter interactive mode after operations");
+		System.out.println("                          (stdin/stdout redirected to serial port, Ctrl+C for exit)");
 		System.out.println("  -f,  --fwversion <num>  Set firmware version 0-255 (default: 0, used with keys F,V)");
+		System.out.println("  -w,  --wait             Wait for device (10 seconds)");
 		System.out.println("  -r,  --retries <num>    Number of retries on failure (default: 3)");
+		System.out.println();
 		System.out.println("  -q,  --quiet            Quiet mode (no output)");
 		System.out.println("  -v,  --version          Display version");
 		System.out.println("  -h,  --help             Show this help");

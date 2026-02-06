@@ -25,7 +25,8 @@
 		<j8b.plugin.version>0.1.0</j8b.plugin.version>
 		<j8b.target>avr:atmega328p</j8b.target>
 		<j8b.targetFreq>16</j8b.targetFreq>
-		<j8b.sourceDirectory>src/main/j8b</j8b.sourceDirectory>
+		<j8b.targetStdio>PB5</j8b.targetStdio>
+		<j8b.sourceDirectory>src</j8b.sourceDirectory>
 	</properties>
 
 	<build>
@@ -36,7 +37,7 @@
 				<version>${j8b.packaging.version}</version>
 			</extension>
 		</extensions>
-
+		<sourceDirectory>${j8b.sourceDirectory}</sourceDirectory>
 		<plugins>
 			<plugin>
 				<groupId>ru.vm5277</groupId>
@@ -54,6 +55,8 @@
 				<configuration>
 					<target>${j8b.target}</target>
 					<targetFreq>${j8b.targetFreq}</targetFreq>
+					<targetStdio>${j8b.targetStdio}</targetStdio>
+					<verboseOutput>false</verboseOutput>
 				</configuration>
 			</plugin>
 		</plugins>

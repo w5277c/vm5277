@@ -15,18 +15,18 @@
  */
 .include "./core/wait_ms.asm"
 
-.IFNDEF WAIT
+.IFNDEF OS_WAIT
 ;--------------------------------------------------------
-WAIT:
+OS_WAIT:
 ;--------------------------------------------------------
-;Ждем 5ms
+;Ждем 4ms
 ;--------------------------------------------------------
 	PUSH ACCUM_H
 	PUSH ACCUM_L
 
 	LDI ACCUM_H,0x00
-	LDI ACCUM_L,0x05
-	MCALL WAIT_MS
+	LDI ACCUM_L,0x04
+	MCALL OS_WAIT_MS
 
 	POP ACCUM_L
 	POP ACCUM_H

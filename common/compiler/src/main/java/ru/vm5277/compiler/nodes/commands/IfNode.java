@@ -65,7 +65,7 @@ public class IfNode extends CommandNode {
 
 		// Then блок
 		try {
-			thenBlockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
+			thenBlockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "if.then") : new BlockNode(tb, mc, parseStatement(), "if.then");
 		}
 		catch(CompileException e) {markFirstError(e);}
 
@@ -75,12 +75,12 @@ public class IfNode extends CommandNode {
         
 			if (tb.match(TokenType.COMMAND, J8BKeyword.IF)) {
 				// Обработка else if
-				elseBlockNode = new BlockNode(tb, mc, new IfNode(tb, mc));
+				elseBlockNode = new BlockNode(tb, mc, new IfNode(tb, mc), "if.elseif");
 
 			}
 			else {
 				try {
-					elseBlockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc) : new BlockNode(tb, mc, parseStatement());
+					elseBlockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "if.else") : new BlockNode(tb, mc, parseStatement(), "if.else");
 				}
 				catch(CompileException e) {markFirstError(e);}
 			}

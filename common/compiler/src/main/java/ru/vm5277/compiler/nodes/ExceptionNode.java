@@ -27,6 +27,7 @@ import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.TargetInfoBuilder;
 import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.lexer.TokenType;
@@ -44,12 +45,13 @@ public class ExceptionNode extends ObjectTypeNode {
 	private			List<String>	values;
 	private			List<String>	ext				= new ArrayList<>();
 	private			CIScope			extScope;
+	private			int				id;
 	
 	public ExceptionNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, List<ObjectTypeNode> importedClasses) throws CompileException {
 		super(tb, mc, modifiers, null, importedClasses);
 		
 		if(null!=name) {
-			VarType.addException(this.name);
+			id = VarType.addException(this.name);
 		}
 		
 		try {
@@ -195,6 +197,8 @@ public class ExceptionNode extends ObjectTypeNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
+		TargetInfoBuilder tib = cg.getTargetInfoBuilder();
+		tib.addException(id, values);
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}

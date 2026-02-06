@@ -52,18 +52,17 @@ import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class Assembler implements AssemblerInterface {
-	public	final	static	String	VERSION		= StrUtils.readVersion(Assembler.class);
-	public			static	int		tabSize		= 4;
+	public	final	static	String	VERSION			= StrUtils.readVersion(Assembler.class);
+	public			static	int		tabSize			= 4;
 	public			static	boolean	isWindows;
 	public			static	Path	toolkitPath;
+	public			static	boolean	quiet			= true;
 	
 	public static void main(String[] args) {
 		System.exit(exec(args));
 	}
 	
 	public static int exec(String[] args) {
-		showDisclaimer();
-		
 		isWindows = (null != System.getProperty("os.name") && System.getProperty("os.name").toLowerCase().contains("windows"));
 
 		toolkitPath = FSUtils.getToolkitPath();
@@ -74,7 +73,7 @@ public class Assembler implements AssemblerInterface {
 			return 0;
 		}
 		if(0x01 == args.length) {
-			if(args[0x00].equals("--version")) {
+			if(args[0x00].equals("-v") || args[0x00].equals("--version")) {
 				System.out.println("AVR assembler version: " + VERSION);
 				return 0;
 			}
@@ -84,6 +83,7 @@ public class Assembler implements AssemblerInterface {
 		Map<Path, SourceType> sourcePaths	= new HashMap<>();
 		int stirctLevel = STRICT_LIGHT;
 		int maxErrors = 30;
+		quiet = false;
 		String format = "hex";
 		String mapFileName = null;
 		String listFileName = null;
@@ -93,20 +93,28 @@ public class Assembler implements AssemblerInterface {
 		
 		source = args[0x00];
 		for(int i=1; i<args.length; i++) {
-			String arg = args[i++];
-			if(args.length > i) {
+			String arg = args[i];
+			if(arg.equals("-q") || arg.equals("--quiet")) {
+				quiet = true;
+				continue;
+			}
+			
+			if(args.length > i+1) {
 				if(arg.equals("-P") || arg.equals("--path")) {
-					toolkitPath = FSUtils.resolveWithEnv(args[i]);
+					toolkitPath = FSUtils.resolveWithEnv(args[++i]);
+					continue;
 				}
 				else if(arg.equals("-I") || arg.equals("--include")) {
 					if(null==toolkitPath) {
 						showInvalidToolkitDir(toolkitPath, null);
 						return 1;
 					}
-					sourcePaths.put(FSUtils.resolve(toolkitPath, args[i]), SourceType.LIB);
+					sourcePaths.put(FSUtils.resolve(toolkitPath, args[++i]), SourceType.LIB);
+					continue;
 				}
 				else if(arg.equals("-t") || arg.equals("--tabsize")) {
-					tabSize = Integer.parseInt(args[i]);
+					tabSize = Integer.parseInt(args[++i]);
+					continue;
 				}
 				else if(arg.equals("--max-errors")) {
 					String value = args[++i];
@@ -117,13 +125,15 @@ public class Assembler implements AssemblerInterface {
 						System.err.println("[ERROR] Invalid parameter " + arg + " value: " + value);
 						return 1;
 					}
+					continue;
 				}
 				else if(arg.equals("-d") || arg.equals("--device")) {
-					mcu = args[i];
+					mcu = args[++i];
 					includes.add(mcu + ".inc");
+					continue;
 				}
 				else if(arg.equals("-D") || arg.equals("--define")) {
-					String[] parts = args[i].split("=", 2);
+					String[] parts = args[++i].split("=", 2);
 					String name = parts[0x00].trim().toLowerCase();
 					if(defines.containsKey(name.toLowerCase())) {
 						System.err.println("[ERROR] define '" + name + "' already defined");
@@ -145,49 +155,56 @@ public class Assembler implements AssemblerInterface {
 						}
 					}
 					defines.put(name, value);
+					continue;
 				}
 				else if(arg.equals("-i") || arg.equals("--include")) {
-					includes.add(args[i]);
+					includes.add(args[++i]);
+					continue;
 				}
 				else if(arg.equals("-m") || arg.equals("--map")) {
-					mapFileName = args[i];
+					mapFileName = args[++i];
+					continue;
 				}
 				else if(arg.equals("-l") || arg.equals("--list")) {
-					listFileName = args[i];
+					listFileName = args[++i];
+					continue;
 				}
 				else if(arg.equals("-o") || arg.equals("--output")) {
-					outputFileName = args[i];
+					outputFileName = args[++i];
+					continue;
 				}
 				else if(arg.equals("-s") || arg.equals("--strict")) {
-					String strictStr = args[i];
+					String strictStr = args[++i];
 					if(strictStr.equals("strong")) stirctLevel = STRICT_STRONG;
 					else if(strictStr.equals("none")) stirctLevel = STRICT_NONE;
 					else if(!strictStr.equals("light")) {
 						showInvalidStrictLevel(strictStr);
 						return 1;
 					}
+					continue;
 				}
 				else if(arg.equals("-f") || arg.equals("--format")) {
-					format = args[i].toLowerCase();
+					format = args[++i].toLowerCase();
 					if(!format.equals("hex") && !format.equals("bin")) {
 						showInvalidStrictLevel("-f " + format);
 						return 1;
 					}
-				}
-				else {
-					System.err.println("[ERROR] Invalid parameter:" + arg + "\n");
-					showHelp();
-					return 1;
+					continue;
 				}
 			}
+			
+			System.err.println("[ERROR] Invalid parameter: " + arg);
+			return 1;
 		}
  
+		if(!quiet) showDisclaimer();
+		
 		if(null==toolkitPath) {
 			showInvalidToolkitDir(toolkitPath, null);
 			return 1;
 		}
-		System.out.println("Toolkit path: " + toolkitPath.toString());
-		
+
+		if(!quiet) System.out.println("Toolkit path: " + toolkitPath.toString());
 		sourcePaths.put(FSUtils.resolve(toolkitPath, "defs/avr/"), SourceType.LIB);
 
 		MessageContainer mc = new MessageContainer(maxErrors, true, false);
@@ -216,7 +233,7 @@ public class Assembler implements AssemblerInterface {
 		if(1==Paths.get(outputFileName).getNameCount()) outputFileName = baseDir.resolve(outputFileName).normalize().toString();
 		
 		long timestamp = System.currentTimeMillis();
-		System.out.println("Parsing " + sourcePath.toString()  + " ...");
+		if(!quiet) System.out.println("Parsing " + sourcePath.toString()  + " ...");
 		boolean success = false;
 		try {
 			success = new Assembler().exec(mc, mcu, sourcePath, sourcePaths, stirctLevel, outputFileName, mapFile, listWriter, defines, includes);
@@ -226,7 +243,7 @@ public class Assembler implements AssemblerInterface {
 		}
 		
 		float time = (System.currentTimeMillis() - timestamp) / 1000f;
-		System.out.println("Total time: " + String.format(Locale.US, "%.3f", time) + " s\n");
+		if(!quiet) System.out.println("Total time: " + String.format(Locale.US, "%.3f", time) + " s\n");
 		return  success ? 0 : 1;
 	}
 
@@ -258,6 +275,7 @@ public class Assembler implements AssemblerInterface {
 			secondPass(scope, mc, parser.getSecondPassNodes());
 		}
 		catch(Exception e) {
+			e.printStackTrace();
 			mc.add(new ErrorMessage(e.getMessage(), null));
 		}
 		
@@ -268,21 +286,22 @@ public class Assembler implements AssemblerInterface {
 		if(null != mapFile) try {scope.makeMap(mapFile);} catch(Exception e) {e.printStackTrace();}
 		if(null != listWriter) try {listWriter.close();} catch(Exception e) {e.printStackTrace();}
 		
+		if(!quiet) System.out.println();
 		if(0 != mc.getErrorCntr()) {
-			System.out.println("\nBuild FAIL, warnings:" + mc.getWarningCntr() + ", errors:" + mc.getErrorCntr() + "/" + mc.getMaxErrorQnt());
+			System.out.println("Assemble FAIL, warnings:" + mc.getWarningCntr() + ", errors:" + mc.getErrorCntr() + "/" + mc.getMaxErrorQnt());
 			return false;
 		}
 		else {
-			System.out.println();
 			if(!scope.getCSeg().isEmpty()) {
 				IntelHexFormatter formatter = new IntelHexFormatter(new File(outputFileName + "_cseg.hex"));
 				scope.getCSeg().build(formatter);
 				formatter.close();
-				scope.getCSeg().printStat();
+				if(!quiet) scope.getCSeg().printStat();
 			}
-
-			System.out.println("\nparsed: " + mc.getLineQnt() + " lines");
-			System.out.println("Build SUCCESS, warnings:" + mc.getWarningCntr());
+			
+			if(!quiet) System.out.println();
+			if(!quiet) System.out.println("parsed: " + mc.getLineQnt() + " lines");
+			System.out.println("Assemble SUCCESS, warnings:" + mc.getWarningCntr());
 			return true;
 		}
 	}
@@ -333,25 +352,26 @@ public class Assembler implements AssemblerInterface {
 		System.out.println("Usage: avrasm" + (isWindows ? ".exe" : "") + " <input.asm> [options]");
 		System.out.println();
 		System.out.println("Options:");
-		System.out.println("  -o, --output <file>   Output HEX file (default: <input>.hex)");
-		System.out.println("  -i, --include <file>  Include specific file before processing");
-		System.out.println("  -f, --format <fmt>    Output format (hex, bin)");
-		System.out.println("                          hex     - Intel HEX (default)");
-		System.out.println("                          bin     - Raw binary");
-		System.out.println("  -d, --device <mcu>    Target MCU (e.g. atmega328p)");
-		System.out.println("  -P,  --path <dir>     Custom toolkit directory path");
-		System.out.println("  -I, --include <dir>   Additional include path(s)");
-		System.out.println("  -t, --tabsize <num>   Tab size in spaces (default: 4)");
+		System.out.println("  -o, --output <file>     Output HEX file (default: <input>.hex)");
+		System.out.println("  -i, --include <file>    Include specific file before processing");
+		System.out.println("  -f, --format <fmt>      Output format (hex, bin)");
+		System.out.println("                            hex     - Intel HEX (default)");
+		System.out.println("                            bin     - Raw binary");
+		System.out.println("  -d, --device <mcu>      Target MCU (e.g. atmega328p)");
+		System.out.println("  -P,  --path <dir>       Custom toolkit directory path");
+		System.out.println("  -I, --include <dir>     Additional include path(s)");
+		System.out.println("  -t, --tabsize <num>     Tab size in spaces (default: 4)");
 		System.out.println("  -s, --strict <strong|light|none> Ambiguity handling level");
-		System.out.println("                          strong  - Treat as error");
-		System.out.println("                          light   - Show warning (default)");
-		System.out.println("                          none    - Silent mode");
-		System.out.println("  -m, --map <file>      Generate memory map file");
-		System.out.println("  -l, --list <file>     Generate assembly listing file");
+		System.out.println("                            strong  - Treat as error");
+		System.out.println("                            light   - Show warning (default)");
+		System.out.println("                            none    - Silent mode");
+		System.out.println("  -m, --map <file>        Generate memory map file");
+		System.out.println("  -l, --list <file>       Generate assembly listing file");
 		System.out.println("  -D, --define <symbol>[=<value>]] Define symbol (.equ direcive");
 		System.out.println();
-		System.out.println("  -v, --version         Display version");
-		System.out.println("  -h, --help            Show this help");
+		System.out.println("  -q,  --quiet            Quiet mode (minimal output)");
+		System.out.println("  -v, --version           Display version");
+		System.out.println("  -h, --help              Show this help");
 		System.out.println();
 		System.out.println("Example:");
 		System.out.println("  avrasm main.asm -d atmega328p -o firmware.hex -I ./libs");

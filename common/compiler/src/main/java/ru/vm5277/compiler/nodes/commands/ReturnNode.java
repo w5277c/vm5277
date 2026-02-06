@@ -156,7 +156,7 @@ public class ReturnNode extends CommandNode {
 								result = false;
 							}
 							else {
-								if(!isCompatibleWith(scope, exprType, type)) {
+								if(!isCompatibleWith(scope, type, exprType)) {
 									markError("Return type mismatch: expected " + type + ", got " + exprType);
 									result = false;
 								}

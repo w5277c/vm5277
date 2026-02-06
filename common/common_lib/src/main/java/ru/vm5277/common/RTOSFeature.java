@@ -19,6 +19,7 @@ package ru.vm5277.common;
 public enum RTOSFeature {
 	OS_FT_IR_TABLE,
 	OS_FT_STDOUT,
+	OS_FT_STDIN,
 	OS_FT_WELCOME,
 	OS_FT_HEARTBEAT,
 	OS_FT_DIAG,

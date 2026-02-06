@@ -27,6 +27,11 @@ public class System {
 	public static native void out(bool i);
 	public static native void out(Exception ex);
 
+	public static native bool hasInput();
+	public static native byte in();
+	public static native byte in(short timeout) throws IOException;
+
+
 	public static native void halt();
 	public static native void reset();
 }

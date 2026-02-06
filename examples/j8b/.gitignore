@@ -1,0 +1,5 @@
+/*/target/*/*.lst
+/*/target/*/*.map
+/*/target/*/*.dbg
+/*/target/*/*.j8bir
+/*/target/*/*.hex

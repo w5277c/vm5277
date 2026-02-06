@@ -28,7 +28,6 @@ import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.cg.items.CGItem;
 import ru.vm5277.common.cg.items.CGIText;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -38,9 +37,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import ru.vm5277.common.ExcsThrowPoint;
 import ru.vm5277.common.ImplementInfo;
 import ru.vm5277.common.LabelNames;
-import ru.vm5277.common.NativeBinding;
 import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.Pair;
+import ru.vm5277.common.Platform;
 import ru.vm5277.common.RTOSFeature;
 import ru.vm5277.common.RTOSLibs;
 import ru.vm5277.common.RTOSParam;
@@ -59,16 +58,15 @@ import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 
 public abstract class CodeGenerator extends CGScope {
-	protected			final	String						platform;
+	protected	static	final	String						GPIO_REGEX			= "P[A-Z][0-7]";
+	protected			final	Platform					platform;
 	protected			final	Set<RTOSFeature>			RTOSFeatures		= new HashSet<>();
 	protected			final	Set<String>					includes			= new HashSet<>();
-	protected			final	Map<String, NativeBinding>	nbMap;
 	//protected			final	Map<Integer, CGLabelScope>	labels				= new HashMap<>();
-	protected			final	Map<RTOSParam, Object>		params;
 	protected			final	TargetInfoBuilder			targetInfoBuilder	= new TargetInfoBuilder();
 	protected					CodeOptimizer				codeOptimizer;
 	protected					CodeFixer					codeFixer;
-	protected			final	int							optLevel;
+	protected					CodeExcsChecker				codeExcsChecker;
 	protected	static	final	Map<Integer, DataSymbol>	flashData			= new HashMap<>();
 	protected	static	final	Map<String, Integer>		flashStrings		= new HashMap<>();
 	protected					CGScope						scope				= null;
@@ -76,12 +74,10 @@ public abstract class CodeGenerator extends CGScope {
 	public				static	int							CLASS_HEADER_SIZE;
 	protected			static	boolean						arraysUsage			= false;
 	private				static	int							statPoolSize		= 0;	// Блок для хранения статических полей классов
+	private						CGIContainer				staticInitContainer	= new CGIContainer();
 	
-	public CodeGenerator(String platform, int optLevel, Map<String, NativeBinding> nbMap, Map<RTOSParam, Object> params) {
+	public CodeGenerator(Platform platform) {
 		this.platform = platform;
-		this.nbMap = nbMap;
-		this.params = params;
-		this.optLevel = optLevel;
 	}
 	
 	public CGClassScope enterClass(VarType type, String name, List<ImplementInfo> impl, boolean isRoot) {
@@ -120,8 +116,8 @@ public abstract class CodeGenerator extends CGScope {
 		scope = scope.free();
 	}
 
-	public CGBlockScope enterBlock(boolean isTry) {
-		scope = isTry ? new CGTryBlockScope(this, scope, genId()) : new CGBlockScope(this, scope, genId());
+	public CGBlockScope enterBlock(boolean isTry, String comment) {
+		scope = isTry ? new CGTryBlockScope(this, scope, genId(), comment) : new CGBlockScope(this, scope, genId(), comment);
 		return (CGBlockScope)scope;
 	}
 	public void leaveBlock() {
@@ -150,8 +146,8 @@ public abstract class CodeGenerator extends CGScope {
 		scope = scope.free();
 	}
 
-	public CGBlockScope enterLoopBlock() {
-		scope = new CGLoopBlockScope(this, scope, genId());
+	public CGBlockScope enterLoopBlock(String comment) {
+		scope = new CGLoopBlockScope(this, scope, genId(), comment);
 		return (CGBlockScope)scope;
 	}
 	public void leaveLoopBlock() {
@@ -225,6 +221,9 @@ public abstract class CodeGenerator extends CGScope {
 		
 		DataSymbol ds = new DataSymbol("j8bD" + resId, size, obj);
 		flashData.put(resId, ds);
+		if(obj instanceof String) { //TODO расширить и для других объектов
+			flashStrings.put((String)obj, resId);
+		}
 		return ds;
 	}
 
@@ -236,7 +235,7 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract CGIContainer call(CGScope scope, CGLabelScope lScope) throws CompileException;
 	public abstract CGIContainer accCast(VarType accType, VarType opType) throws CompileException;
 	public abstract void accResize(VarType opType) throws CompileException;
-	public abstract void cellsToAcc(CGScope scope, CGCells cells) throws CompileException;
+	public abstract void cellsToAcc(CGScope scope, CGCells cells, boolean isFixed) throws CompileException;
 	public abstract void cellsToAcc(CGScope scope, CGCellsScope cScope) throws CompileException;
 	public abstract void accToCells(CGScope scope, CGCellsScope cScope) throws CompileException;
 	
@@ -258,9 +257,12 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract void cellsAction(CGScope scope, CGCells cells, Operator op, boolean isFixed, CGExcs excs) throws CompileException;
 	public abstract void constAction(CGScope scope, Operator op, long k, boolean isFixed, CGExcs excs) throws CompileException;
 	public abstract void cellsCond(CGScope scope, CGCells cells, Operator op, boolean isNot, boolean isOr, CGBranch branchScope) throws CompileException;
-	public abstract void constCond(CGScope scope, CGCells cells, Operator op, long k, boolean isNot, boolean isOr, CGBranch branchScope) throws CompileException;
+	public abstract void constCond(	CGScope scope, CGCells cells, Operator op, long k, boolean isLFixed, boolean isRFixed, boolean isNot, boolean isOr,
+									CGBranch branchScope) throws CompileException;
 	public abstract void boolCond(CGScope scope, CGBranch branchScope, boolean byBit0) throws CompileException;
+	//TODO проверить все вызовы, возможно везде должне быть pushAccLE
 	public abstract	CGIContainer pushAccBE(CGScope scope, Integer size) throws CompileException;
+	public abstract	CGIContainer pushAccLE(CGScope scope, Integer size) throws CompileException;
 	public abstract	void popAccBE(CGScope scope, Integer size) throws CompileException;
 	public abstract	CGIContainer pushHeapReg(CGScope scope) throws CompileException;
 	public abstract	CGIContainer popHeapReg(CGScope scope) throws CompileException;
@@ -287,6 +289,7 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract CGIContainer eNewArray(VarType type, int depth, int[] cDims, CGExcs excs) throws CompileException;
 	public abstract CGIContainer eNewArrView(int depth, CGExcs excs) throws CompileException;
 	public abstract void eTry(CGBlockScope blockScope, List<Case> cases, CGBlockScope defaultBlockScope);
+	public abstract void eCatch(CGScope scope) throws CompileException;
 	public abstract CGIContainer eReturn(CGScope scope, int argsSize, int varsSize, VarType retType) throws CompileException;
 	public abstract CGIContainer finMethod(VarType type, int argsSize, int varsSize, int lastStackOffset) throws CompileException;
 
@@ -310,8 +313,8 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract void exCodeToAcc(CGScope scope) throws CompileException;
 	public abstract void exCodeToAccH(CGScope scope, long numValue) throws CompileException;
 
-	public void setParam(RTOSParam sp, int valueId) {
-		params.put(sp, valueId);
+	public Platform getPlatform() {
+		return platform;
 	}
 	
 	public void setFeature(RTOSFeature feature) {
@@ -354,7 +357,7 @@ public abstract class CodeGenerator extends CGScope {
 	}
 	
 	public void build(VarType classType, int fieldsSize) throws CompileException {
-		append(new CGIText("; vm5277." + platform + " v" + getVersion()));
+		append(new CGIText("; vm5277." + platform.getType().name() + " v" + getVersion()));
 		
 		CGExcs excs = new CGExcs();
 		// Во время кодогенерации не знаем какие поля будут использованы в итоге, поэтому размер HEAP можно вычислить только здесь.
@@ -372,14 +375,141 @@ public abstract class CodeGenerator extends CGScope {
 			}
 		}
 */		
-		if(params.keySet().contains(RTOSParam.CORE_FREQ)) {
-			append(new CGIText(".equ CORE_FREQ = " + params.get(RTOSParam.CORE_FREQ)));
+		if(platform.containsParam(RTOSParam.CORE_FREQ)) {
+			append(new CGIText(".equ CORE_FREQ = " + platform.getParam(RTOSParam.CORE_FREQ)));
 		}
-		if(params.keySet().contains(RTOSParam.STDOUT_PORT)) {
-			append(new CGIText(".equ STDOUT_PORT = " + params.get(RTOSParam.STDOUT_PORT)));
+		if(platform.containsParam(RTOSParam.DEVEL_MODE) && 1==(int)platform.getParam(RTOSParam.DEVEL_MODE)) {
+			append(new CGIText(".set OS_FT_DEV_MODE = 1"));
 		}
-		if(params.keySet().contains(RTOSParam.ACTLED_PORT)) {
-			append(new CGIText(".equ ACTLED_PORT = " + params.get(RTOSParam.ACTLED_PORT)));
+		if(platform.containsParam(RTOSParam.STDIO_PORT)) {
+			Object obj = platform.getParam(RTOSParam.STDIO_PORT);
+			if(obj instanceof String && ((String)obj).contains("/")) {
+				String parts[] = ((String)obj).toUpperCase().split("\\/", 0x02);
+				if(0x02==parts.length && parts[0].trim().replaceFirst(GPIO_REGEX, "").isEmpty() && parts[1].trim().replaceFirst(GPIO_REGEX, "").isEmpty()) {
+					char portLetter = parts[0].trim().charAt(0x01);
+					int portNum = parts[0].trim().charAt(0x02)-'0';
+					
+					String constName = "PORT" + portLetter;
+					Long num = platform.getDefReader().getNum(constName);
+					if(null==num) {
+						throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
+					}
+					append(new CGIText(".set STDIN_PORT_REGID = " + num));
+
+					constName = "DDR" + portLetter;
+					num = platform.getDefReader().getNum(constName);
+					if(null==num) {
+						throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
+					}
+					append(new CGIText(".set STDIN_DDR_REGID = " + num));
+
+					constName = "PIN" + portLetter;
+					num = platform.getDefReader().getNum(constName);
+					if(null==num) {
+						throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
+					}
+					append(new CGIText(".set STDIN_PIN_REGID = " + num));
+
+					append(new CGIText(".set STDIN_PORTNUM = " + (portLetter-'A')));
+					append(new CGIText(".set STDIN_PINNUM = " + portNum));
+					
+					portLetter = parts[1].trim().charAt(0x01);
+					portNum = parts[1].trim().charAt(0x02)-'0';
+					
+					constName = "PORT" + portLetter;
+					num = platform.getDefReader().getNum(constName);
+					if(null==num) {
+						throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
+					}
+					append(new CGIText(".set STDOUT_PORT_REGID = " + num));
+
+					constName = "DDR" + portLetter;
+					num = platform.getDefReader().getNum(constName);
+					if(null==num) {
+						throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
+					}
+					append(new CGIText(".set STDOUT_DDR_REGID = " + num));
+
+					constName = "PIN" + portLetter;
+					num = platform.getDefReader().getNum(constName);
+					if(null==num) {
+						throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
+					}
+					append(new CGIText(".set STDOUT_PIN_REGID = " + num));
+
+					append(new CGIText(".set STDOUT_PORTNUM = " + (portLetter-'A')));
+					append(new CGIText(".set STDOUT_PINNUM = " + portNum));
+				}
+				else {
+					throw new CompileException("Invalid value  '" + ((String)obj) + "' for RTOSParam.STDIO_PORT");
+				}
+			}
+			else if(obj instanceof String && ((String)obj).toUpperCase().trim().replaceFirst(GPIO_REGEX, "").isEmpty()) {
+				String part = ((String)obj).toUpperCase().trim();
+				char portLetter = part.charAt(0x01);
+				int portNum = part.charAt(0x02)-'0';
+
+				String constName = "PORT" + portLetter;
+				Long num = platform.getDefReader().getNum(constName);
+				if(null==num) {
+					throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
+				}
+				append(new CGIText(".set STDIO_PORT_REGID = " + num));
+
+				constName = "DDR" + portLetter;
+				num = platform.getDefReader().getNum(constName);
+				if(null==num) {
+					throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
+				}
+				append(new CGIText(".set STDIO_DDR_REGID = " + num));
+
+				constName = "PIN" + portLetter;
+				num = platform.getDefReader().getNum(constName);
+				if(null==num) {
+					throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
+				}
+				append(new CGIText(".set STDIO_PIN_REGID = " + num));
+
+				append(new CGIText(".set STDIO_PORTNUM = " + (portLetter-'A')));
+				append(new CGIText(".set STDIO_PINNUM = " + portNum));
+			}
+			else {
+				int stdioPortId;
+				try {
+					stdioPortId = (obj instanceof Number ? ((Number)obj).intValue() : Integer.parseInt((String)obj));
+				}
+				catch(Exception ex) {
+					throw new CompileException("Invalid value '" + ((String)obj) + "' for RTOSParam.STDIO_PORT");	
+				}
+				char portLetter = (char)('A'+(stdioPortId>>0x04));
+
+				String constName = "PORT" + portLetter;
+				Long num = platform.getDefReader().getNum(constName);
+				if(null==num) {
+					throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
+				}
+				append(new CGIText(".set STDIO_PORT_REGID = " + num));
+
+				constName = "DDR" + portLetter;
+				num = platform.getDefReader().getNum(constName);
+				if(null==num) {
+					throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
+				}
+				append(new CGIText(".set STDIO_DDR_REGID = " + num));
+
+				constName = "PIN" + portLetter;
+				num = platform.getDefReader().getNum(constName);
+				if(null==num) {
+					throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
+				}
+				append(new CGIText(".set STDIO_PIN_REGID = " + num));
+
+				append(new CGIText(".set STDIO_PORTNUM = " + (stdioPortId>>0x04)));
+				append(new CGIText(".set STDIO_PINNUM = " + (stdioPortId&0x07)));
+			}
+		}
+		if(platform.containsParam(RTOSParam.ACTLED_PORT)) {
+			append(new CGIText(".equ ACTLED_PORT = " + platform.getParam(RTOSParam.ACTLED_PORT)));
 		}
 		if(0!=statPoolSize) {
 			append(new CGIText(".set OS_STAT_POOL_SIZE = " + statPoolSize));
@@ -400,7 +530,7 @@ public abstract class CodeGenerator extends CGScope {
 		}
 		append(new CGIText(""));
 
-		append(new CGIText(".include \"devices/" + params.get(RTOSParam.MCU) + ".def\""));
+		append(new CGIText(".include \"devices/" + platform.getParam(RTOSParam.MCU) + ".def\""));
 		append(new CGIText(".include \"core/core.asm\""));
 
 		if(RTOSFeatures.contains(RTOSFeature.OS_FT_DRAM)) {
@@ -470,12 +600,14 @@ public abstract class CodeGenerator extends CGScope {
 				else throw new CompileException("CG: build, unsupported value:" + ds.getValue());
 			}
 			else throw new CompileException("CG: build, unsupported value:" + ds.getValue());
-			append(new CGIText(""));
 		}
+		append(new CGIText(""));
 		
 		append(new CGIText("Main:"));
 
 		// Очистка статического блока выполняется самой RTOS
+
+		append(staticInitContainer);
 		
 		jump(this, new CGLabelScope(null, -1, LabelNames.MAIN, true));
 	}
@@ -483,21 +615,29 @@ public abstract class CodeGenerator extends CGScope {
 	public String getAsm(Path asmInstrPath, MessageContainer mc) throws CompileException {
 		
 		if(null!=codeFixer && null!=asmInstrPath) {
-			List<CGItem> codeList = codeFixer.resolveInstructionsSize(scope, asmInstrPath, mc, (String)params.get(RTOSParam.MCU));
+			List<CGItem> codeList = codeFixer.resolveInstructionsSize(scope, asmInstrPath, mc, (String)platform.getParam(RTOSParam.MCU));
 			codeFixer.branchRangeFixer(codeList);
 
-			if(Optimization.FRONT<optLevel) {
+			if(Optimization.FRONT<platform.getOptLevel()) {
 				boolean modified = true;
 				while(modified) {
 					modified = false;
+					codeOptimizer.removeUnusedLabels(scope);
 					modified|=codeOptimizer.optimizeJumpInstr(codeList);
 					modified|=codeOptimizer.optimizeBranchInstr(codeList);
+					modified|=codeOptimizer.optimizeEmptyJumps(scope);
 				}
 			}
 		}
 
-		if(Optimization.FRONT<optLevel && null!=codeOptimizer) {
-			codeOptimizer.removeUnusedLabels(scope);
+		if(Optimization.FRONT<platform.getOptLevel() && null!=codeOptimizer) {
+			boolean modified = true;
+			while(modified) {
+				modified = false;
+				codeOptimizer.removeUnusedLabels(scope);
+				modified |= codeOptimizer.optimizeEmptyJumps(scope);
+			}
+			codeOptimizer.optimizeAfterJump(scope);
 		}
 
 		StringBuilder sb = new StringBuilder(getSource());
@@ -526,6 +666,10 @@ public abstract class CodeGenerator extends CGScope {
 		return codeOptimizer;
 	}
 	
+	public CodeExcsChecker getExcsChecker() {
+		return codeExcsChecker;
+	}
+	
 	protected CGBlockScope getCurBlockScope(CGScope scope) {
 		CGScope result = scope;
 		while(null!=result && !(result instanceof CGBlockScope)) {
@@ -546,7 +690,9 @@ public abstract class CodeGenerator extends CGScope {
 			if(item.isDisabled()) continue;
 			
 			if(item instanceof CGLabelScope) {
-				list.add(item);
+				if(((CGLabelScope)item).isUsed()) {
+					list.add(item);
+				}
 			}
 			else if(item instanceof CGIContainer) {
 				if(null != ignoreScanTag && ignoreScanTag.equalsIgnoreCase(((CGIContainer)item).getTag())) {
@@ -560,16 +706,12 @@ public abstract class CodeGenerator extends CGScope {
 					}
 				}
 			}
-			else {
+			else if(!(item instanceof CGIText)) {
 				list.add(item);
 			}
 		}
 	}
 
-	public int getOptLevel() {
-		return optLevel;
-	}
-	
 	public static void setArraysUsage() {
 		arraysUsage = true;
 	}
@@ -577,11 +719,12 @@ public abstract class CodeGenerator extends CGScope {
 		return arraysUsage;
 	}
 	
-	public int getAccumSize() {
-		return accum.getSize();
+	public CGAccum getAccum() {
+		return accum;
 	}
-	public void setAccumSize(int size) {
-		accum.setSize(size);
+	
+	public CGIContainer getStaticInitContaier() {
+		return staticInitContainer;
 	}
 	
 	public int getStatPoolSize() {
@@ -591,9 +734,5 @@ public abstract class CodeGenerator extends CGScope {
 		int tmp = statPoolSize;
 		statPoolSize+=size;
 		return tmp;
-	}
-	
-	public Map<RTOSParam, Object> getRTOSParams() {
-		return params;
 	}
 }

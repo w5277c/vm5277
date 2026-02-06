@@ -129,13 +129,13 @@ public class CGMethodScope extends CGCellsScope {
 			//cont.append(cg.eNewInstance(cScope.getHeapOffset(), cScope.getIIDLabel(), cScope.getType(), false, false));
 			cont.append(initContainer);
 			cont.append(lbCIScope);
-			fieldsInitCallCont = cg.call(null, cScope.getFieldInitLabel());
-			cont.append(fieldsInitCallCont);
+//			fieldsInitCallCont = cg.call(null, cScope.getFieldInitLabel());
+//			cont.append(fieldsInitCallCont);
 		}
 		prepend(cont);
 		
 //		append(cg.eReturn(null, null == type ? 0x00 : type.getSize(), stackOffset));
-		if(Optimization.FRONT<cg.getOptLevel()) {
+		if(Optimization.FRONT<cg.getPlatform().getOptLevel()) {
 			CodeOptimizer co = cg.getOptimizer();
 			if(null != co) {
 //				co.removeUnusedLabels(this, lbScope, lbCIScope);
