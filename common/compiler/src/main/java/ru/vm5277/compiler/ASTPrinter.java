@@ -66,6 +66,7 @@ import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
 import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 import ru.vm5277.common.lexer.Keyword;
 import ru.vm5277.common.lexer.tokens.Token;
+import ru.vm5277.compiler.nodes.expressions.EmptyExpression;
 
 public class ASTPrinter {
 	private class Printer {
@@ -562,8 +563,8 @@ public class ASTPrinter {
 	}
 
 	boolean printExpr(ExpressionNode expr) {
-		if(null==expr || expr.isDisabled()) return false;
-		
+		if(null==expr || expr.isDisabled() || expr instanceof EmptyExpression) return false;
+
 		if(expr instanceof BinaryExpression) {
 			BinaryExpression be = (BinaryExpression)expr;
 			printOperand(be.getLeft(), be.getOperator(), true);
@@ -704,16 +705,16 @@ public class ASTPrinter {
 			}
 			else {
 				printExpr(pe.getTargetExpr());
-			}
-			out.put(".");
-			out.put(pe.getProperty().toString().toLowerCase());
-			if(null==pe.getArguments() || pe.getArguments().isEmpty()) {
-				out.put("()");
-			}
-			else {
-				out.put("(");
-				printArguments(pe.getArguments());
-				out.put(")");
+				out.put(".");
+				out.put(pe.getProperty().toString().toLowerCase());
+				if(null==pe.getArguments() || pe.getArguments().isEmpty()) {
+					out.put("()");
+				}
+				else {
+					out.put("(");
+					printArguments(pe.getArguments());
+					out.put(")");
+				}
 			}
 		}
 		else if(expr instanceof QualifiedPathExpression) {

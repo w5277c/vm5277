@@ -103,9 +103,9 @@ public class ContinueNode extends CommandNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
-		cgScope = cg.enterCommand();
+		cgScope = cg.enterCommand(parent, "continue");
 		
 		// Базовая проверка - команда break должна быть внутри цикла
         if(null==cgScope.getScope(CGLoopBlockScope.class)) {
@@ -120,7 +120,6 @@ public class ContinueNode extends CommandNode {
 		}
 		//TODO добавить проверку: между циклом и меткой не должно быть кода
 		
-		cg.leaveCommand();
 		return result;
 	}
 
@@ -128,11 +127,11 @@ public class ContinueNode extends CommandNode {
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		CodegenResult result = null;
 		
-		CGScope cgs = null == parent ? cgScope : parent;
+		//CGScope cgs = null == parent ? cgScope : parent;
 		
 		if(null==label) {
-			CGLoopBlockScope cgLoop = ((CGLoopBlockScope)cgs.getScope(CGLoopBlockScope.class));
-			cg.jump(cgs, cgLoop.getNextLbScope().isUsed() ? cgLoop.getNextLbScope() : cgLoop.getStartLbScope());
+			CGLoopBlockScope cgLoop = ((CGLoopBlockScope)cgScope.getScope(CGLoopBlockScope.class));
+			cg.jump(cgScope, cgLoop.getNextLbScope().isUsed() ? cgLoop.getNextLbScope() : cgLoop.getStartLbScope());
 		}
 		else {
 			//TODO можно упростить?
@@ -164,7 +163,7 @@ public class ContinueNode extends CommandNode {
 			}
 			
 			// Прыжок на метку начала loop-блока
-			cg.jump(cgs, cgLoop.getNextLbScope().isUsed() ? cgLoop.getNextLbScope() : cgLoop.getStartLbScope());
+			cg.jump(cgScope, cgLoop.getNextLbScope().isUsed() ? cgLoop.getNextLbScope() : cgLoop.getStartLbScope());
 		}
 
 		return result;

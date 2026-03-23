@@ -21,12 +21,13 @@
 OS_OUT_CSTR:
 ;--------------------------------------------------------
 ;Логирование строки, конец определяется по 0x00
-;IN: Z-адрес FLASH на строку
+;IN: ACCUM_L/H-адрес FLASH на строку
 ;--------------------------------------------------------
 .IF OS_FT_STDOUT == 0x01
 	PUSH_Z
 	PUSH ACCUM_L
 
+	MOVW ZL,ACCUM_L
 .IFDEF STDIO_PORT_REGID
 .IF OS_FT_STDIN == 0x01
 	MCALL OS_STDIO_SEND_MODE_NR

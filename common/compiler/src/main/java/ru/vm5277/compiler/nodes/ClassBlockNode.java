@@ -32,6 +32,7 @@ import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 import ru.vm5277.common.lexer.Keyword;
+import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 
 public class ClassBlockNode extends AstNode {
 	protected	List<AstNode>	children	= new ArrayList<>();
@@ -166,11 +167,19 @@ public class ClassBlockNode extends AstNode {
 
 	
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		
-		for(AstNode node : children) {
-			result &= node.postAnalyze(scope, cg);
+		for(int i=0; i<children.size(); i++) {
+			AstNode node = children.get(i);
+			result&=node.postAnalyze(scope, cg, parent);
+			if(result) {
+				// Резолвинг QualifiedPathExpression
+				ExpressionNode resolved = resolveQualifiedPathExpr(node);
+				if(null!=resolved) {
+					children.set(i, resolved);
+				}
+			}
 		}
 		
 		//TODO добавить проверку инициализации не инициализованных final полей в каждом конструкторе
@@ -180,9 +189,23 @@ public class ClassBlockNode extends AstNode {
 	
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		for(AstNode node : children) {
+		for(int i=0; i<children.size(); i++) {
+			AstNode node = children.get(i);
 			if(!node.isDisabled()) {
 				node.codeOptimization(scope, cg);
+				// Могут быть самостоятельные выражения, типа y++
+				if(node instanceof ExpressionNode) {
+					try {
+						ExpressionNode optimizedExpr = ((ExpressionNode)node).optimizeWithScope(scope, cg);
+						if(null != optimizedExpr) {
+							node = optimizedExpr;
+							children.set(i, node);
+						}
+					}
+					catch(CompileException ex) {
+						markError(ex);
+					}
+				}
 			}
 		}
 	}
@@ -207,7 +230,7 @@ public class ClassBlockNode extends AstNode {
 		cgDone = true;
 		
 		for(AstNode node : children) {
-			node.codeGen(cg, null, false, excs);
+			node.codeGen(cg, cgScope, false, excs);
 		}
 		
 		return null;

@@ -1,0 +1,19 @@
+class Main {
+    public static void main() {
+        byte b1;
+        b1=254;
+        fixed[][] arr = new fixed[][]{{0.5,-1},{-4,(fixed)b1},{-4,100.99}};
+        System.out(arr[0][0]);
+        //AST>CONST final byte size = 8;
+        short[] arr2 = new short[8];
+        arr2[1]=3;
+        short s;
+        s=257;
+        if (s<arr2[3]) {
+            System.out(arr2[3]);
+        }
+        arr[0][0]=((fixed)(arr2[1]));
+        arr=null;
+        arr2=null;
+    }
+}

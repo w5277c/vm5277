@@ -111,28 +111,22 @@ public class DoWhileNode extends CommandNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
-		cgScope = cg.enterLoopBlock("do-while3");
-
-		// Анализ тела цикла
-		result&=blockNode.postAnalyze(blockScope, cg);
-
-		if(result) {
-			result&=condition.postAnalyze(blockScope, cg);
-		}
+		cgScope = cg.enterLoopBlock(parent, "do-while3");
+		cgScope.append(((CGLoopBlockScope)cgScope).getStartLbScope());
 		
+		// Анализ тела цикла
+		result&=blockNode.postAnalyze(blockScope, cg, cgScope);
+
 		if(result) {
-			try {
-				ExpressionNode optimizedExpr = condition.optimizeWithScope(blockScope, cg);
-				if(null != optimizedExpr) {
-					condition = optimizedExpr;
-					result&=condition.postAnalyze(blockScope, cg);
+			result&=condition.postAnalyze(blockScope, cg, cgScope);
+			if(result) {
+				// Резолвинг QualifiedPathExpression
+				ExpressionNode resolved = resolveQualifiedPathExpr(condition);
+				if(null!=resolved) {
+					condition = resolved;
 				}
-			}
-			catch (CompileException e) {
-				markFirstError(e);
-				result = false;
 			}
 		}
 		
@@ -152,16 +146,23 @@ public class DoWhileNode extends CommandNode {
 				markWarning("Code after infinite while loop is unreachable");
 			}
 		}
-		
-		cg.leaveLoopBlock();
+
 		return result;
 	}
 	
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		CGScope oldScope = cg.setScope(cgScope);
-		
 		condition.codeOptimization(scope, cg);
+		try {
+			ExpressionNode optimizedExpr = condition.optimizeWithScope(scope, cg);
+			if(null!=optimizedExpr) {
+				condition = optimizedExpr;
+			}
+		}
+		catch(CompileException ex) {
+			markError(ex);
+		}
+
 		if(null!=blockNode) {
 			blockNode.codeOptimization(scope, cg);
 		}
@@ -177,8 +178,6 @@ public class DoWhileNode extends CommandNode {
 				}
 			}
 		}
-
-		cg.setScope(oldScope);
 	}
 
 	@Override
@@ -187,26 +186,23 @@ public class DoWhileNode extends CommandNode {
 		cgDone = true;
 		
 		CodegenResult result = null;
-		CGScope cgs = null == parent ? cgScope : parent;
-		cgs.setBranch(branch);
+		//CGScope cgs = null == parent ? cgScope : parent;
+		cgScope.setBranch(branch);
 		
 		if(!alwaysFalse) {
-			cgs.append(((CGLoopBlockScope)cgScope).getStartLbScope());
-			blockNode.codeGen(cg, cgs, false, excs);
+			blockNode.codeGen(cg, cgScope, false, excs);
 		}
-
+//TODO См. в IfNode, необходима проверка на результат condition.codeGen	
 		if(!alwaysFalse && !alwaysTrue) {
-			condition.codeGen(cg, cgs, false, excs);
+			condition.codeGen(cg, cgScope, false, excs);
 		}
 
 		if(!alwaysFalse) {
-			cg.jump(cgs, ((CGLoopBlockScope)cgScope).getStartLbScope());
-		}
-		if(!alwaysFalse) {
-			cgs.append(branch.getEnd());
+			cg.jump(cgScope, ((CGLoopBlockScope)cgScope).getStartLbScope());
+			cgScope.append(branch.getEnd());
 		}
 
-		cgs.append(((CGLoopBlockScope)cgScope).getEndLbScope());
+		cgScope.append(((CGLoopBlockScope)cgScope).getEndLbScope());
 		
 		((CGBlockScope)cgScope).build(cg, false, excs);
 		((CGBlockScope)cgScope).restoreRegsPool();

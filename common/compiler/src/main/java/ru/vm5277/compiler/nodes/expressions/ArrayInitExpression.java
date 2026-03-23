@@ -131,103 +131,96 @@ public class ArrayInitExpression extends ExpressionNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
+		cgScope = cg.enterExpression(parent, toString());
+		
+		List<Object> consts = null;
+		int pos=-1;
+		for(int i=0; i<linearValues.size(); i++) {
+			ExpressionNode valueExpr = linearValues.get(i);
+			if(!(valueExpr instanceof ArrayInitExpression)) {
+				result&=valueExpr.postAnalyze(scope, cg, parent);
+			}
 
-		try {
-			List<Object> consts = null;
-			int pos=-1;
-			for(int i=0; i<linearValues.size(); i++) {
-				ExpressionNode valueExpr = linearValues.get(i);
-				if(!(valueExpr instanceof ArrayInitExpression)) {
-					result&=valueExpr.postAnalyze(scope, cg);
+			if(result) {
+				// Резолвинг QualifiedPathExpression
+				ExpressionNode resolved = resolveQualifiedPathExpr(valueExpr);
+				if(null!=resolved) {
+					updateNestedElement(valueExprs, valueExpr, resolved);
+					valueExpr = resolved;
+					linearValues.set(i, resolved);
 				}
-				
-				if(result) {
-					ExpressionNode optimizedExpr = valueExpr.optimizeWithScope(scope, cg);
-					if(null != optimizedExpr) {
-						optimizedExpr.postAnalyze(scope, cg);
-						// ASTPrinter работает с valueExprs
-						updateNestedElement(valueExprs, valueExpr, optimizedExpr);
-						
-						valueExpr = optimizedExpr;
-						linearValues.set(i, valueExpr);
-					}
 
-					// Проверка совместимости типов (аналогично VarNode.postAnalyze)
-					VarType valueType = valueExpr.getType();
-					if(valueType.isClassType() && basedType.isClassType()) {
-						if(valueType != basedType) {
-							CIScope cis = scope.getThis().resolveCI(valueType.getClassName(), false);
-							if(!cis.isImplements(basedType)) {
-								markError("Type mismatch: cannot assign " + valueType + " to " + basedType);
-								result = false;
-							}
-						}
-					}
-					else if (!isCompatibleWith(scope, basedType, valueType)) {
-						// Дополнительная проверка автоматического привдения целочисленной константы к fixed.
-						if(VarType.FIXED == basedType && valueExpr instanceof LiteralExpression && valueType.isIntegral()) {
-							long num = ((LiteralExpression)valueExpr).getNumValue();
-							if(num<VarType.FIXED_MIN || num>VarType.FIXED_MAX) {
-								markError("Type mismatch: cannot assign " + valueType + " to " + basedType);
-								result = false;
-							}
-						}
-						else {
+				// Проверка совместимости типов (аналогично VarNode.postAnalyze)
+				VarType valueType = valueExpr.getType();
+				if(valueType.isClassType() && basedType.isClassType()) {
+					if(valueType != basedType) {
+						CIScope cis = scope.getThis().resolveCI(valueType.getClassName(), false);
+						if(!cis.isImplements(basedType)) {
 							markError("Type mismatch: cannot assign " + valueType + " to " + basedType);
 							result = false;
 						}
 					}
-
-					// Дополнительная проверка на сужающее преобразование
-					if (basedType.isNumeric() && valueType.isNumeric() && basedType.getSize() < valueType.getSize()) {
-						markError("Narrowing conversion from " + valueType + " to " + basedType + " requires explicit cast"); 
+				}
+				else if (!isCompatibleWith(scope, basedType, valueType)) {
+					// Дополнительная проверка автоматического привдения целочисленной константы к fixed.
+					if(VarType.FIXED == basedType && valueExpr instanceof LiteralExpression && valueType.isIntegral()) {
+						long num = ((LiteralExpression)valueExpr).getNumValue();
+						if(num<VarType.FIXED_MIN || num>VarType.FIXED_MAX) {
+							markError("Type mismatch: cannot assign " + valueType + " to " + basedType);
+							result = false;
+						}
+					}
+					else {
+						markError("Type mismatch: cannot assign " + valueType + " to " + basedType);
 						result = false;
 					}
+				}
 
-					if(result) {
-						if(valueExpr instanceof LiteralExpression) {
-							if(null==consts) {
-								consts = new ArrayList<>();
-								pos = i;
-							}
-						}
-						else {
-							if(null!=consts) {
-								int size = (-1==basedType.getSize() ? cg.getRefSize() : basedType.getSize());
-								//TODO 0x02 константа зависящая от библиотеки кодогенератора(для AVR переносить во FLASH блоки <3 байт не выгодно)
-								if(0x02<consts.size()*size) {
-									constRanges.add(new ConstRange(pos, i-1, cg.defineData(	cg.genId(), consts.size()*size,
-																							new Pair<VarType,List<Object>>(basedType, consts))));
-								}
-								consts = null;
-							}
-						}
-						if(null!=consts) {
-							if(basedType.isFixedPoint()) {
-								consts.add(((LiteralExpression)valueExpr).getFixedValue());
-							}
-							else {
-								consts.add(((LiteralExpression)valueExpr).getNumValue());
-							}
+				// Дополнительная проверка на сужающее преобразование
+				if (basedType.isNumeric() && valueType.isNumeric() && basedType.getSize() < valueType.getSize()) {
+					markError("Narrowing conversion from " + valueType + " to " + basedType + " requires explicit cast"); 
+					result = false;
+				}
+
+				if(result) {
+					if(valueExpr instanceof LiteralExpression) {
+						if(null==consts) {
+							consts = new ArrayList<>();
+							pos = i;
 						}
 					}
-				}
-			}
-			if(null!=consts) {
-				int size = (-1==basedType.getSize() ? cg.getRefSize() : basedType.getSize());
-				//TODO 0x02 константа зависящая от библиотеки кодогенератора(для AVR переносить во FLASH блоки <3 байт не выгодно)
-				//TODO переносоить копированием блоки мнее блока передачи параметров функции копирования(минимум 3 инструкции) тоже не выгодно
-				if(0x02<consts.size()*size) {
-					constRanges.add(new ConstRange(pos, linearValues.size()-1, cg.defineData(	cg.genId(), consts.size()*size,
-																								new Pair<VarType,List<Object>>(basedType, consts))));
+					else {
+						if(null!=consts) {
+							int size = (-1==basedType.getSize() ? cg.getRefSize() : basedType.getSize());
+							//TODO 0x02 константа зависящая от библиотеки кодогенератора(для AVR переносить во FLASH блоки <3 байт не выгодно)
+							if(0x02<consts.size()*size) {
+								constRanges.add(new ConstRange(pos, i-1, cg.defineData(	cg.genId(), consts.size()*size,
+																						new Pair<VarType,List<Object>>(basedType, consts))));
+							}
+							consts = null;
+						}
+					}
+					if(null!=consts) {
+						if(basedType.isFixedPoint()) {
+							consts.add(((LiteralExpression)valueExpr).getFixedValue());
+						}
+						else {
+							consts.add(((LiteralExpression)valueExpr).getNumValue());
+						}
+					}
 				}
 			}
 		}
-		catch(CompileException ex) {
-			markError(ex);
-			result = false;
+		if(null!=consts) {
+			int size = (-1==basedType.getSize() ? cg.getRefSize() : basedType.getSize());
+			//TODO 0x02 константа зависящая от библиотеки кодогенератора(для AVR переносить во FLASH блоки <3 байт не выгодно)
+			//TODO переносоить копированием блоки мнее блока передачи параметров функции копирования(минимум 3 инструкции) тоже не выгодно
+			if(0x02<consts.size()*size) {
+				constRanges.add(new ConstRange(pos, linearValues.size()-1, cg.defineData(	cg.genId(), consts.size()*size,
+																							new Pair<VarType,List<Object>>(basedType, consts))));
+			}
 		}
 		
 		return result;
@@ -289,29 +282,46 @@ public class ArrayInitExpression extends ExpressionNode {
 		}
 	}
 	
-	
 	public List<ExpressionNode> getValueExprs() {
 		return valueExprs;
 	}
 	
+	@Override
+	public void codeOptimization(Scope scope, CodeGenerator cg) {
+		for(int i=0; i<linearValues.size(); i++) {
+			ExpressionNode valueExpr = linearValues.get(i);
+			valueExpr.codeOptimization(scope, cg);
+			try {
+				ExpressionNode optimizedExpr = valueExpr.optimizeWithScope(scope, cg);
+				if(null != optimizedExpr) {
+					valueExpr = optimizedExpr;
+					linearValues.set(i, optimizedExpr);
+				}
+			}
+			catch(CompileException ex) {
+				markError(ex);
+			}
+		}
+	}
+
 	@Override
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		int size = (-1==basedType.getSize() ? cg.getRefSize() : basedType.getSize());
 		int rangeId=0;
 		for(int i=0; i<linearValues.size(); i++) {
 			
+			ExpressionNode expr = linearValues.get(i);
 			if(constRanges.size()>rangeId) {
 				ConstRange range = constRanges.get(rangeId);
 				if(range.getStart()==i) {
 					//todo выполняем копирование блока по 
-					cg.flashDataToArr(parent, range.getSymbol(), i*size);
+					cg.flashDataToArr(expr.getCGScope(), range.getSymbol(), i*size);
 					i=range.getEnd();
 					rangeId++;
 					continue;
 				}
 			}
 			
-			ExpressionNode expr = linearValues.get(i);
 			//TODO проверить на VIEW(обяателне вызов runtime)
 			//CGArrCells arrCells = new CGArrCells(i*size, size);
 			CGArrCells arrCells = new CGArrCells(valueExprs.size());
@@ -320,11 +330,11 @@ public class ArrayInitExpression extends ExpressionNode {
 			if(expr instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)expr;
 				boolean isFixed = le.isFixed() || VarType.FIXED == basedType;
-				parent.append(cg.constToCells(parent, isFixed ? le.getFixedValue() : le.getNumValue(), arrCells, isFixed));
+				expr.getCGScope().append(cg.constToCells(expr.getCGScope(), isFixed ? le.getFixedValue() : le.getNumValue(), arrCells, isFixed));
 			}
 			else {
-				expr.codeGen(cg, parent, true, excs);
-				cg.accToArr(parent, arrCells);
+				expr.codeGen(cg, null, true, excs);
+				cg.accToArr(expr.getCGScope(), arrCells);
 			}
 		}
 

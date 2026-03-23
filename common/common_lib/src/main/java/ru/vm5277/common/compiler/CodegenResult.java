@@ -18,6 +18,7 @@ package ru.vm5277.common.compiler;
 
 public enum CodegenResult {
 	RESULT_IN_ACCUM,//Выражение сохранило результат в аккумулятор
+	RESULT_IN_FLAG,	//Выражение сохранило bool результат во флаге МК (прим. AVR - флаг Z)
 	TRUE,			//Выражение-условие истинно
 	FALSE;			//Выражение-условие ложно
 }

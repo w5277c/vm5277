@@ -66,7 +66,6 @@ public abstract class AstNode extends SemanticAnalyzer {
 	protected					MessageContainer		mc;
 	protected					Symbol					symbol;
 	protected					boolean					cgDone;
-	protected					Boolean					postResult;
 	protected					boolean					disabled;
 	protected					CGScope					cgScope;
 	protected			static	HashMap<AstNode, Scope>	declarationPendingNodes	= new HashMap<>();
@@ -442,6 +441,16 @@ public abstract class AstNode extends SemanticAnalyzer {
 		}
 
 		return false;
+	}
+	
+	protected ExpressionNode resolveQualifiedPathExpr(AstNode node) {
+		if(node instanceof QualifiedPathExpression) {
+			QualifiedPathExpression qpe = (QualifiedPathExpression)node;
+			if(null!=qpe.getResolvedExpr()) {
+				return qpe.getResolvedExpr();
+			}
+		}
+		return null;
 	}
 
 	private boolean hasAllBranchesReturn(AstNode thenBranch, AstNode elseBranch) {

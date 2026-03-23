@@ -35,7 +35,6 @@ import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
 import ru.vm5277.common.VarType;
-import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -140,35 +139,28 @@ public class BinaryExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterExpression(toString());
+		if(null!=cgScope) cgScope.disable();
+		cgScope = cg.enterExpression(parent, toString());
 		
 		// Анализ операндов
-		result&=leftExpr.postAnalyze(scope, cg);
+		result&=leftExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
-			try {
-				ExpressionNode optimizedExpr = leftExpr.optimizeWithScope(scope, cg);
-				if(null != optimizedExpr) {
-					leftExpr = optimizedExpr;
-				}
-			}
-			catch(CompileException ex) {
-				markError(ex);
+			// Резолвинг QualifiedPathExpression
+			ExpressionNode resolved = resolveQualifiedPathExpr(leftExpr);
+			if(null!=resolved) {
+				leftExpr = resolved;
 			}
 		}
 
-		result&=rightExpr.postAnalyze(scope, cg);
+		result&=rightExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
-			try {
-				ExpressionNode optimizedExpr = rightExpr.optimizeWithScope(scope, cg);
-				if(null != optimizedExpr) {
-					rightExpr = optimizedExpr;
-				}
-			}
-			catch(CompileException ex) {
-				markError(ex);
+			// Резолвинг QualifiedPathExpression
+			ExpressionNode resolved = resolveQualifiedPathExpr(rightExpr);
+			if(null!=resolved) {
+				rightExpr = resolved;
 			}
 		}
 
@@ -210,24 +202,26 @@ public class BinaryExpression extends ExpressionNode {
 			}
 		}
 
-		cg.leaveExpression();
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 	
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		CGScope oldScope = cg.setScope(cgScope);
-
 		leftExpr.codeOptimization(scope, cg);
-		rightExpr.codeOptimization(scope, cg);
-		
 		try {
 			ExpressionNode optimizedExpr = leftExpr.optimizeWithScope(scope, cg);
 			if(null != optimizedExpr) {
 				leftExpr = optimizedExpr;
 			}
-			optimizedExpr = rightExpr.optimizeWithScope(scope, cg);
+		}
+		catch(CompileException ex) {
+			markError(ex);
+		}
+
+		rightExpr.codeOptimization(scope, cg);
+		try {
+			ExpressionNode optimizedExpr = rightExpr.optimizeWithScope(scope, cg);
 			if(null != optimizedExpr) {
 				rightExpr = optimizedExpr;
 			}
@@ -235,7 +229,6 @@ public class BinaryExpression extends ExpressionNode {
 		catch(CompileException ex) {
 			markError(ex);
 		}
-		cg.setScope(oldScope);
 	}
 	
 	@Override
@@ -248,7 +241,7 @@ public class BinaryExpression extends ExpressionNode {
 		
 		CodegenResult result = CodegenResult.RESULT_IN_ACCUM;
 
-		CGScope cgs = null == parent ? cgScope : parent;
+//		CGScope cgs = null == parent ? cgScope : parent;
 		
 		int leftSize = leftType.getSize();
 		int rightSize = rightType.getSize();
@@ -264,7 +257,7 @@ public class BinaryExpression extends ExpressionNode {
 		
 		// Оптимизация порядка для коммутативных операций
 		if(operator.isCommutative()) {
-			if(leftExpr instanceof VarFieldExpression || leftExpr instanceof LiteralExpression) {
+			if(leftExpr instanceof LiteralExpression || (!(rightExpr instanceof LiteralExpression) && leftExpr instanceof VarFieldExpression)) {
 				expr1 = rightExpr;
 				expr2 = leftExpr;
 			}
@@ -272,7 +265,7 @@ public class BinaryExpression extends ExpressionNode {
 		
 		CGBranch branch = null;
 		if(operator.isLogical()) {
-			CGScope _scope = cgs;
+			CGScope _scope = cgScope;
 			while(null!=_scope) {
 				branch = _scope.getBranch();
 				if(null!=branch) break;
@@ -284,18 +277,18 @@ public class BinaryExpression extends ExpressionNode {
 			if(null==branch) {
 				// Вычисление результата в аккумуляторе (без условных переходов)
 				// Генерируем код для левого операнда
-				if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgs, true, excs)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgScope, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr1);
 				}
 				// Сохраняем результат левого операнда
-				cg.pushAccBE(cgs, 1); // boolean занимает 1 байт
+				cg.pushAccBE(cgScope, 1); // boolean занимает 1 байт
 
 				// Генерируем код для правого операнда
-				if(CodegenResult.RESULT_IN_ACCUM != expr2.codeGen(cg, cgs, true, excs)) {
+				if(CodegenResult.RESULT_IN_ACCUM != expr2.codeGen(cg, cgScope, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr2);
 				}
 				// Выполняем логическую операцию со значением в стеке
-				cg.cellsAction(cgs, new CGCells(CGCells.Type.STACK, 1), operator, false, excs);
+				cg.cellsAction(cgScope, new CGCells(CGCells.Type.STACK, 1), operator, false, excs);
 			}
 			else {
 				//TODO Генерирует не оптимальное количество переходов, оптимизатор решит эту задачу, но лучше оптимизировать сразу
@@ -323,13 +316,13 @@ public class BinaryExpression extends ExpressionNode {
 				}
 
 				if(expr1 instanceof BinaryExpression) {
-					if(CodegenResult.RESULT_IN_ACCUM != ((BinaryExpression)expr1).codeGen(cg, cgs, isInvert, Operator.OR == operator, false, excs)) {
+					if(CodegenResult.RESULT_IN_ACCUM != ((BinaryExpression)expr1).codeGen(cg, cgScope, isInvert, Operator.OR == operator, false, excs)) {
 						result = null;
 					}
 				}
 				else if(expr1 instanceof VarFieldExpression) {
-					((VarFieldExpression)expr1).codeGen(cg, cgs, isInvert, Operator.OR == operator, branch, excs);
-					((VarFieldExpression)expr1).postCodeGen(cg, cgs);
+					((VarFieldExpression)expr1).codeGen(cg, cgScope, isInvert, Operator.OR == operator, branch, excs);
+					((VarFieldExpression)expr1).postCodeGen(cg, cgScope);
 					result = null;
 				}
 				else if(expr1 instanceof UnaryExpression) {
@@ -344,17 +337,17 @@ public class BinaryExpression extends ExpressionNode {
 //					cgs.append(lbScope);
 				}
 				else {
-					expr1.codeGen(cg, cgs, false, excs);
+					expr1.codeGen(cg, cgScope, false, excs);
 				}
 
 				if(expr2 instanceof BinaryExpression) {
-					if(CodegenResult.RESULT_IN_ACCUM != ((BinaryExpression)expr2).codeGen(cg, cgs, isInvert, Operator.OR == operator, false, excs)) {
+					if(CodegenResult.RESULT_IN_ACCUM != ((BinaryExpression)expr2).codeGen(cg, cgScope, isInvert, Operator.OR == operator, false, excs)) {
 						result = null;
 					}
 				}
 				else if(expr2 instanceof VarFieldExpression) {
-					((VarFieldExpression)expr2).codeGen(cg, cgs, isInvert, Operator.OR == operator, (CGBranch)branch, excs);
-					((VarFieldExpression)expr2).postCodeGen(cg, cgs);
+					((VarFieldExpression)expr2).codeGen(cg, cgScope, isInvert, Operator.OR == operator, (CGBranch)branch, excs);
+					((VarFieldExpression)expr2).postCodeGen(cg, cgScope);
 					result = null;
 				}
 				else if(expr2 instanceof UnaryExpression) {
@@ -377,14 +370,14 @@ public class BinaryExpression extends ExpressionNode {
 					CGLabelScope lbScope = ((CGBranch)branch).popEnd();
 					//cg.jump(expr2.getCGScope(), ((CGBranchScope)brScope).getEnd());
 					//expr2.getCGScope().append(lbScope);
-					cg.jump(cgs, ((CGBranch)branch).getEnd());
-					cgs.append(lbScope);
+					cg.jump(cgScope, ((CGBranch)branch).getEnd());
+					cgScope.append(lbScope);
 				}
 			}
 		}
 		else {
 			//CastExpression, BinaryExpression и другие
-			if(CodegenResult.RESULT_IN_ACCUM != expr2.codeGen(cg, cgs, true, excs)) {
+			if(CodegenResult.RESULT_IN_ACCUM != expr2.codeGen(cg, cgScope, true, excs)) {
 				throw new CompileException("Accum not used for operand:" + expr2);
 			}					
 
@@ -392,19 +385,19 @@ public class BinaryExpression extends ExpressionNode {
 			int size = (leftType.getSize() > rightType.getSize() ? leftType.getSize() : rightType.getSize());
 			// Выполняем операцию, левый операнд - аккумулятор, правый операнд - значение на вершине стека
 			// Код отстроен и результат может быть только в аккумуляторе, сохраняем его
-			cg.pushAccBE(cgs, size);
+			cg.pushAccBE(cgScope, size);
 			// Строим код для expr1(результат в аккумуляторе)
-			if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg, cgs, true, excs)) {
+			if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg, cgScope, true, excs)) {
 				throw new CompileException("Accum not used for operand:" + expr1);
 			}
 
 			// Аккумулятор уже необходимого размера, но нужно проверить на Fixed
 			if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
-				cgs.append(cg.accCast(expr1.getType(), expr2.getType()));
+				cgScope.append(cg.accCast(expr1.getType(), expr2.getType()));
 			}
-			cg.cellsAction(cgs, new CGCells(CGCells.Type.STACK, size), operator, VarType.FIXED == expr2.getType(), excs);
+			cg.cellsAction(cgScope, new CGCells(CGCells.Type.STACK, size), operator, VarType.FIXED == expr2.getType(), excs);
 			if(operator.isAssignment()) {
-				cg.accToCells(cgs, (CGCellsScope)expr1.getSymbol().getCGScope());
+				cg.accToCells(cgScope, (CGCellsScope)expr1.getSymbol().getCGScope());
 			}
 		}
 

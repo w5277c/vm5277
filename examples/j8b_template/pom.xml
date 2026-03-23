@@ -29,7 +29,28 @@
 		<j8b.sourceDirectory>src</j8b.sourceDirectory>
 	</properties>
 
+	<profiles>
+		<profile>
+			<id>arduino-uno</id>
+			<properties>
+				<j8b.target>avr:atmega328p</j8b.target>
+				<j8b.targetFreq>16</j8b.targetFreq>
+				<j8b.targetStdio>PD0/PD1</j8b.targetStdio>
+				<j8b.output.subdir>arduino-uno</j8b.output.subdir>
+			</properties>
+		</profile>
+	</profiles>
+
 	<build>
+		<resources>
+			<resource>
+				<directory>prebuild</directory>
+				<includes>
+					<include>**/*</include>
+				</includes>
+				<filtering>false</filtering>
+			</resource>
+		</resources>
 		<extensions>
 			<extension>
 				<groupId>ru.vm5277</groupId>

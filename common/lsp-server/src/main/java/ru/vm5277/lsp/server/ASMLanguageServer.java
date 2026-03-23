@@ -16,15 +16,43 @@
 
 package ru.vm5277.lsp.server;
 
+import java.util.HashSet;
+import java.util.Set;
+import ru.vm5277.common.lexer.ExternalTokenProvider;
 import ru.vm5277.common.lexer.SourceBuffer;
 import ru.vm5277.common.lexer.Lexer;
 import ru.vm5277.common.lexer.LexerType;
+import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.lexer.tokens.Token;
 
 public class ASMLanguageServer implements LanguageServer {
-	private	final	Lexer	lexer	= new Lexer(LexerType.ASM);
+	private	final	static	String		instrStr	=
+		"ADD,ADC,ADIW,SUB,SUBI,SBC,SBCI,SBIW,AND,ANDI,OR,ORI,EOR,COM,NEG,SBR,CBR,INC,DEC,TST,CLR,SER,MUL,MULS,MULSU,FMUL,FMULSU," +
+		"RJMP,IJMP,JMP,RCALL,ICALL,CALL,RET,RETI,CPSE,CP,CPC,CPI,SBRC,SBRS,SBIC,SBIS,BRBS,BRBC,BREQ,BRNE,BRCS,BRCC,BRSH,BRLO,BRMI,BRPL,BRGE,BRLT,BRHS,BRHC,BRTS,BRTC,BRVS,BRVC,BRIE,BRID," +
+		"SBI,CBI,LSL,LSR,ROL,ROR,ASR,SWAP,BSET,BCLR,BST,BLD,SEC,CLC,SEN,CLN,SEZ,CLZ,SEI,CLI,SES,CLS,SEV,CLV,SET,CLT,SEH,CLH," +
+		"MOV,MOVW,LDI,LD,LDD,LDS,ST,STD,STS,LPM,SPM,IN,OUT,PUSH,POP," +
+		"NOP,SLEEP,WDR,BREAK";
+	private	final	static	Set<String>	instrSet	= new HashSet<>();
+	private					Lexer		lexer		= new Lexer(LexerType.ASM, tokenProvider);
+
+	static {
+		String parts[] = instrStr.split("\\,");
+		for(String part : parts) {
+			instrSet.add(part.toLowerCase().trim());
+		}
+	}
 	
+	private	final	static	ExternalTokenProvider	tokenProvider	= new ExternalTokenProvider() {
+		@Override
+		public Token getExternalToken(SourceBuffer sb, SourcePosition sp, String str) {
+			if(instrSet.contains(str.toLowerCase())) {
+				return new Token(sb, sp, TokenType.MNEMONIC, str.toLowerCase());
+			}
+			return null;
+		}
+	};
+
 	@Override
 	public LSPToken readNextToken(SourceBuffer sb) {
 		Token token = lexer.parseToken(sb);

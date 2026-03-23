@@ -156,13 +156,13 @@ public class InterfaceBodyNode extends AstNode {
 
 	
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		ClassScope classScope = (ClassScope)scope;
 
 		for (AstNode node : children) {
 			if (node instanceof InterfaceNode || node instanceof ClassNode) {
 				// Обработка вложенных интерфейсов и классов
-				node.postAnalyze(scope, cg);
+				node.postAnalyze(scope, cg, parent);
 			} 
 			else if (node instanceof FieldNode) {
 				FieldNode fieldNode = (FieldNode)node;
@@ -171,7 +171,7 @@ public class InterfaceBodyNode extends AstNode {
 				if (null == fieldNode.getInitializer()) {
 					markError("Interface field '" + fieldNode.getName() + "' must be initialized");
 				} else {
-					fieldNode.getInitializer().postAnalyze(scope, cg);
+					fieldNode.getInitializer().postAnalyze(scope, cg, parent);
 				}
 
 				// Проверка что поле static final
@@ -197,7 +197,7 @@ public class InterfaceBodyNode extends AstNode {
 					if (null == methodNode.getBody()) {
 						markError("Static method '" + methodNode.getName() + "' must have a body");
 					} else {
-						methodNode.getBody().postAnalyze(scope, cg);
+						methodNode.getBody().postAnalyze(scope, cg, parent);
 					}
 				} else {
 					// Для нестатических методов не должно быть тела (абстрактные)

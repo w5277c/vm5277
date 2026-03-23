@@ -105,8 +105,7 @@ public class SwitchNode extends CommandNode {
 				}
 				
 				try {
-					defaultBlock = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "switch.default") :
-																	new BlockNode(tb, mc, parseStatement(), "switch.default");
+					defaultBlock = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "default") : new BlockNode(tb, mc, parseStatement(), "default");
 				}
 				catch(CompileException e) {
 					markFirstError(e);
@@ -197,28 +196,20 @@ public class SwitchNode extends CommandNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		boolean allCasesReturn = true;		
-		cgScope = cg.enterCommand();
+		cgScope = cg.enterCommand(parent, "switch");
 
 		// Проверка типа выражения switch
-		result&=expression.postAnalyze(scope, cg);
+		result&=expression.postAnalyze(scope, cg, cgScope);
 		if(result) {
-			try {
-				ExpressionNode optimizedExpr = expression.optimizeWithScope(scope, cg);
-				if(null!=optimizedExpr) {
-					expression = optimizedExpr;
-					result&=expression.postAnalyze(scope, cg);
-				}
+			// Резолвинг QualifiedPathExpression
+			ExpressionNode resolved = resolveQualifiedPathExpr(expression);
+			if(null!=resolved) {
+				expression = resolved;
 			}
-			catch (CompileException e) {
-				markFirstError(e);
-				result = false;
-			}
-		}		
 
-		if(result) {
 			VarType exprType = expression.getType();
 			if(!exprType.isIntegral()) {
 				markError("Switch expression must be integral type, got: " + exprType);
@@ -243,8 +234,10 @@ public class SwitchNode extends CommandNode {
 					}
 				}
 
+				astCase.postAnalyze(scope, cg, cgScope);
+				
 				// Анализ блока case
-				result&=astCase.getBlock().postAnalyze(astCase.getScope(), cg);
+				result&=astCase.getBlock().postAnalyze(astCase.getScope(), cg, cgScope);
 				if(!isControlFlowInterrupted(astCase.getBlock())) {
 					allCasesReturn = false;
 				}
@@ -253,21 +246,18 @@ public class SwitchNode extends CommandNode {
 
 		// Анализ default-блока (если есть)
 		if(result && null!=defaultBlock) {
-			result&=defaultBlock.postAnalyze(defaultScope, cg);
+			result&=defaultBlock.postAnalyze(defaultScope, cg, cgScope);
 		}
 
 		if(allCasesReturn && !cases.isEmpty()) {
 			markWarning("Code after switch statement may be unreachable");
 		}
 		
-		cg.leaveCommand();
 		return result;
 	}
 
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		CGScope oldScope = cg.setScope(cgScope);
-		
 		expression.codeOptimization(scope, cg);
 		try {
 			ExpressionNode optimizedExpr = expression.optimizeWithScope(scope, cg);
@@ -290,8 +280,6 @@ public class SwitchNode extends CommandNode {
 		if(expression instanceof LiteralExpression) {
 			constantValue = (int)((LiteralExpression)expression).getNumValue();
 		}
-
-		cg.setScope(oldScope);
 	}
 
 	@Override
@@ -299,33 +287,35 @@ public class SwitchNode extends CommandNode {
 		if(cgDone) return null;
 		cgDone = true;
 
-		CGScope cgs = null == parent ? cgScope : parent;
-		CGLabelScope endLabel = new CGLabelScope(null, CGScope.genId(), LabelNames.CASE_END, true);
-		
 		if(null==constantValue) {
+			CGLabelScope shitchEndLabel = new CGLabelScope(null, CGScope.genId(), LabelNames.SWITCH_END, true);
+			
 			// Генерируем выражение switch
 			cg.getAccum().set(-1==expression.getType().getSize() ? cg.getRefSize() : expression.getType().getSize(), false);
-			if(CodegenResult.RESULT_IN_ACCUM!=expression.codeGen(cg, cgs, true, excs)) {
+			if(CodegenResult.RESULT_IN_ACCUM!=expression.codeGen(cg, null, true, excs)) {
 				throw new CompileException("Accum not used for expr:" + expression);
 			}
 
 			// Создаем метки для всех case-блоков
 			List<CGBranch> branches = new ArrayList<>();
-			for(AstCase astCase : cases) {
+			for(int i=0; i<cases.size(); i++) {
 				branches.add(new CGBranch());
 			}
 
 			// Создаем метку для default-блока (если есть)
-			CGLabelScope defaultLabel = null;
+			CGBranch defaultBranch = null;
 			if(null!=defaultBlock) {
-				defaultLabel = new CGLabelScope(null, CGScope.genId(), LabelNames.CASE_DEFAULT + "_", true);
+				defaultBranch = new CGBranch(new CGLabelScope(null, CGScope.genId(), LabelNames.CASE_DEFAULT + "_", true));
 			}
 
 			// Генерируем проверки для каждого case
 			for(int i=0; i<cases.size(); i++) {
 				AstCase astCase = cases.get(i);
-				CGBranch branch = branches.get(i);
 				List<Integer> values = astCase.getValues();
+				
+				astCase.getCGScope().append(branches.get(i).getEnd());
+				CGBranch nextCondBranch = (i<branches.size()-1 ? branches.get(i+1) : defaultBranch);
+				CGBranch endCondBranch = new CGBranch();
 				
 				int j = 0;
 				while(j<values.size()) {
@@ -340,49 +330,51 @@ public class SwitchNode extends CommandNode {
 
 					if(from==to) {
 						// Одиночное значение
-						cg.constCond(cgs, new CGCells(CGCells.Type.ACC), Operator.EQ, from, false, false, false, true, branch); 
-					} else {
+						//EQ OR, переход на branch если true
+						cg.constCond(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), Operator.EQ, from, false, false, false, true, endCondBranch); 
+					}
+					else {
 						CGBranch endBranch = new CGBranch();
 						// Диапазон значений
-						cg.constCond(cgs, new CGCells(CGCells.Type.ACC), Operator.LT, from, false, false,false, true, endBranch);
-						if(255 > to) {
-							cg.constCond(cgs, new CGCells(CGCells.Type.ACC), Operator.LT, to + 1, false, false, false, true, branch);
-						} else {
-							cg.constCond(cgs, new CGCells(CGCells.Type.ACC), Operator.LTE, to, false, false, false, true, branch);
+						cg.constCond(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), Operator.LT, from, false, false,false, true, endBranch);
+						if(255>to) {
+							cg.constCond(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), Operator.LT, to + 1, false, false, false, true, endCondBranch);
 						}
-						cgs.append(endBranch.getEnd());						
+						else {
+							cg.constCond(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), Operator.LTE, to, false, false, false, true, endCondBranch);
+						}
+						astCase.getCGScope().append(endBranch.getEnd());
 					}
-
 					j++;
 				}
+				// Переходим после проверки условия на следующий блок проверок
+				cg.jump(astCase.getCGScope(), nextCondBranch.getEnd());
+				// Добавляем метку на начало тела case
+				astCase.getCGScope().append(endCondBranch.getEnd());
 			}
 
-			cg.jump(cgs, null!=defaultLabel ? defaultLabel : endLabel);
-
-			// Генерируем код для case-блоков
+			// Генерируем код для case-блоков, отдельным блоком так как в блоках проверки настроен размер аккумулятора
 			for(int i=0; i<cases.size(); i++) {
 				AstCase astCase = cases.get(i);
-				CGBranch branch = branches.get(i);
-
-				cgs.append(branch.getEnd());
-				astCase.getBlock().codeGen(cg, cgs, false, excs);
-
-				cg.jump(cgs, endLabel);
+				astCase.getBlock().codeGen(cg, cgScope, false, excs);
+				cg.jump(astCase.getBlock().getCGScope(), shitchEndLabel);
 			}
 
-			if(null!=defaultLabel) {
-				cgs.append(defaultLabel);
-				defaultBlock.codeGen(cg, cgs, false, excs);
-
+			if(null!=defaultBlock) {
+				defaultBlock.getCGScope().prepend(defaultBranch.getEnd());
+				defaultBlock.codeGen(cg, null, false, excs);
 			}
+			else {
+				cgScope.append(defaultBranch.getEnd());
+			}
+			cgScope.append(shitchEndLabel);
 		}
 		else {
 			BlockNode bNode = getConstantFoldedBlock();
 			if(null!=bNode) {
-				bNode.codeGen(cg, cgs, false, excs);
+				bNode.codeGen(cg, null, false, excs);
 			}
 		}
-		cgs.append(endLabel);
 
 		return null;
 	}

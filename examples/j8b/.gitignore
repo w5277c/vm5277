@@ -1,5 +1,4 @@
-/*/target/*/*.lst
-/*/target/*/*.map
-/*/target/*/*.dbg
-/*/target/*/*.j8bir
-/*/target/*/*.hex
+/*/prebuild/*.lst
+/*/prebuild/*.map
+/*/prebuild/*.j8bir
+/*/target/

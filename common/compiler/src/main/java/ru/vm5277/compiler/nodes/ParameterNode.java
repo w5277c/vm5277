@@ -107,10 +107,12 @@ public class ParameterNode extends AstNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
 
+		//TODO похоже здесь может быть QualifiedPathExpression
+		
 		// Дополнительные проверки для массивов
 		if(type.isArray()) {
 			// Проверяем тип элементов массива

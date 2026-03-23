@@ -114,41 +114,39 @@ public class Generator extends CodeGenerator {
 	}
 	
 	@Override
-	public CGIContainer stackPrepare(boolean firstBlock, int argsSize, int varsSize, CGExcs excs) throws CompileException {
-		CGIContainer cont = new CGIContainer();
-		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";stack prepare, size:" + varsSize));
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("set"));
+	public void stackPrepare(CGIContainer scope, boolean firstBlock, int argsSize, int varsSize, CGExcs excs) throws CompileException {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";stack prepare, size:" + varsSize));
+		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
 
 		if(firstBlock && (0!=argsSize || 0!=varsSize)) {
-			cont.append(new CGIAsm("push", "r28")); //TODO проверить адрес ячейки
-			if(def_sph) cont.append(new CGIAsm("push", "r29")); // Если SPH отсутствует, то yh всегда должен быть равен 0
-			cont.append(new CGIAsmLd("lds", "r28", "SPL")); //TODO проверить адрес ячейки
-			if(def_sph) cont.append(new CGIAsmLd("lds", "r29", "SPH"));
+			scope.append(new CGIAsm("push", "r28")); //TODO проверить адрес ячейки
+			if(def_sph) scope.append(new CGIAsm("push", "r29")); // Если SPH отсутствует, то yh всегда должен быть равен 0
+			scope.append(new CGIAsmLd("lds", "r28", "SPL")); //TODO проверить адрес ячейки
+			if(def_sph) scope.append(new CGIAsmLd("lds", "r29", "SPH"));
 		}
 
 		if(0!=varsSize) {
 			// Не просто выделяем память, также инициализируем ее нулями
 			if(varsSize<5) {
 				for(int i=0; i<varsSize; i++) {
-					cont.append(new CGIAsm("push", "c0x00"));
+					scope.append(new CGIAsm("push", "c0x00"));
 				}
 			}
 			else {
 				// Осуществляем проверку переполнения стека, но не выполняем ее если размер <5
 				setFeature(RTOSFeature.OS_FT_ETRACE);
 				codeExcsChecker.stackOverflow(this, scope, excs, varsSize, def_sph ? new byte[]{29, 28} : new byte[]{29});
-				cont.append(new CGIAsmLd("ldi", "r16", "low(" + varsSize + ")"));
-				cont.append(new CGIAsmLd("ldi",  "r17", "high(" + varsSize + ")"));
-				cont.append(new CGIAsm("push", "c0x00"));
-				cont.append(new CGIAsm("dec", "r16"));
-				cont.append(new CGIAsm("brne", "pc-0x02"));
-				cont.append(new CGIAsm("dec", "r17"));
-				cont.append(new CGIAsm("brne", "pc-0x04"));
+				scope.append(new CGIAsmLd("ldi", "r16", "low(" + varsSize + ")"));
+				scope.append(new CGIAsmLd("ldi",  "r17", "high(" + varsSize + ")"));
+				scope.append(new CGIAsm("push", "c0x00"));
+				scope.append(new CGIAsm("dec", "r16"));
+				scope.append(new CGIAsm("brne", "pc-0x02"));
+				scope.append(new CGIAsm("dec", "r17"));
+				scope.append(new CGIAsm("brne", "pc-0x04"));
 			}
 		}
 		
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("clt"));
-		return cont;
+		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
 	}
 
 	@Override
@@ -208,6 +206,11 @@ public class Generator extends CodeGenerator {
 					cont.append(new CGIAsm("subi", "r29,high(" + offset + ")"));
 				}
 			}
+			
+			if(null==type) {
+				cont.append(new CGIAsmIReg('z', true, null, 0)); // Восстановление изначального Z (this)
+				cont.append(new CGIAsmMv("movw", "r16", "r30")); // Помещаем this в accum			
+			}
 			// Передаю размер аргументов
 			if(128>argsSize) {
 				cont.append(new CGIAsmLd("ldi", "r30", Integer.toString(argsSize)));
@@ -225,6 +228,11 @@ public class Generator extends CodeGenerator {
 			cont.append(new CGIAsmJump(JUMP_INSTR, "j8bproc_mfin_sf", true));
 		}
 		else {
+			if(null==type) {
+				cont.append(new CGIAsmIReg('z', true, null, 0)); // Восстановление изначального Z (this)
+				cont.append(new CGIAsmMv("movw", "r16", "r30")); // Помещаем this в accum
+			}
+
 			RTOSLibs.METHOD_FIN.setRequired();
 			cont.append(new CGIAsmJump(JUMP_INSTR, "j8bproc_mfin", true));
 		}
@@ -679,7 +687,7 @@ public class Generator extends CodeGenerator {
 	
 	@Override
 	public void arrSizetoAcc(CGScope cgScope, boolean isView) throws CompileException {
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
+		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) cgScope.append(new CGIAsm("set"));
 		
 		RTOSLibs.ARR_SIZE.setRequired();
 		if(isView) {
@@ -687,7 +695,7 @@ public class Generator extends CodeGenerator {
 			cgScope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_arrview_arraddr", true));
 		}
 		cgScope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_arr_size", true));
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
+		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) cgScope.append(new CGIAsm("clt"));
 	}
 	
 	@Override
@@ -1195,7 +1203,7 @@ public class Generator extends CodeGenerator {
 					String lastReg;
 					@Override
 					public CGItem action(int sn, String reg) throws CompileException {
-						if(null!=reg) lastReg = reg;
+						if(null==lastReg) lastReg = reg;
 						if(accum.isFixed() && !isFixed) return 0x00==sn ? null : new CGIAsm("add", getRightOp(sn, null) + "," + lastReg);
 						if(null!=reg) {
 							return new CGIAsm((0 == sn ? "add" : "adc"), getRightOp(sn, null) + "," + reg);
@@ -1210,7 +1218,7 @@ public class Generator extends CodeGenerator {
 					String lastReg;
 					@Override
 					public CGItem action(int sn, String reg) throws CompileException {
-						if(null!=reg) lastReg = reg;
+						if(null==lastReg) lastReg = reg;
 						if(accum.isFixed() && !isFixed) return 0x00==sn ? null : new CGIAsm("sub", getRightOp(sn, null) + "," + lastReg);
 						if(null!=reg) {
 							return new CGIAsm((0 == sn ? "sub" : "sbc"), getRightOp(sn, null) + "," + reg);
@@ -1917,7 +1925,6 @@ public class Generator extends CodeGenerator {
 		}
 	}
 
-	//TODO актуализировать
 	@Override
 	public void constCond(	CGScope scope, CGCells cells, Operator op, long k, boolean isLFixed, boolean isRFixed, boolean isNot, boolean isOr,
 							CGBranch branchScope)																					throws CompileException {
@@ -1955,36 +1962,36 @@ public class Generator extends CodeGenerator {
 		CGLabelScope lbScope = (0x01 == size ? null : new CGLabelScope(null, null, LabelNames.MULTIBYTE_CP_END, false));
 		
 		for(int i=size-1; i>=0; i--) {
-			int octet = 0;
-			if(isLFixed && !isRFixed) {
-				if(i==1) octet = (int)(k&0xff);
+			if(!isLFixed && isRFixed && 0x0000!=(k&0x8000)) { // Проверка между positive vs (negative
+				cont.append(new CGIAsm("clc")); // Прравая часть всегда меньше и не равна
+				cont.append(new CGIAsm("clz"));
 			}
-			else octet = (int)((k>>(i*8))&0xff);
-			
-			switch(cells.getType()) {
-//	Размер аккумулятора может быть меньше чем cells
-				case ACC:
-					cont.append(new CGIAsm("cpi", "r" + accRegs[i] + "," + octet));
-					break;
-				case REG:
-					cont.append(new CGIAsm("cpi", "r" + cells.getId(i) + "," + octet));
-					break;
-				case ARGS:
-				case STACK_FRAME:
-					cont.append(new CGIAsmIReg('y', true, "r16", cells.getId(i), getCurBlockScope(scope), (CGBlockScope)cells.getObject(),
-												CGCells.Type.ARGS == cells.getType()));
-					cont.append(new CGIAsm("cpi", "r16," + octet));
-					break;
-				case HEAP:
-					cont.append(new CGIAsmIReg('z', true, "r16", cells.getId(i)));
-					cont.append(new CGIAsm("cpi", "r16," + octet));
-					break;
-				case ARRAY:
-					cont.append(new CGIAsmLd("ld", "r16", "-x"));
-					cont.append(new CGIAsm("cpi", "r16," + octet));
-					break;
-				default:
-					throw new CompileException("Unsupported cell type:" + cells.getType());
+			else {
+				switch(cells.getType()) {
+	//	Размер аккумулятора может быть меньше чем cells
+					case ACC:
+						constCondSignCheck(cont, i, "r" + accRegs[i], k, isLFixed, isRFixed);
+						break;
+					case REG:
+						constCondSignCheck(cont, i, "r" + cells.getId(i), k, isLFixed, isRFixed);
+						break;
+					case ARGS:
+					case STACK_FRAME:
+						cont.append(new CGIAsmIReg('y', true, "r16", cells.getId(i), getCurBlockScope(scope), (CGBlockScope)cells.getObject(),
+													CGCells.Type.ARGS == cells.getType()));
+						constCondSignCheck(cont, i, "r16", k, isLFixed, isRFixed);
+						break;
+					case HEAP:
+						cont.append(new CGIAsmIReg('z', true, "r16", cells.getId(i)));
+						constCondSignCheck(cont, i, "r16", k, isLFixed, isRFixed);
+						break;
+					case ARRAY:
+						cont.append(new CGIAsmLd("ld", "r16", "-x"));
+						constCondSignCheck(cont, i, "r16", k, isLFixed, isRFixed);
+						break;
+					default:
+						throw new CompileException("Unsupported cell type:" + cells.getType());
+				}
 			}
 			cond(cont, i, op, isOr, lbScope, branchScope);
 		}
@@ -1992,6 +1999,29 @@ public class Generator extends CodeGenerator {
 		scope.append(cont);
 	}
 
+	private void constCondSignCheck(CGIContainer cont, int i, String reg, long k, boolean isLFixed, boolean isRFixed) throws CompileException {
+		int octet = 0;
+		if(isLFixed && !isRFixed) {
+			if(i==1) octet = (int)(k&0xff);
+		}
+		else octet = (int)((k>>(i*8))&0xff);
+
+		if(isLFixed) { // Проверка c fixed в левой части
+			cont.append(new CGIAsm("sub", "c0xff,c0x00")); // positive vs negative - устанавливает C->0, Z->0
+			cont.append(new CGIAsm("sbrc", reg + ",0x07")); // Проверка знака в левой части
+			if(isRFixed && 0x0000!=(k&0x8000)) {
+				cont.append(new CGIAsm("cpi", reg + "," + octet)); //negaive vs fixed(negative)
+			}
+			else {
+				cont.append(new CGIAsm("sec")); //negative vs unsigned или fixed(positive)
+			}
+		}
+		else { // Проверка между unsigned и unsigned или fixed(positive)
+			cont.append(new CGIAsm("cpi", reg + "," + octet));
+		}
+
+	}
+	
 	//TODO актуализировать
 	@Override
 	public void cellsCond(CGScope scope, CGCells cells, Operator op, boolean isNot, boolean isOr, CGBranch branchScope) throws CompileException {
@@ -2071,7 +2101,7 @@ public class Generator extends CodeGenerator {
 	}
 	
 	@Override
-	public void boolCond(CGScope scope, CGBranch branchScope, boolean byBit0) throws CompileException {
+	public void boolAccCond(CGScope scope, CGBranch branchScope, boolean byBit0) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";accum bool is true"));
 		if(!byBit0) {
 			scope.append(new CGIAsm("tst", "r16"));
@@ -2081,6 +2111,12 @@ public class Generator extends CodeGenerator {
 			scope.append(new CGIAsmSkipInstr("sbrs", "r16,0x00"));
 			scope.append(new CGIAsmJump(JUMP_INSTR, branchScope.getEnd(), false));
 		}
+	}
+
+	@Override
+	public void boolFlagCond(CGScope scope, CGBranch branchScope) throws CompileException {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";flag is set!"));
+		scope.append(new CGIAsmCondJump("brne", branchScope.getEnd()));
 	}
 
 	private void cond(CGIContainer cont, int index, Operator op, boolean isOr, CGLabelScope lbScope, CGBranch branchScope) throws CompileException {
@@ -2176,6 +2212,10 @@ public class Generator extends CodeGenerator {
 				}
 				break;
 			case EQ:
+				// На примере многобатового значения: EQ OR - если нашли байта не равный, то переходим на конец проверки значения
+				// если все байты равны то переходим на конец всего выражения (A OR B) - т.е. метка в branchScope говорит об true-выражении
+				// EQ AND - если хотябы один байт не равен, то переходим на конец всего выражения (A AND B) - т.е. метка в branchScope говорит об false-выражении
+				// Аналогично должны работать и остальные условия
 				if(isOr) { // В связке с OR
 					if(0!=index) {  //Старшие байты
 						cont.append(new CGIAsmCondJump("brne", lbScope));
@@ -2314,26 +2354,27 @@ public class Generator extends CodeGenerator {
 		//Запись кол-ва ссылок
 		scope.append(new CGIAsm("std", "z+" + offset++ + (launchPoint ? ",c0xff" : ",c0x00")));
 		//Запись блока ид типов класса и интерфейсов
-		scope.append(new CGIAsmLdLabel("ldi", "r16", "low(" + iidLabel.getName() + "*2)"));
-		scope.append(new CGIAsm("std", "z+" + offset++ +",r16"));
-		scope.append(new CGIAsmLdLabel("ldi", "r16", "high(" + iidLabel.getName()+ "*2)"));
-		scope.append(new CGIAsm("std", "z+" + offset++ +",r16"));
+		//r16-r17 пока заняты размером heap
+		scope.append(new CGIAsmLdLabel("ldi", "r19", "low(" + iidLabel.getName() + "*2)"));
+		scope.append(new CGIAsm("std", "z+" + offset++ +",r19"));
+		scope.append(new CGIAsmLdLabel("ldi", "r19", "high(" + iidLabel.getName()+ "*2)"));
+		scope.append(new CGIAsm("std", "z+" + offset++ +",r19"));
 
 		if(CLASS_HEADER_SIZE!=heapSize) {
 			RTOSLibs.CLEAR_FIELDS.setRequired();
 			scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_clear_fields_nr", true));
 		}
-
+		//Далее аккумулятор свободен
+		
 		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
 	}
 	
 	@Override
-	public CGIContainer eNewArray(VarType type, int depth, int[] cDims, CGExcs excs) throws CompileException {
+	public void eNewArray(CGScope scope, VarType type, int depth, int[] cDims, CGExcs excs) throws CompileException {
 		setFeature(RTOSFeature.OS_FT_DRAM);
 		RTOSLibs.NEW_ARRAY.setRequired();
 		
-		CGIContainer result = new CGIContainer();
-		if(VERBOSE_LO <= verbose) result.append(new CGIText(";eNewArray " + type));
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";eNewArray " + type));
 		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
 		
 		VarType vt = type;
@@ -2361,21 +2402,21 @@ public class Generator extends CodeGenerator {
 			int dataSize = cDims[0] * (0!=cDims[1] ? cDims[1] : 0x01) * (0!=cDims[2] ? cDims[2] : 0x01) * typeSize;
 
 			//TODO добавить проверку переполнения
-			result.append(new CGIAsmLd("ldi", "r16", Long.toString((headerSize+dataSize)&0xff)));
-			result.append(new CGIAsmLd("ldi", "r17", Long.toString(((headerSize+dataSize)>>0x08)&0xff)));
-			result.append(new CGIAsmCall(CALL_INSTR, "j8bproc_new_array", true));
+			scope.append(new CGIAsmLd("ldi", "r16", Long.toString((headerSize+dataSize)&0xff)));
+			scope.append(new CGIAsmLd("ldi", "r17", Long.toString(((headerSize+dataSize)>>0x08)&0xff)));
+			scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_new_array", true));
 			codeExcsChecker.arrOutOfMemory(this, scope, excs, null);
-			result.append(new CGIAsmLd("ldi", "r19", Long.toString((typeBits<<0x04)+(depth-1)))); //TODO учет только 1 байтового размера типов
-			result.append(new CGIAsm("st", "x+,r19")); // Флаги и глубина
-			result.append(new CGIAsm("st", "x+,C0x01")); // Количество ссылок(массив не может быть создан без присваивания)
-			result.append(new CGIAsmLd("ldi", "r19", Long.toString(type.getId()&0xff))); //TODO учет только 1 байтового размера типов
-			result.append(new CGIAsm("st", "x+,r19"));
+			scope.append(new CGIAsmLd("ldi", "r19", Long.toString((typeBits<<0x04)+(depth-1)))); //TODO учет только 1 байтового размера типов
+			scope.append(new CGIAsm("st", "x+,r19")); // Флаги и глубина
+			scope.append(new CGIAsm("st", "x+,C0x01")); // Количество ссылок(массив не может быть создан без присваивания)
+			scope.append(new CGIAsmLd("ldi", "r19", Long.toString(type.getId()&0xff))); //TODO учет только 1 байтового размера типов
+			scope.append(new CGIAsm("st", "x+,r19"));
 			for(int i=0; i<depth; i++) {
 				// Размер каждого измерения
-				result.append(new CGIAsmLd("ldi", "r19", Long.toString(cDims[i]&0xff)));
-				result.append(new CGIAsm("st", "x+,r19"));
-				result.append(new CGIAsmLd("ldi", "r19", Long.toString((cDims[i]>>0x08)&0xff)));
-				result.append(new CGIAsm("st", "x+,r19"));
+				scope.append(new CGIAsmLd("ldi", "r19", Long.toString(cDims[i]&0xff)));
+				scope.append(new CGIAsm("st", "x+,r19"));
+				scope.append(new CGIAsmLd("ldi", "r19", Long.toString((cDims[i]>>0x08)&0xff)));
+				scope.append(new CGIAsm("st", "x+,r19"));
 			}
 			// Дальше идут данные массива
 		}
@@ -2385,77 +2426,74 @@ public class Generator extends CodeGenerator {
 				popRegIds[i] = 19;
 			}
 			
-			result.append(new CGIAsmLd("lds", "r28", "SPL"));
-			if(def_sph) result.append(new CGIAsmLd("lds", "r29", "SPH"));
-			result.append(new CGIAsm("adiw", "r28,0x01"));
+			scope.append(new CGIAsmLd("lds", "r28", "SPL"));
+			if(def_sph) scope.append(new CGIAsmLd("lds", "r29", "SPH"));
+			scope.append(new CGIAsm("adiw", "r28,0x01"));
 			// Вычисляем размер данных
 			if(1==depth) {
-				result.append(new CGIAsmLd("ld", "r16", "y+"));
-				result.append(new CGIAsmLd("ld", "r17", "y+"));
+				scope.append(new CGIAsmLd("ld", "r16", "y+"));
+				scope.append(new CGIAsmLd("ld", "r17", "y+"));
 			}
 			else {
 				RTOSLibs.MATH_MUL16.setRequired();
-				result.append(new CGIAsmLd("ldi", "r16", "0x01"));
-				result.append(new CGIAsmLd("ldi", "r17", "0x00"));
-				result.append(new CGIAsmLd("ldi", "j8b_atom", Long.toString(depth)));
+				scope.append(new CGIAsmLd("ldi", "r16", "0x01"));
+				scope.append(new CGIAsmLd("ldi", "r17", "0x00"));
+				scope.append(new CGIAsmLd("ldi", "j8b_atom", Long.toString(depth)));
 				CGLabelScope lbScope = new CGLabelScope(null, null, LabelNames.LOOP, true);
-				result.append(lbScope);
-				result.append(new CGIAsmLd("ld", "r18", "y+"));
-				result.append(new CGIAsmLd("ld", "r19", "y+"));
-				result.append(new CGIAsmCall(CALL_INSTR, "os_mul16", true));
+				scope.append(lbScope);
+				scope.append(new CGIAsmLd("ld", "r18", "y+"));
+				scope.append(new CGIAsmLd("ld", "r19", "y+"));
+				scope.append(new CGIAsmCall(CALL_INSTR, "os_mul16", true));
 				codeExcsChecker.arrMathOverflow(this, scope, excs, popRegIds);
-				result.append(new CGIAsm("dec", "j8b_atom"));
-				result.append(new CGIAsmCondJump("brne" , lbScope));
+				scope.append(new CGIAsm("dec", "j8b_atom"));
+				scope.append(new CGIAsmCondJump("brne" , lbScope));
 			}
 			// Учитываем размер типа
 			if(0x01!=typeSize) {
-				result.append(new CGIAsm("lsl", "r16"));
-				result.append(new CGIAsm("rol", "r17"));
+				scope.append(new CGIAsm("lsl", "r16"));
+				scope.append(new CGIAsm("rol", "r17"));
 				if(0x04==typeSize) {
-					result.append(new CGIAsm("lsl", "r16"));
-					result.append(new CGIAsm("rol", "r17"));
+					scope.append(new CGIAsm("lsl", "r16"));
+					scope.append(new CGIAsm("rol", "r17"));
 				}
 				codeExcsChecker.arrMathOverflow(this, scope, excs, popRegIds);
 			}
 			// Учитываем заголовок массива
-			result.append(new CGIAsm("subi", "r16,low(-" + headerSize + ")"));
-			result.append(new CGIAsm("sbci", "r17,high(-" + headerSize + ")"));
-			result.append(new CGIAsmCall(CALL_INSTR, "j8bproc_new_array", true));
+			scope.append(new CGIAsm("subi", "r16,low(-" + headerSize + ")"));
+			scope.append(new CGIAsm("sbci", "r17,high(-" + headerSize + ")"));
+			scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_new_array", true));
 			codeExcsChecker.arrOutOfMemory(this, scope, excs, popRegIds);
-			result.append(new CGIAsmLd("ldi", "r19", Long.toString((typeBits<<0x04)+depth-1))); //TODO учет только 1 байтового размера типов
-			result.append(new CGIAsm("st", "x+,r19")); // Флаги и глубина
-			result.append(new CGIAsm("st", "x+,C0x01")); // Количество ссылок(массив не может быть создан без присваивания)
-			result.append(new CGIAsmLd("ldi", "r19",  Long.toString(type.getId()&0xff))); //TODO учет только 1 байтового размера типов
-			result.append(new CGIAsm("st", "x+,r19"));
+			scope.append(new CGIAsmLd("ldi", "r19", Long.toString((typeBits<<0x04)+depth-1))); //TODO учет только 1 байтового размера типов
+			scope.append(new CGIAsm("st", "x+,r19")); // Флаги и глубина
+			scope.append(new CGIAsm("st", "x+,C0x01")); // Количество ссылок(массив не может быть создан без присваивания)
+			scope.append(new CGIAsmLd("ldi", "r19",  Long.toString(type.getId()&0xff))); //TODO учет только 1 байтового размера типов
+			scope.append(new CGIAsm("st", "x+,r19"));
 			for(int i=0; i<depth; i++) {
 				// Размер каждого измерения
-				result.append(new CGIAsm("pop", "r19"));
-				result.append(new CGIAsm("st", "x+,r19"));
-				result.append(new CGIAsm("pop", "r19"));
-				result.append(new CGIAsm("st", "x+,r19"));
+				scope.append(new CGIAsm("pop", "r19"));
+				scope.append(new CGIAsm("st", "x+,r19"));
+				scope.append(new CGIAsm("pop", "r19"));
+				scope.append(new CGIAsm("st", "x+,r19"));
 			}
 			// Дальше идут данные массива
 		}
 
 		accum.set(0x02, false);
 		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
-		return result;
 	}
 
 	@Override
-	public CGIContainer eNewArrView(int depth, CGExcs excs) throws CompileException {
-		CGIContainer result = new CGIContainer();
-		if(VERBOSE_LO <= verbose) result.append(new CGIText(";eNewArrView depth: " + depth));
+	public void eNewArrView(CGScope scope, int depth, CGExcs excs) throws CompileException {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";eNewArrView depth: " + depth));
 		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
 
 		RTOSLibs.ARRVIEW_MAKE.setRequired();
-		result.append(new CGIAsmLd("ldi", "r19", Long.toString(0x80+depth)));
-		result.append(new CGIAsmCall(CALL_INSTR, "j8bproc_arrview_make", true)); // Результат в ACCUM
+		scope.append(new CGIAsmLd("ldi", "r19", Long.toString(0x80+depth)));
+		scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_arrview_make", true)); // Результат в ACCUM
 		codeExcsChecker.arrOutOfMemory(this, scope, excs, null);
 		
 		accum.set(0x02, false);
 		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
-		return result;
 	}
 
 	@Override
@@ -2928,7 +2966,7 @@ public class Generator extends CodeGenerator {
 					instr.setOffset(yOffset-instr.getOffset());
 				}
 				else if('z'==iReg) {
-					int delta = instr.getOffset()-zOffset;
+					int delta = (null==instr.getReg() ? -zOffset : instr.getOffset()-zOffset);
 					if(MIN_IREG_OFFSET>delta) {
 						moveIReg(instr.getPrefCont(), instr.getIreg(), delta-32);
 						yOffset += (delta-32);

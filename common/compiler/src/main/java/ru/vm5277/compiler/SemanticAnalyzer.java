@@ -22,6 +22,7 @@ import java.util.List;
 import java.util.Set;
 import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.Optimization;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.lexer.J8BKeyword;
@@ -37,14 +38,14 @@ public class SemanticAnalyzer {
 	protected SemanticAnalyzer() {
 	}
 
-	public static void analyze(ObjectTypeNode clazz, CodeGenerator cg, List<ObjectTypeNode> autoImported) {
+	public static void analyze(ObjectTypeNode clazz, CodeGenerator cg, CGScope parent, List<ObjectTypeNode> autoImported) {
 		GlobalScope gScope = new GlobalScope();
 
 		if(null!=autoImported) {
 			for(ObjectTypeNode node : autoImported) {
 				if(node.preAnalyze()) {
 					if(node.declare(gScope)) {
-						node.postAnalyze(gScope, cg);
+						node.postAnalyze(gScope, cg, parent);
 					}
 				}
 			}
@@ -54,7 +55,7 @@ public class SemanticAnalyzer {
 			if(clazz.declare(gScope)) {
 				// Выполняем если все declare отработали и никаких отложенных.
 				if(AstNode.getDeclarationPendingNodes().isEmpty()) {
-					if(clazz.postAnalyze(gScope, cg)) {
+					if(clazz.postAnalyze(gScope, cg, parent)) {
 						if(Optimization.NONE!=Main.getOptLevel()) {
 							clazz.codeOptimization(gScope, cg);
 						}
@@ -85,7 +86,7 @@ public class SemanticAnalyzer {
 			if(AstNode.getDeclarationPendingNodes().isEmpty()) {
 				// Все отложенные выполнены и ошибок не было
 				if(result) {
-					if(clazz.postAnalyze(gScope, cg)) {
+					if(clazz.postAnalyze(gScope, cg, parent)) {
 						if(Optimization.NONE!=Main.getOptLevel()) {
 							clazz.codeOptimization(gScope, cg);
 						}
@@ -104,7 +105,7 @@ public class SemanticAnalyzer {
 	
 	public boolean preAnalyze() {return false;}
 	public boolean declare(Scope scope)  {return false;}
-	public boolean postAnalyze(Scope scope, CodeGenerator cg)  {return false;}
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope _cgScope)  {return false;}
 	public void codeOptimization(Scope scope, CodeGenerator cg) {};
 	
 	public void validateName(String name) throws CompileException {

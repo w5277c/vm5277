@@ -28,4 +28,10 @@ public class CGExpressionScope extends CGScope {
 	public int leave() {
 		return nestCntr--;
 	}
+	
+	@Override
+	public String toString() {
+		return "expr " + name;
+	}
+
 }

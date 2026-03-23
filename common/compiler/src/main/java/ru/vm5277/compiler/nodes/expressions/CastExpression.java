@@ -66,39 +66,40 @@ public class CastExpression extends ExpressionNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterExpression(toString());
+		if(null!=cgScope) cgScope.disable();
+		cgScope = cg.enterExpression(parent, toString());
 		
-		result &=operand.postAnalyze(scope, cg);
-		try {
-			ExpressionNode optimizedExpr = operand.optimizeWithScope(scope, cg);
-			if(null != optimizedExpr) {
-				operand = optimizedExpr;
+		result &=operand.postAnalyze(scope, cg, cgScope);
+		if(result) {
+			// Резолвинг QualifiedPathExpression
+			ExpressionNode resolved = resolveQualifiedPathExpr(operand);
+			if(null!=resolved) {
+				operand = resolved;
 			}
 
 			sourceType = operand.getType();
 
-			if(!canCast(scope, sourceType, type)) {
-				markError("Invalid cast from " + sourceType + " to " + type);
+			try {
+				if(!canCast(scope, sourceType, type)) {
+					markError("Invalid cast from " + sourceType + " to " + type);
+					result = false;
+				}
+			}
+			catch(CompileException ex) {
+				markError(ex);
 				result = false;
 			}
 		}
-		catch (CompileException e) {
-			markError(e);
-			result = false;
-		}
 
-		cg.leaveExpression();
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		CGScope oldScope = cg.setScope(cgScope);
-		
 		operand.codeOptimization(scope, cg);
 		
 		try {
@@ -110,31 +111,41 @@ public class CastExpression extends ExpressionNode {
 		catch(CompileException ex) {
 			markError(ex);
 		}
-		
-		cg.setScope(oldScope);
 	}
 
 	@Override
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
-		CGScope cgs = (null==parent ? cgScope : parent);
+		//CGScope cgs = (null==parent ? cgScope : parent);
 		
 		// Для констант мы можем задать размер аккумулятора изначально, это даст оптимальный код
 		// TODO точно? Проверить!
-		if(operand instanceof LiteralExpression) {
+		// Учет выражения (fixed)byte - ранее я убрал из этого условия VarFieldExpression, что-то оно ломало, нужно проверять
+		//!!! Мы задаем порядок в postAnalyze а состояние аккумулятора - здесь, порядок должен быть единым 
+		
+		//Вопрос оптимизации - мы знаем в какой тип будет выполнено преобразование. Поэтому в аккумулятор можно загрузить только полезную часть
+		
+//		if(operand instanceof LiteralExpression || operand instanceof VarFieldExpression) {
 			if(sourceType!=type) {
-				cgs.append(cg.accCast(sourceType, type));
+				int lSize = (-1 == sourceType.getSize() ? cg.getRefSize() : sourceType.getSize());
+				int rSize = (-1 == type.getSize() ? cg.getRefSize() : type.getSize());
+				cg.accResize(lSize<rSize ? sourceType : type);
 			}
-			return operand.codeGen(cg, cgs, toAccum, excs);
-		}
-		else {
-			// В остальных случаев обработка выражений не может быть построена с учетом определенного размера аккумулятора, поэтому используем пост приведение
-			cg.getAccum().set(-1==operand.getType().getSize() ? cg.getRefSize() : operand.getType().getSize(), operand.getType().isFixedPoint());
-			Object result = operand.codeGen(cg, cgs, toAccum, excs);
+			Object result = operand.codeGen(cg, null, toAccum, excs);
 			if(sourceType!=type) {
-				cgs.append(cg.accCast(sourceType, type));
+				cgScope.append(cg.accCast(sourceType, type));
 			}
 			return result;
-		}
+/*		}
+		else {
+			// В остальных случаев обработка выражений не может быть построена с учетом определенного размера аккумулятора, поэтому используем пост приведение
+			//cg.getAccum().set(-1==operand.getType().getSize() ? cg.getRefSize() : operand.getType().getSize(), operand.getType().isFixedPoint());
+			cg.accResize(sourceType);
+			Object result = operand.codeGen(cg, null, toAccum, excs);
+			if(sourceType!=type) {
+				cgScope.append(cg.accCast(sourceType, type));
+			}
+			return result;
+		}*/
 	}
 
 	public ExpressionNode getOperand() {

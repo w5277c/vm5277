@@ -87,51 +87,37 @@ public class TernaryExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterExpression(toString());
+		if(null!=cgScope) cgScope.disable();
+		cgScope = cg.enterExpression(parent,  toString());
 		
 		// Проверяем условие и ветки
-		result&=condition.postAnalyze(scope, cg);
+		result&=condition.postAnalyze(scope, cg, cgScope);
 		if(result) {
-			try {
-				ExpressionNode optimizedExpr = condition.optimizeWithScope(scope, cg);
-				if(null!=optimizedExpr) {
-					condition = optimizedExpr;
-				}
-			}
-			catch (CompileException e) {
-				markError(e);
-				result = false;
+			// Резолвинг QualifiedPathExpression
+			ExpressionNode resolved = resolveQualifiedPathExpr(condition);
+			if(null!=resolved) {
+				condition = resolved;
 			}
 		}		
 
-		result&=trueExpr.postAnalyze(scope, cg);
+		result&=trueExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
-			try {
-				ExpressionNode optimizedExpr = trueExpr.optimizeWithScope(scope, cg);
-				if(null!=optimizedExpr) {
-					trueExpr = optimizedExpr;
-				}
-			}
-			catch (CompileException e) {
-				markError(e);
-				result = false;
+			// Резолвинг QualifiedPathExpression
+			ExpressionNode resolved = resolveQualifiedPathExpr(trueExpr);
+			if(null!=resolved) {
+				trueExpr = resolved;
 			}
 		}		
 
-		result&=falseExpr.postAnalyze(scope, cg);
+		result&=falseExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
-			try {
-				ExpressionNode optimizedExpr = falseExpr.optimizeWithScope(scope, cg);
-				if(null!=optimizedExpr) {
-					falseExpr = optimizedExpr;
-				}
-			}
-			catch (CompileException e) {
-				markError(e);
-				result = false;
+			// Резолвинг QualifiedPathExpression
+			ExpressionNode resolved = resolveQualifiedPathExpr(falseExpr);
+			if(null!=resolved) {
+				falseExpr = resolved;
 			}
 		}		
 
@@ -167,44 +153,82 @@ public class TernaryExpression extends ExpressionNode {
 			}
 		}
 		
-		cg.leaveExpression();
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 	
 	@Override
+	public void codeOptimization(Scope scope, CodeGenerator cg) {
+		condition.codeOptimization(scope, cg);
+		try {
+			ExpressionNode optimizedExpr = condition.optimizeWithScope(scope, cg);
+			if(null != optimizedExpr) {
+				condition = optimizedExpr;
+			}
+		}
+		catch(CompileException ex) {
+			markError(ex);
+		}
+		
+		trueExpr.codeOptimization(scope, cg);
+		try {
+			ExpressionNode optimizedExpr = trueExpr.optimizeWithScope(scope, cg);
+			if(null != optimizedExpr) {
+				trueExpr = optimizedExpr;
+			}
+		}
+		catch(CompileException ex) {
+			markError(ex);
+		}
+
+		falseExpr.codeOptimization(scope, cg);
+		try {
+			ExpressionNode optimizedExpr = falseExpr.optimizeWithScope(scope, cg);
+			if(null != optimizedExpr) {
+				falseExpr = optimizedExpr;
+			}
+		}
+		catch(CompileException ex) {
+			markError(ex);
+		}
+	}
+
+	@Override
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
 
-		CGScope cgs = (null==parent ? cgScope : parent);
-		cgs.setBranch(branch);
+		//CGScope cgs = (null==parent ? cgScope : parent);
+		cgScope.setBranch(branch);
 		
 		if(alwaysTrue) {
-			return trueExpr.codeGen(cg, cgs, toAccum, excs);
+			return trueExpr.codeGen(cg, cgScope, toAccum, excs);
 		}
 		if(alwaysFalse) {
-			return falseExpr.codeGen(cg, cgs, toAccum, excs);
+			return falseExpr.codeGen(cg, cgScope, toAccum, excs);
 		}
 
-		Object obj = condition.codeGen(cg, cgs, true, excs);
+		Object obj = condition.codeGen(cg, cgScope, true, excs);
 		if(obj==CodegenResult.TRUE) {
-			return trueExpr.codeGen(cg, cgs, toAccum, excs);
+			return trueExpr.codeGen(cg, cgScope, toAccum, excs);
 		}
 		else if(obj==CodegenResult.FALSE) {
-			return falseExpr.codeGen(cg, cgs, toAccum, excs);
+			return falseExpr.codeGen(cg, cgScope, toAccum, excs);
 		}
 		else if(obj==CodegenResult.RESULT_IN_ACCUM) {
-			cg.boolCond(cgs, branch, true);
+			cg.boolAccCond(cgScope, branch, true);
+		}
+		else if(obj==CodegenResult.RESULT_IN_FLAG) {
+			cg.boolFlagCond(cgScope, branch);
 		}
 
 		CGLabelScope endScope = new CGLabelScope(null, CGScope.genId(), LabelNames.TERNARY_END, true);
 		
-		trueExpr.codeGen(cg, cgs, toAccum, excs);
-		cg.jump(cgs, endScope);
-		cgs.append(branch.getEnd());
-		falseExpr.codeGen(cg, cgs, toAccum, excs);
-		cgs.append(endScope);
+		trueExpr.codeGen(cg, cgScope, toAccum, excs);
+		cg.jump(cgScope, endScope);
+		cgScope.append(branch.getEnd());
+		falseExpr.codeGen(cg, cgScope, toAccum, excs);
+		cgScope.append(endScope);
 
 		return (toAccum ? CodegenResult.RESULT_IN_ACCUM : null);
 	}

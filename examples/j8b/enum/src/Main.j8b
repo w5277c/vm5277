@@ -28,7 +28,7 @@ class Main {
 		ERROR
 	}
 
-    public static void main() {
+	public static void main() {
 		System.out("\nEnum EDirection, size:"); System.out(EDirection.size());
 		System.out("\nLEFT id:"); System.out(EDirection.LEFT.index());
 		System.out("\nRIGHT id:"); System.out(EDirection.RIGHT.index());

@@ -69,8 +69,8 @@ public class Generator extends CodeGenerator {
 	@Override public void eInstanceof(CGScope scope, VarType type) throws CompileException {}
 	@Override public void eUnary(CGScope scope, Operator opt, CGCells cells, boolean toAccum, CGExcs excs) throws CompileException {}
 	@Override public void eNewInstance(CGScope scope, int size, CGLabelScope iidLabel, VarType type, boolean launchPoint, CGExcs excs) throws CompileException {}
-	@Override public CGIContainer eNewArray(VarType type, int depth, int[] cDims, CGExcs excs) throws CompileException {return null;}
-	@Override public CGIContainer eNewArrView(int depth, CGExcs excs) throws CompileException {return null;}
+	@Override public void eNewArray(CGScope scope, VarType type, int depth, int[] cDims, CGExcs excs) throws CompileException {};
+	@Override public void eNewArrView(CGScope scope, int depth, CGExcs excs) throws CompileException {};
 	@Override public void eTry(CGBlockScope blockScope, List<Case> cases, CGBlockScope defaultBlockScope) {}
 	@Override public void eCatch(CGScope scope) throws CompileException {};
 	@Override public CGIContainer eReturn(CGScope scope, int argsSize, int varsSize, VarType retType) throws CompileException {return null;}
@@ -83,14 +83,15 @@ public class Generator extends CodeGenerator {
 	@Override public ArrayList<RegPair> buildRegsPool() {return null;}
 	@Override public CGIContainer pushConst(CGScope scope, int size, long value, boolean isFixed) {return null;}
 	@Override public CGIContainer pushCells(CGScope scope, int size, CGCells cells) throws CompileException {return null;}
-	@Override public CGIContainer stackPrepare(boolean firstBlock, int argsSize, int varsSize, CGExcs excs) {return null;}
+	@Override public void stackPrepare(CGIContainer scope, boolean firstBlock, int argsSize, int varsSize, CGExcs excs) throws CompileException {};
 	@Override public CGIContainer blockFree(int size) {return null;}
 	@Override public String getVersion() {return VERSION;}
 	@Override public CGIContainer jump(CGScope scope, CGLabelScope lScope) throws CompileException {return null;}
 	@Override public void pushLabel(CGScope scope, String label) {}
 	@Override public void cellsCond(CGScope scope, CGCells cells, Operator op, boolean isNot, boolean isOr, CGBranch branchScope) throws CompileException {}
 	@Override public void constCond(CGScope scope, CGCells cells, Operator op, long k, boolean isLFixed, boolean isRFixed, boolean isNot, boolean isOr, CGBranch branchScope) throws CompileException {}
-	@Override public void boolCond(CGScope scope, CGBranch branchScope, boolean byBit0) throws CompileException {}
+	@Override public void boolAccCond(CGScope scope, CGBranch branchScope, boolean byBit0) throws CompileException {}
+	@Override public void boolFlagCond(CGScope scope, CGBranch branchScope) throws CompileException {}
 	@Override public CGIContainer call(CGScope scope, CGLabelScope lScope) throws CompileException {return null;}
 	@Override public int getCallStackSize() {return 0;}
 	@Override public boolean normalizeIRegConst(CGMethodScope mScope, char iReg, AtomicInteger lastOffset) {return false;}

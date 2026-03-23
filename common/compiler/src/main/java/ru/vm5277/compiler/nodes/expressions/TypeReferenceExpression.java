@@ -27,7 +27,6 @@ import static ru.vm5277.compiler.Main.debugAST;
 import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
-import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.EnumScope;
@@ -130,7 +129,7 @@ public class TypeReferenceExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 		
@@ -149,7 +148,7 @@ public class TypeReferenceExpression extends ExpressionNode {
 		}
 */		
 		if(null!=parentExpr) {
-			result&=parentExpr.postAnalyze(scope, cg);
+			result&=parentExpr.postAnalyze(scope, cg, parent);
 		}
 		
 		debugAST(this, POST, false, result, getFullInfo());

@@ -121,12 +121,11 @@ public class VarFieldExpression extends ExpressionNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		if(null!=postResult) return postResult;
-		postResult = true;
-
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
+		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterExpression(toString());
+		if(null!=cgScope) cgScope.disable();
+		cgScope = cg.enterExpression(parent, toString());
 
 		if(null==symbol && null!=targetExpr) {
 			try {
@@ -153,23 +152,23 @@ public class VarFieldExpression extends ExpressionNode {
 			}
 			catch(CompileException ex) {
 				markError(ex);
-				postResult = false;
+				result = false;
 			}
 		}
 		
-		if(postResult && null!=symbol && symbol instanceof VarSymbol) {
+		if(result && null!=symbol && symbol instanceof VarSymbol) {
 			if(getSN()<((AstHolder)symbol).getNode().getSN()) {
 				markError("Var '" + symbol.getName() + "' cannot be used before declaration");
-				postResult = false;
+				result = false;
 			}
 		}
 		
-		if(postResult && null!=symbol && symbol instanceof FieldSymbol) {
+		if(result && null!=symbol && symbol instanceof FieldSymbol) {
 			FieldSymbol fSymbol = (FieldSymbol)symbol;
 			MethodScope mScope = scope.getMethod();
 			if(!isInliningMode && mScope.getSymbol().isStatic() && !fSymbol.isStatic()) {
 				markError("Non-static field '" + fSymbol.getName() + "' cannot be referenced from a static context");
-				postResult = false;
+				result = false;
 			}
 
 			// Проверка приватного доступа
@@ -178,26 +177,21 @@ public class VarFieldExpression extends ExpressionNode {
 			}
 		}
 
-		cg.leaveExpression();
-		debugAST(this, POST, false, postResult, getFullInfo());
-		return postResult;
+		debugAST(this, POST, false, result, getFullInfo());
+		return result;
 	}
 	
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		CGScope oldScope = cg.setScope(cgScope);
-		
 		if(!symbol.isReassigned()) {
 			symbol.setFinal(true);
 		}
-		
-		cg.setScope(oldScope);
 	}
 	
 	@Override
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(disabled) return null;
-		CGScope cgs = null == parent ? cgScope : parent;
+		//CGScope cgs = null == parent ? cgScope : parent;
 		
 		// Актуализируем symbol
 		//getSymbol();
@@ -228,7 +222,7 @@ public class VarFieldExpression extends ExpressionNode {
 						targetExpr.codeGen(cg, parent, false, excs);
 					}
 					if(null!=targetExpr && targetExpr instanceof VarFieldExpression) { //Не смотрим на isInliningMode
-						cg.cellsToArrReg(cgs, ((CGCellsScope)((VarFieldExpression)targetExpr).getSymbol().getCGScope()).getCells());
+						cg.cellsToArrReg(cgScope, ((CGCellsScope)((VarFieldExpression)targetExpr).getSymbol().getCGScope()).getCells());
 					}
 
 					if(null!=targetExpr && isInliningMode) {
@@ -240,7 +234,7 @@ public class VarFieldExpression extends ExpressionNode {
 						}
 					}
 					if(toAccum) {
-						cg.cellsToAcc(cgs, (CGCellsScope)symbol.getCGScope());
+						cg.cellsToAcc(cgScope, (CGCellsScope)symbol.getCGScope());
 					}
 //				}
 //				else {
@@ -254,11 +248,11 @@ public class VarFieldExpression extends ExpressionNode {
 	public void codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, CGBranch brScope, CGExcs excs) throws CompileException {
 		depCodeGen(cg, excs);
 		
-		CGScope cgs = null == parent ? cgScope : parent;
+		//CGScope cgs = null == parent ? cgScope : parent;
 		
 		if(null!=brScope) {
 			CGCellsScope cScope = (CGCellsScope)symbol.getCGScope();
-			cg.constCond(cgs, cScope.getCells(), Operator.NEQ, 0, symbol.getType().isFixedPoint(), false, isInvert, opOr, brScope); // NEQ, так как проверяем на 0
+			cg.constCond(cgScope, cScope.getCells(), Operator.NEQ, 0, symbol.getType().isFixedPoint(), false, isInvert, opOr, brScope); // NEQ, так как проверяем на 0
 		}
 	}
 

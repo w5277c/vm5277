@@ -19,6 +19,7 @@ import ru.vm5277.common.cg.CGBranch;
 import java.util.HashMap;
 import java.util.Map;
 import ru.vm5277.common.cg.items.CGIContainer;
+import ru.vm5277.common.cg.items.CGItem;
 
 public class CGScope extends CGIContainer {
 	public		final	static	int						VERBOSE_NO	= 0;
@@ -34,7 +35,7 @@ public class CGScope extends CGIContainer {
 	protected					int						resId;
 	private						int						sbPos		= 0;
 	public				static	int						verbose;
-	
+			
 	public static int genId() {
 		return idCntr++;
 	}
@@ -60,11 +61,6 @@ public class CGScope extends CGIContainer {
 	
 	public int getResId() {
 		return resId;
-	}
-	
-	public CGScope free() {
-//!!!		parent.asmAppend(cgb);
-		return parent;
 	}
 	
 	public CGScope getScope(int resId) {
@@ -133,6 +129,17 @@ public class CGScope extends CGIContainer {
 	}
 	public CGBranch getBranch() {
 		return branch;
+	}
+	
+	public void buildScopeTree(StringBuilder sb, String prefix) {
+		if(!disabled) {
+			sb.append(prefix).append(toString()).append("\n");
+			for(CGItem item : items) {
+				if(item instanceof CGScope) {
+					((CGScope)item).buildScopeTree(sb, prefix+"  ");
+				}
+			}
+		}
 	}
 	
 	@Override

@@ -26,6 +26,9 @@ class Main {
 
 		public Short(short value) {
 			this.value = value;
+			
+			System.out("\nКонструктор Short, параметр value:"); System.out(value);
+			System.out("\nКонструктор Short, поле value после присвоения:"); System.out(this.value);
 		}
 
 		public Number getThis() {
@@ -33,20 +36,72 @@ class Main {
 		}
 
 		public byte toByte() {return (byte)value;}
-		public short toShort() {return value;}
+		public short toShort() {
+			System.out("\ntoShort() класса Short, возвращаем значение:"); System.out(value);
+			return value;
+		}
+	}
+
+	public class Integer implements Number {
+		private	int	value;
+
+		public Integer(int value) {
+			this.value = value;
+			
+			System.out("\nКонструктор Integer, параметр value:"); System.out(value);
+			System.out("\nКонструктор Integer, поле value после присвоения:"); System.out(this.value);
+		}
+
+		public Number getThis() {
+			return this;
+		}
+
+		public byte toByte() {return (byte)value;}
+		public short toShort() {
+			System.out("\ntoShort() класса Integer, возвращаем значение:"); System.out((short)value);
+			return (short)value;
+		}
 	}
 
 	public static void main() {
 		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
 
+		System.out("\nСоздаем экземпляр класса Short");
 		Object num = new Short(0x0102);
+		System.out("\nЭкземпляр создан, помещен в num типа Object");
+		
+		//System.out(((Short)num).toShort()); не работает
+		
+		System.out("\nПроверка if(num is Short as s)");
 		if(num is Short as s) {
-			System.out(s.toShort());
-			System.out(" is short\n");
+			System.out("\nnum типа Object наследован от Short, вызываем s.toShort()");
+			short tmp = s.toShort();
+			System.out("\nvalue:");
+			System.out(tmp);
 			
+			System.out("\nПроверка if(s.getThis() is Short as s2)");
 			if(s.getThis() is Short as s2) {
-				System.out("Is short too\n");
+				System.out("\nthis типа Number класса s также наследован от Short, вызываем s2.toShort()");
+				short tmp2 = s2.toShort();				
+				System.out("\nvalue:"); System.out(tmp2);
+			}
+			else {
+				System.out("\nthis типа Number класса s не наследован от Short");
 			}
 		}
+		else {
+			System.out("\nnum типа Object не наследован от Short");
+		}
+
+		System.out("\nПроверка if(num is Integer as s)");
+		//TODO if(num is Integer as s) { duplicate s
+		if(num is Integer as s3) {
+			System.out("\nnum типа Object наследован от Integer - ошибка");
+		}
+		else {
+			System.out("\nnum типа Object не наследован от Integer");
+		}
+		
+		System.out("\ndone");
 	}
 }

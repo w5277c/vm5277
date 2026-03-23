@@ -189,12 +189,12 @@ public class VarNode extends AstNode implements InitNodeHolder {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 
 		try {
-			cgScope = cg.enterLocal(type, (-1 == type.getSize() ? cg.getRefSize() : type.getSize()), VarType.CSTR == type, name);
+			cgScope = cg.enterLocal(parent, type, (-1 == type.getSize() ? cg.getRefSize() : type.getSize()), VarType.CSTR == type, name);
 			symbol.setCGScope(cgScope);
 			
 			// Проверка инициализации final-полей
@@ -205,13 +205,13 @@ public class VarNode extends AstNode implements InitNodeHolder {
 
 			// Анализ инициализатора, если есть
 			if(null!=init) {
-				if(!init.postAnalyze(scope, cg)) {
-					result = false;
-				}
-
-				ExpressionNode optimizedExpr = init.optimizeWithScope(scope, cg);
-				if(null != optimizedExpr) {
-					init = optimizedExpr;
+				result&=init.postAnalyze(scope, cg, cgScope);
+				if(result) {
+					// Резолвинг QualifiedPathExpression
+					ExpressionNode resolved = resolveQualifiedPathExpr(init);
+					if(null!=resolved) {
+						init = resolved;
+					}
 				}
 				
 				if(result) {
@@ -256,21 +256,18 @@ public class VarNode extends AstNode implements InitNodeHolder {
 			markError(e);
 		}
 		
-		cg.leaveLocal();
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 	
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		CGScope oldScope = cg.setScope(cgScope);
-		
 		if(null!=init) {
 			init.codeOptimization(scope, cg);
 		
 			try {
 				ExpressionNode optimizedExpr = init.optimizeWithScope(scope, cg);
-				if(null != optimizedExpr) {
+				if(null!=optimizedExpr) {
 					init = optimizedExpr;
 				}
 			}
@@ -293,7 +290,7 @@ public class VarNode extends AstNode implements InitNodeHolder {
 			}
 			try {
 				ExpressionNode optimizedExpr = init.optimizeWithScope(scope, cg);
-				if(null != optimizedExpr) {
+				if(null!=optimizedExpr) {
 					init = optimizedExpr;
 				}
 			}
@@ -301,8 +298,6 @@ public class VarNode extends AstNode implements InitNodeHolder {
 				markError(ex);
 			}
 		}
-		
-		cg.setScope(oldScope);
 	}
 	
 	@Override
@@ -310,7 +305,7 @@ public class VarNode extends AstNode implements InitNodeHolder {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 
-		CGScope cgs = null == parent ? cgScope : parent;
+		//CGScope cgs = null == parent ? cgScope : parent;
 		CGVarScope vScope = (CGVarScope)cgScope;
 		
 		Boolean accUsed = null;
@@ -327,26 +322,26 @@ public class VarNode extends AstNode implements InitNodeHolder {
 		else {
 			// Инициализация(заполнение нулями необходима только регистрам, остальные проинициализированы вместе с HEAP/STACK)
 			if(null==init) {
-				if(CGCells.Type.REG==vScope.getCells().getType()) cgs.append(cg.constToCells(cgs, 0, vScope.getCells(), false));
+				if(CGCells.Type.REG==vScope.getCells().getType()) cgScope.append(cg.constToCells(cgScope, 0, vScope.getCells(), false));
 			}
 			else if(init instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
 				LiteralExpression le = (LiteralExpression)init;
 				boolean isFixed = le.isFixed() || VarType.FIXED == vScope.getType();
-				cgs.append(cg.constToCells(cgs, isFixed ? le.getFixedValue() : le.getNumValue(), vScope.getCells(), isFixed));
+				cgScope.append(cg.constToCells(cgScope, isFixed ? le.getFixedValue() : le.getNumValue(), vScope.getCells(), isFixed));
 			}
 			else if(init instanceof NewExpression) {
-				init.codeGen(cg, null, true, excs);
+				init.codeGen(cg, cgScope, true, excs);
 				cg.accCast(null, VarType.SHORT);
-				cg.accToCells(cgs, vScope);
+				cg.accToCells(cgScope, vScope);
 			}
 			else if(init instanceof NewArrayExpression) {
-				init.codeGen(cg, null, true, excs);
+				init.codeGen(cg, cgScope, true, excs);
 				//TODO оптимизация, можно сразу назначать счетчику 1
 				//cg.updateRefCount(vScope, vScope.getCells(), true);
 				
 				//Перенес в declare //((VarSymbol)symbol).setArrayDimensions(((NewArrayExpression)initializer).getConsDimensions());
 				cg.accCast(null, VarType.SHORT);
-				cg.accToCells(cgs, vScope);
+				cg.accToCells(cgScope, vScope);
 			}
 //			else if(init instanceof ArrayExpression) {
 //				init.codeGen(cg, null, true);
@@ -354,63 +349,63 @@ public class VarNode extends AstNode implements InitNodeHolder {
 //				//cg.arrToCells(cgs, (CGArrCells)((CGCellsScope)init.getSymbol().getCGScope()).getCells(), vScope.getCells());
 //			}
 			else if(init instanceof BinaryExpression) {
-				CGScope oldScope = cg.setScope(cgs);
+//!!!				CGScope oldScope = cg.setScope(cgScope);
 				CGBranch branch = new CGBranch();
-				cgs.setBranch(branch);
+				cgScope.setBranch(branch);
 				
-				init.codeGen(cg, cgs, true, excs);
+				init.codeGen(cg, cgScope, true, excs);
 				//TODO проверить на объекты и на массивы(передача ref)
 				VarType initType = init.getType();
 				if(VarType.CLASS == initType) {
-					cg.pushHeapReg(cgs);
-					cg.updateClassRefCount(cgs, vScope.getCells(), true);
-					cg.popHeapReg(cgs);
+					cg.pushHeapReg(cgScope);
+					cg.updateClassRefCount(cgScope, vScope.getCells(), true);
+					cg.popHeapReg(cgScope);
 				}
 				else if(initType.isArray()) {
-					cg.updateArrRefCount(cgs, vScope.getCells(), true, ((CGCellsScope)cgs).isArrayView());
+					cg.updateArrRefCount(cgScope, vScope.getCells(), true, ((CGCellsScope)cgScope).isArrayView());
 				}
 				if(branch.isUsed()) {
-					cg.constToAcc(cgs, 1, 1, false);
+					cg.constToAcc(cgScope, 1, 1, false);
 					CGLabelScope lbScope = new CGLabelScope(null, null, LabelNames.LOCGIC_END, true);
-					cg.jump(cgs, lbScope);
-					cgs.append(((CGBranch)branch).getEnd());
-					cg.constToAcc(cgs, 1, 0, false);
-					cgs.append(lbScope);
-					cg.accToCells(cgs, vScope);
+					cg.jump(cgScope, lbScope);
+					cgScope.append(((CGBranch)branch).getEnd());
+					cg.constToAcc(cgScope, 1, 0, false);
+					cgScope.append(lbScope);
+					cg.accToCells(cgScope, vScope);
 				}
-				cg.accToCells(cgs, vScope);
+				cg.accToCells(cgScope, vScope);
 				accUsed = true;
-				cg.setScope(oldScope);
+//!!!				cg.setScope(oldScope);
 			}
 			else if(init instanceof ArrayExpression) {
-				init.codeGen(cg, cgs, false, excs);
-				cg.accToCells(cgs, vScope);
+				init.codeGen(cg, cgScope, false, excs);
+				cg.accToCells(cgScope, vScope);
 				VarType initType = init.getType();
 				if(VarType.CLASS == initType) {
-					cg.pushHeapReg(cgs);
-					cg.updateClassRefCount(cgs, vScope.getCells(), true);
-					cg.popHeapReg(cgs);
+					cg.pushHeapReg(cgScope);
+					cg.updateClassRefCount(cgScope, vScope.getCells(), true);
+					cg.popHeapReg(cgScope);
 				}
 				else if(initType.isArray()) {
-					cg.updateArrRefCount(cgs, vScope.getCells(), true, ((CGCellsScope)vScope).isArrayView());
+					cg.updateArrRefCount(cgScope, vScope.getCells(), true, ((CGCellsScope)vScope).isArrayView());
 				}
 				accUsed = true;
 			}
 			else if(init instanceof EnumExpression) {
-				cgs.append(cg.constToCells(cgs, ((EnumExpression)init).getIndex(), vScope.getCells(), false));
+				cgScope.append(cg.constToCells(cgScope, ((EnumExpression)init).getIndex(), vScope.getCells(), false));
 			}
 			else {
-				init.codeGen(cg, cgs, true, excs);
+				init.codeGen(cg, cgScope, true, excs);
 				cg.accResize(type);
-				cg.accToCells(cgs, vScope);
+				cg.accToCells(cgScope, vScope);
 				VarType initType = init.getType();
 				if(VarType.CLASS == initType) {
-					cg.pushHeapReg(cgs);
-					cg.updateClassRefCount(cgs, vScope.getCells(), true);
-					cg.popHeapReg(cgs);
+					cg.pushHeapReg(cgScope);
+					cg.updateClassRefCount(cgScope, vScope.getCells(), true);
+					cg.popHeapReg(cgScope);
 				}
 				else if(initType.isArray()) {
-					cg.updateArrRefCount(cgs, vScope.getCells(), true, ((CGCellsScope)vScope).isArrayView());
+					cg.updateArrRefCount(cgScope, vScope.getCells(), true, ((CGCellsScope)vScope).isArrayView());
 				}
 
 				accUsed = true;

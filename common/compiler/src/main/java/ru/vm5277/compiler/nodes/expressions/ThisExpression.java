@@ -54,16 +54,18 @@ public class ThisExpression extends TypeReferenceExpression {
 	}
 	
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
+		if(null!=cgScope) cgScope.disable();
+		cgScope = new CGScope(parent, CGScope.genId(), "this");
 		return true;
 	}
 	
 	@Override
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
-		CGScope cgs = null == parent ? cgScope : parent;
+		//CGScope cgs = null == parent ? cgScope : parent;
 		
 		if(toAccum) {
-			cg.thisToAcc(cgs);
+			cg.thisToAcc(cgScope);
 			return CodegenResult.RESULT_IN_ACCUM;
 		}
 		
@@ -75,6 +77,7 @@ public class ThisExpression extends TypeReferenceExpression {
 		return "this";
 	}
 	
+	@Override
 	public String getFullInfo() {
 		return getClass().getSimpleName();
 	}

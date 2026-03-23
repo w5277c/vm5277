@@ -24,9 +24,18 @@ public class CGBranch {
 	private	boolean				isUsed		= false;
 	
 	public CGBranch() {
+		// Метка нонца выражения (например: A AND B или A OR B), никак не связана с результатом выражения (true/false) а только позволяет сократить код (короткое замыкание)
 		lbEndScopes.add(new CGLabelScope(null, null, LabelNames.COMPARE_END, true));
 	}
 	
+	public CGBranch(String postfix) {
+		lbEndScopes.add(new CGLabelScope(null, null, LabelNames.COMPARE_END + postfix, true));
+	}
+
+	public CGBranch(CGLabelScope lbEndScope) {
+		this.lbEndScopes.add(lbEndScope);
+	}
+
 	public void pushEnd(CGLabelScope lbScope) {
 		lbEndScopes.add(lbScope);
 	}

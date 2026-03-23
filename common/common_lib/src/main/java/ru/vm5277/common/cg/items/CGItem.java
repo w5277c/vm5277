@@ -16,7 +16,7 @@
 package ru.vm5277.common.cg.items;
 
 public abstract class CGItem {
-	private	boolean	disabled;
+	protected	boolean	disabled;
 	
 	public void disable() {
 		disabled = true;

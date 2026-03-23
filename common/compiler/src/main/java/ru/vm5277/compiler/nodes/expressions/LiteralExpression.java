@@ -16,7 +16,6 @@
 
 package ru.vm5277.compiler.nodes.expressions;
 
-import ru.vm5277.common.NumUtils;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
@@ -151,6 +150,9 @@ public class LiteralExpression extends ExpressionNode {
 	}
 	
 	public String getStringValue() {
+		if(value instanceof Boolean) return ((Boolean)value).toString();
+		if(value instanceof Number) return ((Number)value).toString();
+		if(value instanceof Double) return ((Double)value).toString();
 		return (String)value;
 	}
 	
@@ -167,10 +169,11 @@ public class LiteralExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterExpression(toString());
+		if(null!=cgScope) cgScope.disable();
+		cgScope = cg.enterExpression(parent, toString());
 		
 		try{
 			if(value instanceof Number) {
@@ -189,30 +192,29 @@ public class LiteralExpression extends ExpressionNode {
 			result = false;
 		}
 		
-		cg.leaveExpression();
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 	
 	@Override
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
-		CGScope cgs = null == parent ? cgScope : parent;
+		//CGScope cgs = null == parent ? cgScope : parent;
 		
 		//cg.setDataSymbol(cg.defineData(vScope.getResId(), -1, (String)le.getValue()));
 		//TODO попыка вынести запись в аккумулятор на свое место
 		if(toAccum) {
 			//cg.constToAcc(cgScope, returnType.getSize(), isFixed() ? getFixedValue() : getNumValue(), isFixed());
 			if(isString()) {
-				cg.cellsToAcc(cgs, new CGCells(cg.defineData(cg.genId(), -1, value).getLabel()), false);
+				cg.cellsToAcc(cgScope, new CGCells(cg.defineData(cg.genId(), -1, value).getLabel()), false);
 			}
 			else {
 				long v = isFixed() ? getFixedValue() : getNumValue();
 				// LiteralExpression не должен задавать размер аккумулятору!
-				cg.constToAcc(cgs, -1, v, isFixed());
+				cg.constToAcc(cgScope, -1, v, isFixed());
 				if(isOverflow) {
 					Integer exceptionId = cg.getExcsChecker().getHandled(excs, "MathOverflowException");
 					if(null!=exceptionId) {
-						cg.getExcsChecker().makeException(cg, cgs, excs, exceptionId);
+						cg.getExcsChecker().makeException(cg, cgScope, excs, exceptionId);
 					}
 				}
 			}

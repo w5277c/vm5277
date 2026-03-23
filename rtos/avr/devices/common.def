@@ -34,6 +34,16 @@
 
 	.SET	OS_ETRACE_BUFFER_SIZE					= 0x08	;Размер буфера для трассировки исключений. Размер от 0x04 до 0xff.
 
+.IFNDEF OS_DRAM_1B_PERCENT
+	.SET OS_DRAM_1B_PERCENT							= 20	;Процент от свободной памяти для 1B блоков
+.ENDIF
+.IFNDEF OS_DRAM_2B_PERCENT
+	.SET OS_DRAM_2B_PERCENT 						= 30	;Процент от свободной памяти для 2B блоков  
+.ENDIF
+.IFNDEF OS_DRAM_8B_PERCENT
+	.SET OS_DRAM_8B_PERCENT							= 50	;Процент от свободной памяти для 8B блоков
+.ENDIF
+
 ;---OS-RESULT-CODES-----------------------------------------; Универсальны коды ответов
 	.EQU	OSR_OK									= 0x00	;Успешно выполнено
 	.EQU	OSR_ALLOC_FAIL							= 0x01	;Ошибка выделения памяти

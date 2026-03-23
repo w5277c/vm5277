@@ -25,6 +25,7 @@ import java.io.FileOutputStream;
 import java.io.FilenameFilter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.net.HttpURLConnection;
@@ -74,6 +75,9 @@ public abstract class J8bMojo extends AbstractMojo {
 	@Parameter(defaultValue = "${project.basedir}/target/")
 	protected File outputDirectory;
 
+	@Parameter(defaultValue = "${project.basedir}/prebuild/")
+	protected File prebuildDirectory;
+
 	@Parameter(defaultValue = "size")
 	protected String optimization;
 
@@ -112,7 +116,10 @@ public abstract class J8bMojo extends AbstractMojo {
 
 		getLog().info("Main source file: " + mainJ8bFile.getAbsolutePath());
 
-		// 4. Создаем выходную директорию
+		if (!prebuildDirectory.exists()) {
+			prebuildDirectory.mkdirs();
+		}
+
 		if (!outputDirectory.exists()) {
 			outputDirectory.mkdirs();
 		}
@@ -132,7 +139,7 @@ public abstract class J8bMojo extends AbstractMojo {
 			args.add("-F");
 			args.add(targetFreq);
 			args.add("-o");
-			args.add(outputDirectory.getAbsolutePath());
+			args.add(prebuildDirectory.getAbsolutePath());
 			if(devMode) {
 				args.add("-d");
 				args.add("-q");
@@ -154,8 +161,16 @@ public abstract class J8bMojo extends AbstractMojo {
 			throw new MojoExecutionException("Compilation failed with exit code: " + exitCode);
 		}
 
+		//TODO необходимо скопировать prebuild/Main.dbg в target/Main.dbg
+		try {
+			copyFile(	new File(prebuildDirectory.getAbsolutePath() + File.separator + mainName + ".dbg"),
+						new File(outputDirectory.getAbsolutePath() + File.separator + mainName + ".dbg"));
+		}
+		catch(Exception ex) {
+		}
+		
 		//getLog().info("Assembling...");
-		File mainAsmFile = new File(outputDirectory, mainName + ".asm");
+		File mainAsmFile = new File(prebuildDirectory, mainName + ".asm");
 		if(!mainAsmFile.exists()) {
 			throw new MojoExecutionException("Main asm file not found: " + mainAsmFile.getAbsolutePath() + "\n");
 		}
@@ -179,7 +194,8 @@ public abstract class J8bMojo extends AbstractMojo {
 			args.add(defsPath.toAbsolutePath().toString());
 			args.add("-I");
 			args.add(rtosPath.toAbsolutePath().toString());
-
+			args.add("-o");
+			args.add(outputDirectory.getAbsolutePath() + File.separator + mainName);
 			if(verboseOutput || devMode) {
 				String mapFileName = mainName + ".map";
 				String listFileName = mainName + ".lst";
@@ -437,6 +453,21 @@ public abstract class J8bMojo extends AbstractMojo {
 		if (target == null || !target.contains(":")) {
 			throw new MojoExecutionException(
 				"Invalid target format. Expected: platform:mcu, got: " + target);
+		}
+	}
+	
+	protected void copyFile(File source, File destination) throws IOException {
+		if(!source.exists()) {
+			return;
+		}
+
+		try(InputStream in = new FileInputStream(source);
+			OutputStream out = new FileOutputStream(destination)) {
+			byte[] buffer = new byte[8192];
+			int length;
+			while ((length = in.read(buffer)) > 0) {
+				out.write(buffer, 0, length);
+			}
 		}
 	}
 }

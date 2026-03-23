@@ -41,4 +41,9 @@ public class CGLabelScope extends CGScope {
 	public String getSource() {
 		return isUsed ? name + ":\n" : "";
 	}
+	
+	@Override
+	public String toString() {
+		return "label " + name;
+	}
 }

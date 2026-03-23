@@ -38,6 +38,7 @@
 		<module>arrays3</module>
 		<module>stdin</module>
 		<module>stdout</module>
+		<module>if</module>
 	</modules>
 	
 	<properties>
@@ -88,6 +89,15 @@
 		</profile>
 	</profiles>
 	<build>
+		<resources>
+			<resource>
+				<directory>prebuild</directory>
+				<includes>
+					<include>**/*</include>
+				</includes>
+				<filtering>false</filtering>
+			</resource>
+		</resources>
 		<extensions>
 			<extension>
 				<groupId>ru.vm5277</groupId>

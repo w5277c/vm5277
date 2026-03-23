@@ -22,6 +22,7 @@ public class LabelNames {
 	public	static	String	MULTIBYTE_CP_END	= PREFIX + "mcpe";
 	public	static	String	LOOP				= PREFIX + "loop";
 	public	static	String	LOOP_NEXT			= PREFIX + "next";
+	public	static	String	LOOP_ELSE			= PREFIX + "loopelse";
 	public	static	String	LOOP_END			= PREFIX + "eol";
 	public	static	String	BLOCK_END			= PREFIX + "eob";
 	public	static	String	COMPARE_THEN		= PREFIX + "eoct";
@@ -36,7 +37,7 @@ public class LabelNames {
 	public	static	String	TERNARY_END			= PREFIX + "tere";
 	public	static	String	CASE				= PREFIX + "case";
 	public	static	String	CASE_DEFAULT		= PREFIX + "casedef";
-	public	static	String	CASE_END			= PREFIX + "caseend";
+	public	static	String	SWITCH_END			= PREFIX + "switchend";
 	public	static	String	TRY_END				= PREFIX + "tryend";
 	public	static	String	CATCH				= PREFIX + "catch";
 	public	static	String	CATCH_SKIP			= PREFIX + "catchskip";

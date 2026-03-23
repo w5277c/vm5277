@@ -146,18 +146,28 @@ public class ExpressionNode extends AstNode {
             consumeToken(tb);
 			
 			ExpressionNode right = parseBinary(precedence + (operator.isAssignment() ? 0 : 1));
-			left = optimizeOperationChain(left, operator, right);
-			//left = new BinaryExpression(tb, mc, left, operator, right);
+			ExpressionNode optimizedNode = optimizeOperationChain(left, operator, right);
+			if(null!=optimizedNode) {
+				left = optimizedNode;
+			}
+			else {
+				left = BinaryExpression.create(tb, mc, sp, left, operator, right);
+			}
 		}
         return left;
     }
 	
 	// Агрессивная оптимизация
 	private ExpressionNode optimizeOperationChain(ExpressionNode left, Operator op, ExpressionNode right) throws CompileException {
+		boolean modified = false;
 		// Оптимизация унарных операций (если левая часть - унарный оператор)
 		if (right instanceof UnaryExpression) {
 			UnaryExpression unary = (UnaryExpression)right;
-			right = optimizeUnary(unary);
+			ExpressionNode optimized = optimizeUnary(unary);
+			if(null!=optimized) {
+				right = optimized;
+				modified = true;
+			}
 		}
 		
 		if (left instanceof LiteralExpression && right instanceof LiteralExpression) {
@@ -197,42 +207,58 @@ public class ExpressionNode extends AstNode {
 		}
 
 		
-		if (op.isAssignment() && right instanceof BinaryExpression) {
-			BinaryExpression bRight = (BinaryExpression)right;
-			if (left instanceof VarFieldExpression && (Operator.PLUS==bRight.getOperator() || Operator.MINUS==bRight.getOperator())) {
-				if(	(bRight.getLeft() instanceof VarFieldExpression && bRight.getRight() instanceof LiteralExpression) ||
-					(bRight.getLeft() instanceof LiteralExpression && bRight.getRight() instanceof VarFieldExpression)) {
-					
-					VarFieldExpression ve = (VarFieldExpression)(bRight.getLeft() instanceof VarFieldExpression ? bRight.getLeft() : bRight.getRight());
-					LiteralExpression le = (LiteralExpression)(bRight.getLeft() instanceof VarFieldExpression ? bRight.getRight(): bRight.getLeft());
-					if(	ve.getName().equals(((VarFieldExpression)left).getName()) && le.isInteger()) {
-						long num = le.getNumValue();
-						if(-1 == num || 1 == num) {
-							return new UnaryExpression(	tb, mc, left.getSP(),
-														(Operator.PLUS==bRight.getOperator()^(-1==num)) ? Operator.PRE_INC : Operator.PRE_DEC, left);
-						}					
+		if(op.isAssignment()) {
+			if(right instanceof BinaryExpression) {
+				BinaryExpression bRight = (BinaryExpression)right;
+				if (left instanceof VarFieldExpression && (Operator.PLUS==bRight.getOperator() || Operator.MINUS==bRight.getOperator())) {
+					if(	(bRight.getLeft() instanceof VarFieldExpression && bRight.getRight() instanceof LiteralExpression) ||
+						(bRight.getLeft() instanceof LiteralExpression && bRight.getRight() instanceof VarFieldExpression)) {
+
+						VarFieldExpression ve = (VarFieldExpression)(bRight.getLeft() instanceof VarFieldExpression ? bRight.getLeft() : bRight.getRight());
+						LiteralExpression le = (LiteralExpression)(bRight.getLeft() instanceof VarFieldExpression ? bRight.getRight(): bRight.getLeft());
+						if(	ve.getName().equals(((VarFieldExpression)left).getName()) && le.isInteger()) {
+							long num = le.getNumValue();
+							if(-1 == num || 1 == num) {
+								return new UnaryExpression(	tb, mc, left.getSP(),
+															(Operator.PLUS==bRight.getOperator()^(-1==num)) ? Operator.PRE_INC : Operator.PRE_DEC, left);
+							}					
+						}
 					}
+				}
+			}
+			else if(left instanceof VarFieldExpression && right instanceof VarFieldExpression) {
+				if(left.getSymbol()==right.getSymbol()) {
+					return new EmptyExpression(tb, mc);
 				}
 			}
 		}
 		
-		switch(op) {
-			case PLUS:
-			case MINUS:
-				return optimizeAdditiveChain(left, op, right);
-			case MULT:
-			case DIV:
-			case MOD:
-				return optimizeMultiplicativeChain(left, op, right);
-			case BIT_OR:
-			case BIT_AND:
-			case BIT_XOR:
-				return optimizeBitwiseChain(left, op, right);
+		if(	left instanceof BinaryExpression || right instanceof BinaryExpression ||
+			left instanceof VarFieldExpression || right instanceof VarFieldExpression ||
+			(left instanceof LiteralExpression && right instanceof LiteralExpression)) {
+			
+			switch(op) {
+				case PLUS:
+				case MINUS:
+					return optimizeAdditiveChain(left, op, right);
+				case MULT:
+				case DIV:
+				case MOD:
+					return optimizeMultiplicativeChain(left, op, right);
+				case BIT_OR:
+				case BIT_AND:
+				case BIT_XOR:
+					return optimizeBitwiseChain(left, op, right);
 
-			default:
-				return BinaryExpression.create(tb, mc, left.getSP(), left, op, right);
+				default:
+					return null;
+			}
 		}
 		
+		if(modified) {
+			return BinaryExpression.create(tb, mc, sp, left, op, right);
+		}
+		return null;
 	}
 
 	private ExpressionNode optimizeAdditiveChain(ExpressionNode left, Operator op, ExpressionNode right) throws CompileException {
@@ -494,7 +520,10 @@ public class ExpressionNode extends AstNode {
 		
 		// Оптимизация унарных операций
 		if (node instanceof UnaryExpression) {
-			return optimizeUnary((UnaryExpression)node);
+			ExpressionNode optimized = optimizeUnary((UnaryExpression)node);
+			if(null!=optimized) {
+				return optimized;
+			}
 		}
 
 		// Оптимизация бинарных операций
@@ -502,7 +531,10 @@ public class ExpressionNode extends AstNode {
 			BinaryExpression bin = (BinaryExpression)node;
 			ExpressionNode left = optimizeExpression(bin.getLeft());
 			ExpressionNode right = optimizeExpression(bin.getRight());
-			return optimizeOperationChain(left, bin.getOperator(), right);
+			ExpressionNode optimizedNode = optimizeOperationChain(left, bin.getOperator(), right);
+			if(null!=optimizedNode) {
+				return optimizedNode;
+			}
 		}
 
 		return node;
@@ -531,21 +563,21 @@ public class ExpressionNode extends AstNode {
 			ExpressionNode operand = cast.getOperand();
 			ExpressionNode newOperand = cast.getOperand().optimizeWithScope(scope, cg);
 			if(null != newOperand) {
+				newOperand.postAnalyze(scope, cg, operand.getCGScope());
 				operand = newOperand;
-				operand.postAnalyze(scope, cg);
 			}
 
-			VarType operandType = operand.getType();
-			
+			//VarType operandType = operand.getType();
 			// Если внутреннее приведение - расширяющее, его можно убрать
-			if (null != operandType && cast.getType().isPrimitive() && operandType.isPrimitive()) {
+			// Нет, не можем, при расширении нужно обнулять регистры аккумулятора, с Fixed действие выглядет тоже сомнительным - старый код
+/*			if (null != operandType && cast.getType().isPrimitive() && operandType.isPrimitive()) {
 				if(cast.getType() == operandType || (VarType.FIXED != cast.getType() && cast.getType().getSize() >= operandType.getSize())) {
 					return operand;
 				}
 				else if(null != newOperand && cast.getType().isFixedPoint() && operand instanceof LiteralExpression) { 
 					return new LiteralExpression(tb, mc, (((LiteralExpression)operand).getNumValue()&0x7f));
 				}
-			}
+			}*/
 			return null;
 		}
 
@@ -559,26 +591,22 @@ public class ExpressionNode extends AstNode {
 				AstNode node = ((AstHolder)vfe.getSymbol()).getNode();
 				if(node instanceof VarNode) {
 					VarNode vNode = (VarNode)node;
-					if(	vNode.isFinal() && VarType.CSTR != vNode.getType() &&
-						(	vNode.getType().isEnum() || vNode.getInitializer() instanceof LiteralExpression ||
-							vNode.getInitializer() instanceof ArrayExpression || vNode.getInitializer() instanceof VarFieldExpression) ) {
+					if (vNode.isFinal() && VarType.CSTR != vNode.getType() && vNode.getInitializer() instanceof LiteralExpression) {
 						
-						if(vNode.getInitializer() instanceof LiteralExpression) {
-							((LiteralExpression)vNode.getInitializer()).setVarFieldType(vNode.getType());
-						}
-						return vNode.getInitializer();
+						LiteralExpression result = new LiteralExpression(	tb, mc, (Number)((LiteralExpression)((VarNode) node).getInitializer()).getValue(),
+																			vNode.getType(), false);
+						result.postAnalyze(scope, cg, cgScope);
+						return result;
 					}
 				}
 				else if(node instanceof FieldNode) {
 					FieldNode fNode = (FieldNode)node;
-					if (fNode.isStatic() && fNode.isFinal() && VarType.CSTR != fNode.getType() &&
-						(	fNode.getType().isEnum() || fNode.getInitializer() instanceof LiteralExpression ||
-							fNode.getInitializer() instanceof ArrayExpression || fNode.getInitializer() instanceof VarFieldExpression)) {
+					if (fNode.isStatic() && fNode.isFinal() && VarType.CSTR != fNode.getType() && fNode.getInitializer() instanceof LiteralExpression) {
 						
-						if(fNode.getInitializer() instanceof LiteralExpression) {
-							((LiteralExpression)fNode.getInitializer()).setVarFieldType(fNode.getType());
-						}
-						return fNode.getInitializer();
+						LiteralExpression result = new LiteralExpression(	tb, mc, (Number)((LiteralExpression)((FieldNode) node).getInitializer()).getValue(),
+																			fNode.getType(), false);
+						result.postAnalyze(scope, cg, cgScope);
+						return result;
 					}
 				}
 			}
@@ -590,7 +618,7 @@ public class ExpressionNode extends AstNode {
 			// Оптимизация через флаг из postAnalyze
 			if (ioe.isFulfillsContract()) {
 				ExpressionNode result = new LiteralExpression(tb, mc, true);
-				result.postAnalyze(scope, cg);
+				result.postAnalyze(scope, cg, ioe.getCGScope());
 				return result;
 			}
 
@@ -598,7 +626,7 @@ public class ExpressionNode extends AstNode {
 			if (ioe.getLeft() instanceof VarFieldExpression) {
 				if(ioe.getLeftType().isPrimitive() && ioe.getLeftType() == ioe.getRightType()) {
 					ExpressionNode result = new LiteralExpression(tb, mc, true);
-					result.postAnalyze(scope, cg);
+					result.postAnalyze(scope, cg, ioe.getCGScope());
 					return result;
 				}
 
@@ -622,7 +650,7 @@ public class ExpressionNode extends AstNode {
 					// Точное совпадение типов
 					if(leftType==ioe.getRightType()) {
 						ExpressionNode result = new LiteralExpression(tb, mc, true);
-						result.postAnalyze(scope, cg);
+						result.postAnalyze(scope, cg, ioe.getCGScope());
 						return result;
 					}
 
@@ -631,27 +659,27 @@ public class ExpressionNode extends AstNode {
 						// Совпадает размерность?
 						if (leftType.getArrayDepth() != ioe.getRightType().getArrayDepth()) {
 							ExpressionNode result = new LiteralExpression(tb, mc, false);
-							result.postAnalyze(scope, cg);
+							result.postAnalyze(scope, cg, ioe.getCGScope());
 							return result;
 						}
 
 						// Object[] совместим с любым массивом
 						if (ioe.getRightType().isObject()) {
 							ExpressionNode result = new LiteralExpression(tb, mc, true);
-							result.postAnalyze(scope, cg);
+							result.postAnalyze(scope, cg, ioe.getCGScope());
 							return result;
 						}
 
 						// Проверка типа элементов
 						if (leftType.getClassName().equals(ioe.getRightType().getClassName())) {
 							ExpressionNode result = new LiteralExpression(tb, mc, true);
-							result.postAnalyze(scope, cg);
+							result.postAnalyze(scope, cg, ioe.getCGScope());
 							return result;
 						}
 						
 						// Все остальные случаи -> false
 						ExpressionNode result = new LiteralExpression(tb, mc, false);
-						result.postAnalyze(scope, cg);
+						result.postAnalyze(scope, cg, ioe.getCGScope());
 						return result;
 					}
 				}
@@ -667,41 +695,54 @@ public class ExpressionNode extends AstNode {
 				
 				String value = ((EnumScope)tre.getScope()).getValue((int)((LiteralExpression)pe.getArguments().get(0)).getNumValue());
 				EnumExpression result = new EnumExpression(tb, mc, tre, value);
-				result.postAnalyze(scope, cg);
+				result.postAnalyze(scope, cg, pe.getCGScope());
 				return result;
 			}
+			else if(Property.index==pe.getProperty() && 0==pe.getArguments().size()) {
+				if(pe.getTargetExpr() instanceof LiteralExpression) {
+					LiteralExpression result = (LiteralExpression)pe.getTargetExpr();
+					result.postAnalyze(scope, cg, pe.getCGScope());
+					return result;
+				}
+			}
+		}
+		
+		if(this instanceof EnumExpression) {
+			return new LiteralExpression(tb, mc, ((EnumExpression)this).getIndex());
 		}
 		
 		if (this instanceof BinaryExpression) {
 			BinaryExpression bin = (BinaryExpression) this;
-			ExpressionNode _left = bin.getLeft().optimizeWithScope(scope, cg);
-			ExpressionNode _right = bin.getRight().optimizeWithScope(scope, cg);
-			//TODO всегда возвращало значение, даже если результат не оптимизирован
-//			if(null != _left || null != _right) {
-				ExpressionNode result = optimizeOperationChain(	null == _left ? bin.getLeft() : _left, bin.getOperator(),
-																null == _right ? bin.getRight(): _right);
+//TODO!!! Работает не корректно - в случае оптимизации создается новый BinaryExpression код которого генерируется не корректно - основная проблема начинается с
+//повторного postAnalyze (с генерацией нового CGScope) или вообще без postAnalyze
+//Пока снизил вероятность добавив проверки на выражения которые данный функционал не сможет оптмизизировать типа MethodCallExpression + LiteralExpression,
+//но в выражениях BinaryExpression + LiteralExpression/BinaryExpression проблема скорее всего осталась
+//В общем нужно досканально проверить все варинаты оптимизации BinaryExpression, вероятно там остались сюрпризы
+//UPDATE: повторный вызов postAnalyze больше не должен создавать проблем, также убрана проверка для пропуска повторного выполнения - ломало логику.
+//Однако, данный блок до сих пор генерирует бесполезную замену - иногда возвращает новый инстанс с теми-же значениями
 
-				if(result instanceof ComparisonExpression) {
-					ComparisonExpression ce = (ComparisonExpression)result;
+			ExpressionNode optimizedNode = optimizeOperationChain(bin.getLeft(), bin.getOperator(), bin.getRight());
+			if(null!=optimizedNode) {
+				if(optimizedNode instanceof ComparisonExpression) {
+					ComparisonExpression ce = (ComparisonExpression)optimizedNode;
 					if(ce.getLeft() instanceof EnumExpression && ce.getRight() instanceof EnumExpression) {
 						if(Operator.EQ==ce.getOperator() || Operator.NEQ==ce.getOperator()) {
 							EnumExpression left = (EnumExpression)ce.getLeft();
 							EnumExpression right = (EnumExpression)ce.getRight();
 							if(left.getTargetScope()==right.getTargetScope()) {
-								result = new LiteralExpression(tb, mc, left.getIndex()==right.getIndex()^Operator.EQ!=ce.getOperator());
-								result.postAnalyze(scope, cg);
-								return result;
+								optimizedNode = new LiteralExpression(tb, mc, left.getIndex()==right.getIndex()^Operator.EQ!=ce.getOperator());
+								optimizedNode.postAnalyze(scope, cg, bin.getCGScope());
+								return optimizedNode;
 							}							
 						}
 					}
 				}
-
-
-				result.postAnalyze(scope, cg);
-				
-				return result;
-//			}
-//			return null;
+				// Блокируем текущий CGScope и передаем родителя для новой версии CGScope
+				bin.getCGScope().disable();
+				optimizedNode.postAnalyze(scope, cg, bin.getCGScope().getParent());
+				return optimizedNode;
+			}
+			return null;
 		}
 		
 		if(this instanceof UnaryExpression) {
@@ -1012,7 +1053,7 @@ public class ExpressionNode extends AstNode {
 				return operand;
 			}
 		}
-		return new UnaryExpression(tb, mc, ue.getSP(), op, operand);
+		return null;
 	}
 	
 	private ExpressionNode parseUnary() throws CompileException {
@@ -1214,7 +1255,7 @@ public class ExpressionNode extends AstNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope _cgScope) {
 		return false;
 	}
 

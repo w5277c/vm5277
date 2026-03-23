@@ -294,7 +294,7 @@ public class CGMethodScope extends CGCellsScope {
 	
 	@Override
 	public String toString() {
-		return (null==type ? "constructor" : "method " + type) + " '" + getPath('.') +  "(" + StrUtils.toString(types) + ")";
+		return (null==type ? "constructor" : "method " + type) + " " + getPath('.') +  "(" + StrUtils.toString(types) + ")";
 	}
 	
 	@Override

@@ -26,7 +26,6 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.CGBranch;
 import ru.vm5277.common.cg.CGExcs;
-import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.CodegenResult;
@@ -55,8 +54,8 @@ public class ForNode extends CommandNode {
 	private	BlockScope		forScope;
 	private	BlockScope		bodyScope;
 	private	BlockScope		elseScope;
-	private	CGBlockScope	blockScope;
-	private	CGBranch		branch			= new CGBranch();
+	private	CGScope			jumpNext		= new CGScope();
+	private	CGBranch		branch;
 	private	boolean			alwaysTrue;
 	private	boolean			alwaysFalse;
 	
@@ -131,7 +130,7 @@ public class ForNode extends CommandNode {
 		
         // Основной блок
 		try {
-			blockNode = (tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "for.body") : new BlockNode(tb, mc, parseStatement(), "for.body"));
+			blockNode = (tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "body") : new BlockNode(tb, mc, parseStatement(), "body"));
 		}
 		catch(CompileException e) {
 			markFirstError(e);
@@ -141,7 +140,7 @@ public class ForNode extends CommandNode {
         if(tb.match(J8BKeyword.ELSE)) {
 			consumeToken(tb);
 			try {
-				elseBlockNode = (tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "for.else") : new BlockNode(tb, mc, parseStatement(), "for.else"));
+				elseBlockNode = (tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "else") : new BlockNode(tb, mc, parseStatement(), "else"));
 			}
 			catch(CompileException e) {
 				markFirstError(e);
@@ -268,31 +267,36 @@ public class ForNode extends CommandNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
-		cgScope = cg.enterLoopBlock("for");
+		cgScope = cg.enterLoopBlock(parent, "for");
 		
 		// Для метка на next блок используется для ForNode 
 		((CGLoopBlockScope)cgScope).getNextLbScope().setUsed();
 		// Анализ блока инициализации
 		if(null!=init) {
-			result&=init.postAnalyze(forScope, cg);
+			result&=init.postAnalyze(forScope, cg, cgScope);
+			if(result) {
+				// Резолвинг QualifiedPathExpression
+				ExpressionNode resolved = resolveQualifiedPathExpr(init);
+				if(null!=resolved) {
+					init = resolved;
+				}
+			}
 		}
+		// Помещаем метку начала итерации
+		cgScope.append(((CGLoopBlockScope)cgScope).getStartLbScope());
 		// Проверка типа условия
 		if(condition!=null) {
-			result&=condition.postAnalyze(forScope, cg);
+			result&=condition.postAnalyze(forScope, cg, cgScope);
 			if(result) {
-				try {
-					ExpressionNode optimizedExpr = condition.optimizeWithScope(forScope, cg);
-					if(null != optimizedExpr) {
-						condition = optimizedExpr;
-						result&=condition.postAnalyze(forScope, cg);
+				if(result) {
+					// Резолвинг QualifiedPathExpression
+					ExpressionNode resolved = resolveQualifiedPathExpr(condition);
+					if(null!=resolved) {
+						condition = resolved;
 					}
-				}
-				catch (CompileException e) {
-					markFirstError(e);
-					result = false;
 				}
 			}
 			
@@ -314,19 +318,32 @@ public class ForNode extends CommandNode {
 			}
 		}
 
-		// Анализ блока итерации
-		if(null!=iteration) {
-			result&=iteration.postAnalyze(forScope, cg);
-		}
-
 		// Анализ тела цикла
 		if(null!=getBody()) {
-			getBody().postAnalyze(bodyScope, cg);
+			getBody().postAnalyze(bodyScope, cg, cgScope);
 		}
 		
+		// Помещаем метку на блок управления переменной
+		cgScope.append(((CGLoopBlockScope)cgScope).getNextLbScope());
+
+		// Анализ блока итерации
+		if(null!=iteration) {
+			result&=iteration.postAnalyze(forScope, cg, cgScope);
+			if(result) {
+				// Резолвинг QualifiedPathExpression
+				ExpressionNode resolved = resolveQualifiedPathExpr(iteration);
+				if(null!=resolved) {
+					iteration = resolved;
+				}
+			}
+		}
+		// Помещаем блок для будущей генерации jump на новую итерацию
+		cgScope.append(jumpNext);
+		// Помещаем метку else блока
+		cgScope.append(((CGLoopBlockScope)cgScope).getElseLbScope());
 		// Анализ else-блока
 		if(null!=getElseBlock()) {
-			getElseBlock().postAnalyze(elseScope, cg);
+			getElseBlock().postAnalyze(elseScope, cg, cgScope);
 		}
 		
 		// Проверяем бесконечный цикл с возвратом
@@ -334,19 +351,30 @@ public class ForNode extends CommandNode {
 			markWarning("Code after infinite while loop is unreachable");
 		}
 
-		cg.leaveLoopBlock();
+		// Помещаем метку конца цикла
+		cgScope.append(((CGLoopBlockScope)cgScope).getEndLbScope());
+
+		branch = new CGBranch(((CGLoopBlockScope)cgScope).getElseLbScope());
+		
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		CGScope oldScope = cg.setScope(cgScope);
-		
-		//TODO добавить остальные елементы
-		
 		if(null!=init) {
 			init.codeOptimization(scope, cg);
+			if(init instanceof ExpressionNode) {
+				try {
+					ExpressionNode optimizedExpr = ((ExpressionNode)init).optimizeWithScope(scope, cg);
+					if(null!=optimizedExpr) {
+						init = optimizedExpr;
+					}
+				}
+				catch(CompileException ex) {
+					markError(ex);
+				}
+			}
 		}
 		
 		if(null!=condition) {
@@ -394,8 +422,6 @@ public class ForNode extends CommandNode {
 				}
 			}
 		}
-
-		cg.setScope(oldScope);
 	}
 
 	
@@ -414,49 +440,31 @@ public class ForNode extends CommandNode {
 		
 		CodegenResult result = null;
 		
-		CGScope cgs = null == parent ? cgScope : parent;
-		cgs.setBranch(branch);
-		
-		if(null!=init) {
-			//TODO VarScope не учитывает CGScope родиеля(этот) при регистрации переменной
-			init.codeGen(cg, cgs, false, excs);
-		}
-		
-		if(null==condition) {
-			cgs.append(((CGLoopBlockScope)cgScope).getStartLbScope());
-		}
-		else {
-			if(!alwaysFalse) {
-				cgs.append(((CGLoopBlockScope)cgScope).getStartLbScope());
-				if(!alwaysTrue) {
-					condition.codeGen(cg, cgs, false, excs);
-				}
-			}
-		}
-		
-		if(null!=blockNode && !alwaysFalse) {
-			blockNode.codeGen(cg, cgs, false, excs);
-		}
-		
-		if(null!=iteration && !alwaysFalse) {
-			CGLabelScope nextLbScope = ((CGLoopBlockScope)cgScope).getNextLbScope();
-			cgs.append(nextLbScope);
-			nextLbScope.setUsed();
-			iteration.codeGen(cg, cgs, false, excs);
-		}
-
 		if(!alwaysFalse) {
-			cg.jump(cgs, ((CGLoopBlockScope)cgScope).getStartLbScope());
-		}
-		if(null!=condition && !alwaysFalse) {
-			cgs.append(branch.getEnd());
+			cgScope.setBranch(branch);
+
+			if(null!=init) {
+				init.codeGen(cg, null, false, excs);
+			}
+//TODO См. в IfNode, необходима проверка на результат condition.codeGen	
+			if(null!=condition && !alwaysTrue) {
+				condition.codeGen(cg, null, false, excs);
+			}
+
+			if(null!=blockNode) {
+				blockNode.codeGen(cg, null, false, excs);
+			}
+
+			if(null!=iteration) {
+				iteration.codeGen(cg, null, false, excs);
+			}
+
+			cg.jump(jumpNext, ((CGLoopBlockScope)cgScope).getStartLbScope());
 		}
 		
 		if(null!=elseBlockNode) {
-			elseBlockNode.codeGen(cg, cgs, false, excs);
+			elseBlockNode.codeGen(cg, null, false, excs);
 		}
-		
-		cgs.append(((CGLoopBlockScope)cgScope).getEndLbScope());
 		
 		((CGBlockScope)cgScope).build(cg, false, excs);
 		((CGBlockScope)cgScope).restoreRegsPool();

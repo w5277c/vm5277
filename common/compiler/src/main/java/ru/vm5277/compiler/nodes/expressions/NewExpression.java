@@ -100,10 +100,11 @@ public class NewExpression extends ExpressionNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
-		cgScope = cg.enterExpression(toString());
+		if(null!=cgScope) cgScope.disable();
+		cgScope = cg.enterExpression(parent, toString());
 
 		try {
 			if(1<path.size()) {
@@ -136,11 +137,13 @@ public class NewExpression extends ExpressionNode {
 			argTypes = new VarType[args.size()];
 			for(int i=0; i<args.size(); i++) {
 				ExpressionNode arg = args.get(i);
-				result&=arg.postAnalyze(scope, cg);
+				result&=arg.postAnalyze(scope, cg, cgScope);
 				if(result) {
-					ExpressionNode optimizedExpr = arg.optimizeWithScope(scope, cg);
-					if(null!=optimizedExpr) {
-						args.set(i, optimizedExpr);
+					// Резолвинг QualifiedPathExpression
+					ExpressionNode resolved = resolveQualifiedPathExpr(arg);
+					if(null!=resolved) {
+						arg = resolved;
+						args.set(i, resolved);
 					}
 					argTypes[i] = arg.getType();
 				}
@@ -169,15 +172,12 @@ public class NewExpression extends ExpressionNode {
 			result = false;
 		}
 
-		cg.leaveExpression();
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 	
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		CGScope oldScope = cg.setScope(cgScope);
-		
 		for(int i=0; i<args.size(); i++) {
 			ExpressionNode arg = args.get(i);
 			arg.codeOptimization(scope, cg);
@@ -192,27 +192,25 @@ public class NewExpression extends ExpressionNode {
 				markError(ex);
 			}
 		}
-		
-		cg.setScope(oldScope);
 	}
 
 
 	@Override
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
-		CGScope cgs = null == parent ? cgScope : parent;
+		//CGScope cgs = null == parent ? cgScope : parent;
 
 		CIScope cis = (CIScope)((MethodSymbol)symbol).getScope().getParent();
 		String classNameStr = cis.getName();
 
 		int refTypeSize = 1; // TODO Определить значение на базе количества используемых типов класса
 		// Всегда сохраняем heapIReg, метод может использовать его в своих целях
-		cg.pushHeapReg(cgs);
+		cg.pushHeapReg(cgScope);
 
-		putArgsToStack(cg, cgs, refTypeSize, excs);
+		putArgsToStack(cg, cgScope, refTypeSize, excs);
 		depCodeGen(cg, excs);
 
 		CGMethodScope mScope = (CGMethodScope)((AstHolder)symbol).getNode().getCGScope().getScope(CGMethodScope.class);
-		cg.call(cgs, mScope.getLabel());
+		cg.call(cgScope, mScope.getLabel());
 
 		return null;
 	}
@@ -239,11 +237,8 @@ public class NewExpression extends ExpressionNode {
 				// Создаем новую область видимости переменной в вызываемом методе
 				int varSize = paramVarType.isObject() ? refTypeSize + cg.getRefSize() : exprTypeSize;
 
-				CGScope oldCGScope = cg.setScope(symbol.getCGScope(CGMethodScope.class));
-				CGVarScope dstVScope = cg.enterLocal(vSymbol.getType(), varSize, false, vSymbol.getName());
+				CGVarScope dstVScope = cg.enterLocal(symbol.getCGScope(CGMethodScope.class), vSymbol.getType(), varSize, false, vSymbol.getName());
 				dstVScope.build(); // Выделяем память в стеке
-				cg.leaveLocal();
-				cg.setScope(oldCGScope);
 
 				vSymbol.setCGScope(dstVScope);
 

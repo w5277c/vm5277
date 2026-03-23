@@ -35,6 +35,13 @@ class Main {
 			System.out("else блок: i=");System.out(i);
 		}
 
+		System.out("\nЦикл for(; false;), с блоком else: ");
+		for(; false;) {
+			System.out("Ошибка!");
+		}
+		else {
+			System.out("else блок");
+		}
 
 		byte i=3;
 		System.out("\nЦикл for(; i<10; i++), i-внешняя переменная = 3:" );

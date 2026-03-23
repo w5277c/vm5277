@@ -67,6 +67,7 @@ public class J8bMojoTest {
 		rule.setVariableValueToObject(mojo, "targetStdio", "PC4");
 		rule.setVariableValueToObject(mojo, "sourceDirectory", new File(projectDir.toString() + File.separator + "src"));
 		rule.setVariableValueToObject(mojo, "outputDirectory", new File(projectDir.toString() + File.separator + "target"));
+		rule.setVariableValueToObject(mojo, "prebuildDirectory", new File(projectDir.toString() + File.separator + "prebuild"));
 		rule.setVariableValueToObject(mojo, "autoDownload", true);
 		rule.setVariableValueToObject(mojo, "downloadUrl", "https://vm5277.ru/release.zip");
 

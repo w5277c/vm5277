@@ -36,7 +36,9 @@ public class Main {
 	public			static	boolean					isWindows;
 	public			static	Path					toolkitPath;
 	private			static	boolean					quiet;
-	
+	private			static	int						tCSize				= 159;
+	private			static	int						tRSize				= 55;
+
 	public static void main(String[] args) {
 		System.exit(exec(args));
 	}
@@ -73,7 +75,7 @@ public class Main {
 		boolean smartMode = false;
 		int	waitTime = 0;
 		boolean	interactiveMode = false;
-		
+
 		boolean doClearCache = false;
 		boolean doFlash = false;
 		boolean doVerify = false;
@@ -127,6 +129,23 @@ public class Main {
 						catch(Exception ex) {}
 						if(0>retries) {
 							System.err.println("[ERROR] Invalid retries parameter value");
+							return 1;
+						}
+					}
+					else if(args.length>i+1 && (arg.equals("-x") || arg.equals("--tsize"))) {
+						try {
+							parts = args[++i].split("\\/");
+							if(0x02==parts.length) {
+								tCSize = Integer.parseInt(parts[0x00].trim());
+								tRSize = Integer.parseInt(parts[0x01].trim());
+							}
+						}
+						catch(Exception ex) {
+							tCSize=-1;
+							tRSize=-1;
+						}
+						if(0>tCSize || 0>tRSize) {
+							System.err.println("[ERROR] Invalid tsize parameter value");
 							return 1;
 						}
 					}
@@ -385,7 +404,7 @@ public class Main {
 		BootloaderIface bIface = new BootloaderIface(cpuFreq, serialDeviceName, waitTime, retries);
 		if(bIface.open()) {
 			boolean result = true;
-
+			System.out.println();
 			System.out.println("Serial port: " + (null==bIface.getSerialPort() ? "null" : bIface.getSerialPort().getPortName()));
 			System.out.println("Connection mode:" + (bIface.getDeviceInfo().isSingleWireMode() ? "1" : "2") + " wire mode");
 			System.out.println("Device info:" + bIface.getDeviceInfo());
@@ -499,7 +518,8 @@ public class Main {
 				if(result && interactiveMode) {
 					try {
 						System.out.println("\nEntering interactive mode. Press Ctrl+C to exit.");
-						SerialTerminal terminal = new SerialTerminal(bIface.getSerialPort(), serviceMessageHandler);
+						SerialTerminal terminal = new SerialTerminal(	bIface.getSerialPort(), bIface.getDeviceInfo().isSingleWireMode(), tCSize, tRSize,
+																		serviceMessageHandler);
 
 						Runtime.getRuntime().addShutdownHook(new Thread() {
 							@Override
@@ -594,6 +614,7 @@ public class Main {
 		System.out.println("  -r,  --retries <num>    Number of retries on failure (default: 3)");
 		System.out.println();
 		System.out.println("  -q,  --quiet            Quiet mode (no output)");
+		System.out.println("  -x,  --tsize            Terminal size (default: " + tCSize + "/" + tRSize + ")");
 		System.out.println("  -v,  --version          Display version");
 		System.out.println("  -h,  --help             Show this help");
 		System.out.println();

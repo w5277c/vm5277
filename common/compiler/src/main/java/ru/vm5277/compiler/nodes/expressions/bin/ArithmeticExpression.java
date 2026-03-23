@@ -18,6 +18,7 @@ package ru.vm5277.compiler.nodes.expressions.bin;
 
 import java.util.Arrays;
 import java.util.List;
+import ru.vm5277.common.PlatformType;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -46,35 +47,28 @@ public class ArithmeticExpression extends BinaryExpression {
     }
     
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterExpression(toString());
+		if(null!=cgScope) cgScope.disable();
+		cgScope = cg.enterExpression(parent, toString());
 
 		// Анализ операндов
-		result&=leftExpr.postAnalyze(scope, cg);
+		result&=leftExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
-			try {
-				ExpressionNode optimizedExpr = leftExpr.optimizeWithScope(scope, cg);
-				if(null != optimizedExpr) {
-					leftExpr = optimizedExpr;
-				}
-			}
-			catch(CompileException ex) {
-				markError(ex);
+			// Резолвинг QualifiedPathExpression
+			ExpressionNode resolved = resolveQualifiedPathExpr(leftExpr);
+			if(null!=resolved) {
+				leftExpr = resolved;
 			}
 		}
 
-		result&=rightExpr.postAnalyze(scope, cg);
+		result&=rightExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
-			try {
-				ExpressionNode optimizedExpr = rightExpr.optimizeWithScope(scope, cg);
-				if(null != optimizedExpr) {
-					rightExpr = optimizedExpr;
-				}
-			}
-			catch(CompileException ex) {
-				markError(ex);
+			// Резолвинг QualifiedPathExpression
+			ExpressionNode resolved = resolveQualifiedPathExpr(rightExpr);
+			if(null!=resolved) {
+				rightExpr = resolved;
 			}
 		}
 
@@ -202,35 +196,10 @@ public class ArithmeticExpression extends BinaryExpression {
 			}*/
 		}
 
-		cg.leaveExpression();
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 	
-	
-	@Override
-	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		CGScope oldScope = cg.setScope(cgScope);
-
-		leftExpr.codeOptimization(scope, cg);
-		rightExpr.codeOptimization(scope, cg);
-		
-		try {
-			ExpressionNode optimizedExpr = leftExpr.optimizeWithScope(scope, cg);
-			if(null != optimizedExpr) {
-				leftExpr = optimizedExpr;
-			}
-			optimizedExpr = rightExpr.optimizeWithScope(scope, cg);
-			if(null != optimizedExpr) {
-				rightExpr = optimizedExpr;
-			}
-		}
-		catch(CompileException ex) {
-			markError(ex);
-		}
-		cg.setScope(oldScope);
-	}
-
 	//TODO Добавить явные случаи Array + VarField и VarField + Array
 	//TODO Проверить порядок операндов в Literal + VarField
 	
@@ -239,7 +208,7 @@ public class ArithmeticExpression extends BinaryExpression {
 		if(disabled) return null;
 		excs.setSourcePosition(sp);
 		
-		CGScope cgs = null == parent ? cgScope : parent;
+		//CGScope cgs = null == parent ? cgScope : parent;
 		
 		// Изначально сохраняем порядок left/right
 		ExpressionNode expr1 = leftExpr;
@@ -251,12 +220,22 @@ public class ArithmeticExpression extends BinaryExpression {
 		
 		// Оптимизация порядка для коммутативных операций
 		if(operator.isCommutative()) {
-			if(leftExpr instanceof VarFieldExpression || leftExpr instanceof LiteralExpression) {
-				expr1 = rightExpr;
-				expr2 = leftExpr;
+			if(leftExpr instanceof LiteralExpression || (!(rightExpr instanceof LiteralExpression) && leftExpr instanceof VarFieldExpression)) {
+//				if(!(leftExpr instanceof VarFieldExpression) || !(rightExpr instanceof VarFieldExpression)) { // Оба операнда Var/Field - незачем менять порядок
+				//TODO меняем порядок даже для двух VarFieldExpression - так код получается компактнее (почему?)
+					expr1 = rightExpr;
+					expr2 = leftExpr;
+//				}
 			}
 		}
 
+		//AVR не умеет выполнять сложение с константой компактно особенно если типы различаются
+		//TODO верятно также не оптимально кода используются разные типы не завивимо от платформы
+		if(Operator.PLUS == operator && PlatformType.AVR==cg.getPlatform().getType() && rightExpr instanceof LiteralExpression) {
+			expr1 = rightExpr;
+			expr2 = leftExpr;
+		}
+		
 		//================ VarFieldExpression ================================
 		if(expr2 instanceof VarFieldExpression) {
 			CGCellsScope cScope2 = (CGCellsScope)expr2.getSymbol().getCGScope();
@@ -286,28 +265,28 @@ public class ArithmeticExpression extends BinaryExpression {
 */
 			//================ VarFieldExpression ==== OTHER ================================
 //			else {
-				if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgs, true, excs)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, null, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr1);
 				}
 				boolean isFixed = expr1.getType().isFixedPoint() || expr2.getType().isFixedPoint();
 				if(isFixed && !expr1.getType().isFixedPoint()) {
-					cgs.append(cg.accCast(expr1.getType(), expr2.getType()));
+					cgScope.append(cg.accCast(expr1.getType(), expr2.getType()));
 				}
-				cg.cellsAction(cgs, cScope2.getCells(), operator, expr2.getType().isFixedPoint(), excs);
+				cg.cellsAction(cgScope, cScope2.getCells(), operator, expr2.getType().isFixedPoint(), excs);
 //			}
 		}
 		//================ LiteralExpression ================================
 		else if(expr2 instanceof LiteralExpression) {
 			LiteralExpression le = (LiteralExpression)expr2;
 			//================ LiteralExpression ==== OTHER ================================
-			if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgs, true, excs)) {
+			if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgScope, true, excs)) {
 				throw new CompileException("Accum not used for operand:" + expr1);
 			}
 			boolean isFixed = expr1.getType().isFixedPoint() || expr2.getType().isFixedPoint();
 			if(isFixed && !expr1.getType().isFixedPoint()) {
-				cgs.append(cg.accCast(expr1.getType(), expr2.getType()));
+				cgScope.append(cg.accCast(expr1.getType(), expr2.getType()));
 			}
-			cg.constAction(cgs, operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed(), excs);
+			cg.constAction(cgScope, operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed(), excs);
 		}
 		//================ ArrayExpression ================================
 		else if(expr2 instanceof ArrayExpression) {
@@ -315,54 +294,54 @@ public class ArithmeticExpression extends BinaryExpression {
 			//================ ArrayExpression ==== LITERAL ================================
 			if(expr1 instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)expr1;
-				if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgs, true, excs)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgScope, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr2);
 				}
 				//Аккумулятор уже необходимого размера, но нужно проверить на Fixed
 				if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
-					cgs.append(cg.accCast(expr2.getType(), expr1.getType()));
+					cgScope.append(cg.accCast(expr2.getType(), expr1.getType()));
 				}
 				//Добавить проверку деления на 0
-				cg.constAction(cgs, operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed(), excs);
+				cg.constAction(cgScope, operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed(), excs);
 			}
 			//================ ArrayExpression ==== OTHER ================================
 			else {
-				if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgs, true, excs)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgScope, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr2);
 				}					
 
 				// Определяем максмальный размер операнда
 				int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
-				cg.pushAccBE(cgs, size);
-				if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg, cgs, true, excs)) {
+				cg.pushAccBE(cgScope, size);
+				if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg, cgScope, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr1);
 				}
 				if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
-					cgs.append(cg.accCast(expr1.getType(), expr2.getType()));
+					cgScope.append(cg.accCast(expr1.getType(), expr2.getType()));
 				}
-				cg.cellsAction(cgs, new CGCells(CGCells.Type.STACK, size), operator, expr2.getType().isFixedPoint(), excs);
+				cg.cellsAction(cgScope, new CGCells(CGCells.Type.STACK, size), operator, expr2.getType().isFixedPoint(), excs);
 			}
 		}
 		//================ Other ================================
 		else {
-			if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgs, true, excs)) {
-				throw new CompileException("Accum not used for operand:" + expr2);
+			if(CodegenResult.RESULT_IN_ACCUM!=leftExpr.codeGen(cg, null, true, excs)) {
+				throw new CompileException("Accum not used for operand:" + leftExpr);
 			}					
 
 			// Определяем максмальный размер операнда
 			int size = (leftType.getSize() > rightType.getSize() ? leftType.getSize() : rightType.getSize());
 			// Выполняем операцию, левый операнд - аккумулятор, правый операнд - значение на вершине стека
-			cg.pushAccBE(cgs, size);
+			cg.pushAccBE(leftExpr.getCGScope(), size);
 			// Строим код для expr1(результат в аккумуляторе)
-			if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg, cgs, true, excs)) {
-				throw new CompileException("Accum not used for operand:" + expr1);
+			if(CodegenResult.RESULT_IN_ACCUM != rightExpr.codeGen(cg, null, true, excs)) {
+				throw new CompileException("Accum not used for operand:" + rightExpr);
 			}
 
 			// Аккумулятор уже необходимого размера, но нужно проверить на Fixed
-			if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
-				cgs.append(cg.accCast(expr1.getType(), expr2.getType()));
+			if(leftType.isFixedPoint() ^ rightType.isFixedPoint()) {
+				cgScope.append(cg.accCast(leftType, rightType));
 			}
-			cg.cellsAction(cgs, new CGCells(CGCells.Type.STACK, size), operator, expr2.getType().isFixedPoint(), excs);
+			cg.cellsAction(cgScope, new CGCells(CGCells.Type.STACK, size), operator, rightType.isFixedPoint(), excs);
 		}
 		
 		return CodegenResult.RESULT_IN_ACCUM;

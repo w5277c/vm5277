@@ -259,7 +259,7 @@ _OS_DRAM_FIND_FREE_CELLS__BYTELOOP:
 	CPI RESULT,0xff											;Пропускаем проверку бит, если все биты включены
 	BREQ _OS_DRAM_FIND_FREE_CELLS__BYTELOOP_IS_HI
 
-	LDI TEMP_L,0x08											;Цикл из 8 бит
+	LDI TEMP_EL,0x08										;Цикл из 8 бит
 _OS_DRAM_FIND_FREE_CELLS__BITLOOP:
 	LSL RESULT												;Сдвигаем байт карты для поиска нулевого бита(младший бит слева)
 	BRCS _OS_DRAM_FIND_FREE_CELLS__BITLOOP_IS_HI
@@ -269,18 +269,17 @@ _OS_DRAM_FIND_FREE_CELLS__BITLOOP:
 	;Это первый нулевой бит, запоминаем адрес памяти, инициализируем размер необходимых данных и включаем флаг
 	MOVW ZL,XL
 	LDI FLAGS,0x01
-	MOV TEMP_H,TEMP_L
-	MOVW TEMP_EL,ACCUM_L
+	MOV TEMP_EH,TEMP_EL
+	MOVW TEMP_L,ACCUM_L
 	;Общая логика для первого и последующего нулевых бит
-	SUBI TEMP_EL,0x01										;Вычитаем 1 ячейку из необходимого размера
-	SBCI TEMP_EH,0x00
+	SBIW TEMP_L,0x01										;Вычитаем 1 ячейку из необходимого размера
 	BREQ _OS_DRAM_FIND_FREE_CELLS__OK						;Если размер стал нулевым, то блок найден
 	RJMP _OS_DRAM_FIND_FREE_CELLS__BITLOOP_IS_NEXT
 _OS_DRAM_FIND_FREE_CELLS__BITLOOP_IS_HI:
 	LDI FLAGS,0x00											;Обрываем цепочку проверки длины блока нулевых битов
 _OS_DRAM_FIND_FREE_CELLS__BITLOOP_IS_NEXT:
 	ADIW XL,0x01
-	DEC TEMP_L
+	DEC TEMP_EL
 	BRNE _OS_DRAM_FIND_FREE_CELLS__BITLOOP
 	RJMP _OS_DRAM_FIND_FREE_CELLS__BYTELOOP_NEXT
 
@@ -298,7 +297,7 @@ _OS_DRAM_FIND_FREE_CELLS__BYTELOOP_NEXT:
 _OS_DRAM_FIND_FREE_CELLS__OK:
 	;Блок найден, подготавливаем данные для заполнения блока бит.маски
 	LDI ACCUM_EH,0x08
-	SUB ACCUM_EH,TEMP_H
+	SUB ACCUM_EH,TEMP_EH
 ;	SUB YL,TEMP_H
 ;	SBC YH,C0x00
 	LDI ACCUM_EL,0x01										;Устанавливаем биты в 1

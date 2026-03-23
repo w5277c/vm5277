@@ -71,7 +71,7 @@ public class CGBlockScope extends CGScope {
 		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";build " + this.getClass().getSimpleName() + " '" + name + "'"));
 
 		if(0!=mScope.getArgsStackSize() || 0!=stackOffset) {
-			cont.append(cg.stackPrepare(isFirstBlock, mScope.getArgsStackSize(), stackOffset, excs));
+			cg.stackPrepare(cont, isFirstBlock, mScope.getArgsStackSize(), stackOffset, excs);
 		}
 
 		// Регистры(если используются в качестве переменных) используемые в нативных вызовах должны быть сохранены в методе invokeNative
@@ -267,5 +267,10 @@ public class CGBlockScope extends CGScope {
 	@Override
 	public String getLName() {
 		return "";
+	}
+	
+	@Override
+	public String toString() {
+		return "block " + name;
 	}
 }

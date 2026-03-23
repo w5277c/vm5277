@@ -275,12 +275,10 @@ public class BlockNode extends AstNode {
 	}
 	
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		if(null!=postResult) return postResult;
-		postResult = true;
-
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
+		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
-		cgScope = cg.enterBlock(isTry, comment);
+		cgScope = cg.enterBlock(parent, isTry, comment);
 		
 		for(int i=0; i<children.size(); i++) {
 			AstNode node = children.get(i);
@@ -289,18 +287,12 @@ public class BlockNode extends AstNode {
 			sp = node.getSP();
 			
 			// Анализируем текущую ноду
-			postResult&=node.postAnalyze(blockScope, cg);
-			if(postResult) {
-				if(node instanceof ExpressionNode) {
-					try {
-						ExpressionNode optimizedNode = ((ExpressionNode)node).optimizeWithScope(blockScope, cg);
-						if(null != optimizedNode) {
-							node = optimizedNode;
-							node.postAnalyze(blockScope, cg);
-							children.set(i, node);
-						}
-					}
-					catch(Exception ex) {}
+			result&=node.postAnalyze(blockScope, cg, cgScope);
+			if(result) {
+				// Резолвинг QualifiedPathExpression
+				ExpressionNode resolved = resolveQualifiedPathExpr(node);
+				if(null!=resolved) {
+					children.set(i, resolved);
 				}
 
 				// Проверяем недостижимый код после прерывающих инструкций
@@ -312,20 +304,31 @@ public class BlockNode extends AstNode {
 			}
 		}
 		
-		cg.leaveBlock();
-		debugAST(this, POST, false, postResult, getFullInfo());
-		return postResult;
+		debugAST(this, POST, false, result, getFullInfo());
+		return result;
 	}
 
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		CGScope oldScope = cg.setScope(cgScope);
-		for(AstNode node : children) {
+		for(int i=0; i<children.size(); i++) {
+			AstNode node = children.get(i);
 			if(!node.isDisabled()) {
 				node.codeOptimization(blockScope, cg);
+				// Могут быть самостоятельные выражения, типа y++
+				if(node instanceof ExpressionNode) {
+					try {
+						ExpressionNode optimizedExpr = ((ExpressionNode)node).optimizeWithScope(scope, cg);
+						if(null != optimizedExpr) {
+							node = optimizedExpr;
+							children.set(i, node);
+						}
+					}
+					catch(CompileException ex) {
+						markError(ex);
+					}
+				}
 			}
 		}
-		cg.setScope(oldScope);
 	}
 	
 	public void firstCodeGen(CodeGenerator cg, CGExcs excs) throws CompileException {
@@ -356,12 +359,12 @@ public class BlockNode extends AstNode {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 		
-		CGScope cgs = null == parent ? cgScope : parent;
+		//CGScope cgs = null == parent ? cgScope : parent;
 
 		for(AstNode node : children) {
 			//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
 			if(!(node instanceof VarNode)) {
-				node.codeGen(cg, cgs, false, excs);
+				node.codeGen(cg, cgScope, false, excs);
 			}
 		}
 		

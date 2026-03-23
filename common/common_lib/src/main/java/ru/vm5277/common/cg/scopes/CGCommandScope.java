@@ -16,7 +16,12 @@
 package ru.vm5277.common.cg.scopes;
 
 public class CGCommandScope extends CGScope {
-	public CGCommandScope(CGScope parent) {
-		super(parent, -1, "");
+	public CGCommandScope(CGScope parent, String name) {
+		super(parent, -1, name);
+	}
+	
+	@Override
+	public String toString() {
+		return "cmd " + name;
 	}
 }

@@ -51,56 +51,47 @@ public class AssignExpression extends BinaryExpression {
     }
     
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		if(null!=postResult) return postResult;
-		postResult = true;
-		
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
+		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterExpression(toString());
+		if(null!=cgScope) cgScope.disable();
+		cgScope = cg.enterExpression(parent, toString());
 
 		// Анализ операндов
-		postResult&=leftExpr.postAnalyze(scope, cg);
-		if(postResult) {
-			try {
-				ExpressionNode optimizedExpr = leftExpr.optimizeWithScope(scope, cg);
-				if(null != optimizedExpr) {
-					leftExpr = optimizedExpr;
-				}
-			}
-			catch(CompileException ex) {
-				markError(ex);
+		result&=leftExpr.postAnalyze(scope, cg, cgScope);
+		if(result) {
+			// Резолвинг QualifiedPathExpression
+			ExpressionNode resolved = resolveQualifiedPathExpr(leftExpr);
+			if(null!=resolved) {
+				leftExpr = resolved;
 			}
 		}
 
-		postResult&=rightExpr.postAnalyze(scope, cg);
-		if(postResult) {
-			try {
-				ExpressionNode optimizedExpr = rightExpr.optimizeWithScope(scope, cg);
-				if(null != optimizedExpr) {
-					rightExpr = optimizedExpr;
-				}
-			}
-			catch(CompileException ex) {
-				markError(ex);
+		result&=rightExpr.postAnalyze(scope, cg, cgScope);
+		if(result) {
+			// Резолвинг QualifiedPathExpression
+			ExpressionNode resolved = resolveQualifiedPathExpr(rightExpr);
+			if(null!=resolved) {
+				rightExpr = resolved;
 			}
 		}
 
-		if(postResult) {
+		if(result) {
 			// Проверка final переменных
 			if(leftExpr.getSymbol().isFinal()) {
 				markError("Cannot assign to final var/field: " + leftExpr);
-				postResult = false;
+				result = false;
 			}
 		}
 		
-		if(postResult) {
+		if(result) {
 			if(leftExpr instanceof VarFieldExpression) {
 				if(rightExpr instanceof UnaryExpression) {
 					Operator unaryOp = ((UnaryExpression)rightExpr).getOperator();
 					if(Operator.MINUS==unaryOp && !rightExpr.getType().isFixedPoint()) {
 						if(AssemblerInterface.STRICT_STRONG==Main.getStrictLevel()) {
 							markError("Unary " + ((UnaryExpression)rightExpr).getOperator() + " requires fixed type");
-							postResult = false;
+							result = false;
 						}
 						else if(AssemblerInterface.STRICT_LIGHT==Main.getStrictLevel()) {
 							markWarning("Unary " + ((UnaryExpression)rightExpr).getOperator() + " requires fixed type");
@@ -118,7 +109,7 @@ public class AssignExpression extends BinaryExpression {
 								else {
 									markError("Redudnand statement");
 								}
-								postResult = false;
+								result = false;
 							}
 							else if(AssemblerInterface.STRICT_LIGHT == Main.getStrictLevel()) {
 								if(Operator.POST_INC==unaryOp || Operator.POST_DEC==unaryOp) {
@@ -137,16 +128,16 @@ public class AssignExpression extends BinaryExpression {
 				//TODO проверить
 				if(((ArrayExpression)leftExpr).getDepth()!=((ArrayExpression)leftExpr).getPathExpr().getType().getArrayDepth()) {
 					markError("Array assignment dimension mismatch");
-					postResult = false;
+					result = false;
 				}
 			}
 			else {
 				markError("Invalid left operand for assignment: " + leftExpr);
-				postResult = false;
+				result = false;
 			}
 		}
 		
-		if(postResult) {
+		if(result) {
 			if(leftExpr instanceof VarFieldExpression && rightExpr instanceof VarFieldExpression) {
 				if(((VarFieldExpression)leftExpr).isSameVarFiled((VarFieldExpression)rightExpr)) {
 					markWarning("Self-assignment for '" + ((VarFieldExpression)rightExpr).getName() + "' has no effect");
@@ -155,7 +146,7 @@ public class AssignExpression extends BinaryExpression {
 			}
 		}
 
-		if(postResult) {
+		if(result) {
 			leftType = leftExpr.getType();
 			rightType = rightExpr.getType();
 
@@ -171,37 +162,36 @@ public class AssignExpression extends BinaryExpression {
 			// Проверка на NULL присваивание
 			if(!leftType.isReferenceType() && VarType.NULL==rightType) {
 				markError("Cannot assign null to non-reference type: " + leftType);
-				postResult = false;
+				result = false;
 			}
 
-			if(postResult) {
+			if(result) {
 				if(!isCompatibleWith(scope, leftType, rightType)) {
 					if(VarType.FIXED==type && rightExpr instanceof LiteralExpression && rightType.isIntegral()) {
 						long num = ((LiteralExpression)rightExpr).getNumValue();
 						if(num<VarType.FIXED_MIN || num>VarType.FIXED_MAX) {
 							markError("Type mismatch: cannot assign " + rightType + " to " + type);
-							postResult = false;
+							result = false;
 						}
 					}
 					else {
 						markError("Type mismatch: cannot assign " + rightType + " to " + type);
-						postResult = false;
+						result = false;
 					}
 				}
 			}
 		}
 
-		cg.leaveExpression();
-		debugAST(this, POST, false, postResult, getFullInfo());
-		return postResult;
+		debugAST(this, POST, false, result, getFullInfo());
+		return result;
 	}
-	
+
 	@Override
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, boolean toAccum, CGExcs excs) throws CompileException {
 		if(disabled) return null;
 		excs.setSourcePosition(sp);
 		
-		CGScope cgs = null == parent ? cgScope : parent;
+		//CGScope cgs = null == parent ? cgScope : parent;
 		
 		// Для всех выражений должны быть удовлетворены зависимости
 		depCodeGen(cg, leftExpr.getSymbol(), excs);
@@ -213,44 +203,44 @@ public class AssignExpression extends BinaryExpression {
 		//================ VarFieldExpression ================================
 		if(leftExpr instanceof VarFieldExpression) {
 			VarFieldExpression leftVfe = (VarFieldExpression)leftExpr;
-			leftExpr.codeGen(cg, cgs, false, excs);
+			leftExpr.codeGen(cg, cgScope, false, excs);
 			CGCellsScope leftCScope = (CGCellsScope)leftVfe.getSymbol().getCGScope();
 
 			//================ VarFieldExpression ==== NULL ================================
 			if(VarType.NULL==rightType) { // В левой части reference type (гарантирует postAnalyze)
 				// Сохраням HEAP индексный регистр
-				cg.pushHeapReg(cgs);
+				cg.pushHeapReg(cgScope);
 				// Декремент счетчика ссылок
-				cg.updateClassRefCount(cgs, leftCScope.getCells(), false);
+				cg.updateClassRefCount(cgScope, leftCScope.getCells(), false);
 				// Восстанавливаем HEAP индексный регистр
-				cg.popHeapReg(cgs);
+				cg.popHeapReg(cgScope);
 				// Записываем в ref адрес 0 - при обращении необходимо выдать что-то типа 'null pointer exception'
-				cgs.append(cg.constToCells(cgs, 0x00, leftCScope.getCells(), false));
+				cgScope.append(cg.constToCells(cgScope, 0x00, leftCScope.getCells(), false));
 			}
 			//================ VarFieldExpression ==== VAR/FIELD ================================
 			else if(rightExpr instanceof VarFieldExpression) {
 				VarFieldExpression rightVfe = (VarFieldExpression)rightExpr;
 				CGCellsScope rightCScope = (CGCellsScope)rightExpr.getSymbol().getCGScope();				
-				if(CodegenResult.RESULT_IN_ACCUM!=rightVfe.codeGen(cg, cgs, true, excs)) {
-					cg.cellsToAcc(cgs, rightCScope);
+				if(CodegenResult.RESULT_IN_ACCUM!=rightVfe.codeGen(cg, cgScope, true, excs)) {
+					cg.cellsToAcc(cgScope, rightCScope);
 				}
-			    cg.accToCells(cgs, leftCScope);
+			    cg.accToCells(cgScope, leftCScope);
 			}
 			//================ VarFieldExpression ==== ARRAY ================================
 			else if(rightExpr instanceof ArrayExpression) {
 				ArrayExpression ae = (ArrayExpression)rightExpr;
-				if(CodegenResult.RESULT_IN_ACCUM!=ae.codeGen(cg, cgs, true, excs)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=ae.codeGen(cg, cgScope, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + rightExpr);
 				}
-				cgs.append(cg.accCast(rightType, leftType));
-				cg.accToCells(cgs, leftCScope);
+				cgScope.append(cg.accCast(rightType, leftType));
+				cg.accToCells(cgScope, leftCScope);
 			}
 			//================ VarFieldExpression ==== LITERAL ================================
 			else if(rightExpr instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)rightExpr;
 				// Определяем использование FIXED
 				boolean isFixed = le.isFixed() || VarType.FIXED == leftType;
-				cgs.append(cg.constToCells(cgs, isFixed ? le.getFixedValue() : le.getNumValue(), leftCScope.getCells(), isFixed));
+				cgScope.append(cg.constToCells(cgScope, isFixed ? le.getFixedValue() : le.getNumValue(), leftCScope.getCells(), isFixed));
 			}
 			//================ VarFieldExpression ==== UNARY ================================
 			else if(rightExpr instanceof UnaryExpression) {
@@ -264,23 +254,23 @@ public class AssignExpression extends BinaryExpression {
 				}
 				
 				if(justInvertVar) {
-					rightExpr.codeGen(cg, cgs, false, excs);
+					rightExpr.codeGen(cg, cgScope, false, excs);
 				}
 				else {
-					if(CodegenResult.RESULT_IN_ACCUM==rightExpr.codeGen(cg, cgs, true, excs)) {
-						cgs.append(cg.accCast(rightType, leftType));
-						cg.accToCells(cgs, leftCScope);
+					if(CodegenResult.RESULT_IN_ACCUM==rightExpr.codeGen(cg, cgScope, true, excs)) {
+						cgScope.append(cg.accCast(rightType, leftType));
+						cg.accToCells(cgScope, leftCScope);
 					}
 				}
 			}
 			//================ VarFieldExpression ==== OTHER ================================
 			else {
-				if(CodegenResult.RESULT_IN_ACCUM!=rightExpr.codeGen(cg, cgs, true, excs)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=rightExpr.codeGen(cg, cgScope, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + rightExpr);
 				}
 				else {
-					cgs.append(cg.accCast(rightType, leftType));
-					cg.accToCells(cgs, leftCScope);
+					cgScope.append(cg.accCast(rightType, leftType));
+					cg.accToCells(cgScope, leftCScope);
 				}
 			}
 		}
@@ -291,7 +281,7 @@ public class AssignExpression extends BinaryExpression {
 
 			//================ ArrayExpression ==== NULL ================================
 			if(VarType.NULL==rightType) { // В левой части reference type (гарантирует postAnalyze)
-				leftExpr.codeGen(cg, cgs, false, excs);
+				leftExpr.codeGen(cg, cgScope, false, excs);
 				//TODO нужно проверить!
 				// Проверяем на View
 				boolean isView = false;
@@ -303,38 +293,38 @@ public class AssignExpression extends BinaryExpression {
 					}
 				}
 				// Декремент счетчика ссылок
-				cg.updateArrRefCount(cgs, leftCScope.getCells(), false, isView);
+				cg.updateArrRefCount(cgScope, leftCScope.getCells(), false, isView);
 				// Записываем в ref адрес 0 - при обращении необходимо выдать что-то типа 'null pointer exception'
-				cgs.append(cg.constToCells(cgs, 0x00, leftCScope.getCells(), false));
+				cgScope.append(cg.constToCells(cgScope, 0x00, leftCScope.getCells(), false));
 			}
 			//================ ArrayExpression ==== ARRAY ================================
 			else if(rightExpr instanceof ArrayExpression) {
-				if(CodegenResult.RESULT_IN_ACCUM!=rightExpr.codeGen(cg, cgs, true, excs)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=rightExpr.codeGen(cg, cgScope, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + rightExpr);
 				}
-				leftExpr.codeGen(cg, cgs, false, excs);
-				cgs.append(cg.accCast(rightType, leftType));
-				cg.accToArr(cgs, (CGArrCells)leftCScope.getCells());
+				leftExpr.codeGen(cg, cgScope, false, excs);
+				cgScope.append(cg.accCast(rightType, leftType));
+				cg.accToArr(cgScope, (CGArrCells)leftCScope.getCells());
 			}
 			//================ ArrayExpression ==== LITERAL ================================
 			else if(rightExpr instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)rightExpr;
-				leftExpr.codeGen(cg, cgs, false, excs);
+				leftExpr.codeGen(cg, cgScope, false, excs);
 				// Определяем использование FIXED
 				boolean isFixed = le.isFixed() || VarType.FIXED == leftType;
-				cgs.append(cg.constToCells(cgs, isFixed ? le.getFixedValue() : le.getNumValue(), leftCScope.getCells(), isFixed));
+				cgScope.append(cg.constToCells(cgScope, isFixed ? le.getFixedValue() : le.getNumValue(), leftCScope.getCells(), isFixed));
 			}
 			//================ ArrayExpression ==== OTHER ================================
 			else {
-				if(CodegenResult.RESULT_IN_ACCUM!=rightExpr.codeGen(cg, cgs, true, excs)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=rightExpr.codeGen(cg, cgScope, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + rightExpr);
 				}
 				int accumSize = cg.getAccum().getSize();
-				cg.pushAccBE(cgs, accumSize);
-				leftExpr.codeGen(cg, cgs, false, excs);
-				cg.popAccBE(cgs, accumSize);
+				cg.pushAccBE(cgScope, accumSize);
+				leftExpr.codeGen(cg, cgScope, false, excs);
+				cg.popAccBE(cgScope, accumSize);
 				cg.accCast(rightType, leftType);
-				cg.accToCells(cgs, (CGCellsScope)leftExpr.getSymbol().getCGScope());
+				cg.accToCells(cgScope, (CGCellsScope)leftExpr.getSymbol().getCGScope());
 			}
 		}
 

@@ -61,18 +61,37 @@ public class ExpressionsContainer extends ExpressionNode {
 	}
 	
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
-		for(ExpressionNode expr : expressions) {
-			result&=expr.postAnalyze(scope, cg);
+		for(int i=0; i<expressions.size(); i++) {
+			ExpressionNode expr = expressions.get(i);
+			result&=expr.postAnalyze(scope, cg, parent);
+			if(result) {
+				// Резолвинг QualifiedPathExpression
+				ExpressionNode resolved = resolveQualifiedPathExpr(expr);
+				if(null!=resolved) {
+					expr = resolved;
+					expressions.set(i, resolved);
+				}
+			}
 		}
 		return result;
 	}
 
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		for(ExpressionNode expr : expressions) {
+		for(int i=0; i<expressions.size(); i++) {
+			ExpressionNode expr = expressions.get(i);
 			expr.codeOptimization(scope, cg);
+			try {
+				ExpressionNode optimizedExpr = expr.optimizeWithScope(scope, cg);
+				if(null!=optimizedExpr) {
+					expressions.set(i, optimizedExpr);
+				}
+			}
+			catch(CompileException ex) {
+				markError(ex);
+			}
 		}
 	}
 	

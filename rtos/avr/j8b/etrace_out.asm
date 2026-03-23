@@ -27,14 +27,14 @@ J8BPROC_ETRACE_OUT:
 ;Вывод исключения и его точек прохода
 ;-----------------------------------------------------------
 	PUSH_X
-	PUSH ACCUM_L
+	PUSH_A16
 
 	LDI ACCUM_L,'\n'
 	MCALL OS_OUT_CHAR
 	LDI ACCUM_L,0x00
 	MCALL OS_OUT_CHAR
 	PUSH_Z
-	LDI_Z _J8BPROC_ETRACE_OUT_STR*2
+	LDI_A16 _J8BPROC_ETRACE_OUT_STR*2
 	MCALL OS_OUT_CSTR
 	POP_Z
 	
@@ -112,7 +112,7 @@ _J8BPROC_ETRACE_OUT__DONE:
 	LDI ACCUM_L,'\n'
 	MCALL OS_OUT_CHAR
 
-	POP ACCUM_L
+	POP_A16
 	POP_X
 	RET
 .ENDIF

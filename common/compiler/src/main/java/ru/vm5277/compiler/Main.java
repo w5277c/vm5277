@@ -37,6 +37,7 @@ import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.compiler.Optimization;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.compiler.codegen.PlatformLoader;
 import ru.vm5277.common.messages.MessageContainer;
@@ -54,6 +55,7 @@ public class Main {
 	private			static	int						stirctLevel			= STRICT_LIGHT;
 	private			static	int						optLevel			= Optimization.SIZE;
 	public	final	static	boolean					DEBUG_AST			= false;
+	public	final	static	boolean					DEBUG_CGSCOPE		= false;
 	private	final	static	Map<Object, Integer>	DEBUG_AST_CNTR_MAP	= new HashMap<>();
 	private			static	boolean					quiet				= false;
 	
@@ -314,7 +316,8 @@ public class Main {
 		}
 		else {
 			if(!quiet) System.out.println("Semantic...");
-			SemanticAnalyzer.analyze(clazz, cg, parser.getAutoImported());
+			CGScope parentCGScope = new CGScope();
+			SemanticAnalyzer.analyze(clazz, cg, parentCGScope, parser.getAutoImported());
 			time = (System.currentTimeMillis() - timestamp) / 1000f;
 			if(!quiet) System.out.println("Semantic done, time:" + String.format(Locale.US, "%.3f", time) + " s");
 
@@ -368,9 +371,13 @@ public class Main {
 						File asmFile = outputPath.resolve(sourceName + ".asm").normalize().toFile();
 						asmFile.createNewFile();
 						FileWriter fw = new FileWriter(asmFile);
-						fw.write(cg.getAsm(asmDefsPath, mc));
+						fw.write(cg.getAsm(parentCGScope, asmDefsPath, mc));
 						fw.close();
 
+						if(DEBUG_CGSCOPE) {
+							cg.showScopeTree(parentCGScope);
+						}
+						
 						//TODO обозвать fwreport.txt - будет хранить все тех. описание сгенерированной прошивки (ресурсы, метки, типы, исключения,
 						//выделенные пулы памяти, вероятный размер испольуемых ресурсов, включенные фичи и т.п.
 						File dbgFile = outputPath.resolve(sourceName + ".dbg").normalize().toFile();
@@ -486,7 +493,7 @@ public class Main {
 	}
 
 	private static void showInvalidOptLevel(String invalidParam) {
-		System.err.println("[ERROR] TODO Invalid optimization level:" + invalidParam + ", expected none|size|speed");
+		System.err.println("[ERROR] TODO Invalid optimization level:" + invalidParam + ", expected none|front|size|speed");
 	}
 
 	public static int getStrictLevel() {

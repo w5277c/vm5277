@@ -19,9 +19,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class CGIContainer extends CGItem {
-	private	final	List<CGItem>	items	= new ArrayList<>();
-	private			int				pos		= 0;
-	private			String			tag;
+	protected	final	List<CGItem>	items	= new ArrayList<>();
+	private				int				pos		= 0;
+	private				String			tag;
 	
 	public CGIContainer() {
 		tag = "";
@@ -81,6 +81,61 @@ public class CGIContainer extends CGItem {
 			}
 		}
 
+		return sb.toString();
+	}
+	
+	public String dumpTree(String indent, boolean includeDisabled) {
+		StringBuilder sb = new StringBuilder();
+		sb.append(indent).append("+-- ").append(this.getClass().getSimpleName());
+		
+		if (tag != null && !tag.isEmpty()) {
+			sb.append(" [tag=\"").append(tag).append("\"]");
+		}
+		
+		if (items.isEmpty()) {
+			sb.append(" (empty)\n");
+			return sb.toString();
+		}
+		
+		sb.append("\n");
+		
+		String childIndent = indent + "  ";
+		boolean lastWasContainer = false;
+		
+		for (int i = 0; i < items.size(); i++) {
+			CGItem item = items.get(i);
+			
+			if (!includeDisabled && item.isDisabled()) {
+				continue;
+			}
+			
+			boolean isLast = (i == items.size() - 1);
+			
+			if (item instanceof CGIContainer) {
+				sb.append(indent).append(isLast ? "  " : "| ");
+				sb.append(((CGIContainer)item).dumpTree(childIndent, includeDisabled));
+				lastWasContainer = true;
+			} else {
+				sb.append(indent).append(isLast ? "  " : "| ");
+				sb.append("|-").append(item.getClass().getSimpleName() + "" + item.getSource());
+				
+/*				// Дополнительная информация для различных типов
+				if (item instanceof CGIAsmIReg) {
+					sb.append(" (register)");
+				} else if (item instanceof CGIConst) {
+					sb.append(" (constant)");
+				}
+				// Добавьте другие типы по необходимости
+*/				
+				if (item.isDisabled()) {
+					sb.append(" [DISABLED]");
+				}
+				
+				sb.append("\n");
+				lastWasContainer = false;
+			}
+		}
+		
 		return sb.toString();
 	}
 	

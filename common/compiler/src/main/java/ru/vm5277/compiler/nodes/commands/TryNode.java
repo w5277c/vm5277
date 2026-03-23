@@ -147,18 +147,22 @@ public class TryNode extends CommandNode {
 	}
 	
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
-		cgScope = cg.enterCommand();
+		cgScope = cg.enterCommand(parent, "try");
 		
+		CGScope tryScope = new CGScope(parent, CGScope.genId(), "try");
+		CGScope catchScope = new CGScope(parent, CGScope.genId(), "catch");
+
+		// Сначала выполняет обработку catch блоков, так как минимум нам нужно заполнить в BlockScope handlingExcsScopes
 		if(result) {
 			for(CatchBlock cBlock : catchBlocks) {
-				result&=cBlock.postAnalyze(cBlock.getScope(), cg, tryBlock);
+				result&=cBlock.postAnalyze(cBlock.getScope(), cg, catchScope, tryBlock);
 			}
 		}
 
 		if(result) {
-			result&=tryBlock.postAnalyze(tryBlock.getScope(), cg);
+			result&=tryBlock.postAnalyze(tryBlock.getScope(), cg, tryScope);
 		}
 
 		if(result) {
@@ -173,25 +177,18 @@ public class TryNode extends CommandNode {
 				}
 				((CGTryBlockScope)tryBlock.getCGScope()).addCatchExceptions(ids);
 			}
-			
-			
 		}
 		
-		cg.leaveCommand();
 		return result;
 	}
 	
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		CGScope oldScope = cg.setScope(cgScope);
-		
 		tryBlock.codeOptimization(scope, cg);
 		
 		for(CatchBlock cBlock : catchBlocks) {
 			cBlock.codeOptimization(cBlock.getScope(), cg);
 		}
-
-		cg.setScope(oldScope);
 	}
 
 	
@@ -200,7 +197,7 @@ public class TryNode extends CommandNode {
 		if(cgDone) return null;
 		cgDone = true;
 
-		CGScope cgs = null == parent ? cgScope : parent;
+		//CGScope cgs = null == parent ? cgScope : parent;
 
 		CGExcs newExcs = new CGExcs();
 		CGTryBlockScope tbs = ((CGTryBlockScope)tryBlock.getCGScope());
@@ -211,11 +208,11 @@ public class TryNode extends CommandNode {
 		}
 		newExcs.getRuntimeChecks().putAll(excs.getRuntimeChecks());
 
-		tryBlock.codeGen(cg, cgs, false, newExcs);
+		tryBlock.codeGen(cg, cgScope, false, newExcs);
 
 		for(CatchBlock cBlock : catchBlocks) {
 			if(Optimization.NONE==Main.getOptLevel()) {
-				cBlock.codeGen(cg, cgs, false, excs, true);
+				cBlock.codeGen(cg, cgScope, false, excs, true);
 				l1:
 				for(ExceptionScope eScope : cBlock.getExceptionScopes()) {
 					if(newExcs.getProduced().contains(eScope.getId())) {
@@ -249,7 +246,7 @@ public class TryNode extends CommandNode {
 						}
 					}
 				}
-				cBlock.codeGen(cg, cgs, false, excs, isUsed);
+				cBlock.codeGen(cg, cgScope, false, excs, isUsed);
 			}
 		}
 		excs.getProduced().addAll(newExcs.getProduced());

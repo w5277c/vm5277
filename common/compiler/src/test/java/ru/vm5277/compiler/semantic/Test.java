@@ -24,6 +24,7 @@ import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.Platform;
 import ru.vm5277.common.PlatformType;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.compiler.Optimization;
 import ru.vm5277.compiler.ASTParser;
 import ru.vm5277.common.lexer.Lexer;
@@ -72,7 +73,7 @@ public class Test {
 		Lexer lexer = new Lexer(LexerType.J8B, "class Clazz{ void method() { byte b1 = -1; byte b2=0; byte b3=255; byte b4 = 256; byte B5=128; }}",
 								false, 0x04);
 		ASTParser parser = new ASTParser(null, null, lexer.getTokens(), mc, 0x04);
-		SemanticAnalyzer.analyze(parser.getClazz(), cg, null);
+		SemanticAnalyzer.analyze(parser.getClazz(), cg, new CGScope(), null);
 		assertEquals(2, mc.getErrorCntr());
 		assertEquals(2, mc.getWarningCntr());
 	}

@@ -137,67 +137,114 @@ public class PropertyExpression extends ExpressionNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterExpression(toString());
+		if(null!=cgScope) cgScope.disable();
+		cgScope = cg.enterExpression(parent, toString());
 
-		try {
-			ExpressionNode optimizedParentScope = targetExpr.optimizeWithScope(scope, cg);
-			if(null!=optimizedParentScope) {
-				targetExpr = optimizedParentScope;
+		result&=targetExpr.postAnalyze(scope, cg, cgScope);
+		if(result) {
+			// Резолвинг QualifiedPathExpression
+			ExpressionNode resolved = resolveQualifiedPathExpr(targetExpr);
+			if(null!=resolved) {
+				targetExpr = resolved;
 			}
-			result&=targetExpr.postAnalyze(scope, cg);
+		}
 
-			for(int i=0; i<args.size(); i++) {
-				ExpressionNode arg = args.get(i);
-				result&=arg.postAnalyze(scope, cg);
-				if(result) {
-					ExpressionNode optimizedExpr = arg.optimizeWithScope(scope, cg);
-					if(null!=optimizedExpr) {
-						args.set(i, optimizedExpr);
-						arg = optimizedExpr;
-					}
+		for(int i=0; i<args.size(); i++) {
+			ExpressionNode arg = args.get(i);
+			result&=arg.postAnalyze(scope, cg, cgScope);
+			if(result) {
+				// Резолвинг QualifiedPathExpression
+				ExpressionNode resolved = resolveQualifiedPathExpr(arg);
+				if(null!=resolved) {
+					arg = resolved;
+					args.set(i, resolved);
 				}
 			}
-			
-			if(targetExpr instanceof TypeReferenceExpression) {
-				TypeReferenceExpression tre = (TypeReferenceExpression)targetExpr;
-				enumScope = (EnumScope)((TypeReferenceExpression)targetExpr).getScope();
-				if(args.isEmpty() && Property.size==property) {
-					type = VarType.BYTE;
+		}
+
+		if(targetExpr instanceof TypeReferenceExpression) {
+			TypeReferenceExpression tre = (TypeReferenceExpression)targetExpr;
+			enumScope = (EnumScope)((TypeReferenceExpression)targetExpr).getScope();
+			if(args.isEmpty() && Property.size==property) {
+				type = VarType.BYTE;
+			}
+			else if(0x01==args.size() && Property.item==property) {
+				type = tre.getType();
+				ExpressionNode argExpr = args.get(0);
+				if(VarType.BYTE!=argExpr.getType()) {
+					markError("Enum index must be byte value, but found: " + argExpr.getType());
+					result = false;
 				}
-				else if(0x01==args.size() && Property.item==property) {
-					type = tre.getType();
-					ExpressionNode argExpr = args.get(0);
-					if(VarType.BYTE!=argExpr.getType()) {
-						markError("Enum index must be byte value, but found: " + argExpr.getType());
+
+				if(argExpr instanceof LiteralExpression) {
+					LiteralExpression le = (LiteralExpression)argExpr;
+					long index = le.getNumValue();
+					int size = enumScope.getSize();
+					if(0>index || index>=size) {
+						markError("Enum index out of bounds: " + index + ", valid range: 0-" + (size-1));
 						result = false;
 					}
-					
-					if(argExpr instanceof LiteralExpression) {
-						LiteralExpression le = (LiteralExpression)argExpr;
-						long index = le.getNumValue();
-						int size = enumScope.getSize();
-						if(0>index || index>=size) {
-							markError("Enum index out of bounds: " + index + ", valid range: 0-" + (size-1));
-							result = false;
+				}
+			}
+			else {
+				if(args.isEmpty()) {
+					markError("Unsupported enum property:" + property.name() + "()");
+				}
+				else {
+					markError("Unsupported enum property:" + property.name() + "(" + StrUtils.toString(args) + ")");
+				}
+				result = false;
+			}
+		}
+		else if(targetExpr instanceof EnumExpression) {
+			EnumExpression ee = (EnumExpression)targetExpr;
+			enumScope = (EnumScope)ee.getTargetScope();
+			if(args.isEmpty() && Property.index==property) {
+				type = VarType.BYTE;
+			}
+			else {
+				if(args.isEmpty()) {
+					markError("Unsupported enum property:" + property.name() + "()");
+				}
+				else {
+					markError("Unsupported enum property:" + property.name() + "(" + StrUtils.toString(args) + ")");
+				}
+				result = false;
+			}
+		}
+		else if(targetExpr instanceof ArrayExpression) {
+			type = targetExpr.getType();
+			if(args.isEmpty() && Property.length==property) {
+				if(targetExpr.getSymbol() instanceof AstHolder) {
+					AstHolder ah = (AstHolder)targetExpr.getSymbol();
+					if(ah.getNode() instanceof InitNodeHolder) {
+						InitNodeHolder inh = (InitNodeHolder)ah.getNode();
+						if(inh.getInitNode() instanceof NewArrayExpression) {
+							nae = (NewArrayExpression)inh.getInitNode();
 						}
 					}
 				}
-				else {
-					if(args.isEmpty()) {
-						markError("Unsupported enum property:" + property.name() + "()");
-					}
-					else {
-						markError("Unsupported enum property:" + property.name() + "(" + StrUtils.toString(args) + ")");
-					}
+
+				if(null==nae && Property.length == property) {
+					markError("Cannot determine array length: array initialization not found");
 					result = false;
 				}
 			}
-			else if(targetExpr instanceof EnumExpression) {
-				EnumExpression ee = (EnumExpression)targetExpr;
-				enumScope = (EnumScope)ee.getTargetScope();
+			else {
+				if(args.isEmpty()) {
+					markError("Unsupported array property:" + property.name() + "()");
+				}
+				else {
+					markError("Unsupported array property:" + property.name() + "(" + StrUtils.toString(args) + ")");
+				}
+				result = false;
+			}
+		}
+		else if(targetExpr instanceof VarFieldExpression) {
+			if(targetExpr.getType().isEnum()) {
 				if(args.isEmpty() && Property.index==property) {
 					type = VarType.BYTE;
 				}
@@ -211,154 +258,104 @@ public class PropertyExpression extends ExpressionNode {
 					result = false;
 				}
 			}
-			else if(targetExpr instanceof ArrayExpression) {
-				type = targetExpr.getType();
-				if(args.isEmpty() && Property.length==property) {
-					if(targetExpr.getSymbol() instanceof AstHolder) {
-						AstHolder ah = (AstHolder)targetExpr.getSymbol();
-						if(ah.getNode() instanceof InitNodeHolder) {
-							InitNodeHolder inh = (InitNodeHolder)ah.getNode();
-							if(inh.getInitNode() instanceof NewArrayExpression) {
-								nae = (NewArrayExpression)inh.getInitNode();
-							}
-						}
+			else if(targetExpr.getType().isClassType()) {
+				if(args.isEmpty()) {
+					if(Property.instanceId==property) {
+						type = VarType.SHORT;
 					}
-					
-					if(null==nae && Property.length == property) {
-						markError("Cannot determine array length: array initialization not found");
+					else if(Property.typeId==property) {
+						//TODO для refsize = 1
+						type = VarType.BYTE;
+					}
+					else {
+						markError("Unsupported class property:" + property.name() + "()");
 						result = false;
 					}
 				}
 				else {
-					if(args.isEmpty()) {
-						markError("Unsupported array property:" + property.name() + "()");
-					}
-					else {
-						markError("Unsupported array property:" + property.name() + "(" + StrUtils.toString(args) + ")");
-					}
+					markError("Unsupported class property:" + property.name() + "(" + StrUtils.toString(args) + ")");
 					result = false;
 				}
 			}
-			else if(targetExpr instanceof VarFieldExpression) {
-				if(targetExpr.getType().isEnum()) {
-					if(args.isEmpty() && Property.index==property) {
-						type = VarType.BYTE;
-					}
-					else {
-						if(args.isEmpty()) {
-							markError("Unsupported enum property:" + property.name() + "()");
-						}
-						else {
-							markError("Unsupported enum property:" + property.name() + "(" + StrUtils.toString(args) + ")");
-						}
-						result = false;
-					}
-				}
-				else if(targetExpr.getType().isClassType()) {
-					if(args.isEmpty()) {
-						if(Property.instanceId==property) {
-							type = VarType.SHORT;
-						}
-						else if(Property.typeId==property) {
-							//TODO для refsize = 1
-							type = VarType.BYTE;
-						}
-						else {
-							markError("Unsupported class property:" + property.name() + "()");
-							result = false;
-						}
-					}
-					else {
-						markError("Unsupported class property:" + property.name() + "(" + StrUtils.toString(args) + ")");
-						result = false;
-					}
-				}
-				else if(targetExpr.getType().isArray()) {
-					if(args.isEmpty()) {
-						if(Property.length==property) {
-							type = VarType.SHORT;
+			else if(targetExpr.getType().isArray()) {
+				if(args.isEmpty()) {
+					if(Property.length==property) {
+						type = VarType.SHORT;
 
-							if(targetExpr.getSymbol() instanceof AstHolder) {
-								AstHolder ah = (AstHolder)targetExpr.getSymbol();
-								if(ah.getNode() instanceof InitNodeHolder) {
-									InitNodeHolder inh = (InitNodeHolder)ah.getNode();
-									if(inh.getInitNode() instanceof NewArrayExpression) {
-										nae = (NewArrayExpression)inh.getInitNode();
-									}
+						if(targetExpr.getSymbol() instanceof AstHolder) {
+							AstHolder ah = (AstHolder)targetExpr.getSymbol();
+							if(ah.getNode() instanceof InitNodeHolder) {
+								InitNodeHolder inh = (InitNodeHolder)ah.getNode();
+								if(inh.getInitNode() instanceof NewArrayExpression) {
+									nae = (NewArrayExpression)inh.getInitNode();
 								}
 							}
 						}
-						else {
-							markError("Unsupported array property:" + property.name() + "()");
-							result = false;
-						}
 					}
 					else {
-						markError("Unsupported array property:" + property.name() + "(" + StrUtils.toString(args) + ")");
-						result = false;
-					}
-				}
-				else if(VarType.EXCEPTION==targetExpr.getType()) {
-					if(args.isEmpty()) {
-						if(Property.typeId==property) {
-							type = VarType.BYTE;
-						}
-						else if(Property.code==property) {
-							type = VarType.BYTE;
-						}
-						else {
-							markError("Unsupported exception property:" + property.name() + "()");
-							result = false;
-						}
-					}
-					else {
-						markError("Unsupported exception property:" + property.name() + "(" + StrUtils.toString(args) + ")");
+						markError("Unsupported array property:" + property.name() + "()");
 						result = false;
 					}
 				}
 				else {
-					markError("Unsupported init expr in var/field: " + targetExpr);
+					markError("Unsupported array property:" + property.name() + "(" + StrUtils.toString(args) + ")");
 					result = false;
 				}
 			}
-			else if(targetExpr instanceof PropertyExpression) {
-				if(targetExpr.getType().isEnum()) {
-					if(args.isEmpty() && Property.index==property) {
+			else if(VarType.EXCEPTION==targetExpr.getType()) {
+				if(args.isEmpty()) {
+					if(Property.typeId==property) {
+						type = VarType.BYTE;
+					}
+					else if(Property.code==property) {
 						type = VarType.BYTE;
 					}
 					else {
-						if(args.isEmpty()) {
-							markError("Unsupported enum property:" + property.name() + "()");
-						}
-						else {
-							markError("Unsupported enum property:" + property.name() + "(" + StrUtils.toString(args) + ")");
-						}
+						markError("Unsupported exception property:" + property.name() + "()");
 						result = false;
 					}
 				}
 				else {
-					markError("Unsupported init expr in var/field: " + targetExpr);
+					markError("Unsupported exception property:" + property.name() + "(" + StrUtils.toString(args) + ")");
+					result = false;
 				}
 			}
 			else {
-				markError("Unsupported property target expr: " + targetExpr);
+				markError("Unsupported init expr in var/field: " + targetExpr);
 				result = false;
 			}
 		}
-		catch (CompileException e) {
-            markError(e.getMessage());
-            result = false;
-        }
+		else if(targetExpr instanceof PropertyExpression) {
+			if(targetExpr.getType().isEnum()) {
+				if(args.isEmpty() && Property.index==property) {
+					type = VarType.BYTE;
+				}
+				else {
+					if(args.isEmpty()) {
+						markError("Unsupported enum property:" + property.name() + "()");
+					}
+					else {
+						markError("Unsupported enum property:" + property.name() + "(" + StrUtils.toString(args) + ")");
+					}
+					result = false;
+				}
+			}
+			else {
+				markError("Unsupported init expr in var/field: " + targetExpr);
+			}
+		}
+		else {
+			markError("Unsupported property target expr: " + targetExpr);
+			result = false;
+		}
 		
-		cg.leaveExpression();
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 	
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		CGScope oldScope = cg.setScope(cgScope);
-		
+		targetExpr.codeOptimization(scope, cg);
 		try {
 			ExpressionNode optimizedParentScope = targetExpr.optimizeWithScope(scope, cg);
 			if(null!=optimizedParentScope) {
@@ -383,8 +380,6 @@ public class PropertyExpression extends ExpressionNode {
 				markError(ex);
 			}
 		}
-		
-		cg.setScope(oldScope);
 	}
 
 	
@@ -398,17 +393,17 @@ public class PropertyExpression extends ExpressionNode {
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		CodegenResult result = null;
 		
-		CGScope cgs = (null==parent ? cgScope : parent);
+		//CGScope cgs = (null==parent ? cgScope : parent);
 		
 		targetExpr.codeGen(cg, null, false, excs);
 		
 		if(VarType.EXCEPTION==targetExpr.getType()) {
 			if(toAccum) {
 				if(Property.typeId==property) {
-					cg.exTypeIdToAcc(cgs);
+					cg.exTypeIdToAcc(cgScope);
 				}
 				else if(Property.code==property) {
-					cg.exCodeToAcc(cgs);
+					cg.exCodeToAcc(cgScope);
 				}
 				result = CodegenResult.RESULT_IN_ACCUM;
 			}
@@ -427,12 +422,12 @@ public class PropertyExpression extends ExpressionNode {
 			if(toAccum) {
 				if(Property.length == property) {
 					if(!isView && null!=nae.getConstDimensions()) {
-						cg.constToAcc(cgs, 0x02, nae.getConstDimensions()[0x00], false);
+						cg.constToAcc(cgScope, 0x02, nae.getConstDimensions()[0x00], false);
 					}
 					else {
 						CGCellsScope cScope = (CGCellsScope)targetExpr.getSymbol().getCGScope();
-						cg.cellsToArrReg(cgs, cScope.getCells());
-						cg.arrSizetoAcc(cgs, isView);
+						cg.cellsToArrReg(cgScope, cScope.getCells());
+						cg.arrSizetoAcc(cgScope, isView);
 					}
 				}
 				result = CodegenResult.RESULT_IN_ACCUM;
@@ -440,11 +435,11 @@ public class PropertyExpression extends ExpressionNode {
 		}
 		else if(targetExpr.getType().isClassType() && !targetExpr.getType().isEnum()) {
 			if(Property.instanceId==property) {
-				cg.cellsToAcc(cgs, (CGCellsScope)targetExpr.getSymbol().getCGScope());
+				cg.cellsToAcc(cgScope, (CGCellsScope)targetExpr.getSymbol().getCGScope());
 				result = CodegenResult.RESULT_IN_ACCUM;
 			}
 			else if(Property.typeId==property) {
-				cg.constToAcc(cgs, 0x01, targetExpr.getType().getId(), false);
+				cg.constToAcc(cgScope, 0x01, targetExpr.getType().getId(), false);
 				result = CodegenResult.RESULT_IN_ACCUM;
 			}
 			else {
@@ -454,18 +449,18 @@ public class PropertyExpression extends ExpressionNode {
 		else {
 			if(toAccum) {
 				if(Property.size==property) {
-					cg.constToAcc(cgs, 0x01, enumScope.getSize(), false);
+					cg.constToAcc(cgScope, 0x01, enumScope.getSize(), false);
 				}
 				else if(Property.index == property) {
 					if(targetExpr instanceof EnumExpression) {
-						cg.constToAcc(cgs, 0x01, ((EnumExpression)targetExpr).getIndex(), false);
+						cg.constToAcc(cgScope, 0x01, ((EnumExpression)targetExpr).getIndex(), false);
 					}
 					else {
-						targetExpr.codeGen(cg, cgs, true, excs);
+						targetExpr.codeGen(cg, cgScope, true, excs);
 					}
 				}
 				else { //ITEM
-					args.get(0).codeGen(cg, cgs, true, excs);
+					args.get(0).codeGen(cg, cgScope, true, excs);
 				}
 				result = CodegenResult.RESULT_IN_ACCUM;
 			}

@@ -23,6 +23,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.ImplementInfo;
+import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGClassScope;
@@ -41,6 +42,8 @@ import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.lexer.Keyword;
+import static ru.vm5277.compiler.Main.debugAST;
+import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 
 public class ClassNode extends ObjectTypeNode {
 	private	ClassBlockNode	blockNode;
@@ -91,11 +94,6 @@ public class ClassNode extends ObjectTypeNode {
 		blockNode = body;
 	}
 	
-	@Override
-	public String toString() {
-		return getClass().getSimpleName() + ": " + modifiers + ", " + name + ", " + impl;
-	}
-
 	@Override
 	public boolean preAnalyze() {
 		try {validateName(name);} catch(CompileException e) {addMessage(e);	return false;}
@@ -174,10 +172,12 @@ public class ClassNode extends ObjectTypeNode {
 	
 	
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
+		boolean result = true;
+		debugAST(this, POST, true, getFullInfo());
 		if(null != importedClasses) {
 			for (ObjectTypeNode imported : importedClasses) {
-				imported.postAnalyze(ciScope, cg); // Заменил scope на classScope, надо проверить
+				imported.postAnalyze(ciScope, cg, parent); // Заменил scope на classScope, надо проверить
 			}
 		}
 
@@ -204,21 +204,17 @@ public class ClassNode extends ObjectTypeNode {
 			});
 		}
 
-		cgScope = cg.enterClass(VarType.fromClassName(name), name, implInfos, null == parentClassName);
+		cgScope = cg.enterClass(parent, VarType.fromClassName(name), name, implInfos, null == parentClassName);
 
-		blockNode.postAnalyze(ciScope, cg);
+		blockNode.postAnalyze(ciScope, cg, cgScope);
 
-		cg.leaveClass();
-		return true;
+		debugAST(this, POST, false, result, getFullInfo());
+		return result;
 	}
 	
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		CGScope oldScope = cg.setScope(cgScope);
-		
 		blockNode.codeOptimization(ciScope, cg);
-		
-		cg.setScope(oldScope);
 	}
 	
 	private void fillInterfaces(List<InterfaceScope> iScopes, String ifaceName) {
@@ -308,5 +304,14 @@ public class ClassNode extends ObjectTypeNode {
 	@Override
 	public List<AstNode> getChildren() {
 		return Arrays.asList(blockNode);
+	}
+	
+	@Override
+	public String toString() {
+		return modifiers + ", " + name + ", " + impl;
+	}
+
+	public String getFullInfo() {
+		return getClass().getSimpleName() + ": " + toString();
 	}
 }

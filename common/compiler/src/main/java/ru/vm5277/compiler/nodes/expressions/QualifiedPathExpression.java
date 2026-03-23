@@ -228,7 +228,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
 		if(!postAnalyzed) {
@@ -258,7 +258,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 									resolvedExpr = expr;
 									result&=expr.declare(scope);
 									if(result) {
-										result&=expr.postAnalyze(scope, cg);
+										result&=expr.postAnalyze(scope, cg, parent);
 										symbol = expr.getSymbol();
 									}
 								}
@@ -273,7 +273,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 									resolvedExpr = expr;
 									result&=expr.declare(scope);
 									if(result) {
-										result&=expr.postAnalyze(scope, cg);
+										result&=expr.postAnalyze(scope, cg, parent);
 										symbol = expr.getSymbol();
 									}
 								}
@@ -289,7 +289,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 									resolvedExpr = expr;
 									result&=expr.declare(scope);
 									if(result) {
-										result&=expr.postAnalyze(scope, cg);
+										result&=expr.postAnalyze(scope, cg, parent);
 										symbol = expr.getSymbol();
 									}
 									i++;
@@ -302,7 +302,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 																				((MethodSegment)secondSegment).getArguments());
 								result&=expr.declare(scope);
 								if(result) {
-									result&=expr.postAnalyze(scope, cg);
+									result&=expr.postAnalyze(scope, cg, parent);
 									List<ExpressionNode> optimized = null;
 									if(result && Optimization.NONE!=Main.getOptLevel()) {
 										optimized = optimizeMethodCall((MethodCallExpression)expr);
@@ -313,7 +313,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 											ExpressionNode exprNode = optimized.get(0);
 											result&=exprNode.declare(scope);
 											if(result) {
-												result&=exprNode.postAnalyze(scope, cg);
+												result&=exprNode.postAnalyze(scope, cg, parent);
 												resolvedExpr = exprNode;
 												if(exprNode instanceof VarFieldExpression) {
 													symbol = exprNode.getSymbol();
@@ -325,7 +325,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 											for(ExpressionNode exprNode : optimized) {
 												result&=exprNode.declare(scope);
 												if(result) {
-													result&=exprNode.postAnalyze(scope, cg);
+													result&=exprNode.postAnalyze(scope, cg, parent);
 													((ExpressionsContainer)resolvedExpr).add(exprNode);
 												}
 											}
@@ -348,7 +348,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 						resolvedExpr = pathExpr;
 						result&=pathExpr.declare(scope);
 						if(result) {
-							result&=pathExpr.postAnalyze(scope, cg);
+							result&=pathExpr.postAnalyze(scope, cg, parent);
 						}
 					}
 					else if(segment instanceof QualifiedSegment) {
@@ -365,7 +365,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 							resolvedExpr = expr;
 							result&=expr.declare(scope);
 							if(result) {
-								result&=expr.postAnalyze(scope, cg);
+								result&=expr.postAnalyze(scope, cg, parent);
 								symbol = expr.getSymbol();
 							}
 							continue;
@@ -374,7 +374,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 							resolvedExpr = new EnumExpression(tb, mc, pathExpr, qSeg.getName());
 							result&=resolvedExpr.declare(scope);
 							if(result) {
-								result&=resolvedExpr.postAnalyze(scope, cg);
+								result&=resolvedExpr.postAnalyze(scope, cg, parent);
 							}
 							continue;
 						}
@@ -389,7 +389,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 										expr.getSymbol().setReassigned();
 									}
 									expr.getSymbol().setAccessed(getSN());
-									result&=expr.postAnalyze(scope, cg);
+									result&=expr.postAnalyze(scope, cg, parent);
 									symbol = expr.getSymbol();
 									continue;
 								}
@@ -402,7 +402,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 									resolvedExpr = expr;
 									result&=expr.declare(scope);
 									if(result) {
-										result&=expr.postAnalyze(scope, cg);
+										result&=expr.postAnalyze(scope, cg, parent);
 										if(reassigned) {
 											expr.getSymbol().setReassigned();
 										}
@@ -416,7 +416,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 										pathExpr = new TypeReferenceExpression(tb, mc, pathExpr, qSeg.getName(), cis);
 										result&=pathExpr.declare(scope);
 										if(result) {
-											result&=pathExpr.postAnalyze(scope, cg);
+											result&=pathExpr.postAnalyze(scope, cg, parent);
 										}
 										resolvedExpr = pathExpr;
 										continue;
@@ -435,7 +435,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 						resolvedExpr = new ArrayExpression(tb, mc, sp, resolvedExpr, ((ArraySegment)segment).getIndices());
 						result&=resolvedExpr.declare(scope);
 						if(result) {
-							result&=resolvedExpr.postAnalyze(scope, cg);
+							result&=resolvedExpr.postAnalyze(scope, cg, parent);
 							if(reassigned) {
 								resolvedExpr.getSymbol().setReassigned();
 							}
@@ -469,6 +469,15 @@ public class QualifiedPathExpression extends ExpressionNode {
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
 		if(null!=resolvedExpr) {
 			resolvedExpr.codeOptimization(scope, cg);
+			try {
+				ExpressionNode optimizedExpr = resolvedExpr.optimizeWithScope(scope, cg);
+				if(null!=optimizedExpr) {
+					resolvedExpr = optimizedExpr;
+				}
+			}
+			catch(CompileException ex) {
+				markError(ex);
+			}
 		}
 	}
 	
@@ -560,7 +569,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 	@Override
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		if(null!=resolvedExpr) {
-			resolvedExpr.codeGen(cg, parent, true, excs);
+			resolvedExpr.codeGen(cg, cgScope, true, excs);
 		}
 		
 		return CodegenResult.RESULT_IN_ACCUM;

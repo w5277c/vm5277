@@ -28,7 +28,6 @@ import ru.vm5277.common.cg.CodeFixer;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.items.CGIAsm;
 import ru.vm5277.common.cg.items.CGIAsmCondJump;
-import ru.vm5277.common.cg.items.CGIAsmJump;
 import ru.vm5277.common.cg.items.CGItem;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
@@ -36,7 +35,8 @@ import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class Fixer extends CodeFixer {
-	private	static final int JMP_INSTR_SIZE	= 0x04;
+	private	static final int RJMP_INSTR_SIZE	= 0x02;
+	private	static final int JMP_INSTR_SIZE		= 0x04;
 	
 	@Override
 	public List<CGItem> resolveInstructionsSize(CGScope scope, Path instrPath, MessageContainer mc, String mcu) throws CompileException {
@@ -90,16 +90,20 @@ public class Fixer extends CodeFixer {
 						CGIAsmCondJump acj = (CGIAsmCondJump)item;
 						Integer labelOffset = labelsMap.get(acj.getLabelName());
 						if(null!=labelOffset) {
-							int wDelta = (labelOffset-offset);
+							int wDelta = (labelOffset-offset)/2;
 							if(wDelta<-64 || wDelta>63) {
 								CGLabelScope skipLbScope = new CGLabelScope(null, CodeGenerator.genId(), LabelNames.SKIP, true);
-								acj.setInstr(Utils.brInstrInvert(acj.getInstr()));
-								acj.setLabelName(skipLbScope.getName());
-								int index = list.indexOf(acj);
-								CGIAsm aij = new CGIAsmJump("jmp", acj.getLabelName(), false);
-								aij.setSizeInBytes(JMP_INSTR_SIZE);
-								list.add(index, aij);
-								list.add(index+1, skipLbScope);
+								//TODO костыль, я не могу изменить основной листинг чтобы вписать еще два элемента (инструкцию и метку).
+								//но могу расширить CGIAsmCondJump чтобы его код содержал вместо 1 инструкции - 2 инструкции и метку.
+								//Основная проблема - прыжок может быть больше чем позволит rjmp 
+								acj.useJump(Utils.brInstrInvert(acj.getInstr()), "rjmp", RJMP_INSTR_SIZE, skipLbScope.getName());
+//								acj.setInstr(Utils.brInstrInvert(acj.getInstr()));
+//								acj.setLabelName(skipLbScope.getName());
+//								int index = list.indexOf(acj);
+//								CGIAsm aij = new CGIAsmJump("jmp", acj.getLabelName(), false);
+//								aij.setSizeInBytes(JMP_INSTR_SIZE);
+//								list.add(index, aij);
+//								list.add(index+1, skipLbScope);
 
 								modified = true;
 							}

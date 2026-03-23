@@ -19,7 +19,7 @@ import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class CGIAsmCondJump extends CGIAsm {
-	
+
 	public CGIAsmCondJump(String instr, CGLabelScope lbScope) throws CompileException {
 		super(instr, null);
 		postfix = lbScope.getName();
@@ -35,5 +35,11 @@ public class CGIAsmCondJump extends CGIAsm {
 	}
 	public void setLabelName(String labelName) {
 		this.postfix = labelName;
+	}
+	
+	//TODO костыль
+	public void useJump(String condInstr, String jumpInstr, int size, String label) {
+		this.instr = condInstr;
+		postfix = label + "\n\t" + jumpInstr + " " + postfix + "\n" + label + ":";
 	}
 }

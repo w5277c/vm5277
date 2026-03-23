@@ -116,8 +116,8 @@ public class InterfaceNode extends ObjectTypeNode {
 	
 	
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		cgScope = cg.enterInterface(VarType.fromClassName(name), name);
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
+		cgScope = cg.enterInterface(parent, VarType.fromClassName(name), name);
 
 		// Проверка что интерфейс не содержит конструкторов
 		for (AstNode decl : blockIfaceNode.getDeclarations()) {
@@ -152,11 +152,10 @@ public class InterfaceNode extends ObjectTypeNode {
 		// Проверка вложенных интерфейсов
 		for (AstNode decl : blockIfaceNode.getDeclarations()) {
 			if (decl instanceof InterfaceNode) {
-				decl.postAnalyze(ciScope, cg); // Заменил scope на interfaceScope, надо проверить
+				decl.postAnalyze(ciScope, cg, cgScope);
 			}
 		}
 
-		cg.leaveInterface();
 		return true;
 	}
 	
@@ -176,7 +175,7 @@ int[] interfaceIds = null;
 			
 		cg.enterInterface(VarType.fromClassName(name), interfaceIds, name);
 */
-		blockIfaceNode.codeGen(cg, null, false, excs);
+		blockIfaceNode.codeGen(cg, cgScope, false, excs);
 		
 /*		finally {
 			cg.leaveInterface();

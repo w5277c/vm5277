@@ -21,7 +21,6 @@ import java.util.List;
 import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.SemanticAnalyzePhase.POST;
 import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
-import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.CGBranch;
@@ -34,7 +33,6 @@ import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.VarType;
-import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -60,7 +58,7 @@ public class WhileNode extends CommandNode {
 		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(CompileException e) {markFirstError(e);}
 
 		try {
-			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "while.body") : new BlockNode(tb, mc, parseStatement(), "while.body");
+			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "body") : new BlockNode(tb, mc, parseStatement(), "body");
 		}
 		catch(CompileException e) {markFirstError(e);}
 	}
@@ -119,28 +117,20 @@ public class WhileNode extends CommandNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
 		
-		cgScope = cg.enterLoopBlock("while");
+		cgScope = cg.enterLoopBlock(parent, "while");
 
-		result&=condition.postAnalyze(blockScope, cg);
+		result&=condition.postAnalyze(blockScope, cg, cgScope);
 		if(result) {
-			try {
-				ExpressionNode optimizedExpr = condition.optimizeWithScope(blockScope, cg);
-				if(null != optimizedExpr) {
-					condition = optimizedExpr;
-					result&=condition.postAnalyze(blockScope, cg);
-				}
+			// Резолвинг QualifiedPathExpression
+			ExpressionNode resolved = resolveQualifiedPathExpr(condition);
+			if(null!=resolved) {
+				condition = resolved;
 			}
-			catch (CompileException e) {
-				markFirstError(e);
-				result = false;
-			}
-		}
 
-		if(result) {
 			VarType condType = condition.getType();
 			if(null==condType || VarType.BOOL!=condType) {
 				markError("Loop condition must be boolean, got: " + condType);
@@ -150,7 +140,7 @@ public class WhileNode extends CommandNode {
 
 		// Анализ тела цикла
 		if(null!=blockNode) {
-			result&=blockNode.postAnalyze(blockScope, cg);
+			result&=blockNode.postAnalyze(blockScope, cg, cgScope);
 		}
 		
 		// Проверяем бесконечный цикл с возвратом
@@ -159,18 +149,21 @@ public class WhileNode extends CommandNode {
 //			markWarning("Code after infinite loop is unreachable");
 //		}
 
-		cg.leaveLoopBlock();
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 	
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		CGScope oldScope = cg.setScope(cgScope);
-		
 		condition.codeOptimization(scope, cg);
-		if(null!=blockNode) {
-			blockNode.codeOptimization(scope, cg);
+		try {
+			ExpressionNode optimizedExpr = condition.optimizeWithScope(scope, cg);
+			if(null!=optimizedExpr) {
+				condition = optimizedExpr;
+			}
+		}
+		catch(CompileException ex) {
+			markError(ex);
 		}
 		
 		if(condition instanceof LiteralExpression) {
@@ -184,8 +177,10 @@ public class WhileNode extends CommandNode {
 				}
 			}
 		}
-
-		cg.setScope(oldScope);
+		
+		if(null!=blockNode) {
+			blockNode.codeOptimization(scope, cg);
+		}
 	}
 
 	@Override
@@ -194,29 +189,29 @@ public class WhileNode extends CommandNode {
 		cgDone = true;
 				
 		CodegenResult result = null;
-		CGScope cgs = null == parent ? cgScope : parent;
-		cgs.setBranch(branch);
-		
+		//CGScope cgs = null == parent ? cgScope : parent;
+		cgScope.setBranch(branch);
+//TODO См. в IfNode, необходима проверка на результат condition.codeGen	
 		if(!alwaysFalse) {
 			//cgScope.prepend(((CGLoopBlockScope)cgScope).getStartLbScope());
 			condition.getCGScope().append(((CGLoopBlockScope)cgScope).getStartLbScope());
 			if(!alwaysTrue) {
-				condition.codeGen(cg, null, false, excs);
+				condition.codeGen(cg, cgScope, false, excs);
 			}
 		}
 
 		if(null!=blockNode && !alwaysFalse) {
-			blockNode.codeGen(cg, null, false, excs);
+			blockNode.codeGen(cg, cgScope, false, excs);
 		}
 
 		if(!alwaysFalse) {
-			cg.jump(cgs, ((CGLoopBlockScope)cgScope).getStartLbScope());
+			cg.jump(cgScope, ((CGLoopBlockScope)cgScope).getStartLbScope());
 		}
 		if(!alwaysFalse) {
-			cgs.append(branch.getEnd());
+			cgScope.append(branch.getEnd());
 		}
 
-		cgs.append(((CGLoopBlockScope)cgScope).getEndLbScope());
+		cgScope.append(((CGLoopBlockScope)cgScope).getEndLbScope());
 		
 		((CGBlockScope)cgScope).build(cg, false, excs);
 		((CGBlockScope)cgScope).restoreRegsPool();

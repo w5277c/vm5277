@@ -43,6 +43,7 @@ public class CatchBlock extends BlockNode {
 	private	BlockNode				blockNode;
 	private	BlockNode				tryBlockNode;
 	private	Set<ExceptionScope>		eScopes			= new HashSet<>();
+	private	CGScope					cgHeader		= new CGScope();
 	
 	public CatchBlock(TokenBuffer tb, MessageContainer mc, List<ExpressionNode> args, String varName) throws CompileException {
 		super(tb, mc, "catch");
@@ -109,44 +110,42 @@ public class CatchBlock extends BlockNode {
 		return result;
 	}
 	
-	public boolean postAnalyze(Scope scope, CodeGenerator cg, BlockNode tryBlockNode) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent, BlockNode tryBlockNode) {
 		boolean result = true;
 
-		try {
-			this.tryBlockNode = tryBlockNode;
-			
-			if(result) {
-				for(int i=0; i<args.size(); i++) {
-					ExpressionNode expr = args.get(i);
+		parent.append(cgHeader);
+		cgScope = new CGBlockScope(cg, parent, cgScope.genId(), "catch");
+		
+		this.tryBlockNode = tryBlockNode;
 
-					result&=expr.postAnalyze(scope, cg);
-					if(result) {
-						ExpressionNode optimizedExpr = expr.optimizeWithScope(scope, cg);
-						if(null!=optimizedExpr) {
-							expr = optimizedExpr;
-							args.set(i, optimizedExpr);
-						}
-					}
+		if(result) {
+			for(int i=0; i<args.size(); i++) {
+				ExpressionNode expr = args.get(i);
 
-					if(!(expr instanceof TypeReferenceExpression && VarType.EXCEPTION==expr.getType()))  {
-						markError("Catch parameter must be an exception type, got:" + expr);
-						result = false;
-						break;
+				result&=expr.postAnalyze(scope, cg, cgScope);
+				if(result) {
+					// Резолвинг QualifiedPathExpression
+					ExpressionNode resolved = resolveQualifiedPathExpr(expr);
+					if(null!=resolved) {
+						expr = resolved;
+						args.set(i, resolved);
 					}
-					else {
-						ExceptionScope eScope = (ExceptionScope)((TypeReferenceExpression)expr).getScope();
-						eScopes.add(eScope);
-						tryBlockNode.getScope().addHandlingExcsScope(eScope);
-					}
+				}
+
+				if(!(expr instanceof TypeReferenceExpression && VarType.EXCEPTION==expr.getType()))  {
+					markError("Catch parameter must be an exception type, got:" + expr);
+					result = false;
+					break;
+				}
+				else {
+					ExceptionScope eScope = (ExceptionScope)((TypeReferenceExpression)expr).getScope();
+					eScopes.add(eScope);
+					tryBlockNode.getScope().addHandlingExcsScope(eScope);
 				}
 			}
 		}
-		catch(CompileException ex) {
-			markError(ex);
-			result = false;
-		}
 		
-		result&=super.postAnalyze(scope, cg);
+		result&=super.postAnalyze(scope, cg, parent);
 
 		return result;
 	}
@@ -159,8 +158,6 @@ public class CatchBlock extends BlockNode {
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
 		super.codeOptimization(scope, cg);
 		
-		CGScope oldScope = cg.setScope(cgScope);
-
 		try {
 			for(int i=0; i<args.size(); i++) {
 				ExpressionNode optimizedExpr = args.get(i).optimizeWithScope(scope, cg);
@@ -172,19 +169,17 @@ public class CatchBlock extends BlockNode {
 		catch(CompileException ex) {
 			markError(ex);
 		}
-		
-		cg.setScope(oldScope);
 	}
 	
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs, boolean isUsed) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 		
-		CGScope cgs = null == parent ? cgScope : parent;
+//		CGScope cgs = null == parent ? cgScope : parent;
 		CGLabelScope lbCatchEndScope = null;
 		if(isUsed) {
 			lbCatchEndScope = new CGLabelScope(null, CodeGenerator.genId(), LabelNames.CATCH_SKIP, true);
-			cg.jump(cgs, lbCatchEndScope);
+			cg.jump(cgHeader, lbCatchEndScope);
 		}
 		
 		boolean isCatchLabelUsed = false;
@@ -192,27 +187,27 @@ public class CatchBlock extends BlockNode {
 			ExpressionNode expr = args.get(i);
 			String path = ((TypeReferenceExpression)expr).getQualifiedPath();
 			if(!isCatchLabelUsed) {
-				cgs.append(((CGTryBlockScope)tryBlockNode.getCGScope()).getCatchLabel(VarType.getExceptionId(path)));
+				cgHeader.append(((CGTryBlockScope)tryBlockNode.getCGScope()).getCatchLabel(VarType.getExceptionId(path)));
 				isCatchLabelUsed = true;
 			}
 		}
 		
-		CGVarScope vScope = new CGVarScope(cgs, CodeGenerator.genId(), VarType.SHORT, 0x02, true, varName);
+		CGVarScope vScope = new CGVarScope(cgScope, CodeGenerator.genId(), VarType.SHORT, 0x02, true, varName);
 		vScope.setCells(new CGCells(CGCells.Type.ACC));
 		((VarSymbol)symbol).setCGScope(vScope);
 		
 		if(isUsed) {
-			cg.eCatch(cgs);
+			cg.eCatch(cgHeader);
 			for(AstNode node : children) {
 				//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
 				if(!(node instanceof VarNode)) {
-					node.codeGen(cg, cgs, false, excs);
+					node.codeGen(cg, null, false, excs);
 				}
 			}
 		}
 		
 		if(isUsed) {
-			cgs.append(lbCatchEndScope);
+			cgScope.append(lbCatchEndScope);
 		}
 		
 		((CGBlockScope)cgScope).build(cg, false, excs);

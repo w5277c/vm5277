@@ -23,6 +23,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.AssemblerInterface;
+import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.exceptions.CompileException;
@@ -98,6 +99,12 @@ public abstract class CommandNode extends AstNode {
 		@Override
 		public List<AstNode> getChildren() {
 			return Arrays.asList(blockNode);
+		}
+
+		@Override
+		public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
+			cgScope = new CGScope(parent, CGScope.genId(), "case condition");
+			return true;
 		}
 	}
 

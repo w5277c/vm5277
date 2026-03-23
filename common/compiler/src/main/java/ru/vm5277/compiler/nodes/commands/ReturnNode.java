@@ -105,10 +105,10 @@ public class ReturnNode extends CommandNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterCommand();
+		cgScope = cg.enterCommand(parent, "return");
 	
 		// Находим ближайший MethodScope
 		MethodScope methodScope = findEnclosingMethodScope(scope);
@@ -134,32 +134,24 @@ public class ReturnNode extends CommandNode {
 					result = false;
 				}
 				else {
-					result&=expr.postAnalyze(scope, cg);
-
+					result&=expr.postAnalyze(scope, cg, cgScope);
 					if(result) {
-						try {
-							ExpressionNode optimizedExpr = expr.optimizeWithScope(scope, cg);
-							if(null != optimizedExpr) {
-								expr = optimizedExpr;
-							}
+						// Резолвинг QualifiedPathExpression
+						ExpressionNode resolved = resolveQualifiedPathExpr(expr);
+						if(null!=resolved) {
+							expr = resolved;
 						}
-						catch(CompileException ex) {
-							markError(ex);
+
+						// Проверяем тип выражения
+						VarType exprType = expr.getType();
+						if(null==exprType) {
+							markError("Cannot determine type of expression: " + expr.toString());
 							result = false;
 						}
-
-						if(result) {
-							// Проверяем тип выражения
-							VarType exprType = expr.getType();
-							if(null==exprType) {
-								markError("Cannot determine type of expression: " + expr.toString());
+						else {
+							if(!isCompatibleWith(scope, type, exprType)) {
+								markError("Return type mismatch: expected " + type + ", got " + exprType);
 								result = false;
-							}
-							else {
-								if(!isCompatibleWith(scope, type, exprType)) {
-									markError("Return type mismatch: expected " + type + ", got " + exprType);
-									result = false;
-								}
 							}
 						}
 					}
@@ -167,15 +159,12 @@ public class ReturnNode extends CommandNode {
 			}
 		}
 		
-		cg.leaveCommand();
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 	
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		CGScope oldScope = cg.setScope(cgScope);
-
 		expr.codeOptimization(scope, cg);
 		
 		try {
@@ -187,8 +176,6 @@ public class ReturnNode extends CommandNode {
 		catch(CompileException ex) {
 			markError(ex);
 		}
-
-		cg.setScope(oldScope);
 	}
 
 	@Override
@@ -196,10 +183,10 @@ public class ReturnNode extends CommandNode {
 		if(cgDone) return null;
 		cgDone = true;
 
-		CGScope cgs = (null == parent ? cgScope : parent);
+		//CGScope cgs = (null == parent ? cgScope : parent);
 		
 		if(null!=expr) {
-			if(CodegenResult.RESULT_IN_ACCUM!=expr.codeGen(cg, cgs, true, excs)) {
+			if(CodegenResult.RESULT_IN_ACCUM!=expr.codeGen(cg, cgScope, true, excs)) {
 				throw new CompileException("Accum not used for operand:" + expr);
 			}
 		}
@@ -217,7 +204,7 @@ public class ReturnNode extends CommandNode {
 			markError("COPMILER BUG: block scope without method scope");
 		}
 		else {
-			cg.jump(cgs, ((CGBlockScope)scope).getELabel());
+			cg.jump(cgScope, ((CGBlockScope)scope).getELabel());
 
 			if(null!=expr) {
 				return CodegenResult.RESULT_IN_ACCUM;

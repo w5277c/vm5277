@@ -15,18 +15,20 @@
  */
 
 class Main {
-    public static void main() {
+	public static void main() {
 		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
 
-		short s1 = 0x0000;
-		s1++;
-		short s2 = 0x000f;
-		s2++;
-		short s3 = 0x00ff;
-		s3++;
-		short s4 = 0x0fff;
-		s4++;
-		// Инкремент необходим в качестве reassigned, иначе свернется в константу
-		System.out((s1+s2) + (s3+s4));
+		byte b1; b1 = 0x01;
+		byte b2; b2 = 0x02;
+		byte b3; b3 = 0x03;
+		byte b4; b4 = 0x04;
+
+		System.out("\nЗначение выражения (b1+b2) + (b3+b4), где b1="); System.out(b1);
+		System.out(",b2=");System.out(b2);
+		System.out(",b3=");System.out(b3);
+		System.out(",b4="); System.out(b4);
+		System.out(":");
+		System.out((b1+b2) + (b3+b4));
+		System.out("\ndone");
     }
 }

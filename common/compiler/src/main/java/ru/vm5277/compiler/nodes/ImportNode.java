@@ -19,6 +19,7 @@ package ru.vm5277.compiler.nodes;
 import java.io.File;
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.lexer.TokenType;
@@ -152,7 +153,7 @@ public class ImportNode extends AstNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 
 		ImportableScope iScope = (ImportableScope)scope;

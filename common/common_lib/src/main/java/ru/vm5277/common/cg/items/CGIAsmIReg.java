@@ -34,7 +34,7 @@ public class CGIAsmIReg extends CGIAsm {
 		
 		this.ireg = ireg;
 		this.isLdInstr = isLDInstr;
-		this.reg = reg.toLowerCase();
+		this.reg = (null==reg ? null : reg.toLowerCase());
 		this.offset = offset;
 	}
 
@@ -92,6 +92,7 @@ public class CGIAsmIReg extends CGIAsm {
 	
 	@Override
 	public String getText() {
+		if(null==reg) return "";
 		if(isLdInstr) {
 			return "ldd " + reg + "," + ireg + "+" + offset;
 		}
@@ -102,6 +103,8 @@ public class CGIAsmIReg extends CGIAsm {
 	
 	@Override
 	public String toString() {
+		if(null==reg) return "";
+		
 		StringBuilder result = new StringBuilder();
 		if(!prefCont.isEMpty()) {
 			result.append(prefCont.getSource()).append("\n");

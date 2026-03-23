@@ -38,9 +38,10 @@ import ru.vm5277.compiler.semantic.Scope;
 public class NewArrayExpression extends ExpressionNode {
 	private	int						depth;
 	private	List<ExpressionNode>	arrDimensions;
-	private	ArrayInitExpression		aiExpr;
+	private	ArrayInitExpression		arrayInitiExpr;
 	private	int[]					constDimensions		= null;
-
+	private	CGScope					headerCgScope;
+	
 	public NewArrayExpression(	TokenBuffer tb, MessageContainer mc, SourcePosition sp, VarType type, List<ExpressionNode> arrDimensions,
 								ArrayInitExpression aiExpr) {
 		super(tb, mc, sp);
@@ -48,7 +49,7 @@ public class NewArrayExpression extends ExpressionNode {
 		this.type = type;
 		this.depth = type.getArrayDepth();
 		this.arrDimensions = arrDimensions;
-		this.aiExpr = aiExpr;
+		this.arrayInitiExpr = aiExpr;
 
 		if(null!=aiExpr) {
 			constDimensions = aiExpr.getDimensions();
@@ -62,7 +63,7 @@ public class NewArrayExpression extends ExpressionNode {
 		
 		arrDimensions = parseArrayDimensions();
 		if(tb.match(Delimiter.LEFT_BRACE)) {
-			aiExpr = new ArrayInitExpression(tb, mc, sp, type);
+			arrayInitiExpr = new ArrayInitExpression(tb, mc, sp, type);
 		}
 	}
 
@@ -100,8 +101,8 @@ public class NewArrayExpression extends ExpressionNode {
 			}
 		}
 
-		if(null!=aiExpr) {
-			result&=aiExpr.preAnalyze();
+		if(null!=arrayInitiExpr) {
+			result&=arrayInitiExpr.preAnalyze();
 		}
 
 		debugAST(this, PRE, false, result, getFullInfo());
@@ -118,8 +119,8 @@ public class NewArrayExpression extends ExpressionNode {
 				result&=expr.declare(scope);
 			}
 		}
-		if(null!=aiExpr) {
-			result&=aiExpr.declare(scope);
+		if(null!=arrayInitiExpr) {
+			result&=arrayInitiExpr.declare(scope);
 		}
 
 		debugAST(this, DECLARE, false, result, getFullInfo() + (declarationPendingNodes.containsKey(this) ? " [DP]" : ""));
@@ -127,65 +128,83 @@ public class NewArrayExpression extends ExpressionNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterExpression(toString());
+		if(null!=cgScope) cgScope.disable();
+		cgScope = cg.enterExpression(parent, toString());
+		
+		headerCgScope = new CGScope(cgScope, CGScope.genId(), "header");
+		
+		if(null==constDimensions) {
+			constDimensions = new int[]{0, 0, 0};
+			for(int i=0; i<depth; i++) {
+				ExpressionNode expr = arrDimensions.get(i);
+				result&=expr.postAnalyze(scope, cg, cgScope);
+				// Пытаемся оптимизировать final Var/Field 
+				if(result) {
+					// Резолвинг QualifiedPathExpression
+					ExpressionNode resolved = resolveQualifiedPathExpr(expr);
+					if(null!=resolved) {
+						expr = resolved;
+						arrDimensions.set(i, resolved);
+					}
 
-		try {
-			if(null==constDimensions) {
-				constDimensions = new int[]{0, 0, 0};
-				for(int i=0; i<depth; i++) {
-					ExpressionNode expr = arrDimensions.get(i);
-					result&=expr.postAnalyze(scope, cg);
-					if(result) {
-						// Пытаемся оптимизировать final Var/Field 
-						ExpressionNode optimizedExpr = expr.optimizeWithScope(scope, cg);
-						if(null!=optimizedExpr) {
-							optimizedExpr.postAnalyze(scope, cg);
-							expr = optimizedExpr;
-							arrDimensions.set(i, expr);
+					if(0==i || null!=constDimensions) {
+						if(expr instanceof LiteralExpression) {
+							constDimensions[i] = (int)((LiteralExpression)expr).getNumValue();
 						}
-
-						if(0==i || null!=constDimensions) {
-							if(expr instanceof LiteralExpression) {
-								constDimensions[i] = (int)((LiteralExpression)expr).getNumValue();
-							}
-							else {
-								constDimensions = null;
-							}
+						else {
+							constDimensions = null;
 						}
 					}
 				}
 			}
-
-			if(null==constDimensions) {
-				cg.setFeature(RTOSFeature.OS_ARRAY_3D);
-			}
-			else {
-				switch(depth) {
-					case 0x01:
-						cg.setFeature(RTOSFeature.OS_ARRAY_1D);
-						break;
-					case 0x02:
-						cg.setFeature(RTOSFeature.OS_ARRAY_2D);
-						break;
-					default:
-						cg.setFeature(RTOSFeature.OS_ARRAY_3D);
-				}
-			}
-
-			if(null!=aiExpr) {
-				result&=aiExpr.postAnalyze(scope, cg);
-			}
-		}
-		catch (CompileException e) {
-			markError(e.getMessage());
 		}
 
-		cg.leaveExpression();
+		if(null==constDimensions) {
+			cg.setFeature(RTOSFeature.OS_ARRAY_3D);
+		}
+		else {
+			switch(depth) {
+				case 0x01:
+					cg.setFeature(RTOSFeature.OS_ARRAY_1D);
+					break;
+				case 0x02:
+					cg.setFeature(RTOSFeature.OS_ARRAY_2D);
+					break;
+				default:
+					cg.setFeature(RTOSFeature.OS_ARRAY_3D);
+			}
+		}
+
+		if(null!=arrayInitiExpr) {
+			result&=arrayInitiExpr.postAnalyze(scope, cg, cgScope);
+		}
+
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
+	}
+
+	
+	@Override
+	public void codeOptimization(Scope scope, CodeGenerator cg) {
+		for(int i=0; i<depth; i++) {
+			ExpressionNode expr = arrDimensions.get(i);
+			if(null!=expr) {
+				expr.codeOptimization(scope, cg);
+				try {
+					ExpressionNode optimizedExpr = expr.optimizeWithScope(scope, cg);
+					if(null != optimizedExpr) {
+						expr = optimizedExpr;
+						arrDimensions.set(i, optimizedExpr);
+					}
+				}
+				catch(CompileException ex) {
+					markError(ex);
+				}
+			}
+		}
 	}
 
 	public List<ExpressionNode> getDimensions() {
@@ -201,7 +220,7 @@ public class NewArrayExpression extends ExpressionNode {
 	}
 
 	public ArrayInitExpression getInitializer() {
-		return aiExpr;
+		return arrayInitiExpr;
 	}
 
 	public int[] getConstDimensions() {
@@ -227,28 +246,29 @@ public class NewArrayExpression extends ExpressionNode {
 		excs.setSourcePosition(sp);
 		
 		if(null==constDimensions) {
-			cg.pushStackReg(cgScope);
+			cg.pushStackReg(headerCgScope);
 			for(int i=arrDimensions.size()-1; i>=0; i--) {
 				ExpressionNode expr = arrDimensions.get(i);
 				if(expr instanceof LiteralExpression) {
 					//TODO 0x02 - количество байт под размер массива
-					cg.pushConst(cgScope, 0x02, ((LiteralExpression)expr).getNumValue(), false);
+					cg.pushConst(headerCgScope, 0x02, ((LiteralExpression)expr).getNumValue(), false);
 				}
 				else {
 					expr.codeGen(cg, null, true, excs);
 					//TODO 0x02 - количество байт под размер массива
-					cgScope.append(cg.accCast(null, VarType.SHORT));
-					cg.pushAccBE(cgScope, 0x02);
+					headerCgScope.append(cg.accCast(null, VarType.SHORT));
+					cg.pushAccBE(headerCgScope, 0x02);
 				}
 			}
 		}
-		cgScope.append(cg.eNewArray(type, depth, constDimensions, excs));
+		
+		cg.eNewArray(headerCgScope, type, depth, constDimensions, excs);
 		if(null==constDimensions) {
-			cg.popStackReg(cgScope);
+			cg.popStackReg(headerCgScope);
 		}
-		if(null!=aiExpr) {
-			cg.pushAccBE(cgScope, 0x02);
-			aiExpr.codeGen(cg, cgScope, false, excs);
+		if(null!=arrayInitiExpr) {
+			cg.pushAccBE(headerCgScope, 0x02);
+			arrayInitiExpr.codeGen(cg, null, false, excs);
 			cg.popAccBE(cgScope, 0x02);
 		}
 

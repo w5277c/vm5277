@@ -24,14 +24,16 @@
 	.EQU	OS_IR_QNT								= 0x1a	;Количество перырваний
 	.EQU	OS_PCINT_PORTS_QNT						= 0x03	;Количество портов поддерживающих внешние прерывания(PCINT)
 	.EQU	OS_RAM_BORDER_SIZE						= 0x10	;Минимальное допустимое расстояние между вершинами FREE_RAM и STACK
+
+.IFNDEF OS_STACK_SIZE
 	.SET	OS_STACK_SIZE							= 0xc0	;Общий стек(192 байта)
+.ENDIF
+.IFNDEF OS_STDIN_CBUFFER_SIZE
 	.SET	OS_STDIN_CBUFFER_SIZE					= 0x08	;Размер буфера ввода (не менее 4)
-
+.ENDIF
+.IFNDEF OS_ETRACE_BUFFER_SIZE
 	.SET	OS_ETRACE_BUFFER_SIZE					= 0x10	;Размер буфера для трассировки исключений
-
-	.EQU	OS_DRAM_BMASK_1B_SIZE					= 8		;Размер 64Б(64 яч.) //TODO рассчитать
-	.EQU	OS_DRAM_BMASK_2B_SIZE					= 6		;Размер 96Б(48 яч.)
-	.EQU	OS_DRAM_BMASK_8B_SIZE					= 10	;Размер 640Б(80 яч.)
+.ENDIF
 
 	.EQU	SDA										= PC4
 	.EQU	SCL										= PC5

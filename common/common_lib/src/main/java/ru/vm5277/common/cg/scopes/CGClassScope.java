@@ -123,7 +123,7 @@ public class CGClassScope extends CGScope {
 	
 	@Override
 	public String toString() {
-		return "class " + name + " '" + getPath('.') + resId;
+		return "class " + name;
 	}
 
 	public void addMethod(CGMethodScope mScope) {

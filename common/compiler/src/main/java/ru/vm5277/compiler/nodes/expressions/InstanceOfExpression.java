@@ -32,14 +32,11 @@ import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
-import ru.vm5277.compiler.nodes.CatchBlock;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.CIScope;
-import ru.vm5277.compiler.semantic.ExceptionScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
-import ru.vm5277.compiler.semantic.VarSymbol;
 
 public class InstanceOfExpression extends ExpressionNode {
 	private	ExpressionNode	leftExpr;	// Проверяемое выражение
@@ -156,28 +153,31 @@ public class InstanceOfExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 		
 		this.scope = scope;
-		cgScope = cg.enterExpression(toString());
+		if(null!=cgScope) cgScope.disable();
+		cgScope = cg.enterExpression(parent, toString());
 
-		result&=leftExpr.postAnalyze(scope, cg);
+		result&=leftExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
-			try {
-				ExpressionNode optimizedExpr = leftExpr.optimizeWithScope(scope, cg);
-				if(null!=optimizedExpr) {
-					leftExpr = optimizedExpr;
-				}
-			}
-			catch(CompileException ex) {
-				markError(ex);
-				result = false;
+			// Резолвинг QualifiedPathExpression
+			ExpressionNode resolved = resolveQualifiedPathExpr(leftExpr);
+			if(null!=resolved) {
+				leftExpr = resolved;
 			}
 		}
 
-		result&=rightExpr.postAnalyze(scope, cg);
+		result&=rightExpr.postAnalyze(scope, cg, cgScope);
+		if(result) {
+			// Резолвинг QualifiedPathExpression
+			ExpressionNode resolved = resolveQualifiedPathExpr(rightExpr);
+			if(null!=resolved) {
+				rightExpr = resolved;
+			}
+		}
 
 		if(VarType.UNKNOWN==rightType) {
 			markError("Unknown right-hand side of 'is': " + rightExpr);
@@ -219,11 +219,12 @@ public class InstanceOfExpression extends ExpressionNode {
 			}
 		}
 		
-		cg.leaveExpression();
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 
+	//TODO codeOptimization
+	
 	public VarType getLeftType() {
 		return leftType;
 	}
@@ -252,27 +253,27 @@ public class InstanceOfExpression extends ExpressionNode {
 		//Обходимся без рантайма, пока в левой части примитив или это константа
 		//Но нужно вызывать рантайм, если встречаем объект, так как только в рантайм данных есть информация о типе переменной
 		
-		CGScope cgs = null == parent ? cgScope : parent;
+		//CGScope cgs = null == parent ? cgScope : parent;
 
 		Symbol varSymbol = getSrcSymbol();
 		if(varSymbol.isFinal()) return (isCompatibleWith(scope, varSymbol.getType(), rightType) ? CodegenResult.TRUE : CodegenResult.FALSE);
 
-			leftExpr.codeGen(cg, cgs, false, excs);
+		leftExpr.codeGen(cg, cgScope, false, excs);
 
-			// TODO весь код можно вынести в RTOS j8b утилиты и просто вызывать как функцию
-			boolean heapSaved=false;
-			if(leftExpr instanceof VarFieldExpression) {
-				CGCellsScope cScope = (CGCellsScope)((VarFieldExpression)leftExpr).getSymbol().getCGScope();
-				cg.pushHeapReg(cgs);
-				heapSaved = true;
-				cg.setHeapReg(cgs, cScope.getCells());
-			}
+		// TODO весь код можно вынести в RTOS j8b утилиты и просто вызывать как функцию
+		boolean heapSaved=false;
+		if(leftExpr instanceof VarFieldExpression) {
+			CGCellsScope cScope = (CGCellsScope)((VarFieldExpression)leftExpr).getSymbol().getCGScope();
+			cg.pushHeapReg(cgScope);
+			heapSaved = true;
+			cg.setHeapReg(cgScope, cScope.getCells());
+		}
 
-			cg.eInstanceof(cgs, rightType);
+		cg.eInstanceof(cgScope, rightType);
 
-			if(heapSaved) cg.popHeapReg(cgs);
+		if(heapSaved) cg.popHeapReg(cgScope);
 
-		return CodegenResult.RESULT_IN_ACCUM;
+		return CodegenResult.RESULT_IN_FLAG;
 	}
 
 	@Override

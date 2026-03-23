@@ -47,35 +47,28 @@ public class ComparisonExpression extends BinaryExpression {
     }
     
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterExpression(toString());
+		if(null!=cgScope) cgScope.disable();
+		cgScope = cg.enterExpression(parent, toString());
 
 		// Анализ операндов
-		result&=leftExpr.postAnalyze(scope, cg);
+		result&=leftExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
-			try {
-				ExpressionNode optimizedExpr = leftExpr.optimizeWithScope(scope, cg);
-				if(null != optimizedExpr) {
-					leftExpr = optimizedExpr;
-				}
-			}
-			catch(CompileException ex) {
-				markError(ex);
+			// Резолвинг QualifiedPathExpression
+			ExpressionNode resolved = resolveQualifiedPathExpr(leftExpr);
+			if(null!=resolved) {
+				leftExpr = resolved;
 			}
 		}
 
-		result&=rightExpr.postAnalyze(scope, cg);
+		result&=rightExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
-			try {
-				ExpressionNode optimizedExpr = rightExpr.optimizeWithScope(scope, cg);
-				if(null != optimizedExpr) {
-					rightExpr = optimizedExpr;
-				}
-			}
-			catch(CompileException ex) {
-				markError(ex);
+			// Резолвинг QualifiedPathExpression
+			ExpressionNode resolved = resolveQualifiedPathExpr(rightExpr);
+			if(null!=resolved) {
+				rightExpr = resolved;
 			}
 		}
 
@@ -136,7 +129,6 @@ public class ComparisonExpression extends BinaryExpression {
 			}
 		}
 		
-		cg.leaveExpression();
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
@@ -149,7 +141,7 @@ public class ComparisonExpression extends BinaryExpression {
 		//TODO операции сравнения не сохраняют результат в аккумулятор, это делают(к примеру) логические операции.
 		CodegenResult result = null;
 
-		CGScope cgs = null == parent ? cgScope : parent;
+		//CGScope cgs = null == parent ? cgScope : parent;
 		
 		// Изначально сохраняем порядок left/right
 		ExpressionNode expr1 = leftExpr;
@@ -161,14 +153,14 @@ public class ComparisonExpression extends BinaryExpression {
 		
 		// Оптимизация порядка для коммутативных операций
 		if(operator.isCommutative()) {
-			if(leftExpr instanceof LiteralExpression || (!(rightExpr instanceof VarFieldExpression) && leftExpr instanceof VarFieldExpression)) {
+			if(leftExpr instanceof LiteralExpression || (!(rightExpr instanceof LiteralExpression) && leftExpr instanceof VarFieldExpression)) {
 				expr1 = rightExpr;
 				expr2 = leftExpr;
 			}
 		}
 
 		CGBranch branch = null;
-		CGScope _scope = cgs;
+		CGScope _scope = cgScope;
 		while(null!=_scope) {
 			branch = _scope.getBranch();
 			if(null!=branch) break;
@@ -181,8 +173,8 @@ public class ComparisonExpression extends BinaryExpression {
 			//================ VarFieldExpression ==== LITERAL ================================
 			if(expr1 instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)expr1;
-				expr2.codeGen(cg, cgs, false, excs);
-				cg.constCond(	cgs, cScope2.getCells(), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), expr2.getType().isFixedPoint(),
+				expr2.codeGen(cg, cgScope, false, excs);
+				cg.constCond(	cgScope, cScope2.getCells(), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), expr2.getType().isFixedPoint(),
 								le.isFixed(), isInvert, opOr, (CGBranch)branch);
 			}
 			//================ VarFieldExpression ==== ARRAY ================================
@@ -197,13 +189,16 @@ public class ComparisonExpression extends BinaryExpression {
 */
 			//================ VarFieldExpression ==== OTHER ================================
 			else {
-				if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgs, true, excs)) {
+				//TODO эксперимент. Размер аккумулятора не задан, однако VarFilendExpression основывается на размере аккумулятора
+				//Вероятно нужно задать для всех записей в аккумулятор или вынести куда-то в другое место.
+				cg.accResize(expr1.getType());
+				if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgScope, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr1);
 				}
 				if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
-					cgs.append(cg.accCast(expr1.getType(), expr2.getType()));
+					cgScope.append(cg.accCast(expr1.getType(), expr2.getType()));
 				}
-				cg.cellsCond(cgs, cScope2.getCells(), operator, isInvert, opOr, (CGBranch)branch);
+				cg.cellsCond(cgScope, cScope2.getCells(), operator, isInvert, opOr, (CGBranch)branch);
 			}
 		}
 		//================ LiteralExpression ================================
@@ -211,24 +206,25 @@ public class ComparisonExpression extends BinaryExpression {
 			LiteralExpression le = (LiteralExpression)expr2;
 			//================ LiteralExpression ==== VAR/FIELD ================================
 			if(expr1 instanceof VarFieldExpression) {
-				expr1.codeGen(cg, cgs, false, excs);
+				expr1.codeGen(cg, cgScope, false, excs);
 				CGCellsScope cScope = (CGCellsScope)expr1.getSymbol().getCGScope();
-				cg.constCond(	cgs, cScope.getCells(), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), expr1.getType().isFixedPoint(),
+				cg.constCond(	cgScope, cScope.getCells(), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), expr1.getType().isFixedPoint(),
 								le.isFixed(), isInvert, opOr, branch);
 			}
 			else if(expr1 instanceof ArrayExpression) {
-				expr1.codeGen(cg, cgs, false, excs);
+				expr1.codeGen(cg, cgScope, false, excs);
 				CGCellsScope cScope = (CGCellsScope)expr1.getSymbol().getCGScope();
-				cg.constCond(	cgs, cScope.getCells(), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), expr1.getType().isFixedPoint(),
+				cg.constCond(	cgScope, cScope.getCells(), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), expr1.getType().isFixedPoint(),
 								le.isFixed(), isInvert, opOr, branch);
 			}
 			//================ LiteralExpression ==== OTHER ================================
 			else {
-				if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgs, true, excs)) {
+				cg.accResize(expr1.getType());
+				if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgScope, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr1);
 				}
-				cg.constCond(	cgs, new CGCells(	CGCells.Type.ACC), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(),
-													expr1.getType().isFixedPoint(), le.isFixed(), isInvert, opOr, branch);
+				cg.constCond(	cgScope, new CGCells(	CGCells.Type.ACC), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(),
+														expr1.getType().isFixedPoint(), le.isFixed(), isInvert, opOr, branch);
 			}
 		}
 		//================ ArrayExpression ================================
@@ -237,58 +233,58 @@ public class ComparisonExpression extends BinaryExpression {
 			//================ ArrayExpression ==== LITERAL ================================
 			if(expr1 instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)expr1;
-				expr2.codeGen(cg, cgs, false, excs);
+				expr2.codeGen(cg, cgScope, false, excs);
 				CGCellsScope cScope = (CGCellsScope)expr2.getSymbol().getCGScope();
-				cg.constCond(	cgs, cScope.getCells(), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), expr2.getType().isFixedPoint(),
+				cg.constCond(	cgScope, cScope.getCells(), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), expr2.getType().isFixedPoint(),
 								le.isFixed(), isInvert, opOr, (CGBranch)branch);
 			}
 			//================ ArrayExpression ==== VAR/FIELD ================================
 			else if(expr1 instanceof VarFieldExpression) {
-				if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgs, true, excs)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgScope, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr1);
 				}
-				expr2.codeGen(cg, cgs, false, excs);
+				expr2.codeGen(cg, cgScope, false, excs);
 				CGCellsScope cScope = (CGCellsScope)expr2.getSymbol().getCGScope();
-				cg.cellsCond(cgs, cScope.getCells(), operator, isInvert, opOr, (CGBranch)branch);
+				cg.cellsCond(cgScope, cScope.getCells(), operator, isInvert, opOr, (CGBranch)branch);
 			}
 			//================ ArrayExpression ==== OTHER ================================
 			else {
-				if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgs, true, excs)) {
+				if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgScope, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr2);
 				}					
 
 				// Определяем максмальный размер операнда
 				int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
-				cg.pushAccBE(cgs, size);
-				if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg, cgs, true, excs)) {
+				cg.pushAccBE(cgScope, size);
+				if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg, cgScope, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr1);
 				}
 				if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
-					cgs.append(cg.accCast(expr1.getType(), expr2.getType()));
+					cgScope.append(cg.accCast(expr1.getType(), expr2.getType()));
 				}
-				cg.cellsCond(cgs, new CGCells(CGCells.Type.STACK, size), operator, isInvert, opOr, (CGBranch)branch);
+				cg.cellsCond(cgScope, new CGCells(CGCells.Type.STACK, size), operator, isInvert, opOr, (CGBranch)branch);
 			}
 		}
 		//================ Other ================================
 		else {
-			if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgs, true, excs)) {
+			if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgScope, true, excs)) {
 				throw new CompileException("Accum not used for operand:" + expr2);
 			}					
 
 			// Определяем максмальный размер операнда
 			int size = (leftType.getSize() > rightType.getSize() ? leftType.getSize() : rightType.getSize());
 			// Выполняем операцию, левый операнд - аккумулятор, правый операнд - значение на вершине стека
-			cg.pushAccBE(cgs, size);
+			cg.pushAccBE(cgScope, size);
 			// Строим код для expr1(результат в аккумуляторе)
-			if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg, cgs, true, excs)) {
+			if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg, cgScope, true, excs)) {
 				throw new CompileException("Accum not used for operand:" + expr1);
 			}
 
 			// Аккумулятор уже необходимого размера, но нужно проверить на Fixed
 			if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
-				cgs.append(cg.accCast(expr1.getType(), expr2.getType()));
+				cgScope.append(cg.accCast(expr1.getType(), expr2.getType()));
 			}
-			cg.cellsCond(cgs, new CGCells(CGCells.Type.STACK, size), operator, isInvert, opOr, (CGBranch)branch);
+			cg.cellsCond(cgScope, new CGCells(CGCells.Type.STACK, size), operator, isInvert, opOr, (CGBranch)branch);
 		}
 		
 		return result;

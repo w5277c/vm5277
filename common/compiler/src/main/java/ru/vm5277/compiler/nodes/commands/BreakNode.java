@@ -116,10 +116,10 @@ public class BreakNode extends CommandNode {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
-		cgScope = cg.enterCommand();
+		cgScope = cg.enterCommand(parent, "break");
 		
 		// Базовая проверка - команда break должна быть внутри цикла
 		if(null==cgScope.getScope(CGLoopBlockScope.class)) {
@@ -129,7 +129,6 @@ public class BreakNode extends CommandNode {
 
 		//TODO добавить проверку: между циклом и меткой не должно быть кода		
 		
-		cg.leaveCommand();
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
@@ -143,12 +142,12 @@ public class BreakNode extends CommandNode {
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		CodegenResult result = null;
 		
-		CGScope cgs = null == parent ? cgScope : parent;
+		//CGScope cgs = null == parent ? cgScope : parent;
 		
 		if(null==label) {
 			CGLabelScope lbScope = ((CGLoopBlockScope)cgScope.getScope(CGLoopBlockScope.class)).getEndLbScope();
 			lbScope.setUsed();
-			cg.jump(cgs, lbScope);
+			cg.jump(cgScope, lbScope);
 			
 		}
 		else {
@@ -182,7 +181,7 @@ public class BreakNode extends CommandNode {
 			
 			// Прыжок на метку окончания loop-блока
 			cgLoop.getEndLbScope().setUsed();
-			cg.jump(cgs, cgLoop.getEndLbScope());
+			cg.jump(cgScope, cgLoop.getEndLbScope());
 		}
 		
 		return result;

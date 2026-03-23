@@ -69,7 +69,7 @@ public abstract class CodeGenerator extends CGScope {
 	protected					CodeExcsChecker				codeExcsChecker;
 	protected	static	final	Map<Integer, DataSymbol>	flashData			= new HashMap<>();
 	protected	static	final	Map<String, Integer>		flashStrings		= new HashMap<>();
-	protected					CGScope						scope				= null;
+//	protected					CGScope						scope				= null;
 	protected	final			CGAccum						accum				= new CGAccum();
 	public				static	int							CLASS_HEADER_SIZE;
 	protected			static	boolean						arraysUsage			= false;
@@ -80,135 +80,42 @@ public abstract class CodeGenerator extends CGScope {
 		this.platform = platform;
 	}
 	
-	public CGClassScope enterClass(VarType type, String name, List<ImplementInfo> impl, boolean isRoot) {
-		scope = new CGClassScope(this, scope, genId(), type, name, impl, null != scope && isRoot);
-		return (CGClassScope)scope;
+	public CGClassScope enterClass(CGScope cgScope, VarType type, String name, List<ImplementInfo> impl, boolean isRoot) {
+		return new CGClassScope(this, cgScope, genId(), type, name, impl, isRoot);
 	}
-	public void leaveClass() {
-		if(null != scope.getParent()) scope = scope.free(); // оставялем верхний класс в зоне видимости
-		
-		//TODO
+	public CGInterfaceScope enterInterface(CGScope cgScope, VarType type, String name) {
+		return new CGInterfaceScope(cgScope, genId(), type, name);
 	}
-
-	public CGInterfaceScope enterInterface(VarType type, String name) {
-		scope = new CGInterfaceScope(scope, genId(), type, name);
-		return (CGInterfaceScope)scope;
+	public CGMethodScope enterConstructor(CGScope cgScope) {
+		return new CGMethodScope(this, (CGClassScope)cgScope, genId(), null, 0, ((CGClassScope)cgScope).getName(), buildRegsPool());
 	}
-	public void leaveInterface() {
-		scope = scope.free();
-		//TODO
-	}
-
-	public CGMethodScope enterConstructor() {
-		scope = new CGMethodScope(this, (CGClassScope)scope, genId(), null, 0, ((CGClassScope)scope).getName(), buildRegsPool());
-		return (CGMethodScope)scope;
-	}
-	public void leaveConstructor() {
-		scope = scope.free();
-	}
-
-	public CGMethodScope enterMethod(VarType type, String name) {
+	public CGMethodScope enterMethod(CGScope cgScope, VarType type, String name) {
 		int size = (-1 == type.getSize() ? getRefSize() : type.getSize());
-		scope = new CGMethodScope(this, (CGClassScope)scope, genId(), type, size, name, buildRegsPool());
-		return (CGMethodScope)scope;
+		return new CGMethodScope(this, (CGClassScope)cgScope, genId(), type, size, name, buildRegsPool());
 	}
-	public void leaveMethod() {
-		scope = scope.free();
+	public CGBlockScope enterBlock(CGScope cgScope, boolean isTry, String comment) {
+		return isTry ? new CGTryBlockScope(this, cgScope, genId(), comment) : new CGBlockScope(this, cgScope, genId(), comment);
 	}
-
-	public CGBlockScope enterBlock(boolean isTry, String comment) {
-		scope = isTry ? new CGTryBlockScope(this, scope, genId(), comment) : new CGBlockScope(this, scope, genId(), comment);
-		return (CGBlockScope)scope;
+	public CGBlockScope enterLoopBlock(CGScope cgScope, String comment) {
+		return new CGLoopBlockScope(this, cgScope, genId(), comment);
 	}
-	public void leaveBlock() {
-/*		CGBlockScope bScope = (CGBlockScope)scope;
-
-		if(!bScope.getUsedRegs().isEmpty()) {
-			bScope.begin();
-			for(int i=0; i<bScope.getUsedRegs().size(); i++) {
-				bScope.insert(pushRegAsm(bScope.getUsedRegs().get(i)));
-			}
-		}
-
-		int size = bScope.getStackBlockSize();
-		if(0x00 != size) {
-			dpStackAlloc = true;
-			bScope.prepend(stackAllocAsm(size));
-		}
-
-		if(!bScope.getUsedRegs().isEmpty()) {
-			for(int i=bScope.getUsedRegs().size()-1; i>=0; i--) {
-				bScope.append(popRegAsm(bScope.getUsedRegs().get(i)));
-			}
-		}
-
-		if(0x00 != size) bScope.append(stackFreeAsm());*/
-		scope = scope.free();
+	public CGVarScope enterLocal(CGScope cgScope, VarType type, int size, boolean isConstant, String name) throws CompileException {
+		return new CGVarScope(cgScope, genId(), type, size, isConstant, name);
 	}
-
-	public CGBlockScope enterLoopBlock(String comment) {
-		scope = new CGLoopBlockScope(this, scope, genId(), comment);
-		return (CGBlockScope)scope;
+	public CGFieldScope enterField(CGScope cgScope, VarType type, boolean isStatic, String name) throws CompileException {
+		return new CGFieldScope((CGClassScope)cgScope, genId(), type, (-1 == type.getSize() ? getRefSize() : type.getSize()), isStatic, name);
 	}
-	public void leaveLoopBlock() {
-		scope = scope.free();
+	public CGExpressionScope enterExpression(CGScope cgScope, String name) {
+		return new CGExpressionScope(cgScope, name);
 	}
-
-	public CGVarScope enterLocal(VarType type, int size, boolean isConstant, String name) throws CompileException {
-		this.scope = new CGVarScope(scope, genId(), type, size, isConstant, name);
-
-		return (CGVarScope)this.scope;
-	}
-	public void leaveLocal() {
-/*		CGLocalScope lScope = (CGLocalScope)scope;
-		if(lScope.isConstant()) {
-			lScope.setDataSymbol(flashData.get(lScope.getResId()));
-		}
-		else {
-//			lScope.setValue(accum.getValue());
-//			loadRegs(lScope.getSize());
-//			storeAcc(lScope.getResId());
-		}
-*/		
-		scope = scope.free();
-		//TODO
-	}
-	public CGFieldScope enterField(VarType type, boolean isStatic, String name) throws CompileException {
-		scope = new CGFieldScope((CGClassScope)scope, genId(), type, (-1 == type.getSize() ? getRefSize() : type.getSize()), isStatic, name);
-
-		return (CGFieldScope)scope;
-	}
-	public void leaveField() {
-		scope = scope.free();
-		//TODO
-	}
-	
-	
-	public CGExpressionScope enterExpression(String name) {
-		scope = new CGExpressionScope(scope, name);
-		return (CGExpressionScope)scope;
-	}
-	public void leaveExpression() {
-		scope = scope.free();
-	}
-
-	public CGCellsScope enterArrayExpression(VarType type, int size, final CGCells cells) {
-		scope = new CGCellsScope(scope, genId(), type, size, "arrExpr") {
+	public CGCellsScope enterArrayExpression(CGScope cgScope, VarType type, int size, final CGCells cells) {
+		return new CGCellsScope(cgScope, genId(), type, size, "arrExpr") {
 			@Override
 			public CGCells getCells() {return cells;}
 		};
-		return (CGCellsScope)scope;
 	}
-	public void leaveArrayExpression() {
-		scope = scope.free();
-	}
-
-	public CGCommandScope enterCommand() {
-		scope = new CGCommandScope(scope);
-		return (CGCommandScope)scope;
-	}
-	public void leaveCommand() {
-		scope = scope.free();
+	public CGCommandScope enterCommand(CGScope cgScope, String name) {
+		return new CGCommandScope(cgScope, name);
 	}
 
 	public DataSymbol defineData(int resId, int size, Object obj) {
@@ -259,7 +166,8 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract void cellsCond(CGScope scope, CGCells cells, Operator op, boolean isNot, boolean isOr, CGBranch branchScope) throws CompileException;
 	public abstract void constCond(	CGScope scope, CGCells cells, Operator op, long k, boolean isLFixed, boolean isRFixed, boolean isNot, boolean isOr,
 									CGBranch branchScope) throws CompileException;
-	public abstract void boolCond(CGScope scope, CGBranch branchScope, boolean byBit0) throws CompileException;
+	public abstract void boolAccCond(CGScope scope, CGBranch branchScope, boolean byBit0) throws CompileException;
+	public abstract void boolFlagCond(CGScope scope, CGBranch branchScope) throws CompileException;
 	//TODO проверить все вызовы, возможно везде должне быть pushAccLE
 	public abstract	CGIContainer pushAccBE(CGScope scope, Integer size) throws CompileException;
 	public abstract	CGIContainer pushAccLE(CGScope scope, Integer size) throws CompileException;
@@ -286,8 +194,8 @@ public abstract class CodeGenerator extends CGScope {
 	
 	//TODO набор методов для реализации команд if, switch, for, loop и .т.д
 	public abstract void eNewInstance(CGScope scope, int fieldsSize, CGLabelScope iidLabel, VarType type, boolean launchPoint, CGExcs excs) throws CompileException;
-	public abstract CGIContainer eNewArray(VarType type, int depth, int[] cDims, CGExcs excs) throws CompileException;
-	public abstract CGIContainer eNewArrView(int depth, CGExcs excs) throws CompileException;
+	public abstract void eNewArray(CGScope scope, VarType type, int depth, int[] cDims, CGExcs excs) throws CompileException;
+	public abstract void eNewArrView(CGScope scope, int depth, CGExcs excs) throws CompileException;
 	public abstract void eTry(CGBlockScope blockScope, List<Case> cases, CGBlockScope defaultBlockScope);
 	public abstract void eCatch(CGScope scope) throws CompileException;
 	public abstract CGIContainer eReturn(CGScope scope, int argsSize, int varsSize, VarType retType) throws CompileException;
@@ -305,7 +213,7 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract CGIContainer pushConst(CGScope scope, int size, long value, boolean isFixed) throws CompileException;
 	public abstract CGIContainer pushCells(CGScope scope, int size, CGCells cells) throws CompileException;
 //	public abstract void setValueByIndex(Operand op, int size, List<Byte> tempRegs) throws CompileException;
-	public abstract CGIContainer stackPrepare(boolean firstBlock, int argsSize, int varsSize, CGExcs excs) throws CompileException ;
+	public abstract void stackPrepare(CGIContainer scope, boolean firstBlock, int argsSize, int varsSize, CGExcs excs) throws CompileException;
 	public abstract CGIContainer blockFree(int varsSize) throws CompileException ;
 	public abstract boolean normalizeIRegConst(CGMethodScope mScope, char iReg, AtomicInteger lastOffset) throws CompileException;
 	public abstract String getVersion();
@@ -612,20 +520,26 @@ public abstract class CodeGenerator extends CGScope {
 		jump(this, new CGLabelScope(null, -1, LabelNames.MAIN, true));
 	}
 	
-	public String getAsm(Path asmInstrPath, MessageContainer mc) throws CompileException {
+	public void showScopeTree(CGScope cgScope) {
+		StringBuilder sb = new StringBuilder();
+		cgScope.buildScopeTree(sb, "");
+		System.out.println(sb);
+	}
+	
+	public String getAsm(CGScope cgScope, Path asmInstrPath, MessageContainer mc) throws CompileException {
 		
 		if(null!=codeFixer && null!=asmInstrPath) {
-			List<CGItem> codeList = codeFixer.resolveInstructionsSize(scope, asmInstrPath, mc, (String)platform.getParam(RTOSParam.MCU));
+			List<CGItem> codeList = codeFixer.resolveInstructionsSize(cgScope, asmInstrPath, mc, (String)platform.getParam(RTOSParam.MCU));
 			codeFixer.branchRangeFixer(codeList);
 
 			if(Optimization.FRONT<platform.getOptLevel()) {
 				boolean modified = true;
 				while(modified) {
 					modified = false;
-					codeOptimizer.removeUnusedLabels(scope);
+					codeOptimizer.removeUnusedLabels(cgScope);
 					modified|=codeOptimizer.optimizeJumpInstr(codeList);
 					modified|=codeOptimizer.optimizeBranchInstr(codeList);
-					modified|=codeOptimizer.optimizeEmptyJumps(scope);
+					modified|=codeOptimizer.optimizeEmptyJumps(cgScope);
 				}
 			}
 		}
@@ -634,32 +548,19 @@ public abstract class CodeGenerator extends CGScope {
 			boolean modified = true;
 			while(modified) {
 				modified = false;
-				codeOptimizer.removeUnusedLabels(scope);
-				modified |= codeOptimizer.optimizeEmptyJumps(scope);
+				codeOptimizer.removeUnusedLabels(cgScope);
+				modified |= codeOptimizer.optimizeEmptyJumps(cgScope);
 			}
-			codeOptimizer.optimizeAfterJump(scope);
+			codeOptimizer.optimizeAfterJump(cgScope);
 		}
 
 		StringBuilder sb = new StringBuilder(getSource());
-		sb.append(scope.getSource());
+		sb.append(cgScope.getSource());
 		return sb.toString();
-	}
-	
-	public boolean isExpressionScope() {
-		return (scope instanceof CGExpressionScope);
 	}
 	
 	protected boolean isEven(int reg) {
 		return 0 == (reg&0x01);
-	}
-	
-//	public CGScope getScope() {
-//		return scope;
-//	}
-	public CGScope setScope(CGScope scope) {
-		CGScope old = this.scope;
-		this.scope = scope;
-		return old;
 	}
 	
 	public CodeOptimizer getOptimizer() {

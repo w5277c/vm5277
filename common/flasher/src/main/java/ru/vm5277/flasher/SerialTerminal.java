@@ -16,37 +16,48 @@
 
 package ru.vm5277.flasher;
 
+import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.input.KeyStroke;
 import com.googlecode.lanterna.input.KeyType;
-import com.googlecode.lanterna.screen.TerminalScreen;
 import com.googlecode.lanterna.terminal.DefaultTerminalFactory;
 import jssc.SerialPort;
 import java.nio.charset.Charset;
 import com.googlecode.lanterna.terminal.Terminal;
-import java.util.Arrays;
 
 public class SerialTerminal extends Thread {
 	private	final			SerialPort				serialPort;
+	private					int						cSize;
+	private					int						rSize;
 	private					ServiceMessageHandler	handler;
-	private					boolean					enabled		= true;
-	private	static	final	Charset					MC_CHARSET	= Charset.forName("KOI8-R");
+	private					boolean					singleWireMode;
+	private					boolean					enabled			= true;
+	private	static	final	Charset					MC_CHARSET		= Charset.forName("KOI8-R");
 	
-	public SerialTerminal(SerialPort serialPort, ServiceMessageHandler hanlder) {
+	public SerialTerminal(SerialPort serialPort, boolean singleWireMode, int cSize, int rSize, ServiceMessageHandler hanlder) {
 		this.serialPort = serialPort;
+		this.singleWireMode = singleWireMode;
+		this.cSize = cSize;
+		this.rSize = rSize;
 		this.handler = hanlder;
 	}
 
 	@Override
 	public void run() {
 		try {
-			Terminal terminal = new DefaultTerminalFactory().createTerminal();
+			DefaultTerminalFactory terminalFactory = new DefaultTerminalFactory();
+			terminalFactory.setTerminalEmulatorTitle("vm5277 MC terminal");
+			terminalFactory.setInitialTerminalSize(new TerminalSize(cSize, rSize));
+//			AWTTerminalFontConfiguration fontConf = AWTTerminalFontConfiguration.getDefaultOfSize(6);
+//			terminalFactory.setTerminalEmulatorFontConfiguration(fontConf);
+			Terminal terminal = terminalFactory.createTerminal();
+			
 			while(enabled && !isTerminalClosed(terminal)) {
 				try{Thread.sleep(100);} catch(Exception ex) {}
 				KeyStroke ks = terminal.pollInput();
 				if(null!=ks) {
 					if(KeyType.EOF == ks.getKeyType()) break;
 					Character ch = ks.getCharacter();
-					System.out.println("ks:" + ks + ", ch:" + ch);
+//					System.out.println("ks:" + ks + ", ch:" + ch);
 					if(null==ch) {
 						switch(ks.getKeyType()) {
 							case ArrowDown:
@@ -68,7 +79,9 @@ public class SerialTerminal extends Thread {
 						byte[] koi8Bytes = charStr.getBytes(MC_CHARSET);
 
 						serialPort.writeByte(koi8Bytes[0x00]);
-						serialPort.readBytes(0x01);
+						if(singleWireMode) {
+							serialPort.readBytes(0x01);
+						}
 					}
 				}
 

@@ -21,8 +21,8 @@ import org.netbeans.api.lexer.TokenId;
 public enum ASMTokenId implements TokenId {
     LITERAL("keyword"),
     COMMAND("keyword"),
-    DIRECTIVE("keyword"),
-    MNEMONIC("keyword"),
+    DIRECTIVE("field"),
+    MNEMONIC("char"), //GREEN
     
     IDENTIFIER("identifier"),
     INDEX_REG("keyword"),

@@ -196,12 +196,12 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 	}
 
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 
 		try {
-			cgScope = cg.enterField(type, isStatic(), name);
+			cgScope = cg.enterField(parent, type, isStatic(), name);
 			symbol.setCGScope(cgScope);
 			
 			// Проверка инициализации final-полей
@@ -212,10 +212,16 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 
 			// Анализ инициализатора, если есть
 			if(null!=init) {
-				if(!init.postAnalyze(scope, cg)) {
+				if(!init.postAnalyze(scope, cg, cgScope)) {
 					result = false;
 				}
 				else {
+					// Резолвинг QualifiedPathExpression
+					ExpressionNode resolved = resolveQualifiedPathExpr(init);
+					if(null!=resolved) {
+						init = resolved;
+					}
+					
 					((CGCellsScope)cgScope).setArrayView(init instanceof ArrayExpression);
 					// Проверка совместимости типов
 					VarType initType = init.getType();
@@ -257,15 +263,12 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 			markError(e);
 		}
 		
-		cg.leaveLocal();
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 	
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		CGScope oldScope = cg.setScope(cgScope);
-		
 		if(null!=init) {
 			init.codeOptimization(scope, cg);
 		
@@ -302,8 +305,6 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 				markError(ex);
 			}
 		}
-		
-		cg.setScope(oldScope);
 	}
 	
 	@Override
@@ -338,11 +339,11 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 																	isFixed));
 			}
 			else if(init instanceof NewExpression) {
-				init.codeGen(cg, null, true, excs);
+				init.codeGen(cg, cgScope, true, excs);
 				accUsed = true;
 			}
 			else if(init instanceof NewArrayExpression) {
-				init.codeGen(cg, null, true, excs);
+				init.codeGen(cg, cgScope, true, excs);
 				if(VarType.CLASS == ((CGFieldScope)cgScope).getType()) {
 					cg.pushHeapReg(cgScope);
 					cg.updateClassRefCount(cgScope, ((CGFieldScope)cgScope).getCells(), true);
@@ -352,7 +353,7 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 //				cg.accToCells(cgScope, ((CGFieldScope)cgScope));
 			}
 			else if(init instanceof BinaryExpression) {
-				CGScope oldScope = cg.setScope(cgScope);
+//!!!				CGScope oldScope = cg.setScope(cgScope);
 				CGBranch branch = new CGBranch();
 				cgScope.setBranch(branch);
 				
@@ -375,7 +376,7 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 				cgScope.append(lbScope);
 				cg.accToCells(cgScope, fScope);
 				accUsed = true;
-				cg.setScope(oldScope);
+//!!!				cg.setScope(oldScope);
 			}
 			else if(init instanceof EnumExpression) {
 				cg.accCast(null, VarType.BYTE);

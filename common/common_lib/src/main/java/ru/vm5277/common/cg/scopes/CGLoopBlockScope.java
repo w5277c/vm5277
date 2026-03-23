@@ -22,6 +22,7 @@ import ru.vm5277.common.cg.CodeGenerator;
 public class CGLoopBlockScope extends CGBlockScope {
 	private	CGLabelScope	startLbScope;
 	private	CGLabelScope	nextLbScope;
+	private	CGLabelScope	elseLbScope;
 	private	CGLabelScope	endLbScope;
 	
 	public CGLoopBlockScope(CodeGenerator cg, CGScope parent, int id, String comment) {
@@ -29,6 +30,7 @@ public class CGLoopBlockScope extends CGBlockScope {
 		
 		startLbScope = new CGLabelScope(null, null, LabelNames.LOOP, true);
 		nextLbScope = new CGLabelScope(null, null, LabelNames.LOOP_NEXT, false);
+		elseLbScope = new CGLabelScope(null, null, LabelNames.LOOP_ELSE, false);
 		endLbScope = new CGLabelScope(null, null, LabelNames.LOOP_END, false);
 	}
 	
@@ -37,10 +39,17 @@ public class CGLoopBlockScope extends CGBlockScope {
 	}
 
 	public CGLabelScope getNextLbScope() {
+		nextLbScope.setUsed();
 		return nextLbScope;
 	}
 
+	public CGLabelScope getElseLbScope() {
+		elseLbScope.setUsed();
+		return elseLbScope;
+	}
+
 	public CGLabelScope getEndLbScope() {
+		endLbScope.setUsed();
 		return endLbScope;
 	}
 }

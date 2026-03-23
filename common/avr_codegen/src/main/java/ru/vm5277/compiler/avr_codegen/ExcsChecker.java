@@ -51,7 +51,7 @@ public class ExcsChecker extends CodeExcsChecker {
 	
 	//UNCHECKED
 	@Override
-	public void stackOverflow(CodeGenerator cg, CGScope scope, CGExcs excs, int size, byte[] popRegIds) throws CompileException {
+	public void stackOverflow(CodeGenerator cg, CGIContainer scope, CGExcs excs, int size, byte[] popRegIds) throws CompileException {
 		int id = VarType.getExceptionId("StackOverflowException");
 		if(-1==id) return;
 

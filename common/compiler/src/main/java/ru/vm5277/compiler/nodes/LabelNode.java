@@ -60,8 +60,8 @@ public class LabelNode extends AstNode {
 	}
 	
 	@Override
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
-		cgScope = cg.enterCommand();
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
+		cgScope = cg.enterCommand(parent, "label");
 		
 		labelScope = ((CGBlockScope)cgScope.getScope(CGBlockScope.class)).addLabel(name);
 		
@@ -72,7 +72,7 @@ public class LabelNode extends AstNode {
 		((LabelSymbol)symbol).setCGScopes(cgScope, labelScope);
 		
 		// TODO Контроль достижимости кода после return/break/continue
-		cg.leaveCommand();
+
 		return true;
 	}
 
@@ -80,8 +80,8 @@ public class LabelNode extends AstNode {
 	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
 		CodegenResult result = null;
 		
-		CGScope cgs = null == parent ? cgScope : parent;
-		cgs.append(labelScope);
+		//CGScope cgs = null == parent ? cgScope : parent;
+		cgScope.append(labelScope);
 		return result;
 	}
 

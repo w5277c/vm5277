@@ -44,6 +44,11 @@ public class Lexer {
 		this.type = type;
 	}
 
+	public Lexer(LexerType type, ExternalTokenProvider extTokenProvider) {
+		this.type = type;
+		this.extTokenProvider = extTokenProvider;
+	}
+
 	public Lexer(LexerType type, File sourceFile, ExternalTokenProvider extTokenProvider, int tabSize, boolean allTokens) throws IOException {
 		this.type = type;
 		this.sb = new SourceBuffer(sourceFile, tabSize);

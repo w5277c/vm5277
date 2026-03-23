@@ -139,7 +139,7 @@ public class EnumNode extends AstNode {
 	}
 
 	@Override  
-	public boolean postAnalyze(Scope scope, CodeGenerator cg) {
+	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
 		debugAST(this, POST, false, result, getFullInfo());
