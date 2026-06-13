@@ -15,12 +15,12 @@
  */
 
 class Main {
-    public static void main() {
+	public static void main() {
 		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
 
 		byte b; b=0;
 		
-		System.out("\nПример switch, b="); System.out(b); System.out(": ");
+		System.out("\nПример switch, b=" + b + ": ");
 		switch(b) {
 			case 0: System.out("\nСработал 'case 0'");
 			case 1..10: System.out("\nСработал 'case 1..10'");
@@ -29,7 +29,7 @@ class Main {
 		}
 
 		b=2;
-		System.out("\nswitch, b="); System.out(b); System.out(": ");
+		System.out("\nswitch, b=" + b + ": ");
 		switch(b) {
 			case 0: System.out("\nСработал 'case 0'");
 			case 1..10: System.out("\nСработал 'case 1..10'");
@@ -38,7 +38,7 @@ class Main {
 		}
 
 		b=17;
-		System.out("\nswitch, b="); System.out(b); System.out(": ");
+		System.out("\nswitch, b=" + b + ": ");
 		switch(b) {
 			case 0: System.out("\nСработал 'case 0'");
 			case 1..10: System.out("\nСработал 'case 1..10'");
@@ -47,7 +47,7 @@ class Main {
 		}
 
 		b=18;
-		System.out("\nswitch, b="); System.out(b); System.out(": ");
+		System.out("\nswitch, b=" + b + ": ");
 		switch(b) {
 			case 0: System.out("\nСработал 'case 0'");
 			case 1..10: System.out("\nСработал 'case 1..10'");
@@ -56,6 +56,5 @@ class Main {
 		}
 
 		System.out("\ndone");
-
 	}
 }

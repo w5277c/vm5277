@@ -16,6 +16,8 @@
 package ru.vm5277.common.cg.scopes;
 
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -31,7 +33,7 @@ import ru.vm5277.common.cg.CodeOptimizer;
 import ru.vm5277.common.cg.RegPair;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGIText;
-import ru.vm5277.common.compiler.Optimization;
+import ru.vm5277.common.enums.OptimizationType;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
@@ -52,9 +54,10 @@ public class CGMethodScope extends CGCellsScope {
 	private			String						signature;
 	private			int							argsStackSize;
 	private			int							stackOffset			= 0;
-	private	final	ArrayList<RegPair>			regsPool;	// Свободные регистры, true = cвободен
+	private	final	Set<Byte>					usedRegs			= new HashSet<>();	// Регистры, которые были задейстованы в коде метода - требуют сохранения оригинала в стек
+	private	final	HashMap<Byte, RegPair>		regsPool;	// Свободные регистры, true = cвободен
 	private			boolean						isUsed;
-	private			CGIContainer				fieldsInitCallCont;
+	private			CGIContainer				fieldsInitCallCont	= new CGIContainer("instance init caller");
 	private			CGCells						cells;
 
 	private			CGIContainer				initContainer		= new CGIContainer();
@@ -64,11 +67,11 @@ public class CGMethodScope extends CGCellsScope {
 	private			AtomicInteger				lastStackOffset		= new AtomicInteger();
 	private			Set<Integer>				exceptionIds		= new HashSet<>();
 	
-	public CGMethodScope(CodeGenerator cg, CGClassScope parent, int resId, VarType type, int size, String name, ArrayList<RegPair> regsPool) {
+	public CGMethodScope(CodeGenerator cg, CGClassScope parent, int resId, VarType type, int size, String name) {
 		super(parent, resId, type, size, name);
 		
 		this.cg = cg;
-		this.regsPool = regsPool;
+		this.regsPool = cg.buildRegsPool();
 	
 		if(null!=type) {
 			this.cells = new CGCells(CGCells.Type.ACC, size);
@@ -106,6 +109,9 @@ public class CGMethodScope extends CGCellsScope {
 		else {
 			lbScope = new CGLabelScope(this, null, null, true);
 		}
+		// Похоже полезно для любого метода - что за метод без точки входа?
+		// Изначально задавалось только для persist методов в NewExpression.codeGen
+		lbScope.setPersist();
 	}
 	
 	public CGIContainer getInitContainer() {
@@ -117,7 +123,6 @@ public class CGMethodScope extends CGCellsScope {
 		
 		CGIContainer cont = new CGIContainer();
 		cont.append(new CGIText(""));
-		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";build " + toString()));
 		cont.append(lbScope);
 
 		heapIRegModified = cg.normalizeIRegConst(this, 'z', lastHeapOffset);
@@ -128,14 +133,17 @@ public class CGMethodScope extends CGCellsScope {
 		if(null==type) {
 			//cont.append(cg.eNewInstance(cScope.getHeapOffset(), cScope.getIIDLabel(), cScope.getType(), false, false));
 			cont.append(initContainer);
+			cont.append(fieldsInitCallCont);
 			cont.append(lbCIScope);
 //			fieldsInitCallCont = cg.call(null, cScope.getFieldInitLabel());
 //			cont.append(fieldsInitCallCont);
 		}
+
 		prepend(cont);
+		if(VERBOSE_LO <= verbose) prepend(new CGIText(";build " + toString()));
 		
 //		append(cg.eReturn(null, null == type ? 0x00 : type.getSize(), stackOffset));
-		if(Optimization.FRONT<cg.getPlatform().getOptLevel()) {
+		if(OptimizationType.FRONT.getId()<cg.getDevice().getOptimizationType().getId()) {
 			CodeOptimizer co = cg.getOptimizer();
 			if(null != co) {
 //				co.removeUnusedLabels(this, lbScope, lbCIScope);
@@ -151,11 +159,10 @@ public class CGMethodScope extends CGCellsScope {
 	}
 	
 	//Выделение ячеек для переданных параметров (только стек)
-	public CGCells argAllocate(int size) throws CompileException {
-//		stackOffset+=size;
-//		CGCells cells = new CGCells(CGCells.Type.STACK_FRAME, size, types.length-stackOffset);
+	public CGCells argAllocate(CGScope cgScope, int size) throws CompileException {
 		CGCells cells = new CGCells(CGCells.Type.ARGS, size, stackOffset);
 		stackOffset+=size;
+		if(VERBOSE_LO <= verbose) cgScope.append(new CGIText(";allocated args data, x" + size + " from stack frame (" + getPath('.') + ")"));
 		return cells;
 	}
 	
@@ -196,35 +203,49 @@ public class CGMethodScope extends CGCellsScope {
 	 * @param size количество ячеек
 	 * @return массив выделенных регистров либо null
 	 */
-	public RegPair[] borrowReg(int size) {
+	public RegPair[] borrowReg(int size) throws CompileException {
 		if(regsPool.isEmpty()) return null;
 
 		if(0x02==size) {
-			RegPair[] pair = findPair();
-			if(null!=pair) return pair;
+			RegPair[] pairs = findRegsPair(regsPool);
+			if(null!=pairs) {
+				for(RegPair pair: pairs) {
+					usedRegs.add(pair.getReg());	// Помечаем, что регистр использовался для сохраненния оригинала в стек
+				}
+				return pairs;
+			}
 		}
 		else if(0x04==size) {
-			RegPair[] pair1 = findPair();
-			if(null!=pair1) {
-				RegPair[] pair2 = findPair();
-				if(null!=pair2) {
-					return new RegPair[]{pair1[0x00], pair1[0x01], pair2[0x00], pair2[0x01]};
+			RegPair[] pairs1 = findRegsPair(regsPool);
+			if(null!=pairs1) {
+				RegPair[] pairs2 = findRegsPair(regsPool);
+				if(null!=pairs2) {
+					for(RegPair pair: pairs1) {
+						usedRegs.add(pair.getReg());	// Помечаем, что регистр использовался
+					}
+					for(RegPair pair: pairs2) {
+						usedRegs.add(pair.getReg());	// Помечаем, что регистр использовался
+					}
+					return new RegPair[]{pairs1[0x00], pairs1[0x01], pairs2[0x00], pairs2[0x01]};
 				}
 				else {
-					pair1[0x00].setFree(true);
-					pair1[0x01].setFree(true);
+					pairs1[0x00].setFree(true);
+					pairs1[0x01].setFree(true);
 				}
 			}
 		}
 		
 		RegPair[] result = new RegPair[size];
+		List<RegPair> tmp = new ArrayList<>(regsPool.values());
+		Collections.sort(tmp);
 		int index = 0;
-		for(RegPair pair : regsPool) {
+		for(RegPair pair : tmp) {
 			if(pair.isFree()) {
 				result[index++] = pair;
 				if(index==size) {
 					for(RegPair rp : result) {
 						rp.setFree(false);
+						usedRegs.add(rp.getReg());	// Помечаем, что регистр использовался
 					}
 					return result;
 				}
@@ -235,34 +256,10 @@ public class CGMethodScope extends CGCellsScope {
 		}
 		return null;
 	}
-	// Вероятно эта парная аллокация полезна только для AVR. Похоже нужно будет вынести в библиотеку кодогенератора
-	private RegPair[] findPair() {
-		for(RegPair pair1 : regsPool) {
-			if(pair1.isFree() && 0==(pair1.getReg()&0x01)) {
-				for(RegPair pair2 : regsPool) {
-					if(pair1.getReg()+0x01==pair2.getReg()) {
-						pair1.setFree(false);
-						pair2.setFree(false);
-						return new RegPair[]{pair1, pair2};
-					}
-				}
-			}
-		}
-		return null;
-	}
-
-	public RegPair getReg(byte reg) {
-		for(RegPair pair : regsPool) {
-			if(pair.getReg() == reg) {
-				return pair;
-			}
-		}
-		return null;
-	}
 	
-	public boolean isFreeReg(byte reg) {
-		RegPair regPair = getReg(reg);
-		return null == regPair || regPair.isFree();
+	protected void releaseReg(CGScope cgScope, Byte regId) throws CompileException {
+		if(VERBOSE_LO <= verbose) cgScope.append(new CGIText(";release REG[" + regId + "] (" + getPath('.') + ") " + System.currentTimeMillis()));
+		regsPool.get(regId).setFree(true);	// Помечаем, что регистр освобожден
 	}
 
 	public CGLabelScope getLabel() {
@@ -286,6 +283,10 @@ public class CGMethodScope extends CGCellsScope {
 	
 	public boolean isUsed() {
 		return isUsed;
+	}
+	
+	public Set<Byte> getUsedRegs() {
+		return usedRegs;
 	}
 	
 	public int getArgsStackSize() {

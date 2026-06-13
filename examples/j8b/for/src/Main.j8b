@@ -17,22 +17,22 @@
 // Пример различных циклов, в том числе с else условием
 
 class Main {
-    public static void main() {
+	public static void main() {
 		System.out("\nЦикл for(byte i=0; i<10; i++), с блоком else и break на 3: ");
 		for(byte i=0; i<10; i++) {
 			if(3==i) break;
-			System.out(i); System.outChar(' ');
+			System.out(i + ' ');
 		}
 		else {
-			System.out("else блок: i=");System.out(i);
+			System.out("else блок: i=" + i);
 		}
 
 		System.out("\nЦикл for(byte i=7; i<10; i++), с блоком else без break: ");
 		for(byte i=7; i<10; i++) {
-			System.out(i); System.outChar(' ');
+			System.out(i + ' ');
 		}
 		else {
-			System.out("else блок: i=");System.out(i);
+			System.out("else блок: i=" + i);
 		}
 
 		System.out("\nЦикл for(; false;), с блоком else: ");
@@ -46,18 +46,18 @@ class Main {
 		byte i=3;
 		System.out("\nЦикл for(; i<10; i++), i-внешняя переменная = 3:" );
 		for(; i<10; i++) {
-			System.out(i); System.outChar(' ');
+			System.out(i + ' ');
 		}
 	
 		System.out("\nЦикл for(i=0; i<10; i++), i-внешняя переменная: ");
 		for(i=0; i<10; i++) {
-			System.out(i); System.outChar(' ');
+			System.out(i + ' ');
 		}
 
 		byte cntr = 0;
 		System.out("\nЦикл for(byte i=0; i<10;), без инкремента, с выходом по break: ");
 		for(byte i=0; i<10;) {
-			System.out(i); System.outChar(' ');
+			System.out(i + ' ');
 			cntr++;
 			if(20==cntr) break;
 		}
@@ -65,7 +65,7 @@ class Main {
 		cntr = 0;
 		System.out("\nЦикл for(byte i=0; ; i++), без условия, с выходом по break:");
 		for(byte i=0; ; i++) {
-			System.out(i); System.outChar(' ');
+			System.out(i + ' ');
 			cntr++;
 			if(20==cntr) break;
 		}
@@ -73,18 +73,18 @@ class Main {
 		System.out("\nЦикл for(byte i=0; i<10; i++), с continue перед выводом, если i<5: ");
 		for(byte i=0; i<10; i++) {
 			if(i<5) continue;
-			System.out(i); System.outChar(' ');
+			System.out(i + ' ');
 		}
 
 		System.out("\nЦикл for(byte i=0; i<5; i++), с вложенным for(byte j=0; j<3; j++) с выходом если i=2 и j=1: ");
 l1:
 		for(byte i=0; i<5; i++) {
 			for(byte j=0; j<3; j++) {
-				System.out(i); System.outChar('.'); System.out(j); System.outChar(' ');
+				System.out(i + '.' + j + ' ');
 				if(i==2 && j==1) break l1;
 			}
 		}
 
 		System.out("\ndone");
-    }
+	}
 }

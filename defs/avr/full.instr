@@ -165,8 +165,8 @@ ELPMZ	elpm	none	3	1	0x9006	R,Z	# Extended LPM (Rd ← [RAMPZ:Z], синоним 
 ELPMZP	elpm	none	3	1	0x9007	R,Z+	# Extended LPM with Post-Increment (Rd ← [RAMPZ:Z], Z ← Z + 1)
 SPM	spm	none	-	1	0x95e8	none|Z	# Store program memory ([Z] ← R1:R0)
 SPMZP	spm	none	-	1	0x95f8	Z+	# Store program memory ([Z] ← R1:R0, Z ← Z + 1)
-IN	in	none	1	1	0xb000	R,A	# Read I/O port (Rd ← I/O(A))
-OUT	out	none	1	1	0xb800	A,R	# Write I/O port (I/O(A) ← Rr)
+IN	in	none	1	1	0xb000	R,k6	# Read I/O port (Rd ← I/O(A))
+OUT	out	none	1	1	0xb800	k6,R	# Write I/O port (I/O(A) ← Rr)
 PUSH	push	none	2	1	0x920f	R	# Push register on stack ([SP] ← Rr, SP ← SP - 1)
 POP	pop	none	2	1	0x900f	R	# Pop register from stack (Rd ← [SP + 1], SP ← SP + 1)
 

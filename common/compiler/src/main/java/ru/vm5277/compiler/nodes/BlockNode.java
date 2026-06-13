@@ -21,9 +21,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import ru.vm5277.common.AssemblerInterface;
 import ru.vm5277.common.lexer.Operator;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
@@ -32,8 +31,8 @@ import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Main;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.commands.CommandNode.AstCase;
@@ -54,6 +53,7 @@ import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.lexer.Keyword;
+import ru.vm5277.compiler.Instance;
 
 public class BlockNode extends AstNode {
 	protected	List<AstNode>			children	= new ArrayList<>();
@@ -66,18 +66,18 @@ public class BlockNode extends AstNode {
 		this.comment = comment;
 	}
 	
-	public BlockNode(TokenBuffer tb, MessageContainer mc, AstNode singleStatement, String comment) {
-		super(tb, mc);
+	public BlockNode(Instance inst, TokenBuffer tb, AstNode singleStatement, String comment) {
+		super(inst, tb);
 		
 		this.comment = comment;
 		children.add(singleStatement);
 	}
 
-	public BlockNode(TokenBuffer tb, MessageContainer mc, String comment) throws CompileException {
-		this(tb, mc, false, false, comment);
+	public BlockNode(Instance inst, TokenBuffer tb, String comment) throws CompileException {
+		this(inst, tb, false, false, comment);
 	}
-	public BlockNode(TokenBuffer tb, MessageContainer mc, boolean leftBraceConsumed, boolean isTry, String comment) throws CompileException {
-		super(tb, mc);
+	public BlockNode(Instance inst, TokenBuffer tb, boolean leftBraceConsumed, boolean isTry, String comment) throws CompileException {
+		super(inst, tb);
         
 		this.isTry = isTry;
 		this.comment = comment;
@@ -86,13 +86,13 @@ public class BlockNode extends AstNode {
 
 		while (!tb.match(TokenType.EOF) && !tb.match(Delimiter.RIGHT_BRACE)) {
 			if(tb.match(TokenType.LABEL)) {
-				LabelNode label = new LabelNode(tb, mc);
+				LabelNode label = new LabelNode(inst, tb);
 				labels.put(label.getName(), label);
 				children.add(label);
 			}
 			if (tb.match(TokenType.COMMAND)) {
 				try {
-					children.add(parseCommand());
+					children.add(parseCommand(inst));
 				}
 				catch(CompileException e) {
 					addMessage(e.getErrorMessage());
@@ -105,25 +105,25 @@ public class BlockNode extends AstNode {
 
 			// Обработка классов с модификаторами
 			if (tb.match(TokenType.OOP) && J8BKeyword.CLASS == tb.current().getValue()) {
-				ClassNode cNode = new ClassNode(tb, mc, modifiers, true, null);
+				ClassNode cNode = new ClassNode(inst, tb, modifiers, true, null);
 				children.add(cNode);
 				continue;
 			}
 			// Обработка enum с модификаторами
 			if (tb.match(TokenType.OOP) && J8BKeyword.ENUM == tb.current().getValue()) {
-				EnumNode eNode = new EnumNode(tb, mc, modifiers);
+				EnumNode eNode = new EnumNode(inst, tb, modifiers);
 				children.add(eNode);
 				continue;
 			}
 			// Обработка интерфейсов с модификаторами
 			if (tb.match(TokenType.OOP, J8BKeyword.INTERFACE)) {
-				InterfaceNode iNode = new InterfaceNode(tb, mc, modifiers, null, null);
+				InterfaceNode iNode = new InterfaceNode(inst, tb, modifiers, null, null);
 				children.add(iNode);
 				continue;
 			}
 			// Обработка exception с модификаторами
 			if (tb.match(TokenType.OOP, J8BKeyword.EXCEPTION)) {
-				ExceptionNode eNode = new ExceptionNode(tb, mc, modifiers, null);
+				ExceptionNode eNode = new ExceptionNode(inst, tb, modifiers, null);
 				children.add(eNode);
 				continue;
 			}
@@ -137,7 +137,7 @@ public class BlockNode extends AstNode {
 				if(null!=type) {
 					if(tb.match(Delimiter.DOT)) {
 						tb.back();
-						ExpressionNode expr = new ExpressionNode(tb, mc).parse();
+						ExpressionNode expr = new ExpressionNode(inst, tb).parse();
 						consumeToken(tb, Delimiter.SEMICOLON);
 						children.add(expr);
 						continue;
@@ -147,7 +147,7 @@ public class BlockNode extends AstNode {
 						String name = null;
 						try {name = consumeToken(tb, TokenType.IDENTIFIER).getStringValue();}catch(CompileException e) {markFirstError(e);} // Нет имени сущности, пытаемся парсить дальше
 
-						VarNode varNode = new VarNode(tb, mc, modifiers, type, name);
+						VarNode varNode = new VarNode(inst, tb, modifiers, type, name);
 						if(null!=name) children.add(varNode);
 						continue;
 					}
@@ -160,7 +160,7 @@ public class BlockNode extends AstNode {
 
 			// Обработка остальных statement (if, while, вызовы и т.д.)
 			try {
-				children.add(parseStatement());
+				children.add(parseStatement(inst));
 			}
 			catch(CompileException e) {
 				markFirstError(e);
@@ -243,12 +243,12 @@ public class BlockNode extends AstNode {
 				
 				if(noEffect) {
 					node.disable();
-					String text = "Statement has no practical effect";
-					if(AssemblerInterface.STRICT_STRONG == Main.getStrictLevel()) {
+					String text = "Statement '" + node.toString() + "' has no practical effect";
+					if(StrictLevel.STRONG==Main.getStrictLevel()) {
 						markError(text);
 						result = false;
 					}
-					else if(AssemblerInterface.STRICT_LIGHT == Main.getStrictLevel()) {
+					else if(StrictLevel.LIGHT==Main.getStrictLevel()) {
 						markWarning(text);
 					}
 				}
@@ -262,7 +262,7 @@ public class BlockNode extends AstNode {
 	public boolean declare(Scope scope) {
 		boolean result = true;
 		// Создаем новую область видимости для блока
-		blockScope = new BlockScope(scope);
+		blockScope = new BlockScope(scope, false);
 
 		// Объявляем все элементы в блоке
 		for(AstNode node : children) {
@@ -339,10 +339,10 @@ public class BlockNode extends AstNode {
 			//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
 			if(!node.isDisabled() && !(node instanceof VarNode)) {
 				if(node instanceof ExpressionNode) {
-					((ExpressionNode)node).codeGen(cg, null, false, excs);
+					((ExpressionNode)node).codeGen(cg, false, excs);
 				}
 				else {
-					node.codeGen(cg, null, false, excs);
+					node.codeGen(cg, false, excs);
 				}
 			}
 		}
@@ -355,21 +355,19 @@ public class BlockNode extends AstNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 		
-		//CGScope cgs = null == parent ? cgScope : parent;
-
 		for(AstNode node : children) {
 			//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
 			if(!(node instanceof VarNode)) {
-				node.codeGen(cg, cgScope, false, excs);
+				node.codeGen(cg, false, excs);
 			}
 		}
 		
 		((CGBlockScope)cgScope).build(cg, false, excs);
-		((CGBlockScope)cgScope).restoreRegsPool();
+		((CGBlockScope)cgScope).releaseRegsPool();
 		
 		return null;
 	}

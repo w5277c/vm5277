@@ -25,9 +25,9 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.lexer.Operator;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
-import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGBranch;
 import ru.vm5277.common.cg.CGCells;
@@ -38,6 +38,7 @@ import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -54,6 +55,8 @@ import ru.vm5277.compiler.semantic.FieldSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.InitNodeHolder;
 import ru.vm5277.common.lexer.Keyword;
+import ru.vm5277.compiler.Instance;
+import ru.vm5277.compiler.Main;
 
 public class FieldNode extends AstNode implements InitNodeHolder {
 	private	final	ObjectTypeNode	objectTypeNode;
@@ -62,8 +65,8 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 	private			String			name;
 	private			ExpressionNode	init;
 	
-	public FieldNode(TokenBuffer tb, MessageContainer mc, ObjectTypeNode objectTypeNode, Set<Keyword> modifiers, VarType type, String name) {
-		super(tb, mc);
+	public FieldNode(Instance inst, TokenBuffer tb, ObjectTypeNode objectTypeNode, Set<Keyword> modifiers, VarType type, String name) {
+		super(inst, tb);
 		
 		this.objectTypeNode = objectTypeNode;
 		this.modifiers = modifiers;
@@ -76,7 +79,7 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 		else {
 			consumeToken(tb);
 			try {
-				init = new ExpressionNode(tb, mc).parse();
+				init = new ExpressionNode(inst, tb).parse();
 			}
 			catch(CompileException e) {markFirstError(e);}
 		}
@@ -188,7 +191,9 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 				try{classScope.addField(symbol);}
 				catch(CompileException e) {markError(e);}
 			}
-			else markError("Unexpected scope:" + scope.getClass().getSimpleName() + " in filed:" + name);
+			else {
+				markError("Unexpected scope:" + scope.getClass().getSimpleName() + " in filed:" + name);
+			}
 		}
 
 		debugAST(this, DECLARE, false, result, getFullInfo() + (declarationPendingNodes.containsKey(this) ? " [DP]" : ""));
@@ -227,7 +232,7 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 					VarType initType = init.getType();
 					if(initType.isClassType() && type.isClassType()) {
 						if(initType!=type) {
-							CIScope cis = scope.getThis().resolveCI(initType.getClassName(), false);
+							CIScope cis = scope.getThis().resolveCI(null, initType.getClassName(), false);
 							if(!cis.isImplements(type)) {
 								markError("Type mismatch: cannot assign " + initType + " to " + type);
 								result = false;
@@ -236,7 +241,7 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 					}
 					else if(!isCompatibleWith(scope, type, initType)) {
 						// Дополнительная проверка автоматического привдения целочисленной константы к fixed.
-						if(VarType.FIXED == type && init instanceof LiteralExpression && initType.isIntegral()) {
+						if(VarType.FIXED == type && init instanceof LiteralExpression && initType.isInteger()) {
 							long num = ((LiteralExpression)init).getNumValue();
 							if(num<VarType.FIXED_MIN || num>VarType.FIXED_MAX) {
 								markError("Type mismatch: cannot assign " + initType + " to " + type);
@@ -308,12 +313,21 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 
 		CGFieldScope fScope = (CGFieldScope)cgScope;		
 		CGClassScope cScope = (CGClassScope)fScope.getParent();
+		
+		if(cg.getDevice().isLowRAM() && StrictLevel.NONE!=Main.getStrictLevel() && !isStatic()) {
+			if(StrictLevel.STRONG==Main.getStrictLevel()) {
+				markError("HEAP usage on low memory device " + cg.getDevice().getUniqueName());
+			}
+			else {
+				markWarning("HEAP usage on low memory device " + cg.getDevice().getUniqueName());
+			}
+		}
 		
 		Boolean accUsed = null;
 		((CGFieldScope)cgScope).build();
@@ -334,30 +348,29 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 			}
 			else if(init instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
 				LiteralExpression le = (LiteralExpression)init;
-				boolean isFixed = le.isFixed() || VarType.FIXED == ((CGFieldScope)cgScope).getType();
-				cScope.getFieldsInitCont().append(cg.constToCells(	null, isFixed ? le.getFixedValue() : le.getNumValue(), ((CGFieldScope)cgScope).getCells(),
-																	isFixed));
+				boolean isFixed = le.getType().isFixedPoint() || VarType.FIXED == ((CGFieldScope)cgScope).getType();
+				cgScope.append(cg.constToCells(null, isFixed ? le.getFixedValue() : le.getNumValue(), ((CGFieldScope)cgScope).getCells(), isFixed));
 			}
 			else if(init instanceof NewExpression) {
-				init.codeGen(cg, cgScope, true, excs);
+				init.codeGen(cg, true, excs);
+				cg.accumLock(VarType.CLASS);
+				cg.accToCells(cgScope, type, fScope);
+				cg.accumUnlock();
 				accUsed = true;
 			}
 			else if(init instanceof NewArrayExpression) {
-				init.codeGen(cg, cgScope, true, excs);
-				if(VarType.CLASS == ((CGFieldScope)cgScope).getType()) {
-					cg.pushHeapReg(cgScope);
-					cg.updateClassRefCount(cgScope, ((CGFieldScope)cgScope).getCells(), true);
-					cg.popHeapReg(cgScope);
-				}
-//				((FieldSymbol)symbol).setArrayDimensions(((NewArrayExpression)init).getConsDimensions());
-//				cg.accToCells(cgScope, ((CGFieldScope)cgScope));
+				init.codeGen(cg, true, excs);
+				//При инициализации счетчику ссылок сразу назначаем 1 (не допускаем создание висящих объектов)
+				cg.accumLock(VarType.SHORT);
+				cg.accToCells(cgScope, type, fScope);
+				cg.accumUnlock();
 			}
 			else if(init instanceof BinaryExpression) {
 //!!!				CGScope oldScope = cg.setScope(cgScope);
 				CGBranch branch = new CGBranch();
 				cgScope.setBranch(branch);
-				
-				init.codeGen(cg, cgScope, true, excs);
+				cg.accumLock(type);
+				init.codeGen(cg, true, excs);
 				//TODO проверить на объекты и на массивы(передача ref)
 				VarType initType = init.getType();
 				if(VarType.CLASS == initType) {
@@ -368,22 +381,47 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 				else if(initType.isArray()) {
 					cg.updateArrRefCount(cgScope, fScope.getCells(), true, ((CGCellsScope)cgScope).isArrayView());
 				}
-				cg.constToAcc(cgScope, 1, 1, false);
-				CGLabelScope lbScope = new CGLabelScope(null, null, LabelNames.LOCGIC_END, true);
-				cg.jump(cgScope, lbScope);
-				cgScope.append(((CGBranch)branch).getEnd());
-				cg.constToAcc(cgScope, 1, 0, false);
-				cgScope.append(lbScope);
-				cg.accToCells(cgScope, fScope);
+				if(branch.isUsed()) {
+					cg.constToAcc(cgScope, 1, 1, false);
+					CGLabelScope lbScope = new CGLabelScope(null, null, LabelNames.LOCGIC_END, true);
+					cg.jump(cgScope, lbScope);
+					cgScope.append(((CGBranch)branch).getEnd());
+					cg.constToAcc(cgScope, 1, 0, false);
+					cgScope.append(lbScope);
+					cg.accToCells(cgScope, type, fScope);
+				}
+				cg.accToCells(cgScope, type, fScope);
+				cg.accumUnlock();
 				accUsed = true;
-//!!!				cg.setScope(oldScope);
 			}
 			else if(init instanceof EnumExpression) {
-				cg.accCast(null, VarType.BYTE);
-				cgScope.append(cg.constToCells(cgScope, ((EnumExpression)init).getIndex(), fScope.getCells(), false));
+				cg.accumLock(type);
+				cg.constToCells(cgScope, ((EnumExpression)init).getIndex(), fScope.getCells(), false);
+				cg.accumUnlock();
 			}
 			else {
-				init.codeGen(cg, null, true, excs);
+				boolean optimized = false;
+				try {
+					if(	init instanceof VarFieldExpression && null!=init.getSymbol() && null!=init.getSymbol().getCGScope() &&
+						init.getSymbol().getCGScope() instanceof CGCellsScope && null!=((CGCellsScope)init.getSymbol().getCGScope()).getCells()) {
+					
+						init.codeGen(cg, false, excs);
+						cg.cellsToCells(cgScope, fScope.getCells(), type, ((CGCellsScope)init.getSymbol().getCGScope()).getCells(), init.getType());
+						optimized = true;
+					}
+				}
+				catch(Exception ex) {
+					System.out.println("TODO:" + ex.getMessage());
+				}
+
+				if(!optimized) {
+					cg.accumLock(type);
+					init.codeGen(cg, true, excs);
+					cg.accToCells(cgScope, type, fScope);
+					cg.accumUnlock();
+					accUsed = true;
+				}
+
 				//TODO проверить на объекты и на массивы(передача ref)
 				VarType initType = init.getType();
 				if(VarType.CLASS == initType) {
@@ -394,11 +432,18 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 				else if(initType.isArray()) {
 					cg.updateArrRefCount(cgScope, fScope.getCells(), true, ((CGCellsScope)cgScope).isArrayView());
 				}
-				cg.accToCells(cgScope, ((CGFieldScope)cgScope));
-				accUsed = true;
+			}
+			
+			if(null!=init) {
+				cgScope.getParent().remove(cgScope);
+				if(isStatic()) {
+					cScope.getStatFieldsInitCont().append(cgScope);
+				}
+				else {
+					cScope.getFieldsInitCont().append(cgScope);
+				}
 			}
 		}
-
 		return accUsed;
 	}
 

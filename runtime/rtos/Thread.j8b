@@ -14,8 +14,16 @@
  * limitations under the License.
  */
 
-public class Thread {
-    public static native void wait();
-    public static native void waitMS(short milliseconds);
-    public static native void waitS(short seconds);
+// Важно - RTOS ожидает, что метод run() будет единственным (а поэтому первым) методом в vtable
+public interface Thread {
+	public native void start();
+	public native void stop();
+	public native bool isAlive();	// Если возвращаемый тип bool, то результат во флаге нуля (флаг Z для AVR)
+	public native bool isStopped();
+
+	public void run();
+
+	public static native void sleep();
+	public static native void sleep(short milliseconds);
+	public static native void sleepSeconds(short seconds);
 }

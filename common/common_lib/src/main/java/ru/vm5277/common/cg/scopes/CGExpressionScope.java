@@ -18,8 +18,8 @@ package ru.vm5277.common.cg.scopes;
 public class CGExpressionScope extends CGScope {
 	private	int	nestCntr = 0;
 	
-	public CGExpressionScope(CGScope parent, String name) {
-		super(parent, -1, name);
+	public CGExpressionScope(CGScope parent, CGScope oldScope, String name) {
+		super(parent, -1, oldScope, name);
 	}
 	
 	public void enter() {

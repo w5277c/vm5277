@@ -27,9 +27,10 @@ public class IfNDefNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException, CriticalParseException {
 		SourcePosition sp = tb.getSP();
 		String id = (String)Node.consumeToken(tb,TokenType.IDENTIFIER).getValue();
-		scope.getIncludeSymbol().blockStart(null != scope.resolveVariable(id) || null != scope.resolveLabel(id), sp);
+		boolean flag = null==scope.resolveVariable(id) && null==scope.resolveLabel(id);
+		scope.getIncludeSymbol().blockStart(flag, sp);
 
-		scope.list(".IFNDEF " + id + " # " + !scope.getIncludeSymbol().isBlockSkip());
+		scope.list(".IFNDEF " + id + " #" + flag + ", " + scope.getIncludeSymbol().debugInfo());
 
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}

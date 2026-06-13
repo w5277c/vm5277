@@ -27,38 +27,57 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.items.CGIAsmLdLabel;
+import ru.vm5277.common.enums.InstanceType;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class CGClassScope extends CGScope {
 	private	final	CodeGenerator				cg;
 	private	final	VarType						type;
 	private	final	List<ImplementInfo>			impl;
-	private	final	Map<Integer, CGFieldScope>	fields			= new HashMap<>();
-	private	final	Map<String, CGMethodScope>	methods			= new HashMap<>();
-	private			int							fieldsOffset	= 0;
+	private	final	Map<Integer, CGFieldScope>	fields				= new HashMap<>();
+	private	final	Map<String, CGMethodScope>	methods				= new HashMap<>();
+	private			int							fieldsOffset		= 0;
 	private	final	boolean						isImported;
+	private	final	InstanceType				instType;
 //	private			CGLabelScope				lbFiledsInitScope;
 	private			CGLabelScope				lbIIDSScope;
-	private			CGIContainer				cont			= new CGIContainer();
-	private			CGIContainer				fieldsInitCont	= new CGIContainer();
+	private			CGIContainer				cont				= new CGIContainer();
+	private			CGIContainer				statFieldsInitCont	= new CGIContainer();
+	private			CGLabelScope				instInitlabel;
+	private			CGIContainer				instInitCont		= new CGIContainer();
+	private			CGIContainer				postfixCont			= new CGIContainer();
 	
-	public CGClassScope(CodeGenerator cg, CGScope parent, int id, VarType type, String name, List<ImplementInfo> impl, boolean isRoot) {
+	public CGClassScope(CodeGenerator cg, CGScope parent, int id, VarType type, String name, List<ImplementInfo> impl, InstanceType instType) {
 		super(parent, id, name);
 		
 		this.cg = cg;
 		this.type = type;
 		this.impl = impl;
-		this.isImported = isRoot;
+		this.instType = instType;
+		this.isImported = (InstanceType.NO_PARENT==instType);
 		
-		fieldsOffset = CodeGenerator.CLASS_HEADER_SIZE;
+		switch(instType) {
+			case FIRST_THREAD:
+			case THREAD:
+				fieldsOffset = cg.getThreadHeaderSize();
+				break;
+			case TIMER:
+				fieldsOffset = cg.getTimerHeaderSize();
+				break;
+			default:
+				fieldsOffset = CodeGenerator.CLASS_HEADER_SIZE;
+		}
 		
 //		lbFiledsInitScope = new CGLabelScope(null, null, LabelNames.FIELDS_INIT, true);
 //		fieldsInitCont.append(lbFiledsInitScope);
-		cg.getStaticInitContaier().append(fieldsInitCont);
+		cg.getStaticInitContaier().append(statFieldsInitCont);
 		lbIIDSScope = new CGLabelScope(null, null, LabelNames.META, true);
 		
 		Collections.sort(impl);
 		// адрес HEAP, счетчик ссылок, адрес блока реализаций класса и интерфейсов
+		
+		instInitlabel = new CGLabelScope(null, CGScope.genId(), "j8b_" + getLName() + "_instinit", true);
 	}
 
 	public void addField(CGFieldScope field) {
@@ -66,6 +85,10 @@ public class CGClassScope extends CGScope {
 	}
 	public CGFieldScope getField(int resId) {
 		return fields.get(resId);
+	}
+	
+	public List<ImplementInfo>	getImlementInfos() {
+		return impl;
 	}
 	
 	public CGCells memAllocate(int size, boolean isStatic) {
@@ -77,8 +100,8 @@ public class CGClassScope extends CGScope {
 		return cells;
 	}
 	
-	public void build(CodeGenerator cg, CGExcs excs) throws CompileException {
-		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";======== enter CLASS " + getPath('.') + " ========================"));
+	public void build(CodeGenerator cg, boolean isLaunchPoint, CGExcs excs) throws CompileException {
+		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";======== enter CLASS " + getPath('.') + "[" + instType + "] ========================"));
 		prepend(cont);
 		
 		//TODO Похоже здесь мы знаем о всех используемых полях и можем выделить память для heap
@@ -86,15 +109,33 @@ public class CGClassScope extends CGScope {
 		//constrInit.getCont().append(eNewInstance(cScope.getHeapOffset(), cScope.getIIDLabel(), cScope.getType(), false, excs));
 		//terminate(scope, false, true);
 		
-		for(CGMethodScope mScope : methods.values()) {
+		if(!isLaunchPoint) {
+//			CGLabelScope runLabel = null;
+			boolean haveConstr = false;
+			//Не вызываем создание инстанса если конструкторов нет, иначе будут лишние включения фич типа OS_FT_DRAM
+			for(CGMethodScope mScope : methods.values()) {
+				if(null==mScope.getType()) {
+					haveConstr = true;
+				}
+//				else if(mScope.getSignature().equals("run()")) {
+//					runLabel = mScope.getCILabel();
+//				}
+			}
+			if(haveConstr) {
+				instInitCont.prepend(cg.eNewInstance(null, fieldsOffset, lbIIDSScope, type, instType, postfixCont, excs));
+			}
+		}
+		
+/*		for(CGMethodScope mScope : methods.values()) {
 			if(null==mScope.getType()) {
+				//TODO нужно вынести в общий блок инициализации инстанса, а здесь использовать его вызов
 				CGScope scope = new CGScope();
 				cg.eNewInstance(scope, fieldsOffset, lbIIDSScope, type, isImported, excs);
 				mScope.getInitContainer().append(scope);
 			}
-		}
+		}*/
 		
-		if(VERBOSE_LO <= verbose) append(new CGIText(";======== leave CLASS " + getPath('.') + " ========================"));
+		if(VERBOSE_LO<=verbose) append(new CGIText(";======== leave CLASS " + getPath('.') + " ========================"));
 	}
 	
 	public int getHeapOffset() {
@@ -117,9 +158,13 @@ public class CGClassScope extends CGScope {
 	public CGLabelScope getIIDLabel() {
 		return lbIIDSScope;
 	}
-//	public CGLabelScope getFieldInitLabel() {
-//		return lbFiledsInitScope;
-//	}
+	public CGLabelScope getFieldsInitLabel() {
+		return instInitlabel;
+	}
+	
+	public InstanceType getInstType() {
+		return instType;
+	}
 	
 	@Override
 	public String toString() {
@@ -131,11 +176,14 @@ public class CGClassScope extends CGScope {
 	}
 	
 	public CGIContainer getFieldsInitCont() {
-		return fieldsInitCont;
+		return instInitCont;
+	}
+	public CGIContainer getStatFieldsInitCont() {
+		return statFieldsInitCont;
 	}
 	
 	@Override
-	public String getSource() {
+	public String getSource() throws CompileException {
 		// Поздний этап сборки, так как использование методов класса известно только на этапе кодогенерации
 		
 		// Формируем FLASH блок с ид типов класса и реализованных интерфейсов
@@ -154,43 +202,87 @@ public class CGClassScope extends CGScope {
 
 		StringBuilder implSB = new StringBuilder(lbIIDSScope.getName());
 		implSB.append(":\n\t.db ").append(type.getId()).append(",").append(impl.size());
-			
+		
+		boolean isThread = false;
 		if(!impl.isEmpty()) {
 			implSB.append(",");
 			StringBuilder methodsAddrSB = new StringBuilder("\n\t.dw ");
+			int totalImplemented=0;
 			for(ImplementInfo pair : impl) {
-				implSB.append(pair.getType().getId()).append(",").append(pair.getSignatures().size()).append(",");
-
+				isThread |= pair.getType().getClassName().equals(VarType.CLASSNAME_THREAD);
+				isThread |= pair.getType().getClassName().equals(VarType.CLASSNAME_TIMER);
+				int implementedCntr = 0;
 				for(String mehodId : pair.getSignatures()) {
 					CGMethodScope mScope = methods.get(mehodId);
 					// Метод может не использоваться в кодогенерации
 					if(null!=mScope && mScope.isUsed()) { //TODO похоже isUsed = рудимент
 						methodsAddrSB.append(mScope.getLabel().getName()).append(",");
+						implementedCntr++;
 					}
 					else {
-						methodsAddrSB.append(0).append(",");
+						// Не записываем методы реализованные в интерфейсах (они либо вызываются нативно, либо статичны и известны на этапе компиляции)
+						//methodsAddrSB.append(0).append(",");
 					}
 				}
+				totalImplemented+=implementedCntr;
+				implSB.append(pair.getType().getId()).append(",").append(implementedCntr).append(",");
 			}
 			implSB.deleteCharAt(implSB.length()-1);
-			methodsAddrSB.deleteCharAt(methodsAddrSB.length()-1);
-			implSB.append(methodsAddrSB);
+			if(0!=totalImplemented) {
+				methodsAddrSB.deleteCharAt(methodsAddrSB.length()-1);
+				implSB.append(methodsAddrSB);
+			}
 		}
 		cont.append(new CGIText(implSB.toString()));
 		
-		if(0x01<fieldsInitCont.getItems().size()) {
-			try {
-				fieldsInitCont.append(cg.eReturn(null, 0, 0, null));
-			}
-			catch(Exception ex) {}
-			cont.append(fieldsInitCont);
-		}
-		else {
-			for(CGMethodScope mScope : methods.values()) {
-				if(null == mScope.getType() && null != mScope.getFieldInitCallCont()) {
-					mScope.getFieldInitCallCont().disable();
+		if(!instInitCont.getItems().isEmpty()) {
+			// Если не статических полей больше 1 - формируем общий блок кода
+//			if(0x01<instInitCont.getItems().size()) {
+				// В общем блоке также инициализация HEAP (ранее был в каждом коснтрукторе)
+
+				int constCntr = 0;
+				for(CGMethodScope mScope : methods.values()) {
+					if(null!=postfixCont && !postfixCont.isEMpty() && isThread && null!=mScope && mScope.getSignature().equals("run()")) {
+						//TODO костыль. Не менять порядок, см Generator.eNewInstance
+						//Не получилось получить доступ к методу run в build, его адрес нужен для создания нового инстанса Thread
+						((CGIAsmLdLabel)postfixCont.getItems().get(0x00)).setPostfix("low(" + mScope.getLabel().getLName() + ")");
+						((CGIAsmLdLabel)postfixCont.getItems().get(0x02)).setPostfix("high(" + mScope.getLabel().getLName() + ")");
+					}
+
+					if(null==mScope.getType()) {
+						constCntr++;
+					}
 				}
-			}
+
+				if(0x01==constCntr) {
+					for(CGMethodScope mScope : methods.values()) {
+						if(null==mScope.getType()) {
+							mScope.getFieldInitCallCont().append(instInitCont);
+						}
+					}
+				}
+				else if(0x01<constCntr) {
+					instInitCont.prepend(instInitlabel);
+
+					instInitCont.append(cg.eReturn(null, VarType.VOID, null));
+
+					for(CGMethodScope mScope : methods.values()) {
+						if(null==mScope.getType()) {
+							mScope.getFieldInitCallCont().append(cg.call(null, instInitlabel));
+						}
+					}
+
+					cont.append(instInitCont);
+				}
+/*			}
+			else { // Если поле одно, то общий блок кода не оптимален, просто включаю поле в конструкторы
+				for(CGMethodScope mScope : methods.values()) {
+					if(null==mScope.getType()) {
+						mScope.getFieldInitCallCont().clear();
+						mScope.getFieldInitCallCont().append(instInitCont);
+					}
+				}
+			}*/
 		}
 	
 		return super.getSource();

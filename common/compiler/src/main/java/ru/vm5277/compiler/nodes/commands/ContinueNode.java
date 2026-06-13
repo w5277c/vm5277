@@ -22,13 +22,13 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.CodegenResult;
+import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.lexer.TokenType;
-import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.LabelSymbol;
 import ru.vm5277.compiler.semantic.Scope;
@@ -37,8 +37,8 @@ public class ContinueNode extends CommandNode {
 	private String		label;
 	private	LabelSymbol	symbol;
 	
-	public ContinueNode(TokenBuffer tb, MessageContainer mc) {
-        super(tb, mc);
+	public ContinueNode(Instance inst, TokenBuffer tb) {
+        super(inst, tb);
         
         consumeToken(tb);
 		if(tb.match(TokenType.IDENTIFIER)) {
@@ -124,10 +124,8 @@ public class ContinueNode extends CommandNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		CodegenResult result = null;
-		
-		//CGScope cgs = null == parent ? cgScope : parent;
 		
 		if(null==label) {
 			CGLoopBlockScope cgLoop = ((CGLoopBlockScope)cgScope.getScope(CGLoopBlockScope.class));

@@ -34,6 +34,7 @@ import ru.vm5277.avr_asm.Assembler;
 import ru.vm5277.avr_asm.InstrReader;
 import static ru.vm5277.avr_asm.Assembler.tabSize;
 import ru.vm5277.avr_asm.nodes.Node;
+import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.CompileException;
@@ -57,7 +58,7 @@ public class Scope {
 	private					boolean									listEnabled		= true;
 	private					boolean									listMacEnabled	= true;
 	private					boolean									overlapAllowed	= true;
-	private			static	int										strictLevel		= Assembler.STRICT_LIGHT;
+	private			static	StrictLevel								strictLevel		= StrictLevel.LIGHT;
 	private	final			Map<String, Byte>						regAliases		= new HashMap<>();	// Алиасы регистров
 	private	final			Map<String, VariableSymbol>				variables		= new HashMap<>();
 	private	final			Map<String, Integer>					labels			= new HashMap<>();
@@ -297,10 +298,10 @@ public class Scope {
 		return cSeg;
 	}
 	
-	public static void setStrictLevel(int _strinctLevel) {
+	public static void setStrictLevel(StrictLevel _strinctLevel) {
 		strictLevel = _strinctLevel;
 	}
-	public static int getStrincLevel() {
+	public static StrictLevel getStrincLevel() {
 		return strictLevel;
 	}
 

@@ -55,7 +55,11 @@ public class SerialTerminal extends Thread {
 				try{Thread.sleep(100);} catch(Exception ex) {}
 				KeyStroke ks = terminal.pollInput();
 				if(null!=ks) {
-					if(KeyType.EOF == ks.getKeyType()) break;
+					if(KeyType.Escape==ks.getKeyType()) {
+						enabled=false;
+						break;
+					}
+					if(KeyType.EOF==ks.getKeyType()) break;
 					Character ch = ks.getCharacter();
 //					System.out.println("ks:" + ks + ", ch:" + ch);
 					if(null==ch) {

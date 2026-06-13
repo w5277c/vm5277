@@ -18,16 +18,17 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.CodegenResult;
+import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.cg.CGExcs;
+import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.EnumScope;
 
@@ -37,8 +38,8 @@ public class EnumExpression extends ExpressionNode {
 	private	int						index		= -1;
 	private	EnumScope				targetScope;
 
-	public EnumExpression(TokenBuffer tb, MessageContainer mc, TypeReferenceExpression targetExpr, String value) throws CompileException {
-		super(tb, mc);
+	public EnumExpression(Instance inst, TokenBuffer tb, TypeReferenceExpression targetExpr, String value) throws CompileException {
+		super(inst, tb);
 		
 		this.targetExpr = targetExpr;
 		this.value = value;
@@ -83,8 +84,7 @@ public class EnumExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		if(null!=cgScope) cgScope.disable();
-		cgScope = cg.enterExpression(parent, toString());
+		cgScope = cg.enterExpression(parent, cgScope, toString());
 		
 		targetScope = (EnumScope)targetExpr.getScope();
 		index = targetScope.getValueIndex(value);
@@ -100,7 +100,7 @@ public class EnumExpression extends ExpressionNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(toAccum) {
 			cg.constToAcc(cgScope, 0x01, index, false);
 			return CodegenResult.RESULT_IN_ACCUM;

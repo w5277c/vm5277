@@ -37,6 +37,9 @@ public class CGArrCells extends CGCells {
 	public void setIndexConst(int depthPos, int index) {
 		indexesConst[depthPos] = index;
 	}
+	public int getIndexConst(int depth) {
+		return indexesConst[depth];
+	}
 	
 	public void setIndexCells(int depthPos, CGCells cells) {
 		indexesCells[depthPos] = cells;

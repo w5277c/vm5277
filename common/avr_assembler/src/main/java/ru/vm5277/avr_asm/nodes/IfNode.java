@@ -28,9 +28,9 @@ public class IfNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException, CriticalParseException {
 		Long value = 0x00l;
 		SourcePosition sp = tb.getSP();
-		
-		Expression expr = Expression.parse(tb, scope, mc);
-		if(!scope.getIncludeSymbol().isBlockSkip()) {
+		StringBuilder listSb = new StringBuilder();
+		Expression expr = Expression.parse(tb, scope, mc, listSb);
+		if(scope.getIncludeSymbol().isTrue()) {
 			Long _value = Expression.getLong(expr, sp);
 			if(null==_value) {
 				tb.skipLine();
@@ -40,9 +40,9 @@ public class IfNode {
 				value = _value;
 			}
 		}
-		scope.getIncludeSymbol().blockStart(0x01!=value, sp);
+		scope.getIncludeSymbol().blockStart(0x01==value, sp);
 		
-		scope.list(".IF " + " # " + (0 != value));
+		scope.list(".IF " + listSb.toString() + "#" + (0 != value) + ", " + scope.getIncludeSymbol().debugInfo());
 		
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}

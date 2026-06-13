@@ -16,7 +16,9 @@
 
 package ru.vm5277.common.lexer;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class Keyword {
@@ -71,6 +73,10 @@ public class Keyword {
 	
 	public static int getSize() {
 		return KEYWORDS.size();
+	}
+	
+	public static List<Keyword> getItems() {
+		return new ArrayList<>(KEYWORDS.values());
 	}
 	
 	@Override

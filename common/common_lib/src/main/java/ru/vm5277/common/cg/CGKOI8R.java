@@ -15,18 +15,20 @@
  */
 package ru.vm5277.common.cg;
 
+import ru.vm5277.common.exceptions.CompileException;
+
 public class CGKOI8R {
 	public	final	static	String	KOI8_R	=	"─│┌┐└┘├┤┬┴┼▀▄█▌▐░▒▓⌠■∙√≈≤≥ ⌡°²·÷═║╒ё╓╔╕╖╗╘╙╚╛╜╝╞╟╠╡Ё╢╣╤╥╦╧╨╩╪╫╬©" +
 												"юабцдефгхийклмнопярстужвьызшэщчъЮАБЦДЕФГХИЙКЛМНОПЯРСТУЖВЬЫЗШЭЩЧЪ";
 
 	
-	public static String decode(String input) {
+	public static String decode(String input) throws CompileException {
 		if(input.trim().isEmpty()) return "";
 		
 		boolean inQuotes = false;
 		int byteCount = 0;
 		StringBuilder sb = new StringBuilder(".db ");
-		
+l1:	
 		for(int i=0; i<input.length(); i++) {
 			char ch = input.charAt(i);
 
@@ -43,11 +45,25 @@ public class CGKOI8R {
 						case '0':  escapedChar = 0x00; break;
 						case '\"': escapedChar = 0x22; break;
 						case '\\': escapedChar = 0x5c; break;
+						case 'u':
+							int hex = 0;
+							try {
+								hex = Integer.parseInt(input.substring(i+2, i+6), 0x10);
+							}
+							catch(Exception ex) {
+								throw new CompileException("Invalud escape unicode expression:'" + input.substring(i, 6));
+							}
+							if(255<hex) throw new CompileException("Invalud escape unicode expression:'" + input.substring(i, 6) + "', 8 bit supports only");
+							if(byteCount>0) sb.append(",");
+							sb.append(String.format("0x%02x", hex));
+							byteCount++;
+							i+=5;
+							continue l1;
 						default:  isEscape = false;
 					}
 
 					if(isEscape) {
-						if (inQuotes) {
+						if(inQuotes) {
 							sb.append("\"");
 							inQuotes = false;
 						}

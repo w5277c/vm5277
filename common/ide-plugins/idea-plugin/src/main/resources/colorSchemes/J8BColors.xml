@@ -1,0 +1,9 @@
+<?xml version='1.0'?>
+<list>
+    <option name="J8B_PRIMITIVE_TYPE">
+        <value>
+            <option name="FOREGROUND" value="9876AA"/>
+            <option name="FONT_TYPE" value="1"/> <!-- BOLD -->
+        </value>
+    </option>
+</list>

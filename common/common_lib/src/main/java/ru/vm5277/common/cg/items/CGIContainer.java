@@ -17,6 +17,8 @@ package ru.vm5277.common.cg.items;
 
 import java.util.ArrayList;
 import java.util.List;
+import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.exceptions.CompileException;
 
 public class CGIContainer extends CGItem {
 	protected	final	List<CGItem>	items	= new ArrayList<>();
@@ -52,8 +54,23 @@ public class CGIContainer extends CGItem {
 		items.add(pos++, item);
 	}
 	
+	public void replace(CGItem item, CGScope oldScope) {
+		int index = items.indexOf(oldScope);
+		if(-1==index) {
+			items.add(item);
+			pos = items.size()-1;
+		}
+		else {
+			items.set(index, item);
+		}
+	}
+
 	public void remove(CGItem item)  {
 		items.remove(item);
+	}
+	
+	public void clear() {
+		items.clear();
 	}
 	
 	public List<CGItem> getItems() {
@@ -65,7 +82,7 @@ public class CGIContainer extends CGItem {
 	}
 	
 	@Override
-	public String getSource() {
+	public String getSource() throws CompileException {
 		StringBuilder sb = new StringBuilder();
 		
 		for(CGItem item : items) {
@@ -84,7 +101,7 @@ public class CGIContainer extends CGItem {
 		return sb.toString();
 	}
 	
-	public String dumpTree(String indent, boolean includeDisabled) {
+	public String dumpTree(String indent, boolean includeDisabled) throws CompileException {
 		StringBuilder sb = new StringBuilder();
 		sb.append(indent).append("+-- ").append(this.getClass().getSimpleName());
 		

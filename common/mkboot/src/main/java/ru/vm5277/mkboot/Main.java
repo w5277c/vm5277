@@ -46,7 +46,9 @@ import java.util.Map;
 import java.util.Properties;
 import ru.vm5277.common.AssemblerInterface;
 import ru.vm5277.common.AssemblerLoader;
-import ru.vm5277.common.SourceType;
+import ru.vm5277.common.enums.SourceType;
+import ru.vm5277.common.enums.StrictLevel;
+import ru.vm5277.common.flash.InternalFlashTool;
 import ru.vm5277.common.messages.MessageContainer;
 
 //TODO добавить поддержку RST и TX0/RX0
@@ -67,8 +69,13 @@ public class Main {
 			showHelp();
 			System.exit(0);
 		}
-		if(0x01==args.length && args[0x00].equals("--version")) {
-			System.out.println("j8b mkboot version: " + VERSION);
+		if(0x01==args.length) {
+			if(args[0x00].equals("--version")) {
+				System.out.println("j8b mkboot version: " + VERSION);
+			}
+			else {
+				showHelp();
+			}
 			System.exit(0);
 		}
 		
@@ -212,7 +219,7 @@ public class Main {
 			System.exit(1);
 		}
 
-		Path incPath = toolkitPath.resolve("defs").resolve(platform).resolve(mcu + ".inc");
+		Path incPath = toolkitPath.resolve("defs").resolve(platform).resolve(mcu + ".asm");
 		if(!incPath.toFile().exists()) {
 			System.err.println("[ERROR] File " + incPath.toString() + " not found");
 			System.exit(1);
@@ -248,8 +255,8 @@ public class Main {
 					rnd.nextBytes(key);
 				}
 			}
-			
-			String source = (1024>=flashSize ? "bldrtiny.asm" : "bldr.asm");
+			//TODO 
+			String source = (InternalFlashTool.MIN_FLASH_SIZE_FOR_BOOTLOADER>=flashSize ? "bldrtiny.asm" : "bldr.asm");
 			Path bldrPath = rtosPath.resolve("boot").resolve(source);
 			if(!bldrPath.toFile().exists()) {
 				System.err.println("[ERROR] File " + bldrPath.toString() + " not found");
@@ -342,7 +349,7 @@ public class Main {
 						System.exit(1);
 					}
 				}
-				props.put(uidStr, makeUIDInfoStr("local", uid, stdio, stdout, stdout, platform, mcu, signature, key));
+				props.put(uidStr, makeUIDInfoStr("local", uid, stdio, stdout, stdin, platform, mcu, signature, key));
 			}
 			else {
 				String uidStr = DatatypeConverter.printHexBinary(uid);
@@ -481,7 +488,7 @@ public class Main {
 					File listFile = new File("bldr.lst");
 					listBW = new BufferedWriter(new FileWriter(listFile));
 				}
-				boolean result = ai.exec(mc, mcu, bldrPath, sourcePaths, AssemblerInterface.STRICT_NONE, "bldr", null, listBW, defines, includes);
+				boolean result = ai.exec(mc, mcu, bldrPath, sourcePaths, StrictLevel.NONE, "bldr", null, listBW, defines, includes);
 				if(null!=listBW) listBW.close();
 				
 				if(result) {
@@ -544,16 +551,16 @@ public class Main {
     }
 	
 	
-	private static String makeUIDInfoStr(	String srcType, byte[] uid, Integer stdio, int stdout, int stdin, String platform, String mcu, Long signature,
-											byte[] secureKey)															throws UnsupportedEncodingException {
+	private static String makeUIDInfoStr(	String srcType, byte[] uid, Integer stdio, Integer stdout, Integer stdin, String platform, String mcu,
+											Long signature, byte[] secureKey)											throws UnsupportedEncodingException {
 		
 		return	"timestamp:" + Long.toString(System.currentTimeMillis()) +
 				",srcType:" + URLEncoder.encode(srcType, "UTF-8") +
 				",uid:" + DatatypeConverter.printHexBinary(uid) +
 				",port:" + (null!=stdio ?
 							(-1==stdio ? "RESET" : ("P" + (char)('A'+(stdio>>0x04)) + (stdio&0x0f))) :
-							(-1==stdout ? "TX0" : ("P" + (char)('A'+(stdout>>0x04)) + (stdout&0x0f)))  + "/" +
-							(-1==stdin ? "RX0" : ("P" + (char)('A'+(stdin>>0x04)) + (stdin&0x0f)))) +
+							(null==stdout ? "TX0" : ("P" + (char)('A'+(stdout>>0x04)) + (stdout&0x0f)))  + "/" +
+							(null==stdin ? "RX0" : ("P" + (char)('A'+(stdin>>0x04)) + (stdin&0x0f)))) +
 				",platform:" + URLEncoder.encode(platform, "UTF-8") +
 				",mcu:" + URLEncoder.encode(mcu, "UTF-8") +
 				",signature:" + (null==signature ? "null" : String.format("%08x", signature)) +
@@ -593,18 +600,12 @@ public class Main {
 	}
 	
 	private static void showDisclaimer() {
-		System.out.println(";j8b mkboot: bootloader firmware generator for vm5277 Embedded Toolkit");
-		System.out.println(";Version: " + VERSION + " | License: Apache-2.0");
-		System.out.println(";================================================================");
-		System.out.println(";WARNING: This project is under active development.");
-		System.out.println(";The primary focus is on functionality; testing is currently limited.");
-		System.out.println(";Please report any bugs found to: konstantin@5277.ru");
-		System.out.println(";================================================================");
+		System.out.println("MkBoot v." + VERSION + ": bootloader firmware generator for vm5277 Embedded Toolkit");
 	}
-
 	
 	private static void showHelp() {
-		System.out.println("j8b mkboot: bootloader firmware generator for vm5277 Embedded Toolkit");
+		System.out.println("MkBoot bootloader firmware generator for vm5277 Embedded Toolkit");
+		System.out.println("Version: " + VERSION + " | License: Apache-2.0");
 		System.out.println("-------------------------------------------");
 		System.out.println();
 		System.out.println("This tool is part of the open-source vm5277 project for 8-bit microcontrollers (AVR, PIC, STM8, etc.)");

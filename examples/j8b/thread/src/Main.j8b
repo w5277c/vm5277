@@ -1,0 +1,56 @@
+/*
+ * Copyright 2025 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+class Main {
+	static public class Th1 implements Thread {
+		private byte b;
+		public Th1(byte b) {
+			this.b = b;
+		}
+
+		public void run() {
+			while(isAlive()) {
+			    System.out(b);
+			    Thread.sleep(100);
+			    b++;
+			    if(0==b) GPIO.invert(GPIO.PB5);
+			}
+		}
+	}
+
+	public static void main() {
+		//System.setParam(RTOSParam.SHOW_WELCOME,0x01);
+		//System.setParam(RTOSParam.DIAG_MODE,0x01);
+
+		GPIO.modeOut(GPIO.PB5);
+
+//		for(byte b=0; b<3; b++) {
+//			Thread th = new Th1(b);
+//			th.start();
+//		}
+
+			Thread th2 = new Th1(3);
+			th2.start();
+
+		while(true) {
+			Thread.sleep(1000);
+			ANSI.setCursor(0,0);
+			ANSI.setColor(2,0);
+			System.showDRAMMap();
+			ANSI.setColor(7,0);
+		}
+	}
+}

@@ -1,0 +1,163 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+	.include "attiny2313a.asm"
+	.include "devices/_common.def"
+
+;---CONSTANTS-----------------------------------------------
+	.SET	_MCALL_SIZE								= 0x01	;Размер макроса MCALL/MJMP: 1(RCALL)-2(CALL)
+	.SET	JMP_SUPPORT								= 0x00	;Поддержка JMP,CALL
+	.SET	MUL_SUPPORT								= 0x00	;Поддержка MUL,MULS,MULSU
+	.SET	BLDRSEC_SUPPORT							= 0x00	;Аппаратная защита секции бутлоадера
+	.EQU	OS_IR_QNT								= 0x15	;Количество перырваний
+	.EQU	OS_PCINT_PORTS_QNT						= 0x03	;Количество портов поддерживающих внешние прерывания(PCINT)
+	.EQU	OS_RAM_BORDER_SIZE						= 0x01	;Минимальное допустимое расстояние между вершинами FREE_RAM и STACK
+	.SET	OS_TASKS_QNT							= 0x02	;По умолчанию одновременно разрешено только 2 задачи
+	
+.IFNDEF OS_STACK_SIZE
+	.SET	OS_STACK_SIZE							= -1	;Общий стек(-1 - вся свободная память)
+.ENDIF
+.IFNDEF OS_STDIN_CBUFFER_SIZE
+	.SET	OS_STDIN_CBUFFER_SIZE					= 0x04	;Размер буфера ввода (не менее 4)
+.ENDIF
+.IFNDEF OS_ETRACE_BUFFER_SIZE
+	.SET	OS_ETRACE_BUFFER_SIZE					= 0x03	;Размер буфера для трассировки исключений
+.ENDIF
+
+	.EQU	RXD										= PD0
+	.EQU	TXD										= PD1
+	.EQU	RXD0									= RXD
+	.EQU	TXD0									= TXD
+	.EQU	SCK										= PB7
+	.EQU	MISO									= PB6
+	.EQU	MOSI									= PB5
+
+	.SET	INT0_PORT								= PD2
+	.SET	INT1_PORT								= PD3
+
+	;---IR---
+	.EQU	C5_IR_INT0								= 0x01
+	.EQU	C5_IR_INT1								= 0x02
+	.EQU	C5_IR_TIMER1_CAPT						= 0x03
+	.EQU	C5_IR_TIMER1_COMPA						= 0x04
+	.EQU	C5_IR_TIMER1_OVF						= 0x05
+	.EQU	C5_IR_TIMER0_OVF						= 0x06
+	.EQU	C5_IR_UART_RX							= 0x07
+	.EQU	C5_IR_UART_UDRE							= 0x08
+	.EQU	C5_IR_UART_TX							= 0x09
+	.EQU	C5_IR_ANALOG_COMP						= 0x0a
+	.EQU	C5_IR_PCINT0							= 0x0b
+	.EQU	C5_IR_TIMER1_COMPB						= 0x0c
+	.EQU	C5_IR_RESERVED_CORE_TIMER1				= 0x0d
+	.EQU	C5_IR_RESERVED_CORE_TIMER2				= 0x0e
+	.EQU	C5_IR_USI_START							= 0x0f
+	.EQU	C5_IR_USI_OVF							= 0x10
+	.EQU	C5_IR_EE_READY							= 0x11
+	.EQU	C5_IR_WDT								= 0x12
+	.EQU	C5_IR_PCINT1							= 0x13
+	.EQU	C5_IR_PCINT2							= 0x14
+
+.IF OS_FT_BOOTLOADER_ONLY==0x01								; Важно точно рассчитать _OS_INIT в прошивке
+	.EQU	_OS_INIT = OS_IR_QNT*_MCALL_SIZE+0x04+0x04+0x02
+.ELSE														; Пропускаем блок для сборки только бутлоадера
+.ORG 0x0000
+	RJMP	_OS_INIT										; Reset Handler
+.IF OS_FT_IR_TABLE == 0x01
+	RCALL	_OS_IR_HANDLER									; External Interrupt0 Handler
+	RCALL	_OS_IR_HANDLER									; External Interrupt1 Handler
+	RCALL	_OS_IR_HANDLER									; Timer/Counter1 Capture Event
+	RCALL	_OS_IR_HANDLER									; Timer/Counter1 Compare Match A
+	RCALL	_OS_IR_HANDLER									; Timer/Counter1 Overflow
+	RCALL	_OS_IR_HANDLER									; Timer/Counter0 Overflow
+	RCALL	_OS_IR_HANDLER									; USART Rx Complete
+	RCALL	_OS_IR_HANDLER									; USART, Data Register Empty
+	RCALL	_OS_IR_HANDLER									; USART, Tx Complete
+	RCALL	_OS_IR_HANDLER									; Analog Comparator
+;TODO _OS_PCINT_0_VECTOR: - здесь нельзя использовать нарешен порядок нужно учесть в драйверах для .DEVICE ATtiny2313a и ATtiny4313
+.IF OS_FT_PCINT
+	RCALL	_OS_PCINT_HANDLER								; Pin Change Interrupt Request 0
+.ELSE
+	RCALL	_OS_IR_HANDLER									; Pin Change Interrupt Request 0
+.ENDIF
+	RCALL	_OS_IR_HANDLER									; Timer/Counter1 Compare Match B
+.IF OS_FT_TIMER == 0x01										; Timer/Counter0 Compare Match A
+	RJMP	_OS_TIMER1_HANDLER
+.ELSE
+	RCALL	_OS_IR_HANDLER
+.ENDIF
+	RCALL	_OS_IR_HANDLER									; Timer/Counter0 Compare Match B
+	RCALL	_OS_IR_HANDLER									; USI Start Condition
+	RCALL	_OS_IR_HANDLER									; USI Overflow
+	RCALL	_OS_IR_HANDLER									; EEPROM Ready	
+	RCALL	_OS_IR_HANDLER									; Watchdog Time-out Interrupt
+.IF OS_FT_PCINT												;TODO учесть смещение!
+	RCALL	_OS_PCINT_HANDLER								; Pin Change Interrupt Request 1
+	RCALL	_OS_PCINT_HANDLER								; Pin Change Interrupt Request 2
+.ELSE
+	RCALL	_OS_IR_HANDLER									; Pin Change Interrupt Request 1
+	RCALL	_OS_IR_HANDLER									; Pin Change Interrupt Request 2
+.ENDIF
+.ENDIF
+
+;TODO можно оптимизировать - проверять на включенную фичу
+PORTS_TABLE:												;Таблица из адресов IO PINx регистров (A,B,-,D)
+	.db	0x39,0x36,0xff,0x30
+PCINT_TABLE:
+	.db	PCMSK0, PCMSK1, 0x00, PCMSK2
+INT_TABLE:
+	.db	(1<<INT0),(1<<INT1)
+.ENDIF
+
+.MACRO MCALL
+	RCALL @0
+.ENDMACRO
+.MACRO MJMP
+	RJMP @0
+.ENDMACRO
+
+;ATOMIC_REQUIRED
+.MACRO _OS_POWER_ON
+	PUSH ACCUM_L
+	LDS ACCUM_L,PRR
+	ANDI ACCUM_L,low(~(1<<@0))
+	STS PRR,ACCUM_L
+	POP ACCUM_L
+.ENDMACRO
+;ATOMIC_REQUIRED
+.MACRO _OS_POWER_OFF
+	PUSH ACCUM_L
+	LDS ACCUM_L,PRR
+	ORI ACCUM_L,low(1<<@0)
+	STS PRR,ACCUM_L
+	POP ACCUM_L
+.ENDMACRO
+
+;ATOMIC_REQUIRED
+.MACRO _OS_TIMER_INIT_NR
+	_OS_POWER_ON PRTIM0										;Подпитываю TIMER0
+	LDI ACCUM_L,(1<<WGM01)|(0<<WGM00)
+	STS TCCR0A,ACCUM_L
+	LDI ACCUM_L,(0<<CS02)|(1<<CS01)|(0<<CS00)				;/8
+	STS TCCR0B,ACCUM_L
+	STS TCNT0,C0x00
+	LDI ACCUM_L,_OS_TIMER_FREQ-0x01
+	STS OCR0A,ACCUM_L
+	LDI ACCUM_L,(1<<OCF0A)
+	STS TIFR0,ACCUM_L
+	LDI ACCUM_L,(1<<OCIE0A)
+	STS TIMSK0,ACCUM_L
+.ENDMACRO
+

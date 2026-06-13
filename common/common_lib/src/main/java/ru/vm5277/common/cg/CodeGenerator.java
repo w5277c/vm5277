@@ -33,16 +33,18 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.Stack;
 import java.util.concurrent.atomic.AtomicInteger;
+import ru.vm5277.common.Device;
 import ru.vm5277.common.ExcsThrowPoint;
 import ru.vm5277.common.ImplementInfo;
 import ru.vm5277.common.LabelNames;
+import ru.vm5277.common.NativeBinding;
 import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.Pair;
-import ru.vm5277.common.Platform;
-import ru.vm5277.common.RTOSFeature;
-import ru.vm5277.common.RTOSLibs;
-import ru.vm5277.common.RTOSParam;
+import ru.vm5277.common.enums.RTOSFeature;
+import ru.vm5277.common.enums.RTOSLibs;
+import ru.vm5277.common.enums.RTOSParam;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
@@ -52,14 +54,17 @@ import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.scopes.CGCommandScope;
 import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
 import ru.vm5277.common.cg.scopes.CGTryBlockScope;
-import ru.vm5277.common.compiler.Optimization;
+import ru.vm5277.common.enums.OptimizationType;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.items.CGIAsm;
+import ru.vm5277.common.cg.items.CGIMeta;
+import ru.vm5277.common.enums.InstanceType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 
 public abstract class CodeGenerator extends CGScope {
 	protected	static	final	String						GPIO_REGEX			= "P[A-Z][0-7]";
-	protected			final	Platform					platform;
+	protected			final	Device						device;
 	protected			final	Set<RTOSFeature>			RTOSFeatures		= new HashSet<>();
 	protected			final	Set<String>					includes			= new HashSet<>();
 	//protected			final	Map<Integer, CGLabelScope>	labels				= new HashMap<>();
@@ -70,28 +75,45 @@ public abstract class CodeGenerator extends CGScope {
 	protected	static	final	Map<Integer, DataSymbol>	flashData			= new HashMap<>();
 	protected	static	final	Map<String, Integer>		flashStrings		= new HashMap<>();
 //	protected					CGScope						scope				= null;
-	protected	final			CGAccum						accum				= new CGAccum();
-	public				static	int							CLASS_HEADER_SIZE;
+	protected					int							refSize				= 0x02;
+	protected					CGAccum						acc;
+	public		final	static	int							ARRAY_1D_HEADER_SIZE= 0x05;
+	public				static	int							CLASS_HEADER_SIZE	= 0x05;
 	protected			static	boolean						arraysUsage			= false;
 	private				static	int							statPoolSize		= 0;	// Блок для хранения статических полей классов
 	private						CGIContainer				staticInitContainer	= new CGIContainer();
+	protected	final	static	Set<String>					SUPPORTED_FUNCT		= new HashSet<>();
+	public				static	byte[]						accRegs;
+	public				static	byte[]						arrRegs;
+	public				static	byte[]						stackRegs;
+	public				static	byte[]						heapRegs;
+	protected	final			Stack<Pair<VarType, Boolean>>
+															accumStack			= new Stack<>();
+	protected					int							tasksQuantity		= 0;
 	
-	public CodeGenerator(Platform platform) {
-		this.platform = platform;
+	public CodeGenerator(Device device) {
+		this.device = device;
+
+		Long tmp = device.getDefNum("SRAM_SIZE");
+		if(null!=tmp) {
+			refSize = (256>=tmp ? 1 : 2);
+		}
+
+		this.acc = new CGAccum(refSize);
 	}
 	
-	public CGClassScope enterClass(CGScope cgScope, VarType type, String name, List<ImplementInfo> impl, boolean isRoot) {
-		return new CGClassScope(this, cgScope, genId(), type, name, impl, isRoot);
+	public CGClassScope enterClass(CGScope cgScope, VarType type, String name, List<ImplementInfo> impl, InstanceType instType) {
+		return new CGClassScope(this, cgScope, genId(), type, name, impl, instType);
 	}
 	public CGInterfaceScope enterInterface(CGScope cgScope, VarType type, String name) {
 		return new CGInterfaceScope(cgScope, genId(), type, name);
 	}
 	public CGMethodScope enterConstructor(CGScope cgScope) {
-		return new CGMethodScope(this, (CGClassScope)cgScope, genId(), null, 0, ((CGClassScope)cgScope).getName(), buildRegsPool());
+		return new CGMethodScope(this, (CGClassScope)cgScope, genId(), null, 0, ((CGClassScope)cgScope).getName());
 	}
 	public CGMethodScope enterMethod(CGScope cgScope, VarType type, String name) {
-		int size = (-1 == type.getSize() ? getRefSize() : type.getSize());
-		return new CGMethodScope(this, (CGClassScope)cgScope, genId(), type, size, name, buildRegsPool());
+		int size = (-1 == type.getSize() ? refSize : type.getSize());
+		return new CGMethodScope(this, (CGClassScope)cgScope, genId(), type, size, name);
 	}
 	public CGBlockScope enterBlock(CGScope cgScope, boolean isTry, String comment) {
 		return isTry ? new CGTryBlockScope(this, cgScope, genId(), comment) : new CGBlockScope(this, cgScope, genId(), comment);
@@ -103,10 +125,10 @@ public abstract class CodeGenerator extends CGScope {
 		return new CGVarScope(cgScope, genId(), type, size, isConstant, name);
 	}
 	public CGFieldScope enterField(CGScope cgScope, VarType type, boolean isStatic, String name) throws CompileException {
-		return new CGFieldScope((CGClassScope)cgScope, genId(), type, (-1 == type.getSize() ? getRefSize() : type.getSize()), isStatic, name);
+		return new CGFieldScope((CGClassScope)cgScope, genId(), type, (-1 == type.getSize() ? refSize : type.getSize()), isStatic, name);
 	}
-	public CGExpressionScope enterExpression(CGScope cgScope, String name) {
-		return new CGExpressionScope(cgScope, name);
+	public CGExpressionScope enterExpression(CGScope parentScope, CGScope oldScope, String name) {
+		return new CGExpressionScope(parentScope, oldScope, name);
 	}
 	public CGCellsScope enterArrayExpression(CGScope cgScope, VarType type, int size, final CGCells cells) {
 		return new CGCellsScope(cgScope, genId(), type, size, "arrExpr") {
@@ -115,7 +137,7 @@ public abstract class CodeGenerator extends CGScope {
 		};
 	}
 	public CGCommandScope enterCommand(CGScope cgScope, String name) {
-		return new CGCommandScope(cgScope, name);
+		return new CGCommandScope(this, cgScope, name);
 	}
 
 	public DataSymbol defineData(int resId, int size, Object obj) {
@@ -140,65 +162,68 @@ public abstract class CodeGenerator extends CGScope {
 	
 	public abstract CGIContainer jump(CGScope scope, CGLabelScope lScope) throws CompileException;
 	public abstract CGIContainer call(CGScope scope, CGLabelScope lScope) throws CompileException;
-	public abstract CGIContainer accCast(VarType accType, VarType opType) throws CompileException;
-	public abstract void accResize(VarType opType) throws CompileException;
+//	protected abstract CGIContainer accCast(VarType accType, VarType opType) throws CompileException;
+	public abstract void cellsToCells(CGScope scope, CGCells leftCells, VarType leftType, CGCells rightCells, VarType rigthType) throws CompileException;
 	public abstract void cellsToAcc(CGScope scope, CGCells cells, boolean isFixed) throws CompileException;
 	public abstract void cellsToAcc(CGScope scope, CGCellsScope cScope) throws CompileException;
-	public abstract void accToCells(CGScope scope, CGCellsScope cScope) throws CompileException;
+	public abstract void accToCells(CGScope scope, VarType varType, CGCellsScope cScope) throws CompileException;
 	
 	public abstract void computeArrCellAddr(CGScope scope, CGCells arrAddrCells, CGArrCells arrCells, CGExcs excs) throws CompileException;
-	public abstract void arrToAcc(CGScope scope, CGArrCells arrCells) throws CompileException;
+	public abstract void computeArrViewCellsAddr(CGScope scope, CGCells arrAddrCells, CGArrCells arrCells, CGExcs excs) throws CompileException;
+	public abstract void arrToAcc(CGScope scope, CGArrCells arrCells, boolean isFixed) throws CompileException;
 	public abstract void accToArr(CGScope scope, CGArrCells arrScope) throws CompileException;
-	public abstract void arrToCells(CGScope scope, CGArrCells arrCells, CGCells cells, CGExcs excs) throws CompileException;
 	public abstract void flashDataToArr(CGScope scope, DataSymbol symbol, int offset) throws CompileException;
 	public abstract void cellsToArrReg(CGScope cgScope, CGCells cells) throws CompileException;
 	public abstract void arrSizetoAcc(CGScope cgScope, boolean isView) throws CompileException;
-	public abstract void arrRegToCells(CGScope scope, CGCells cells) throws CompileException;
-	public abstract void arrRegToAcc(CGScope scope) throws CompileException;
 	public abstract void accToArrReg(CGScope scope) throws CompileException;
 	
 //	public abstract void retToCells(CGScope scope, CGCellsScope cScope) throws CompileException;
 	public abstract void setHeapReg(CGScope scope, CGCells cells) throws CompileException;
-	public abstract void constToAcc(CGScope scope, int size, long value, boolean isFixed) throws CompileException;
+	public abstract void constToAcc(CGScope scope, int sizeInBytes, long value, boolean isFixed) throws CompileException;
 	public abstract CGIContainer constToCells(CGScope scope, long value, CGCells cells, boolean isFixed) throws CompileException;
-	public abstract void cellsAction(CGScope scope, CGCells cells, Operator op, boolean isFixed, CGExcs excs) throws CompileException;
-	public abstract void constAction(CGScope scope, Operator op, long k, boolean isFixed, CGExcs excs) throws CompileException;
-	public abstract void cellsCond(CGScope scope, CGCells cells, Operator op, boolean isNot, boolean isOr, CGBranch branchScope) throws CompileException;
-	public abstract void constCond(	CGScope scope, CGCells cells, Operator op, long k, boolean isLFixed, boolean isRFixed, boolean isNot, boolean isOr,
-									CGBranch branchScope) throws CompileException;
+	public abstract void cellsAction(CGScope scope, CGCells leftCells, Operator op, CGCells rightCells, boolean leftisFixed, boolean rightIsFixed, CGExcs excs) throws CompileException;
+	public abstract void constAction(CGScope scope, CGCells cells, Operator op, long k, boolean isFixed, CGExcs excs) throws CompileException;
+	public abstract void cellsOpCells(CGScope scope, CGCells leftCells, VarType leftType, Operator op, CGCells rightCells, VarType rightType) throws CompileException;
+	public abstract void cellsCpCells(CGScope scope, CGCells leftCells, VarType leftType, CGCells rightCells, VarType rigthType, Operator op, boolean isNot, boolean isOr, CGBranch branchScope) throws CompileException;
 	public abstract void boolAccCond(CGScope scope, CGBranch branchScope, boolean byBit0) throws CompileException;
-	public abstract void boolFlagCond(CGScope scope, CGBranch branchScope) throws CompileException;
+	public abstract void boolFlagCond(CGScope scope, boolean inverted, CGBranch branchScope) throws CompileException;
 	//TODO проверить все вызовы, возможно везде должне быть pushAccLE
-	public abstract	CGIContainer pushAccBE(CGScope scope, Integer size) throws CompileException;
-	public abstract	CGIContainer pushAccLE(CGScope scope, Integer size) throws CompileException;
-	public abstract	void popAccBE(CGScope scope, Integer size) throws CompileException;
+	public abstract	CGIContainer pushAccBE(CGScope scope, int size) throws CompileException;
+	public abstract	CGIContainer pushAccLE(CGScope scope, int size) throws CompileException;
+	public abstract	void popAccBE(CGScope scope, int size) throws CompileException;
 	public abstract	CGIContainer pushHeapReg(CGScope scope) throws CompileException;
 	public abstract	CGIContainer popHeapReg(CGScope scope) throws CompileException;
 	public abstract	CGIContainer pushStackReg(CGScope scope)throws CompileException;
 	public abstract	CGIContainer popStackReg(CGScope scope) throws CompileException;
 	public abstract	CGIContainer pushArrReg(CGScope scope) throws CompileException;
 	public abstract	CGIContainer popArrReg(CGScope scope) throws CompileException;
+	public abstract	CGIAsm pushReg(byte reg) throws CompileException;
+	public abstract	CGIAsm popReg(byte reg) throws CompileException;
 	public abstract void thisToAcc(CGScope scope) throws CompileException;
 	public abstract void pushLabel(CGScope scope, String label) throws CompileException;
 	public abstract void updateClassRefCount(CGScope scope, CGCells cells, boolean isInc) throws CompileException;
 	public abstract void updateArrRefCount(CGScope cgScope, CGCells cells, boolean isInc, boolean isView) throws CompileException;
+	public abstract void methodInvoke(CGScope scope, CGLabelScope lbScope, String signature, VarType type) throws CompileException;
 	public abstract void invokeInterfaceMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, VarType ifaceType, int methodSN) throws CompileException;
+
+	public abstract void invokeConstr(CGScope scope, CGLabelScope lScope) throws CompileException;	
 	
 	//TODO добавить необходимые прамаметры
-	public abstract void nativeMethodInit(CGScope scope, String signature) throws CompileException;
-	public abstract void nativeMethodSetArg(CGScope scope, String signature, int index) throws CompileException;
-	public abstract void nativeMethodInvoke(CGScope scope, String signature) throws CompileException;
-
+	public abstract NativeBinding nativeMethodInit(CGScope scope, String signature, boolean isConstants) throws CompileException;
+	public abstract void nativeMethodArrArgPrepare(CGScope cgScope, String signature, List<Byte> storedRegs, int index, boolean checkedByCompiler, CGLabelScope lbScope) throws CompileException;
+	public abstract void nativeMethodSetArg(CGScope scope, String signature, List<Byte> storedRegs, int index, boolean isFixed) throws CompileException;
+	public abstract void nativeMethodInvoke(CGScope scope, String signature, List<Byte> storedRegs, VarType type) throws CompileException;
+	public abstract void functApply(CGScope scope, String funct, long[] constants) throws CompileException;
 	public abstract void eInstanceof(CGScope scope, VarType type) throws CompileException;
 	public abstract void eUnary(CGScope scope, Operator op, CGCells cells, boolean toAccum, CGExcs excs) throws CompileException;
 	
 	//TODO набор методов для реализации команд if, switch, for, loop и .т.д
-	public abstract void eNewInstance(CGScope scope, int fieldsSize, CGLabelScope iidLabel, VarType type, boolean launchPoint, CGExcs excs) throws CompileException;
+	public abstract CGIContainer eNewInstance(CGScope scope, int fieldsSize, CGLabelScope iidLabel, VarType type, InstanceType instType, CGIContainer postfixCont, CGExcs excs) throws CompileException;
 	public abstract void eNewArray(CGScope scope, VarType type, int depth, int[] cDims, CGExcs excs) throws CompileException;
 	public abstract void eNewArrView(CGScope scope, int depth, CGExcs excs) throws CompileException;
 	public abstract void eTry(CGBlockScope blockScope, List<Case> cases, CGBlockScope defaultBlockScope);
 	public abstract void eCatch(CGScope scope) throws CompileException;
-	public abstract CGIContainer eReturn(CGScope scope, int argsSize, int varsSize, VarType retType) throws CompileException;
+	public abstract CGIContainer eReturn(CGScope scope, VarType retType, CGLabelScope lScope) throws CompileException;
 	public abstract CGIContainer finMethod(VarType type, int argsSize, int varsSize, int lastStackOffset) throws CompileException;
 
 	public abstract void eThrow(CGScope cgs, int exceptioId, boolean isMethodLeave, CGLabelScope lbScope, boolean withCode, ExcsThrowPoint point) throws CompileException;
@@ -206,10 +231,9 @@ public abstract class CodeGenerator extends CGScope {
 									ExcsThrowPoint point) throws CompileException;
 	public abstract void terminate(CGScope scope, boolean systemStop, boolean excsCheck) throws CompileException;
 	
-	public abstract int getRefSize();
 	public abstract int getCallSize();
 	public abstract int getCallStackSize();
-	public abstract ArrayList<RegPair> buildRegsPool();
+	public abstract HashMap<Byte, RegPair> buildRegsPool();
 	public abstract CGIContainer pushConst(CGScope scope, int size, long value, boolean isFixed) throws CompileException;
 	public abstract CGIContainer pushCells(CGScope scope, int size, CGCells cells) throws CompileException;
 //	public abstract void setValueByIndex(Operand op, int size, List<Byte> tempRegs) throws CompileException;
@@ -220,9 +244,20 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract void exTypeIdToAcc(CGScope scope) throws CompileException;
 	public abstract void exCodeToAcc(CGScope scope) throws CompileException;
 	public abstract void exCodeToAccH(CGScope scope, long numValue) throws CompileException;
+	public abstract int getThreadHeaderSize();
+	public abstract int getTimerHeaderSize();
 
-	public Platform getPlatform() {
-		return platform;
+
+	public int getRefSize() {
+		return refSize;
+	}
+
+	public Device getDevice() {
+		return device;
+	}
+	
+	public boolean isSupportedFunct(String functName) {
+		return SUPPORTED_FUNCT.contains(functName.toLowerCase());
 	}
 	
 	public void setFeature(RTOSFeature feature) {
@@ -265,7 +300,7 @@ public abstract class CodeGenerator extends CGScope {
 	}
 	
 	public void build(VarType classType, int fieldsSize) throws CompileException {
-		append(new CGIText("; vm5277." + platform.getType().name() + " v" + getVersion()));
+		append(new CGIText("; vm5277." + device.getUniqueName() + ", opt:" + device.getOptimizationType().toString().toLowerCase() + " v" + getVersion()));
 		
 		CGExcs excs = new CGExcs();
 		// Во время кодогенерации не знаем какие поля будут использованы в итоге, поэтому размер HEAP можно вычислить только здесь.
@@ -283,14 +318,17 @@ public abstract class CodeGenerator extends CGScope {
 			}
 		}
 */		
-		if(platform.containsParam(RTOSParam.CORE_FREQ)) {
-			append(new CGIText(".equ CORE_FREQ = " + platform.getParam(RTOSParam.CORE_FREQ)));
+		if(device.containsParam(RTOSParam.CORE_FREQ)) {
+			append(new CGIText(".equ CORE_FREQ = " + device.getParam(RTOSParam.CORE_FREQ) + " ;KHz"));
 		}
-		if(platform.containsParam(RTOSParam.DEVEL_MODE) && 1==(int)platform.getParam(RTOSParam.DEVEL_MODE)) {
-			append(new CGIText(".set OS_FT_DEV_MODE = 1"));
+		if(device.containsParam(RTOSParam.SOFT_RESET) && 1==(int)device.getParam(RTOSParam.SOFT_RESET)) {
+			append(new CGIText(".set OS_FT_SOFT_RESET = 1"));
 		}
-		if(platform.containsParam(RTOSParam.STDIO_PORT)) {
-			Object obj = platform.getParam(RTOSParam.STDIO_PORT);
+		if(device.containsParam(RTOSParam.BLDR_API_REUSE) && 1==(int)device.getParam(RTOSParam.BLDR_API_REUSE)) {
+			append(new CGIText(".set OS_FT_BLDR_API_REUSE = 1"));
+		}
+		if(device.containsParam(RTOSParam.STDIO_PORT)) {
+			Object obj = device.getParam(RTOSParam.STDIO_PORT);
 			if(obj instanceof String && ((String)obj).contains("/")) {
 				String parts[] = ((String)obj).toUpperCase().split("\\/", 0x02);
 				if(0x02==parts.length && parts[0].trim().replaceFirst(GPIO_REGEX, "").isEmpty() && parts[1].trim().replaceFirst(GPIO_REGEX, "").isEmpty()) {
@@ -298,21 +336,21 @@ public abstract class CodeGenerator extends CGScope {
 					int portNum = parts[0].trim().charAt(0x02)-'0';
 					
 					String constName = "PORT" + portLetter;
-					Long num = platform.getDefReader().getNum(constName);
+					Long num = device.getDefNum(constName);
 					if(null==num) {
 						throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
 					}
 					append(new CGIText(".set STDIN_PORT_REGID = " + num));
 
 					constName = "DDR" + portLetter;
-					num = platform.getDefReader().getNum(constName);
+					num = device.getDefNum(constName);
 					if(null==num) {
 						throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
 					}
 					append(new CGIText(".set STDIN_DDR_REGID = " + num));
 
 					constName = "PIN" + portLetter;
-					num = platform.getDefReader().getNum(constName);
+					num = device.getDefNum(constName);
 					if(null==num) {
 						throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
 					}
@@ -325,21 +363,21 @@ public abstract class CodeGenerator extends CGScope {
 					portNum = parts[1].trim().charAt(0x02)-'0';
 					
 					constName = "PORT" + portLetter;
-					num = platform.getDefReader().getNum(constName);
+					num = device.getDefNum(constName);
 					if(null==num) {
 						throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
 					}
 					append(new CGIText(".set STDOUT_PORT_REGID = " + num));
 
 					constName = "DDR" + portLetter;
-					num = platform.getDefReader().getNum(constName);
+					num = device.getDefNum(constName);
 					if(null==num) {
 						throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
 					}
 					append(new CGIText(".set STDOUT_DDR_REGID = " + num));
 
 					constName = "PIN" + portLetter;
-					num = platform.getDefReader().getNum(constName);
+					num = device.getDefNum(constName);
 					if(null==num) {
 						throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
 					}
@@ -358,21 +396,21 @@ public abstract class CodeGenerator extends CGScope {
 				int portNum = part.charAt(0x02)-'0';
 
 				String constName = "PORT" + portLetter;
-				Long num = platform.getDefReader().getNum(constName);
+				Long num = device.getDefNum(constName);
 				if(null==num) {
 					throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
 				}
 				append(new CGIText(".set STDIO_PORT_REGID = " + num));
 
 				constName = "DDR" + portLetter;
-				num = platform.getDefReader().getNum(constName);
+				num = device.getDefNum(constName);
 				if(null==num) {
 					throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
 				}
 				append(new CGIText(".set STDIO_DDR_REGID = " + num));
 
 				constName = "PIN" + portLetter;
-				num = platform.getDefReader().getNum(constName);
+				num = device.getDefNum(constName);
 				if(null==num) {
 					throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
 				}
@@ -392,21 +430,21 @@ public abstract class CodeGenerator extends CGScope {
 				char portLetter = (char)('A'+(stdioPortId>>0x04));
 
 				String constName = "PORT" + portLetter;
-				Long num = platform.getDefReader().getNum(constName);
+				Long num = device.getDefNum(constName);
 				if(null==num) {
 					throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
 				}
 				append(new CGIText(".set STDIO_PORT_REGID = " + num));
 
 				constName = "DDR" + portLetter;
-				num = platform.getDefReader().getNum(constName);
+				num = device.getDefNum(constName);
 				if(null==num) {
 					throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
 				}
 				append(new CGIText(".set STDIO_DDR_REGID = " + num));
 
 				constName = "PIN" + portLetter;
-				num = platform.getDefReader().getNum(constName);
+				num = device.getDefNum(constName);
 				if(null==num) {
 					throw new CompileException("Absent constant '" + constName + "' in assember MCU headers.");
 				}
@@ -416,8 +454,8 @@ public abstract class CodeGenerator extends CGScope {
 				append(new CGIText(".set STDIO_PINNUM = " + (stdioPortId&0x07)));
 			}
 		}
-		if(platform.containsParam(RTOSParam.ACTLED_PORT)) {
-			append(new CGIText(".equ ACTLED_PORT = " + platform.getParam(RTOSParam.ACTLED_PORT)));
+		if(device.containsParam(RTOSParam.ACTLED_PORT)) {
+			append(new CGIText(".equ ACTLED_PORT = " + device.getParam(RTOSParam.ACTLED_PORT)));
 		}
 		if(0!=statPoolSize) {
 			append(new CGIText(".set OS_STAT_POOL_SIZE = " + statPoolSize));
@@ -436,9 +474,10 @@ public abstract class CodeGenerator extends CGScope {
 				append(new CGIText(".set " + feature + " = 1"));
 			}
 		}
+		
 		append(new CGIText(""));
 
-		append(new CGIText(".include \"devices/" + platform.getParam(RTOSParam.MCU) + ".def\""));
+		append(new CGIText(".include \"devices/" + device.getParam(RTOSParam.MCU) + ".def\""));
 		append(new CGIText(".include \"core/core.asm\""));
 
 		if(RTOSFeatures.contains(RTOSFeature.OS_FT_DRAM)) {
@@ -448,18 +487,24 @@ public abstract class CodeGenerator extends CGScope {
 			RTOSLibs.DISPATCHER.setRequired();
 		}
 		
+		Set<String> included = new HashSet<>();
 		for(RTOSLibs lib : RTOSLibs.values()) {
 			if(lib.isRequired()) {
+				included.add(lib.getPath());
 				append(new CGIText(".include \"" + lib.getPath() + "\""));
 			}
 		}
 		
 		for(String include : includes) {
-			append(new CGIText(".include \"" + include + "\""));
+			if(!included.contains(include)) {
+				append(new CGIText(".include \"" + include + "\""));
+			}
 		}
 		append(new CGIText(""));
 		
-		for(int resId : flashData.keySet()) {
+		List<Integer> sorted = new ArrayList<>(flashData.keySet());
+		Collections.sort(sorted);
+		for(int resId : sorted) {
 			DataSymbol ds = flashData.get(resId);
 			append(new CGIText(ds.getLabel() + ":"));
 			if(ds.getValue() instanceof String) {
@@ -482,22 +527,16 @@ public abstract class CodeGenerator extends CGScope {
 				if(pair.getK() instanceof VarType) {
 					StringBuilder sb = new StringBuilder();
 					int size = ((VarType)pair.getK()).getSize();
-					if(-1==size) size = getRefSize();
+					if(-1==size) size = refSize;
 
-					switch(((VarType)pair.getK()).getSize()) {
-						case 4:
-							sb.append(".dq ");
-							break;
-
-						case 2:
-							sb.append(".dw ");
-							break;
-						default:
-							sb.append(".db ");
-					}
-					
+					// Используем только big endian исключая влияние сборщика asm
+					sb.append(".db ");
 					for(Long value : (ArrayList<Long>)pair.getV()) {
-						sb.append(value).append(",");
+						for(int i=0; i<size; i++) { // Корректно для массива с типом fixed
+							byte b = (byte)((value >> (i*8))&0xFF);
+							sb.append(String.format("0x%02X", b));
+							sb.append(",");
+						}
 					}
 					sb.deleteCharAt(sb.length()-1);
 					if(1==size && 0!=(((ArrayList<Object>)pair.getV()).size()&0x01)) {
@@ -517,22 +556,30 @@ public abstract class CodeGenerator extends CGScope {
 
 		append(staticInitContainer);
 		
+		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) {
+			// Должен выполняться если в основном классе нет конструкторов
+			eNewInstance(this, getThreadHeaderSize(), null, VarType.addClassName(VarType.CLASSNAME_MAIN, disabled), InstanceType.FIRST_THREAD,  null, excs);
+		}
+		
 		jump(this, new CGLabelScope(null, -1, LabelNames.MAIN, true));
 	}
 	
 	public void showScopeTree(CGScope cgScope) {
 		StringBuilder sb = new StringBuilder();
-		cgScope.buildScopeTree(sb, "");
+		cgScope.buildScopeTree(sb, "", disabled);
 		System.out.println(sb);
 	}
 	
 	public String getAsm(CGScope cgScope, Path asmInstrPath, MessageContainer mc) throws CompileException {
 		
 		if(null!=codeFixer && null!=asmInstrPath) {
-			List<CGItem> codeList = codeFixer.resolveInstructionsSize(cgScope, asmInstrPath, mc, (String)platform.getParam(RTOSParam.MCU));
+			List<CGItem> codeList = codeFixer.resolveInstructionsSize(cgScope, asmInstrPath, mc, (String)device.getParam(RTOSParam.MCU));
 			codeFixer.branchRangeFixer(codeList);
 
-			if(Optimization.FRONT<platform.getOptLevel()) {
+			if(OptimizationType.FRONT.getId()<device.getOptimizationType().getId()) {
+				if(null!=accRegs) {
+					codeOptimizer.accNarrowing(codeList, accRegs);
+				}
 				boolean modified = true;
 				while(modified) {
 					modified = false;
@@ -544,7 +591,7 @@ public abstract class CodeGenerator extends CGScope {
 			}
 		}
 
-		if(Optimization.FRONT<platform.getOptLevel() && null!=codeOptimizer) {
+		if(OptimizationType.FRONT.getId()<device.getOptimizationType().getId() && null!=codeOptimizer) {
 			boolean modified = true;
 			while(modified) {
 				modified = false;
@@ -584,11 +631,12 @@ public abstract class CodeGenerator extends CGScope {
 	//}
 	
 	public static void treeToList(CGIContainer cont, List<CGItem> list) {
-		treeToList(cont, list, null);
+		treeToList(cont, list, null, true);
 	}
-	public static void treeToList(CGIContainer cont, List<CGItem> list, String ignoreScanTag) {
+	public static void treeToList(CGIContainer cont, List<CGItem> list, String ignoreScanTag, boolean ignoreMeta) {
 		for(CGItem item : cont.getItems()) {
 			if(item.isDisabled()) continue;
+			if(ignoreMeta && item instanceof CGIMeta) continue;
 			
 			if(item instanceof CGLabelScope) {
 				if(((CGLabelScope)item).isUsed()) {
@@ -603,7 +651,7 @@ public abstract class CodeGenerator extends CGScope {
 				else {
 					//TODO убрал if(((CGIContainer)item).getItems().isEmpty()) { list.add(item); ... добавлял мусор типа CGExpressionScope, возможно что-то поломал
 					if(!((CGIContainer)item).getItems().isEmpty()) {
-						treeToList((CGIContainer)item, list, ignoreScanTag);
+						treeToList((CGIContainer)item, list, ignoreScanTag, ignoreMeta);
 					}
 				}
 			}
@@ -620,10 +668,20 @@ public abstract class CodeGenerator extends CGScope {
 		return arraysUsage;
 	}
 	
-	public CGAccum getAccum() {
-		return accum;
-	}
+//	public CGAccum getAccum() {
+//		return acc;
+//	}
 	
+	public void accumLock(VarType varType) {
+		accumLock(varType, false);
+	}
+	public void accumLock(VarType varType, boolean strong) {
+		accumStack.add(new Pair<VarType, Boolean>(varType, strong));
+	}
+	public void accumUnlock() {
+		accumStack.pop();
+	}
+
 	public CGIContainer getStaticInitContaier() {
 		return staticInitContainer;
 	}
@@ -635,5 +693,29 @@ public abstract class CodeGenerator extends CGScope {
 		int tmp = statPoolSize;
 		statPoolSize+=size;
 		return tmp;
+	}
+	
+	public int incAndGetTaskQuantity() {
+		return ++tasksQuantity;
+	}
+	
+	public CGAccum _getAcc() {
+		return acc;
+	}
+	public void _setAcc(CGAccum acc) {
+		this.acc = acc;
+	}
+	
+	public boolean isAccumReg(byte reg) {
+		for(byte accReg : accRegs) {
+			if(accReg==reg) return true;
+		}
+		return false;
+	}
+	public boolean isArrReg(byte reg) {
+		for(byte arrReg : arrRegs) {
+			if(arrReg==reg) return true;
+		}
+		return false;
 	}
 }

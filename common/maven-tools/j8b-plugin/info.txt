@@ -1,0 +1,16 @@
+mvn j8b:clean - очистка папок prebuild и target
+mvn j8b:compile - j8b:clean + трансляция j8b в ассемблер
+mvn j8b:assemble - сборка ассемблер кода в hex (очищает папку target)
+mvn j8b:build = j8b:compile + j8b:assemble
+mvn j8b:flash - прошивка МК содержимым hex файла
+mvn j8b:iflash - прошивка МК содержимым hex файла и переход в интерактивный режим
+mvn j8b:run = j8b:compile + j8b:assemble + j8b:run
+
+mvn package = j8b:build = j8b:compile + j8b:assemble
+
+@Mojo(name = "clean", defaultPhase = LifecyclePhase.CLEAN)
+@Mojo(name = "compile", defaultPhase = LifecyclePhase.COMPILE)
+@Mojo(name = "assemble", defaultPhase = LifecyclePhase.PACKAGE)
+@Mojo(name = "build")
+@Mojo(name = "flash")
+@Mojo(name = "run")

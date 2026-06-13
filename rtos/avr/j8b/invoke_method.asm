@@ -31,7 +31,7 @@ J8BPROC_INVOKE_METHOD_NR:									;NR-NO_RESTORE - не восстанавлив
 	ADIW ZL,0x01											;Пропускаем ид типа класса
 	LPM ACCUM_EH,Z+											;Получаем количество пар(ид интерфейс + кол-во методов)
 
-	MOV YL,ACCUM_EH											;Вычисляю адрес блока адресов методов
+	MOV YL,ACCUM_EH											;Вычисляем адрес блока адресов методов
 	LDI YH,0x00
 	LSL YL
 	ROL YH
@@ -40,19 +40,22 @@ J8BPROC_INVOKE_METHOD_NR:									;NR-NO_RESTORE - не восстанавлив
 
 	LDI TEMP_L,0x00											;Порядковый номер метода в классе
 _J8BPROC_INVOKE_METHOD_NR__IFACEIDS_LOOP:
-	LPM ACCUM_EL,Z+											;Получаю id интерфейса
+	LPM ACCUM_EL,Z+											;Получаем id интерфейса
 	CP ACCUM_EL,ACCUM_L
 	BREQ _J8BPROC_INVOKE_METHOD_NR__GOT_IFACE
-	LPM ACCUM_EL,Z+											;Получаю количество методов в интерфейсе
+	LPM ACCUM_EL,Z+											;Получаем количество методов в интерфейсе
 	ADD ACCUM_H,ACCUM_EL
 	DEC ACCUM_EH
 	BRNE _J8BPROC_INVOKE_METHOD_NR__IFACEIDS_LOOP
 _J8BPROC_INVOKE_METHOD_NR__GOT_IFACE:
-	POP_Z
 
-	LSL ACCUM_H												;Смещаюсь на адрес с учетом порядкового номера метода в классе
+	LSL ACCUM_H												;Смещаемся на адрес с учетом порядкового номера метода в классе
 	ADD YL,ACCUM_H
 	ADC YH,C0x00
+	MOVW ZL,YL
+	LPM YL,Z+												;Загружаем адрес метоа
+	LPM YH,Z
+	POP_Z
 	PUSH_Y
 	RET
 .ENDIF

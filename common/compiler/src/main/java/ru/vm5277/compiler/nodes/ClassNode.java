@@ -23,7 +23,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.ImplementInfo;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGClassScope;
@@ -32,8 +32,8 @@ import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.enums.InstanceType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.ClassScope;
@@ -42,16 +42,15 @@ import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.lexer.Keyword;
+import ru.vm5277.compiler.Instance;
 import static ru.vm5277.compiler.Main.debugAST;
-import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 
 public class ClassNode extends ObjectTypeNode {
 	private	ClassBlockNode	blockNode;
 	private	boolean			isInner;
 	
-	public ClassNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, boolean isInner, List<ObjectTypeNode> importedClasses)
-																																	throws CompileException {
-		super(tb, mc, modifiers, null, importedClasses);
+	public ClassNode(Instance inst, TokenBuffer tb, Set<Keyword> modifiers, boolean isInner, List<ObjectTypeNode> importedClasses) throws CompileException {
+		super(inst, tb, modifiers, null, importedClasses);
 		
 		if(null!=name) {
 			VarType.addClassName(this.name, false);
@@ -71,8 +70,10 @@ public class ClassNode extends ObjectTypeNode {
 			consumeToken(tb);
 			while(true) {
 				try {
+					String interfaceName = (String)consumeToken(tb, TokenType.IDENTIFIER).getValue();
+					resolveSameDirImport(inst, tb.getSP().getSourceFile(), interfaceName);
 					//TODO QualifiedPath
-					impl.add((String)consumeToken(tb, TokenType.IDENTIFIER).getValue());
+					impl.add(interfaceName);
 				}
 				catch(CompileException e) {
 					markFirstError(e); // встретили что-то кроме ID интерфейса
@@ -83,7 +84,7 @@ public class ClassNode extends ObjectTypeNode {
 		}
 
 		// Парсинг тела класса
-		blockNode = new ClassBlockNode(tb, mc, this);
+		blockNode = new ClassBlockNode(inst, tb, this);
 	}
 	
 	@Override
@@ -93,7 +94,7 @@ public class ClassNode extends ObjectTypeNode {
 	public void setBody(ClassBlockNode body) {
 		blockNode = body;
 	}
-	
+
 	@Override
 	public boolean preAnalyze() {
 		try {validateName(name);} catch(CompileException e) {addMessage(e);	return false;}
@@ -104,8 +105,8 @@ public class ClassNode extends ObjectTypeNode {
 		
 		try{validateModifiers(modifiers, J8BKeyword.PUBLIC, J8BKeyword.PRIVATE, J8BKeyword.STATIC);} catch(CompileException e) {addMessage(e);}
 
-		if(null!=importedClasses) {
-			for (ObjectTypeNode imported : importedClasses) {
+		if(null!=imported) {
+			for (ObjectTypeNode imported : imported) {
 				imported.preAnalyze();
 			}
 		}
@@ -127,8 +128,8 @@ public class ClassNode extends ObjectTypeNode {
 				((ImportableScope)scope).addCI(ciScope, true);
 			}
 
-			if(null!=importedClasses) {
-				for(ObjectTypeNode imported : importedClasses) {
+			if(null!=imported) {
+				for(ObjectTypeNode imported : imported) {
 					result&=imported.declare(ciScope);
 
 					if(result) {
@@ -145,7 +146,7 @@ public class ClassNode extends ObjectTypeNode {
 
 			List<VarType> implTypes = new ArrayList<>();
 			for(String ifaceName : impl) {
-				if(null==scope.resolveCI(ifaceName, false)) {
+				if(null==ciScope.resolveCI(null, ifaceName, false)) {
 					markError("Interface not found: " + ifaceName);
 					result = false;
 				}
@@ -175,8 +176,8 @@ public class ClassNode extends ObjectTypeNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
-		if(null != importedClasses) {
-			for (ObjectTypeNode imported : importedClasses) {
+		if(null != imported) {
+			for (ObjectTypeNode imported : imported) {
 				imported.postAnalyze(ciScope, cg, parent); // Заменил scope на classScope, надо проверить
 			}
 		}
@@ -185,7 +186,7 @@ public class ClassNode extends ObjectTypeNode {
 		if(!impl.isEmpty()) {
 			List<InterfaceScope> iScopes = new ArrayList<>();
 			for(String ifaceName : impl) {
-				fillInterfaces(iScopes, ifaceName);
+				fillInterfaces(ciScope, iScopes, ifaceName);
 			}	
 			for(InterfaceScope iScope : iScopes) {
 				VarType iType = VarType.fromClassName(iScope.getName());
@@ -204,7 +205,19 @@ public class ClassNode extends ObjectTypeNode {
 			});
 		}
 
-		cgScope = cg.enterClass(parent, VarType.fromClassName(name), name, implInfos, null == parentClassName);
+		InstanceType instType = (null == classPath ? InstanceType.NO_PARENT : InstanceType.CLASS);
+		VarType timerType = VarType.fromClassName(VarType.CLASSNAME_TIMER);
+		if(null!=timerType && ciScope.isImplements(timerType)) {
+			instType = InstanceType.TIMER;
+		}
+		else {
+			VarType threadType = VarType.fromClassName(VarType.CLASSNAME_THREAD);
+			if(null!=threadType && ciScope.isImplements(threadType)) {
+				instType = InstanceType.THREAD;
+			}
+		}
+		
+		cgScope = cg.enterClass(parent, VarType.fromClassName(name), name, implInfos, instType);
 
 		blockNode.postAnalyze(ciScope, cg, cgScope);
 
@@ -214,11 +227,15 @@ public class ClassNode extends ObjectTypeNode {
 	
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
+		for(ObjectTypeNode node : imported) {
+			node.codeOptimization(scope, cg);
+		}
+		
 		blockNode.codeOptimization(ciScope, cg);
 	}
 	
-	private void fillInterfaces(List<InterfaceScope> iScopes, String ifaceName) {
-		CIScope cis = ciScope.resolveCI(ifaceName, false);
+	private void fillInterfaces(CIScope scope, List<InterfaceScope> iScopes, String ifaceName) {
+		CIScope cis = scope.resolveCI(null, ifaceName, false);
 		if(null==cis || !(cis instanceof InterfaceScope)) {
 			markError("Interface not found: " + ifaceName);
 		}
@@ -226,7 +243,7 @@ public class ClassNode extends ObjectTypeNode {
 			checkInterfaceImplementation(ciScope, (InterfaceScope)cis);
 			iScopes.add((InterfaceScope)cis);
 			for(VarType type : cis.getImpl()) {
-				fillInterfaces(iScopes, type.getClassName());
+				fillInterfaces(cis, iScopes, type.getClassName());
 			}
 		}
 	}
@@ -251,8 +268,13 @@ public class ClassNode extends ObjectTypeNode {
 				}
 			}
 
-			if(!found) {
+			if(!found && !interfaceMethod.isNative()) {
 				markError(	"Class '" + classScope.getName() + "' must implement method: " + interfaceMethod.getSignature() + 
+							" from interface '" + interfaceSymbol.getName() + "'");
+				allMethodsImplemented = false;
+			}
+			if(found && interfaceMethod.isNative()) {
+				markError(	"Class '" + classScope.getName() + "' cannot override native method: " + interfaceMethod.getSignature() + 
 							" from interface '" + interfaceSymbol.getName() + "'");
 				allMethodsImplemented = false;
 			}
@@ -262,18 +284,18 @@ public class ClassNode extends ObjectTypeNode {
 	
 	public void firstCodeGen(CodeGenerator cg, MethodNode methodNode, CGExcs excs) throws CompileException {
 		cgDone = true;
-		
+		CGScope.launchPointActivate();
 		methodNode.firstCodeGen(cg, excs);
 		
-		((CGClassScope)cgScope).build(cg, excs);
+		((CGClassScope)cgScope).build(cg, true, excs);
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 		
-		((CGClassScope)cgScope).build(cg, excs);
+		((CGClassScope)cgScope).build(cg, false, excs);
 /*		if(null != importedClasses) {
 			for (ClassNode imported : importedClasses) {
 				if(isUsed()) imported.codeGen(cg);

@@ -32,12 +32,13 @@ import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.lexer.Keyword;
+import ru.vm5277.compiler.Instance;
 
 public class InterfaceBodyNode extends AstNode {
 	protected List<AstNode> children = new ArrayList<>();
 	
-	public InterfaceBodyNode(TokenBuffer tb, MessageContainer mc, String className, ObjectTypeNode ifaceNode) throws CompileException {
-		super(tb, mc);
+	public InterfaceBodyNode(Instance inst, TokenBuffer tb, String className, ObjectTypeNode ifaceNode) throws CompileException {
+		super(inst, tb);
 
 		consumeToken(tb, Delimiter.LEFT_BRACE);
 
@@ -46,27 +47,27 @@ public class InterfaceBodyNode extends AstNode {
 
 			// Обработка вложенных интерфейсов
 			if (tb.match(TokenType.OOP, J8BKeyword.INTERFACE)) {
-				InterfaceNode iNode = new InterfaceNode(tb, mc, modifiers, null, null);
+				InterfaceNode iNode = new InterfaceNode(inst, tb, modifiers, null, null);
 				children.add(iNode);
 				continue;
 			}
 			// Обработка exception с модификаторами
 			if (tb.match(TokenType.OOP, J8BKeyword.EXCEPTION)) {
-				ExceptionNode eNode = new ExceptionNode(tb, mc, modifiers, null);
+				ExceptionNode eNode = new ExceptionNode(inst, tb, modifiers, null);
 				children.add(eNode);
 				continue;
 			}
 			// Обработка enum с модификаторами
 			if (tb.match(TokenType.OOP) && J8BKeyword.ENUM == tb.current().getValue()) {
-				markError("Enums are not allowed in interfaces");
-    			EnumNode eNode = new EnumNode(tb, mc, modifiers);
-				eNode.disable();
+				//markError("Enums are not allowed in interfaces");
+    			EnumNode eNode = new EnumNode(inst, tb, modifiers);
+//				eNode.disable();
 				children.add(eNode);
 				continue;
 			}
 			// Обработка вложенных классов
 			if (tb.match(TokenType.OOP, J8BKeyword.CLASS)) {
-				ClassNode cNode = new ClassNode(tb, mc, modifiers, true, null);
+				ClassNode cNode = new ClassNode(inst, tb, modifiers, true, null);
 				// Проверяем что класс статический
 				//TODO Продумать необходимость/возможность наличия статических классов в интерфейсе
 				if(!modifiers.contains(J8BKeyword.STATIC)) {
@@ -89,12 +90,12 @@ public class InterfaceBodyNode extends AstNode {
 			}
 
 			if (tb.match(Delimiter.LEFT_PAREN)) { // Это метод
-				children.add(new MethodNode(tb, mc, modifiers, type, name, ifaceNode));
+				children.add(new MethodNode(inst, tb, modifiers, type, name, ifaceNode));
 				continue;
 			}
 
 			if (null != type) { // Это поле
-				children.add(new FieldNode(tb, mc, ifaceNode, modifiers, type, name));
+				children.add(new FieldNode(inst, tb, ifaceNode, modifiers, type, name));
 				continue;
 			}
 
@@ -118,7 +119,7 @@ public class InterfaceBodyNode extends AstNode {
 	public boolean preAnalyze() {
 		// Проверка всех объявлений в блоке
 		for (AstNode node : children) {
-			if(node instanceof InterfaceNode) {
+			if(node instanceof InterfaceNode || node instanceof EnumNode) {
 				node.preAnalyze();
 			}
 			else if(node instanceof FieldNode) {
@@ -131,10 +132,11 @@ public class InterfaceBodyNode extends AstNode {
 			}
 			else if(node instanceof MethodNode) {
 				MethodNode methoddNode = (MethodNode)node;
-				if(!methoddNode.getModifiers().isEmpty()) {
+				// В этой реализации языка похоже разрешены все модификаторы (так как нет наследования классов)
+/*				if(!methoddNode.getModifiers().isEmpty()) {
 					//TODO не сохраняется позиция для конкретного modifier
 					addMessage(new WarningMessage("Modifiers not allowed for interface methods (already public abstract)", methoddNode.getSP()));
-				}
+				}*/
 				node.preAnalyze();
 			}
 			else {
@@ -217,7 +219,7 @@ public class InterfaceBodyNode extends AstNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 		

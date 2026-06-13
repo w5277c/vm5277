@@ -25,6 +25,14 @@ import java.util.Properties;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class StrUtils {
+	private	final	static	char[]	ALPHABET	= "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".toCharArray();
+	private			static	int[]	toInt		= new int[128];
+	static {
+		for(int i=0; i< ALPHABET.length; i++){
+			toInt[ALPHABET[i]]= i;
+		}
+	}
+
     public static String readVersion(Class<?> clazz) {
 		String packagePath = clazz.getPackage().getName().replace('.', '/');
 		String resourcePath = packagePath + "/version.properties";
@@ -63,11 +71,35 @@ public class StrUtils {
 		return "";
 	}
 	
+	public static String toString(byte[] array) {
+		if(null != array && 0!=array.length) {
+			StringBuilder sb = new StringBuilder("");
+			for(byte b : array) {
+				sb.append(b&0xff).append(",");
+			}
+			if(0!=sb.length()) sb.deleteCharAt(sb.length()-1);
+			return sb.toString();
+		}
+		return "";
+	}
+
 	public static String toString(int[] array) {
 		if(null != array && 0!=array.length) {
 			StringBuilder sb = new StringBuilder("");
-			for(Object obj : array) {
-				if(!obj.toString().isEmpty()) sb.append(obj).append(",");
+			for(int i : array) {
+				sb.append(i).append(",");
+			}
+			if(0!=sb.length()) sb.deleteCharAt(sb.length()-1);
+			return sb.toString();
+		}
+		return "";
+	}
+
+	public static String toString(long[] array) {
+		if(null != array && 0!=array.length) {
+			StringBuilder sb = new StringBuilder("");
+			for(long l : array) {
+				sb.append(l).append(",");
 			}
 			if(0!=sb.length()) sb.deleteCharAt(sb.length()-1);
 			return sb.toString();
@@ -203,5 +235,83 @@ public class StrUtils {
 			}
 		}    
 		return value;
+	}
+	
+	public static byte[] parseBase64Binary(String _base64String) {
+		int delta = _base64String.endsWith( "==" ) ? 2 : _base64String.endsWith( "=" ) ? 1 : 0;
+		byte[] result = new byte[_base64String.length()*3/4 - delta];
+		int mask=0xff;
+		int index=0x00;
+		for(int pos=0; pos<_base64String.length(); pos+=4){
+			int c0 = toInt[_base64String.charAt(pos)];
+			int c1 = toInt[_base64String.charAt(pos+1)];
+			result[index++]=(byte)(((c0 << 2) | (c1 >> 4)) & mask);
+			if(index>=result.length){
+				return result;
+			}
+			int c2 = toInt[_base64String.charAt(pos+2)];
+			result[index++]=(byte)(((c1 << 4) | (c2 >> 2)) & mask);
+			if(index>=result.length){
+				return result;
+			}
+			int c3 = toInt[_base64String.charAt(pos+3)];
+			result[index++]=(byte)(((c2 << 6) | c3) & mask);
+		}
+		return result;
+	}
+
+	public static String printBase64Binary(byte _bytes[]) {
+		int size = _bytes.length;
+		char[] buffer = new char[((size+2)/3)*4];
+		int index=0;
+		int pos=0;
+		while(pos<size){
+			byte b0 = _bytes[pos++];
+			byte b1 = (pos < size) ? _bytes[pos++] : 0;
+			byte b2 = (pos < size) ? _bytes[pos++] : 0;
+
+			int mask = 0x3F;
+			buffer[index++] = ALPHABET[(b0 >> 2) & mask];
+			buffer[index++] = ALPHABET[((b0 << 4) | ((b1 & 0xFF) >> 4)) & mask];
+			buffer[index++] = ALPHABET[((b1 << 2) | ((b2 & 0xFF) >> 6)) & mask];
+			buffer[index++] = ALPHABET[b2 & mask];
+		}
+		switch(size % 3){
+			case 1: buffer[--index]  = '=';
+			case 2: buffer[--index]  = '=';
+		}
+		return new String(buffer);
+	}
+	
+	public static byte[] parseHexBinary(String _hexString) {
+		if(null==_hexString || _hexString.isEmpty()) {
+			return new byte[0x00];
+		}
+
+		byte[] result = new byte[_hexString.length() / 0x02];
+		for(int pos = 0; pos < result.length; pos++) {
+			String substr = _hexString.substring(pos * 0x02, pos * 0x02 + 0x02).toLowerCase();
+			result[pos] = (byte)Integer.parseInt(substr, 16);
+		}
+		return result;
+	}
+
+	public static String printHexBinary(byte[] _bytes) {
+		return printHexBinary(_bytes, 0x00, _bytes.length);
+	}
+	public static String printHexBinary(byte[] _bytes, int _offset, int _len) {
+		if(null==_bytes) {
+			return "";
+		}
+
+		StringBuilder result = new StringBuilder();
+		for(int pos = 0; pos<_len && (pos+_offset)<_bytes.length; pos++) {
+			String num = Integer.toHexString(_bytes[pos+_offset] & 0xff).toLowerCase();
+			if(num.length()<0x02) {
+				result.append("0");
+			}
+			result.append(num);
+		}
+		return result.toString();
 	}
 }

@@ -21,9 +21,9 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.CodegenResult;
+import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.LabelSymbol;
 import ru.vm5277.compiler.semantic.Scope;
@@ -32,8 +32,8 @@ public class LabelNode extends AstNode {
 	private	final	String			name;
 	private			CGLabelScope	labelScope;
 
-	public LabelNode(TokenBuffer tb, MessageContainer mc) {
-		super(tb, mc);
+	public LabelNode(Instance inst, TokenBuffer tb) {
+		super(inst, tb);
 
 		this.name = consumeToken(tb).getStringValue(); // Гарантирован вызывающим
 	}
@@ -61,7 +61,8 @@ public class LabelNode extends AstNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
-		cgScope = cg.enterCommand(parent, "label");
+		//Зачем? cgScope = cg.enterCommand(parent, "label");
+		cgScope = parent;
 		
 		labelScope = ((CGBlockScope)cgScope.getScope(CGBlockScope.class)).addLabel(name);
 		
@@ -77,10 +78,9 @@ public class LabelNode extends AstNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		CodegenResult result = null;
 		
-		//CGScope cgs = null == parent ? cgScope : parent;
 		cgScope.append(labelScope);
 		return result;
 	}

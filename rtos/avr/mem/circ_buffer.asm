@@ -29,9 +29,8 @@ OS_CIRC_BUFFER_INIT_NR:
 	PUSH_T16
 	PUSH ACCUM_L
 	
-	LDI ACCUM_L,0x02
-	ST Y+,ACCUM_L										;Запись
-	ST Y+,ACCUM_L										;Чтение
+	ST Y+,C0x02												;Запись
+	ST Y+,C0x02												;Чтение
 	LDI ACCUM_L,0x00
 	LDI TEMP_H,0x00
 	SUBI TEMP_L,0x02

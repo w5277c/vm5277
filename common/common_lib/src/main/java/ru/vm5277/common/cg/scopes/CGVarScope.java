@@ -32,13 +32,13 @@ public class CGVarScope extends CGCellsScope {
 	public void build() throws CompileException {
 		if(!isConstant) {
 			if(parent instanceof CGMethodScope) { // Используется при вызове метода(передача параметров)
-				cells = ((CGMethodScope)parent).argAllocate(size);
-				if(VERBOSE_LO <= verbose) ((CGMethodScope)parent).append(new CGIText(";build " + toString() + ", allocated " + cells));
+				if(VERBOSE_LO <= verbose) append(new CGIText(";build " + toString()));
+				cells = ((CGMethodScope)parent).argAllocate(this, size);
 				((CGMethodScope)parent).addArg(this);
 			}
 			else if(parent instanceof CGBlockScope) { // Инициализация переменной в блоке
-				cells = ((CGBlockScope)parent).memAllocate(size);
-				if(VERBOSE_LO <= verbose) ((CGBlockScope)parent).append(new CGIText(";build " + toString() + ", allocated " + cells));
+				if(VERBOSE_LO <= verbose) append(new CGIText(";build " + toString()));
+				cells = ((CGBlockScope)parent).memAllocate(this, size);
 				((CGBlockScope)parent).addVar(this);
 			}
 			else {

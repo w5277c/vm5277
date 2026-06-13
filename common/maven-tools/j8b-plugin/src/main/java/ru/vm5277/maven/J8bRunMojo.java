@@ -16,69 +16,41 @@
 
 package ru.vm5277.maven;
 
-import org.apache.maven.plugin.MojoExecutionException;
-import org.apache.maven.plugins.annotations.Mojo;
-import org.apache.maven.plugins.annotations.LifecyclePhase;
-
 import java.io.File;
 import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
+import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.MojoFailureException;
+import org.apache.maven.plugins.annotations.Mojo;
+import ru.vm5277.common.Toolkit;
 
-@Mojo(name = "run", defaultPhase = LifecyclePhase.VERIFY)
-//@Execute(phase = LifecyclePhase.COMPILE, goal = "compile")
+@Mojo(name = "run")
 public class J8bRunMojo extends J8bMojo {
 	@Override
-	public void execute() throws MojoExecutionException {
+	public void execute() throws MojoExecutionException, MojoFailureException {
+		if(skip) return;
+
 		// Проверяем, что это не родительский проект
 		if("pom".equals(project.getPackaging())) {
 			getLog().warn("J8B run goal cannot be executed on parent POM project.");
 			getLog().warn("Please run 'mvn j8b:run' from a specific module directory instead.");
 			return;
 		}
-		getLog().info("=== J8B Maven plugin  - RUN ===");
-		checkToolkit(false);
 		
-		if(null==target || target.isEmpty() || !target.contains(":")) {
-			throw new MojoExecutionException("[ERROR] Target parameter is absent or incorrect, please specify j8b.target parameter. Example: avr:atmega328p");
+		File outputSubDirectory = new File(outputDirectory, "default");
+		if(!session.getRequest().getActiveProfiles().isEmpty()) outputSubDirectory = new File(outputDirectory, session.getRequest().getActiveProfiles().get(0));
+		if(!outputSubDirectory.exists()) {
+			outputSubDirectory.mkdirs();
 		}
 
-        doCompile(true);
+		doClean(log, prebuildDirectory);
+		doClean(log, outputSubDirectory);
+
+		if(!Toolkit.checkToolkit(verbose ? log : null, Path.of(toolkitPath), downloadUrl, true)) {
+			throw new MojoExecutionException("Toolkit not found, can't download toolkit from: " + downloadUrl + ", please try later.");
+		}
 		
-		String mainName = mainFile.substring(0, mainFile.lastIndexOf("."));
-
-		Path libsPath = Paths.get(toolkitPath, "bin", "libs");
-
-		//getLog().info("Flashing...");
-		File mainHexFile = new File(outputDirectory, mainName + "_cseg.hex");
-		if(!mainHexFile.exists()) {
-			throw new MojoExecutionException("Main hex file not found: " + mainHexFile.getAbsolutePath() + "\n");
-		}
-
-		int exitCode = 1;
-		try {
-			List<String> args = new ArrayList<>();
-			args.add(target);
-			args.add(targetFreq);
-			args.add(mainHexFile.getAbsolutePath());
-			args.add("-P");
-			args.add(toolkitPath);
-			args.add("-s");
-			args.add("-F");
-			//args.add("-V");
-			args.add("-R");
-			args.add("-I");
-			args.add("-w");
-			//args.add("-q");
-			exitCode = runJ8BTool(libsPath, "ru.vm5277.flasher.Main", args);
-		}
-		catch(Exception ex) {
-		}
-		if(0!=exitCode) {
-			throw new MojoExecutionException("Flashing failed with exit code: " + exitCode);
-		}
-
-		getLog().info("=== Run finished successfully ===");
+		doCompile();
+		doAssemble(outputSubDirectory);
+		doFlash(outputSubDirectory, true);
 	}
 }

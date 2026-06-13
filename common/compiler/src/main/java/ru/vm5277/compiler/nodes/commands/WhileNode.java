@@ -18,23 +18,23 @@ package ru.vm5277.compiler.nodes.commands;
 
 import java.util.Arrays;
 import java.util.List;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
-import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.CGBranch;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.CodegenResult;
+import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.Instance;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
@@ -49,16 +49,16 @@ public class WhileNode extends CommandNode {
 	private	boolean			alwaysTrue;
 	private	boolean			alwaysFalse;
 		
-	public WhileNode(TokenBuffer tb, MessageContainer mc) {
-		super(tb, mc);
+	public WhileNode(Instance inst, TokenBuffer tb) {
+		super(inst, tb);
 
 		consumeToken(tb); // Потребляем "while"
 		try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(CompileException e) {markFirstError(e);}
-		try {this.condition = new ExpressionNode(tb, mc).parse();} catch(CompileException e) {markFirstError(e);}
+		try {this.condition = new ExpressionNode(inst, tb).parse();} catch(CompileException e) {markFirstError(e);}
 		try {consumeToken(tb, Delimiter.RIGHT_PAREN);} catch(CompileException e) {markFirstError(e);}
 
 		try {
-			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "body") : new BlockNode(tb, mc, parseStatement(), "body");
+			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(inst, tb, "body") : new BlockNode(inst, tb, parseStatement(inst), "body");
 		}
 		catch(CompileException e) {markFirstError(e);}
 	}
@@ -106,9 +106,10 @@ public class WhileNode extends CommandNode {
 		result&=condition.declare(scope);
 
 		// Создаем новую область видимости для тела цикла
-		blockScope = new BlockScope(scope);
+		blockScope = new BlockScope(scope, true);
 		// Объявляем элементы тела цикла
 		if(null!=blockNode) {
+			blockScope = new BlockScope(blockScope, true);
 			result&=blockNode.declare(blockScope);
 		}
 
@@ -123,7 +124,9 @@ public class WhileNode extends CommandNode {
 		
 		cgScope = cg.enterLoopBlock(parent, "while");
 
-		result&=condition.postAnalyze(blockScope, cg, cgScope);
+		cgScope.append(((CGLoopBlockScope)cgScope).getStartLbScope());
+
+		result&=condition.postAnalyze(scope, cg, cgScope);
 		if(result) {
 			// Резолвинг QualifiedPathExpression
 			ExpressionNode resolved = resolveQualifiedPathExpr(condition);
@@ -143,6 +146,7 @@ public class WhileNode extends CommandNode {
 			result&=blockNode.postAnalyze(blockScope, cg, cgScope);
 		}
 		
+//		cgScope.append(((CGLoopBlockScope)cgScope).getEndLbScope());
 		// Проверяем бесконечный цикл с возвратом
 		//TODO нужно доделать isControlFlowInterrupted и добавить в другие циклы
 //		if (condition instanceof LiteralExpression && Boolean.TRUE.equals(((LiteralExpression)condition).getValue()) &&	isControlFlowInterrupted(blockNode)) {
@@ -184,37 +188,60 @@ public class WhileNode extends CommandNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
 				
 		CodegenResult result = null;
-		//CGScope cgs = null == parent ? cgScope : parent;
-		cgScope.setBranch(branch);
-//TODO См. в IfNode, необходима проверка на результат condition.codeGen	
-		if(!alwaysFalse) {
-			//cgScope.prepend(((CGLoopBlockScope)cgScope).getStartLbScope());
-			condition.getCGScope().append(((CGLoopBlockScope)cgScope).getStartLbScope());
+
+		if(!alwaysFalse) {		
+			cgScope.setBranch(branch);
+
+			Object condResult = null;
 			if(!alwaysTrue) {
-				condition.codeGen(cg, cgScope, false, excs);
+				 condResult = condition.codeGen(cg, false, excs);
+				//Если результат стал известен без runtime
+//				if(condResult==CodegenResult.TRUE) {
+//					cg.jump(cgScope, ((CGLoopBlockScope)cgScope).getStartLbScope());
+//					return null;
+//				}
+
+				if(condResult==CodegenResult.FALSE) {
+					cg.jump(cgScope, ((CGLoopBlockScope)cgScope).getEndLbScope());
+				}
+				else if(condResult==CodegenResult.RESULT_IN_ACCUM) {
+					cg.boolAccCond(condition.getCGScope(), branch, (VarType.BOOL==condition.getType()));
+				}
+				else if(condResult==CodegenResult.RESULT_IN_FLAG) {
+					cg.boolFlagCond(condition.getCGScope(), false, branch);
+				}
+				else if(condResult==CodegenResult.RESULT_IN_INV_FLAG) {
+					cg.boolFlagCond(condition.getCGScope(), true, branch);
+				}
 			}
-		}
 
-		if(null!=blockNode && !alwaysFalse) {
-			blockNode.codeGen(cg, cgScope, false, excs);
-		}
+			// Не генерируем код, если тело отсутствует, или известен отрицательный результат условия
+			if(null!=blockNode && !alwaysFalse && CodegenResult.FALSE!=condResult) {
+				blockNode.codeGen(cg, false, excs);
+			}
 
-		if(!alwaysFalse) {
+			if(CodegenResult.TRUE==condResult) {
+				cg.jump(cgScope, ((CGLoopBlockScope)cgScope).getStartLbScope());
+			}
+			
+			//CGScope cgs = null == parent ? cgScope : parent;
+
+	//TODO См. в IfNode, необходима проверка на результат condition.codeGen	
+			//cgScope.prepend(((CGLoopBlockScope)cgScope).getStartLbScope());
+//			condition.getCGScope().prepend(((CGLoopBlockScope)cgScope).getStartLbScope());
+
 			cg.jump(cgScope, ((CGLoopBlockScope)cgScope).getStartLbScope());
-		}
-		if(!alwaysFalse) {
 			cgScope.append(branch.getEnd());
+			cgScope.append(((CGLoopBlockScope)cgScope).getEndLbScope());
 		}
-
-		cgScope.append(((CGLoopBlockScope)cgScope).getEndLbScope());
 		
 		((CGBlockScope)cgScope).build(cg, false, excs);
-		((CGBlockScope)cgScope).restoreRegsPool();
+		((CGBlockScope)cgScope).releaseRegsPool();
 
 		return result;
 	}

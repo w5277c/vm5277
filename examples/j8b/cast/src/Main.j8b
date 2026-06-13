@@ -14,20 +14,15 @@
  * limitations under the License.
  */
 
+// TODO не корректная кодогенерация, нужно пофиксить
 class Main {
-    public static void main() {
+	public static void main() {
 		int i = 0x04030201;
-		System.out("orig num:");
-		System.out(i);
-		System.outChar('\n');
+		System.out("orig num:" + i + "\n");
 
 		i = (int)(short)(int)(short)i;
-		System.out("short:");
-		System.out(i);
-		System.outChar('\n');
+		System.out("short:" + i + '\n');
 
-		System.out("byte:");
-		System.out((byte)i);
-		System.outChar('\n');
-    }
+		System.out("byte:" + (byte)i + '\n');
+	}
 }

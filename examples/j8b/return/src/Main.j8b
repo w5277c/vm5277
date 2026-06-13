@@ -30,8 +30,6 @@ class Main {
 	}
 
 	public static void main() {
-		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
-
 		System.out(someMethod());
 	}
 }

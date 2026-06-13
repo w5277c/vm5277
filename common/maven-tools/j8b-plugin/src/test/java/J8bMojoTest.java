@@ -21,6 +21,10 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import java.io.File;
+import java.lang.reflect.Field;
+import java.util.Arrays;
+import org.apache.maven.execution.MavenExecutionRequest;
+import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Build;
 import org.apache.maven.project.MavenProject;
 
@@ -40,18 +44,23 @@ public class J8bMojoTest {
 	@Rule
 	public TestResources resources = new TestResources();
 
+	// Если консоль не показывает вывод инструмента: mvn test -Dsurefire.useFile=false
+	
 	@Test
 	public void testMojoExecution() throws Exception {
+		String currentDir = new File("").getAbsolutePath();
 
-		File parentProjectDir = new File("/home/kostas/repos/w5277c/vm5277_local/examples/j8b");
+		File parentProjectDir = new File(	currentDir + File.separator + ".." + File.separator + ".." + File.separator + ".." + File.separator + "examples" +
+											File.separator + "j8b");
 		File projectDir = new File(parentProjectDir.getAbsolutePath() + "/hello");
 		File pom = new File(parentProjectDir, "pom.xml");
 		assertNotNull(pom);
 		assertTrue(pom.exists());
 
-		J8bMojo mojo = (J8bMojo) rule.lookupMojo("compile", pom);
+		J8bMojo mojo = (J8bMojo) rule.lookupMojo("package", pom);
 		assertNotNull(mojo);
 
+		
 		// Создаем мок MavenProject
 		MavenProject mockProject = mock(MavenProject.class);
 		when(mockProject.getBasedir()).thenReturn(projectDir);
@@ -60,8 +69,18 @@ public class J8bMojoTest {
 		when(mockProject.getArtifactId()).thenReturn("test-project");
 		when(mockProject.getGroupId()).thenReturn("test.group");
 
+		MavenSession mockSession = mock(MavenSession.class);
+		MavenExecutionRequest mockRequest = mock(MavenExecutionRequest.class);
+		when(mockSession.getRequest()).thenReturn(mockRequest);
+		when(mockRequest.getActiveProfiles()).thenReturn(Arrays.asList("default"));
+		Field sessionField = J8bMojo.class.getDeclaredField("session");
+		sessionField.setAccessible(true);
+		sessionField.set(mojo, mockSession);
+		
 		rule.setVariableValueToObject(mojo, "project", mockProject);
 		rule.setVariableValueToObject(mojo, "mainFile", "Main.j8b");
+		rule.setVariableValueToObject(mojo, "strict", "light");
+		rule.setVariableValueToObject(mojo, "optimization", "size");
 		rule.setVariableValueToObject(mojo, "target", "avr:atmega328p");
 		rule.setVariableValueToObject(mojo, "targetFreq", "16.0");
 		rule.setVariableValueToObject(mojo, "targetStdio", "PC4");
@@ -70,7 +89,8 @@ public class J8bMojoTest {
 		rule.setVariableValueToObject(mojo, "prebuildDirectory", new File(projectDir.toString() + File.separator + "prebuild"));
 		rule.setVariableValueToObject(mojo, "autoDownload", true);
 		rule.setVariableValueToObject(mojo, "downloadUrl", "https://vm5277.ru/release.zip");
-
+		rule.setVariableValueToObject(mojo, "softReset", false);
+		rule.setVariableValueToObject(mojo, "bldrApiReuse", false);
 		String userHome = System.getProperty("user.home");
 		String expectedPath = userHome + File.separator + "vm5277";
 		rule.setVariableValueToObject(mojo, "toolkitPath", expectedPath);

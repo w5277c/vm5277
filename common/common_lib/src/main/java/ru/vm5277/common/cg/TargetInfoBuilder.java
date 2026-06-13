@@ -61,6 +61,7 @@ public class TargetInfoBuilder {
 		fw.write(VarType.VOID.getId() + " " + VarType.VOID.getName() + "\n");
 		fw.write(VarType.BOOL.getId() + " " + VarType.BOOL.getName() + "\n");
 		fw.write(VarType.BYTE.getId() + " " + VarType.BYTE.getName() + "\n");
+		fw.write(VarType.CHAR.getId() + " " + VarType.CHAR.getName() + "\n");
 		fw.write(VarType.SHORT.getId() + " " + VarType.SHORT.getName() + "\n");
 		fw.write(VarType.INT.getId() + " " + VarType.INT.getName() + "\n");
 		fw.write(VarType.FIXED.getId() + " " + VarType.FIXED.getName() + "\n");

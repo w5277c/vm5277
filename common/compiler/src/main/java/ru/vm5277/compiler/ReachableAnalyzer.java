@@ -38,8 +38,8 @@ class ReachableAnalyzer {
 							Symbol symbol = fNode.getSymbol();
 							if(null!=symbol && symbol.isReassigned()) {
 								
-								fNode.getObjectTypeNode().codeGen(cg, cg, false, excs);
-								fNode.codeGen(cg, null, false, excs);
+								fNode.getObjectTypeNode().codeGen(cg, false, excs);
+								fNode.codeGen(cg, false, excs);
 								//TODO пока статика работает не корректно cg.terminate(fNode.getCGScope(), false, true);
 							}
 						}

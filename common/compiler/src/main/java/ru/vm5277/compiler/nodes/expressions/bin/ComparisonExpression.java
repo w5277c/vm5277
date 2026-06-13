@@ -20,17 +20,16 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.common.lexer.Operator;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.CGBranch;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.CodegenResult;
+import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.VarType;
-import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.compiler.nodes.expressions.ArrayExpression;
+import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
@@ -39,8 +38,8 @@ import ru.vm5277.compiler.semantic.Scope;
 
 public class ComparisonExpression extends BinaryExpression {
 	
-    ComparisonExpression(TokenBuffer tb, MessageContainer mc, SourcePosition sp, ExpressionNode left, Operator operator, ExpressionNode right) {
-        super(tb, mc, sp, left, operator, right);
+    ComparisonExpression(Instance inst, TokenBuffer tb, SourcePosition sp, ExpressionNode left, Operator operator, ExpressionNode right) {
+        super(inst, tb, sp, left, operator, right);
 		
 		// Результат сравнения - всегда boolean
 		type = VarType.BOOL;
@@ -50,25 +49,24 @@ public class ComparisonExpression extends BinaryExpression {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		if(null!=cgScope) cgScope.disable();
-		cgScope = cg.enterExpression(parent, toString());
+		cgScope = cg.enterExpression(parent, cgScope, toString());
 
-		// Анализ операндов
-		result&=leftExpr.postAnalyze(scope, cg, cgScope);
-		if(result) {
-			// Резолвинг QualifiedPathExpression
-			ExpressionNode resolved = resolveQualifiedPathExpr(leftExpr);
-			if(null!=resolved) {
-				leftExpr = resolved;
-			}
-		}
-
-		result&=rightExpr.postAnalyze(scope, cg, cgScope);
+		result&=rightExpr.postAnalyze(scope, cg, null);
 		if(result) {
 			// Резолвинг QualifiedPathExpression
 			ExpressionNode resolved = resolveQualifiedPathExpr(rightExpr);
 			if(null!=resolved) {
 				rightExpr = resolved;
+			}
+		}
+
+		// Анализ операндов
+		result&=leftExpr.postAnalyze(scope, cg, null);
+		if(result) {
+			// Резолвинг QualifiedPathExpression
+			ExpressionNode resolved = resolveQualifiedPathExpr(leftExpr);
+			if(null!=resolved) {
+				leftExpr = resolved;
 			}
 		}
 
@@ -134,7 +132,7 @@ public class ComparisonExpression extends BinaryExpression {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean isInvert, boolean opOr, boolean toAccum, CGExcs excs) throws CompileException {
 		if(disabled) return null;
 		excs.setSourcePosition(sp);
 		
@@ -152,6 +150,7 @@ public class ComparisonExpression extends BinaryExpression {
 		depCodeGen(cg, expr2.getSymbol(), excs);
 		
 		// Оптимизация порядка для коммутативных операций
+		//TODO не работает, так как позиция CGScope устанавливается в postAnalyze для каждого выражения
 		if(operator.isCommutative()) {
 			if(leftExpr instanceof LiteralExpression || (!(rightExpr instanceof LiteralExpression) && leftExpr instanceof VarFieldExpression)) {
 				expr1 = rightExpr;
@@ -167,126 +166,100 @@ public class ComparisonExpression extends BinaryExpression {
 			_scope = _scope.getParent();
 		}
 
-		//================ VarFieldExpression ================================
-		if(expr2 instanceof VarFieldExpression) {
-			CGCellsScope cScope2 = (CGCellsScope)expr2.getSymbol().getCGScope();
-			//================ VarFieldExpression ==== LITERAL ================================
-			if(expr1 instanceof LiteralExpression) {
-				LiteralExpression le = (LiteralExpression)expr1;
-				expr2.codeGen(cg, cgScope, false, excs);
-				cg.constCond(	cgScope, cScope2.getCells(), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), expr2.getType().isFixedPoint(),
-								le.isFixed(), isInvert, opOr, (CGBranch)branch);
-			}
-			//================ VarFieldExpression ==== ARRAY ================================
-/*TODO вроде как попаадает под универсальный случай, надо проверить
-			else if(expr1 instanceof ArrayExpression) {
-				expr1.codeGen(cg, cgs, true);
-				if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
-					cgs.append(cg.accCast(expr1.getType(), expr2.getType()));
-				}
-				cg.cellsCond(cgs, cScope2.getCells(), operator, isInvert, opOr, (CGBranch)branch);
-			}
-*/
-			//================ VarFieldExpression ==== OTHER ================================
-			else {
-				//TODO эксперимент. Размер аккумулятора не задан, однако VarFilendExpression основывается на размере аккумулятора
-				//Вероятно нужно задать для всех записей в аккумулятор или вынести куда-то в другое место.
-				cg.accResize(expr1.getType());
-				if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgScope, true, excs)) {
-					throw new CompileException("Accum not used for operand:" + expr1);
-				}
-				if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
-					cgScope.append(cg.accCast(expr1.getType(), expr2.getType()));
-				}
-				cg.cellsCond(cgScope, cScope2.getCells(), operator, isInvert, opOr, (CGBranch)branch);
-			}
-		}
-		//================ LiteralExpression ================================
-		else if(expr2 instanceof LiteralExpression) {
-			LiteralExpression le = (LiteralExpression)expr2;
-			//================ LiteralExpression ==== VAR/FIELD ================================
-			if(expr1 instanceof VarFieldExpression) {
-				expr1.codeGen(cg, cgScope, false, excs);
-				CGCellsScope cScope = (CGCellsScope)expr1.getSymbol().getCGScope();
-				cg.constCond(	cgScope, cScope.getCells(), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), expr1.getType().isFixedPoint(),
-								le.isFixed(), isInvert, opOr, branch);
-			}
-			else if(expr1 instanceof ArrayExpression) {
-				expr1.codeGen(cg, cgScope, false, excs);
-				CGCellsScope cScope = (CGCellsScope)expr1.getSymbol().getCGScope();
-				cg.constCond(	cgScope, cScope.getCells(), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), expr1.getType().isFixedPoint(),
-								le.isFixed(), isInvert, opOr, branch);
-			}
-			//================ LiteralExpression ==== OTHER ================================
-			else {
-				cg.accResize(expr1.getType());
-				if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgScope, true, excs)) {
-					throw new CompileException("Accum not used for operand:" + expr1);
-				}
-				cg.constCond(	cgScope, new CGCells(	CGCells.Type.ACC), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(),
-														expr1.getType().isFixedPoint(), le.isFixed(), isInvert, opOr, branch);
-			}
-		}
-		//================ ArrayExpression ================================
-		else if(expr2 instanceof ArrayExpression) {
-			ArrayExpression ae = (ArrayExpression)expr2;
-			//================ ArrayExpression ==== LITERAL ================================
-			if(expr1 instanceof LiteralExpression) {
-				LiteralExpression le = (LiteralExpression)expr1;
-				expr2.codeGen(cg, cgScope, false, excs);
-				CGCellsScope cScope = (CGCellsScope)expr2.getSymbol().getCGScope();
-				cg.constCond(	cgScope, cScope.getCells(), operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), expr2.getType().isFixedPoint(),
-								le.isFixed(), isInvert, opOr, (CGBranch)branch);
-			}
-			//================ ArrayExpression ==== VAR/FIELD ================================
-			else if(expr1 instanceof VarFieldExpression) {
-				if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, cgScope, true, excs)) {
-					throw new CompileException("Accum not used for operand:" + expr1);
-				}
-				expr2.codeGen(cg, cgScope, false, excs);
-				CGCellsScope cScope = (CGCellsScope)expr2.getSymbol().getCGScope();
-				cg.cellsCond(cgScope, cScope.getCells(), operator, isInvert, opOr, (CGBranch)branch);
-			}
-			//================ ArrayExpression ==== OTHER ================================
-			else {
-				if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgScope, true, excs)) {
-					throw new CompileException("Accum not used for operand:" + expr2);
-				}					
+		if(	null!=rightExpr.getSymbol() && null!=rightExpr.getSymbol().getCGScope() &&
+			rightExpr.getSymbol().getCGScope() instanceof CGCellsScope && null!=((CGCellsScope)rightExpr.getSymbol().getCGScope()).getCells() &&
+			null!=leftExpr.getSymbol() && null!=leftExpr.getSymbol().getCGScope() &&
+			leftExpr.getSymbol().getCGScope() instanceof CGCellsScope && null!=((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells()) {
 
-				// Определяем максмальный размер операнда
-				int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
-				cg.pushAccBE(cgScope, size);
-				if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg, cgScope, true, excs)) {
-					throw new CompileException("Accum not used for operand:" + expr1);
-				}
-				if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
-					cgScope.append(cg.accCast(expr1.getType(), expr2.getType()));
-				}
-				cg.cellsCond(cgScope, new CGCells(CGCells.Type.STACK, size), operator, isInvert, opOr, (CGBranch)branch);
+			expr1.getCGScope().setParent(cgScope);
+			expr2.getCGScope().setParent(cgScope);
+
+			rightExpr.codeGen(cg, false, excs);
+			leftExpr.codeGen(cg, false, excs);
+			cg.cellsCpCells(cgScope,
+							((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType,
+							((CGCellsScope)rightExpr.getSymbol().getCGScope()).getCells(), rightType,
+							operator, isInvert, opOr, (CGBranch)branch);
+			return result;
+		}
+		else if(null!=rightExpr.getSymbol() && null!=rightExpr.getSymbol().getCGScope() && rightExpr.getSymbol().getCGScope() instanceof CGCellsScope &&
+				null!=((CGCellsScope)rightExpr.getSymbol().getCGScope()).getCells()) {
+
+			expr1.getCGScope().setParent(cgScope);
+			expr2.getCGScope().setParent(cgScope);
+			// Определяем максмальный размер операнда
+			int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
+			rightExpr.codeGen(cg, false, excs);
+
+			if(leftExpr instanceof LiteralExpression) {
+				CGCells leftCells = new CGCells(CGCells.Type.CONST, size);
+				leftCells.setConst(leftType.isFixedPoint() ? ((LiteralExpression)leftExpr).getFixedValue() : ((LiteralExpression)leftExpr).getNumValue());
+				cg.cellsCpCells(cgScope,
+								leftCells, leftType,
+								((CGCellsScope)rightExpr.getSymbol().getCGScope()).getCells(), rightType,
+								operator, isInvert, opOr, (CGBranch)branch);
+				return result;
+			}
+			if(CodegenResult.RESULT_IN_ACCUM==leftExpr.codeGen(cg, true, excs)) {
+				cg.cellsCpCells(cgScope,
+								new CGCells(CGCells.Type.ACC, size), leftType,
+								((CGCellsScope)rightExpr.getSymbol().getCGScope()).getCells(), rightType,
+								operator, isInvert, opOr, (CGBranch)branch);
+				return result;
 			}
 		}
-		//================ Other ================================
-		else {
-			if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgScope, true, excs)) {
-				throw new CompileException("Accum not used for operand:" + expr2);
-			}					
+		else if(null!=leftExpr.getSymbol() && null!=leftExpr.getSymbol().getCGScope() && leftExpr.getSymbol().getCGScope() instanceof CGCellsScope &&
+				null!=((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells()) {
+
+			expr1.getCGScope().setParent(cgScope);
+			expr2.getCGScope().setParent(cgScope);
 
 			// Определяем максмальный размер операнда
-			int size = (leftType.getSize() > rightType.getSize() ? leftType.getSize() : rightType.getSize());
-			// Выполняем операцию, левый операнд - аккумулятор, правый операнд - значение на вершине стека
-			cg.pushAccBE(cgScope, size);
-			// Строим код для expr1(результат в аккумуляторе)
-			if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg, cgScope, true, excs)) {
-				throw new CompileException("Accum not used for operand:" + expr1);
+			int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
+			leftExpr.codeGen(cg, false, excs);
+			if(rightExpr instanceof LiteralExpression) {
+				CGCells rightCells = new CGCells(CGCells.Type.CONST, size);
+				rightCells.setConst(rightType.isFixedPoint() ? ((LiteralExpression)rightExpr).getFixedValue() : ((LiteralExpression)rightExpr).getNumValue());
+				cg.cellsCpCells(cgScope,
+								((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType,
+								rightCells, rightType,
+								operator, isInvert, opOr, (CGBranch)branch);
+				return result;
 			}
-
-			// Аккумулятор уже необходимого размера, но нужно проверить на Fixed
-			if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
-				cgScope.append(cg.accCast(expr1.getType(), expr2.getType()));
+			if(CodegenResult.RESULT_IN_ACCUM==rightExpr.codeGen(cg, true, excs)) {
+				cg.cellsCpCells(cgScope,
+								((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType,
+								new CGCells(CGCells.Type.ACC, size), rightType,
+								operator, isInvert, opOr, (CGBranch)branch);
+				return result;
 			}
-			cg.cellsCond(cgScope, new CGCells(CGCells.Type.STACK, size), operator, isInvert, opOr, (CGBranch)branch);
 		}
-		
-		return result;
+		else if(leftExpr instanceof LiteralExpression) {
+			expr1.getCGScope().setParent(cgScope);
+			expr2.getCGScope().setParent(cgScope);
+			// Определяем максмальный размер операнда
+			int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
+
+			CGCells leftCells = new CGCells(CGCells.Type.CONST, size);
+			leftCells.setConst(leftType.isFixedPoint() ? ((LiteralExpression)leftExpr).getFixedValue() : ((LiteralExpression)leftExpr).getNumValue());
+			if(CodegenResult.RESULT_IN_ACCUM==rightExpr.codeGen(cg, true, excs)) {
+				cg.cellsCpCells(cgScope, leftCells, null, new CGCells(CGCells.Type.ACC, size), rightType, operator, isInvert, opOr, (CGBranch)branch);
+				return result;
+			}
+		}
+		else if(rightExpr instanceof LiteralExpression) {
+			expr1.getCGScope().setParent(cgScope);
+			expr2.getCGScope().setParent(cgScope);
+			// Определяем максмальный размер операнда
+			int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
+
+			CGCells rightCells = new CGCells(CGCells.Type.CONST, size);
+			rightCells.setConst(rightType.isFixedPoint() ? ((LiteralExpression)rightExpr).getFixedValue() : ((LiteralExpression)rightExpr).getNumValue());
+			if(CodegenResult.RESULT_IN_ACCUM==leftExpr.codeGen(cg, true, excs)) {
+				cg.cellsCpCells(cgScope, new CGCells(CGCells.Type.ACC, size), leftType, rightCells, null, operator, isInvert, opOr, (CGBranch)branch);
+				return result;
+			}
+		}
+		throw new CompileException("Unsupported expression:" + getFullInfo());
 	}
 }

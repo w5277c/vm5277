@@ -16,8 +16,19 @@
 
 package ru.vm5277.lsp.server;
 
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import ru.vm5277.common.lexer.SourceBuffer;
+import ru.vm5277.common.lexer.tokens.Token;
 
-public interface LanguageServer {
-	public LSPToken readNextToken(SourceBuffer sb);
+public abstract class LanguageServer {
+	protected	Set<String>	labels	= new HashSet<>();
+	
+	public Set<String> getLabels() {
+		return labels;
+	}
+	
+	public abstract LSPToken readNextToken(SourceBuffer sb);
+	public abstract List<Token> tokenize(SourceBuffer sb);
 }

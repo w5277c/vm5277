@@ -28,20 +28,21 @@ import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.semantic.ImportableScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.lexer.tokens.Token;
+import ru.vm5277.compiler.Instance;
 
 public class ImportNode extends AstNode {
 	private	boolean	isStatic;
 	private	String	importStr;
 	private	String	alias;
 
-	public ImportNode(TokenBuffer tb, MessageContainer mc, String importStr) {
-        super(tb, mc);
+	public ImportNode(Instance inst, TokenBuffer tb, String importStr) {
+        super(inst, tb);
 		
 		this.importStr = importStr;
 	}
 
-	public ImportNode(TokenBuffer tb, MessageContainer mc) {
-        super(tb, mc);
+	public ImportNode(Instance inst, TokenBuffer tb) {
+        super(inst, tb);
 		
 		try {
 			// Пропуск import токена
@@ -166,7 +167,7 @@ public class ImportNode extends AstNode {
 		}
 		else {
 			// Проверяем существование класса
-			if(null==iScope.resolveCI(importStr, false)) {
+			if(null==iScope.resolveCI(null, importStr, false)) {
 				markError("Imported class not found: " + importStr);
 				result = false;
 			}

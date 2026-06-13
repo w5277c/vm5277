@@ -1,0 +1,70 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import drivers.display.TextDisplay;
+
+public class AnsiDisplay implements TextDisplay {
+	private final static byte[] ESC_DATA 		= new byte[]{0x1b,'['};
+	private final static byte[] CLEAR_DATA 		= new byte[]{0x1b,'[','2','J'};
+	private final static byte[] HOME_DATA 		= new byte[]{0x1b,'[','H'};
+
+	// Композиция: канал вывода
+	private OutputStream os;
+
+	// Флаги состояния
+	private byte inkColor = 7;
+	private byte paperColor = 0;
+	private bool inited = false;
+
+	public AnsiDisplay(OutputStream os) {this.os = os;}
+
+    public void init() {
+        if(inited) return;
+        clear();
+        os.write(HOME_DATA);
+        inited = true;
+    }
+
+    public short getWidth() {return 80;}
+    public short getHeight() {return 24;}
+
+    public void clear() {
+        os.write(CLEAR_DATA);
+    }
+
+    public void flush() {}
+    public void setBacklight(bool on) {}
+
+    public void setCursor(short x, short y) {
+        os.write(ESC_DATA);
+        os.write((short)(y+1));
+        os.write(';');
+        os.write((short)(x+1));
+        os.write('H');
+    }
+
+    public void putChar(char c) {os.write(c);}
+    public void setInkColor(byte c) {inkColor = c; applyColors();}
+    public void setPaperColor(byte c) {paperColor = c; applyColors();}
+
+    private void applyColors() {
+        os.write(ESC_DATA);
+        os.write((byte)(30+inkColor));
+        os.write(';');
+        os.write((byte)(40+paperColor));
+        os.write('m');
+    }
+}

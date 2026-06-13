@@ -24,7 +24,7 @@ J8BPROC_ARRVIEW_ARRADDR:
 ;-----------------------------------------------------------
 	PUSH ACCUM_L
 	ADIW XL,0x01
-	LD ACCUM_L,X
+	LD ACCUM_L,X+											;LE
 	LD XH,X
 	MOV XL,ACCUM_L
 	POP ACCUM_L

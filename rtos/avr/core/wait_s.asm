@@ -13,13 +13,14 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 .include "./core/wait_ms.asm"
 .IFNDEF OS_WAIT_S
 ;--------------------------------------------------------
 OS_WAIT_S:
 ;--------------------------------------------------------
 ;Ждем
-;IN ACCUM_H, ACCUM_L - время в 1s
+;IN ACCUM_L/H-время в 1s
 ;--------------------------------------------------------
 	PUSH ACCUM_H
 	PUSH ACCUM_L

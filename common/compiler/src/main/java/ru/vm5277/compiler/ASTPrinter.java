@@ -66,6 +66,7 @@ import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
 import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 import ru.vm5277.common.lexer.Keyword;
 import ru.vm5277.common.lexer.tokens.Token;
+import ru.vm5277.compiler.nodes.expressions.CstrConcatExpression;
 import ru.vm5277.compiler.nodes.expressions.EmptyExpression;
 
 public class ASTPrinter {
@@ -719,6 +720,15 @@ public class ASTPrinter {
 		}
 		else if(expr instanceof QualifiedPathExpression) {
 			out.put(((QualifiedPathExpression)expr).toString());
+		}
+		else if(expr instanceof CstrConcatExpression) {
+			CstrConcatExpression ce = (CstrConcatExpression)expr;
+			int size = ce.getExprs().size();
+			for(int i=0; i<size-1; i++) {
+				printExpr(ce.getExprs().get(i));
+				out.put(" + ");
+			}
+			printExpr(ce.getExprs().get(size-1));
 		}
 		else if(expr instanceof ExpressionsContainer) {
 			ExpressionsContainer ec = (ExpressionsContainer)expr;

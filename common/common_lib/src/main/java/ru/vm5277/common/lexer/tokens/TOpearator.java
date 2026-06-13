@@ -37,9 +37,11 @@ public class TOpearator extends Token {
         if(sb.available(3)) {
             Operator op = Operator.fromSymbol(sb.peekString(3));
             if(null!=op) {
-				sb.next(3);
-				TOpearator result = new TOpearator(sb, sp, op);
-				return result;
+				if(!op.isAlpha() || !Character.isLetterOrDigit(sb.peek(3))) {
+					sb.next(3);
+					TOpearator result = new TOpearator(sb, sp, op);
+					return result;
+				}
 			}
         }
         
@@ -47,19 +49,23 @@ public class TOpearator extends Token {
         if(sb.available(2)) {
             Operator op = Operator.fromSymbol(sb.peekString(2));
             if(null!=op) {
-				sb.next(2);
-				TOpearator result = new TOpearator(sb, sp, op);
-				return result;
+				if(!op.isAlpha() || !Character.isLetterOrDigit(sb.peek(2))) {
+					sb.next(2);
+					TOpearator result = new TOpearator(sb, sp, op);
+					return result;
+				}
 			}
         }
         
 		// Проверяем односимвольные операторы
-        if(sb.available()) {
+        if(sb.available(1)) {
             Operator op = Operator.fromSymbol(sb.peekString(1));
             if(null!=op) {
-				sb.next();
-				TOpearator result = new TOpearator(sb, sp, op);
-				return result;
+				if(!op.isAlpha() || !Character.isLetterOrDigit(sb.peek(1))) {
+					sb.next();
+					TOpearator result = new TOpearator(sb, sp, op);
+					return result;
+				}
 			}
         }
 		return null;

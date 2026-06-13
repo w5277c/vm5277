@@ -23,7 +23,7 @@ J8BPROC_ARR_SIZE:
 ;OUT: ACCUM_L/H-размер
 ;-----------------------------------------------------------
 	ADIW XL,0x03
-	LD ACCUM_L,X+
+	LD ACCUM_L,X+ ;LE
 	LD ACCUM_H,X
 	SBIW XL,0x04
 	RET

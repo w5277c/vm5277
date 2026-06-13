@@ -31,10 +31,11 @@ import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.CodegenResult;
+import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
@@ -48,8 +49,8 @@ public class SwitchNode extends CommandNode {
 	private			BlockScope		defaultScope;
 	private			Integer			constantValue;
 	
-	public SwitchNode(TokenBuffer tb, MessageContainer mc) {
-		super(tb, mc);
+	public SwitchNode(Instance inst, TokenBuffer tb) {
+		super(inst, tb);
 
 		consumeToken(tb); // Потребляем "switch"
 		// Парсим выражение switch
@@ -61,7 +62,7 @@ public class SwitchNode extends CommandNode {
 		}
 		
 		try {
-			this.expression = new ExpressionNode(tb, mc).parse();
+			this.expression = new ExpressionNode(inst, tb).parse();
 		}
 		catch(CompileException e) {
 			markFirstError(e);
@@ -85,7 +86,7 @@ public class SwitchNode extends CommandNode {
 		while(!tb.match(Delimiter.RIGHT_BRACE)) {
 			if(tb.match(J8BKeyword.CASE)) {
 				try {
-					AstCase astCase = parseCase(tb, mc);
+					AstCase astCase = parseCase(inst, tb);
 					if(null!=astCase) {
 						cases.add(astCase);
 					}
@@ -105,7 +106,7 @@ public class SwitchNode extends CommandNode {
 				}
 				
 				try {
-					defaultBlock = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "default") : new BlockNode(tb, mc, parseStatement(), "default");
+					defaultBlock = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(inst, tb, "default") : new BlockNode(inst, tb, parseStatement(inst), "default");
 				}
 				catch(CompileException e) {
 					markFirstError(e);
@@ -173,13 +174,13 @@ public class SwitchNode extends CommandNode {
 		result&=expression.declare(scope);
 
 		// Создаем новую область видимости для switch
-		switchScope = new BlockScope(scope);
+		switchScope = new BlockScope(scope, false);
 
 		if(result) {
 			// Объявление всех case-блоков
 			for(AstCase astCase : cases) {
 				if(result && null!=astCase.getBlock()) {
-					BlockScope caseScope = new BlockScope(switchScope);
+					BlockScope caseScope = new BlockScope(switchScope, false);
 					result&=astCase.getBlock().declare(caseScope);
 					astCase.setScope(caseScope);
 				}
@@ -188,7 +189,7 @@ public class SwitchNode extends CommandNode {
 
 		// Объявление default-блока
 		if(result && null!=defaultBlock) {
-			defaultScope = new BlockScope(switchScope);
+			defaultScope = new BlockScope(switchScope, false);
 			result&=defaultBlock.declare(defaultScope);
 		}
 		
@@ -211,7 +212,7 @@ public class SwitchNode extends CommandNode {
 			}
 
 			VarType exprType = expression.getType();
-			if(!exprType.isIntegral()) {
+			if(!exprType.isInteger()) {
 				markError("Switch expression must be integral type, got: " + exprType);
 				result = false;
 			}
@@ -283,18 +284,20 @@ public class SwitchNode extends CommandNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
 
 		if(null==constantValue) {
-			CGLabelScope shitchEndLabel = new CGLabelScope(null, CGScope.genId(), LabelNames.SWITCH_END, true);
+			CGLabelScope switchEndLabel = new CGLabelScope(null, CGScope.genId(), LabelNames.SWITCH_END, true);
 			
 			// Генерируем выражение switch
-			cg.getAccum().set(-1==expression.getType().getSize() ? cg.getRefSize() : expression.getType().getSize(), false);
-			if(CodegenResult.RESULT_IN_ACCUM!=expression.codeGen(cg, null, true, excs)) {
+			cg.accumLock(expression.getType());
+			if(CodegenResult.RESULT_IN_ACCUM!=expression.codeGen(cg, true, excs)) {
+				cg.accumUnlock();
 				throw new CompileException("Accum not used for expr:" + expression);
 			}
+			cg.accumUnlock();
 
 			// Создаем метки для всех case-блоков
 			List<CGBranch> branches = new ArrayList<>();
@@ -331,24 +334,36 @@ public class SwitchNode extends CommandNode {
 					if(from==to) {
 						// Одиночное значение
 						//EQ OR, переход на branch если true
-						cg.constCond(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), Operator.EQ, from, false, false, false, true, endCondBranch); 
+						//cg.constCond(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), Operator.EQ, from, false, false, false, true, endCondBranch); 
+						CGCells rightCells = new CGCells(CGCells.Type.CONST);
+						rightCells.setConst(from);
+						cg.cellsCpCells(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), expression.getType(), rightCells, null, Operator.EQ, false, true, endCondBranch);
 					}
 					else {
 						CGBranch endBranch = new CGBranch();
 						// Диапазон значений
-						cg.constCond(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), Operator.LT, from, false, false,false, true, endBranch);
+						//cg.constCond(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), Operator.LT, from, false, false,false, true, endBranch);
+						CGCells rightCells = new CGCells(CGCells.Type.CONST);
+						rightCells.setConst(from);
+						cg.cellsCpCells(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), expression.getType(), rightCells, null, Operator.LT, false, true, endBranch);
 						if(255>to) {
-							cg.constCond(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), Operator.LT, to + 1, false, false, false, true, endCondBranch);
+							//cg.constCond(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), Operator.LT, to + 1, false, false, false, true, endCondBranch);
+							rightCells = new CGCells(CGCells.Type.CONST);
+							rightCells.setConst(to+1);
+							cg.cellsCpCells(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), expression.getType(), rightCells, null, Operator.LT, false, true, endCondBranch);
 						}
 						else {
-							cg.constCond(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), Operator.LTE, to, false, false, false, true, endCondBranch);
+							//cg.constCond(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), Operator.LTE, to, false, false, false, true, endCondBranch);
+							rightCells = new CGCells(CGCells.Type.CONST);
+							rightCells.setConst(to);
+							cg.cellsCpCells(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), expression.getType(), rightCells, null, Operator.LTE, false, true, endCondBranch);
 						}
 						astCase.getCGScope().append(endBranch.getEnd());
 					}
 					j++;
 				}
 				// Переходим после проверки условия на следующий блок проверок
-				cg.jump(astCase.getCGScope(), nextCondBranch.getEnd());
+				cg.jump(astCase.getCGScope(), null!=nextCondBranch ? nextCondBranch.getEnd() : switchEndLabel);
 				// Добавляем метку на начало тела case
 				astCase.getCGScope().append(endCondBranch.getEnd());
 			}
@@ -356,23 +371,23 @@ public class SwitchNode extends CommandNode {
 			// Генерируем код для case-блоков, отдельным блоком так как в блоках проверки настроен размер аккумулятора
 			for(int i=0; i<cases.size(); i++) {
 				AstCase astCase = cases.get(i);
-				astCase.getBlock().codeGen(cg, cgScope, false, excs);
-				cg.jump(astCase.getBlock().getCGScope(), shitchEndLabel);
+				astCase.getBlock().codeGen(cg, false, excs);
+				cg.jump(astCase.getBlock().getCGScope(), switchEndLabel);
 			}
 
 			if(null!=defaultBlock) {
 				defaultBlock.getCGScope().prepend(defaultBranch.getEnd());
-				defaultBlock.codeGen(cg, null, false, excs);
+				defaultBlock.codeGen(cg, false, excs);
 			}
-			else {
-				cgScope.append(defaultBranch.getEnd());
-			}
-			cgScope.append(shitchEndLabel);
+//			else {
+//				cgScope.append(defaultBranch.getEnd());
+//			}
+			cgScope.append(switchEndLabel);
 		}
 		else {
 			BlockNode bNode = getConstantFoldedBlock();
 			if(null!=bNode) {
-				bNode.codeGen(cg, null, false, excs);
+				bNode.codeGen(cg, false, excs);
 			}
 		}
 

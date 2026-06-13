@@ -22,20 +22,20 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.CGBranch;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.CodegenResult;
+import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.VarSymbol;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
+import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.semantic.AstHolder;
 import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.FieldSymbol;
@@ -47,12 +47,11 @@ public class VarFieldExpression extends ExpressionNode {
 	private			CIScope			targetScope;
 	private			boolean			isInliningMode;
 	
-    public VarFieldExpression(TokenBuffer tb, MessageContainer mc, SourcePosition sp, Integer sn, ExpressionNode pathExpr, String name) {
-		this(tb, mc, sp, sn, pathExpr, name, false);
+    public VarFieldExpression(Instance inst, TokenBuffer tb, SourcePosition sp, Integer sn, ExpressionNode pathExpr, String name) {
+		this(inst, tb, sp, sn, pathExpr, name, false);
 	}
-	public VarFieldExpression(	TokenBuffer tb, MessageContainer mc, SourcePosition sp, Integer sn, ExpressionNode pathExpr, String name,
-								boolean isInliningMode) {
-        super(tb, mc, sp);
+	public VarFieldExpression(Instance inst, TokenBuffer tb, SourcePosition sp, Integer sn, ExpressionNode pathExpr, String name, boolean isInliningMode) {
+        super(inst, tb, sp);
          
 		if(null!=sn) {
 			this.sn=sn;
@@ -124,8 +123,7 @@ public class VarFieldExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		if(null!=cgScope) cgScope.disable();
-		cgScope = cg.enterExpression(parent, toString());
+		cgScope = cg.enterExpression(parent, cgScope, toString());
 
 		if(null==symbol && null!=targetExpr) {
 			try {
@@ -135,7 +133,7 @@ public class VarFieldExpression extends ExpressionNode {
 				else if(targetExpr instanceof VarFieldExpression) {
 					VarFieldExpression vfe = (VarFieldExpression)targetExpr;
 					CIScope parentTargetScope = vfe.getTargetScope();
-					targetScope = parentTargetScope.resolveCI(vfe.getSymbol().getType().getClassName(), true);
+					targetScope = parentTargetScope.resolveCI(null, vfe.getSymbol().getType().getClassName(), true);
 				}
 				else {
 					targetScope = ((TypeReferenceExpression)targetExpr).getScope();
@@ -165,15 +163,10 @@ public class VarFieldExpression extends ExpressionNode {
 		
 		if(result && null!=symbol && symbol instanceof FieldSymbol) {
 			FieldSymbol fSymbol = (FieldSymbol)symbol;
-			MethodScope mScope = scope.getMethod();
-			if(!isInliningMode && mScope.getSymbol().isStatic() && !fSymbol.isStatic()) {
+			MethodScope mScope = scope.getMethod(); //mScope может быть null если работаем со станическим полем(вне метода)
+			if(!isInliningMode && (null==mScope || mScope.getSymbol().isStatic()) && !fSymbol.isStatic()) {
 				markError("Non-static field '" + fSymbol.getName() + "' cannot be referenced from a static context");
 				result = false;
-			}
-
-			// Проверка приватного доступа
-			if(fSymbol.isPrivate() && scope.getThis() == targetScope.getThis()) {
-				
 			}
 		}
 
@@ -189,10 +182,8 @@ public class VarFieldExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(disabled) return null;
-		//CGScope cgs = null == parent ? cgScope : parent;
-		
 		// Актуализируем symbol
 		//getSymbol();
 		
@@ -219,7 +210,7 @@ public class VarFieldExpression extends ExpressionNode {
 //				if(null!=cScope) {
 					
 					if(null!=targetExpr) {
-						targetExpr.codeGen(cg, parent, false, excs);
+						targetExpr.codeGen(cg, false, excs);
 					}
 					if(null!=targetExpr && targetExpr instanceof VarFieldExpression) { //Не смотрим на isInliningMode
 						cg.cellsToArrReg(cgScope, ((CGCellsScope)((VarFieldExpression)targetExpr).getSymbol().getCGScope()).getCells());
@@ -245,25 +236,26 @@ public class VarFieldExpression extends ExpressionNode {
 		return (toAccum ? CodegenResult.RESULT_IN_ACCUM : null);
 	}
 	
-	public void codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, CGBranch brScope, CGExcs excs) throws CompileException {
+	public void codeGen(CodeGenerator cg, boolean isInvert, boolean opOr, CGBranch brScope, CGExcs excs) throws CompileException {
 		depCodeGen(cg, excs);
-		
-		//CGScope cgs = null == parent ? cgScope : parent;
 		
 		if(null!=brScope) {
 			CGCellsScope cScope = (CGCellsScope)symbol.getCGScope();
-			cg.constCond(cgScope, cScope.getCells(), Operator.NEQ, 0, symbol.getType().isFixedPoint(), false, isInvert, opOr, brScope); // NEQ, так как проверяем на 0
+			//cg.constCond(cgScope, cScope.getCells(), Operator.NEQ, 0, symbol.getType().isFixedPoint(), false, isInvert, opOr, brScope); // NEQ, так как проверяем на 0
+			CGCells rightCells = new CGCells(CGCells.Type.CONST);
+			rightCells.setConst(0);
+			cg.cellsCpCells(cgScope, cScope.getCells(), symbol.getType(), rightCells, null, Operator.NEQ, isInvert, opOr, brScope);
+
 		}
 	}
 
-	public void postCodeGen(CodeGenerator cg, CGScope parent) throws CompileException {
+	public void postCodeGen(CodeGenerator cg) throws CompileException {
 		//TODO рудимент
 		if(!disabled) {
-			CGScope cgs = null == parent ? cgScope : parent;
 
 			if(null!=targetExpr && targetExpr instanceof VarFieldExpression) { //Не смотрим на isInliningMode
 				if(!isInliningMode) {
-					cg.popHeapReg(cgs);
+					cg.popHeapReg(cgScope);
 				}
 			}
 		}

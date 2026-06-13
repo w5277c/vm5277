@@ -29,11 +29,11 @@ public class MessageNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
 		SourcePosition sp = tb.getSP();
 		
-		Expression expr = Expression.parse(tb, scope, mc);
+		Expression expr = Expression.parse(tb, scope, mc, null);
 		StringBuilder sb = new StringBuilder(expr.toString());
 		while(tb.match(Delimiter.COMMA)) {
 			tb.consume();
-			expr = Expression.parse(tb, scope, mc);
+			expr = Expression.parse(tb, scope, mc, null);
 			sb.append(expr.toString());
 			if(tb.match(TokenType.EOF) || tb.match(TokenType.NEWLINE)) break;
 		}

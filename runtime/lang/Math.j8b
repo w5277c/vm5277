@@ -15,10 +15,19 @@
  */
 
 public class Math {
-  public static native int mul(int a, byte b);
-  public static native int mul(int a, short b);
-  public static native int mul(int a, int b);
-  public static native int mul(short a, byte b);
-  public static native int mul(short a, short b);
-  public static native short mul(byte a, byte b);
+	public final static byte CRC_REFLECT_NONE	= 0b00000000;
+	public final static byte CRC_REFLECT_IN		= 0b00000001;
+	public final static byte CRC_REFLECT_OUT	= 0b00000010;
+	public final static byte CRC_REFLECT_BOTH 	= 0b00000011;
+	
+	public static native int mul(int a, byte b);
+	public static native int mul(int a, short b);
+	public static native int mul(int a, int b);
+	public static native int mul(short a, byte b);
+	public static native int mul(short a, short b);
+	public static native short mul(byte a, byte b);
+
+	public static native byte reflect(byte b);
+	public static native byte crc8(byte[] data, short len) throws ArrayBoundsException;
+	public static native byte crc8(byte[] data, short len, byte poly, byte init, byte reflect, byte xorOut) throws ArrayBoundsException;
 }

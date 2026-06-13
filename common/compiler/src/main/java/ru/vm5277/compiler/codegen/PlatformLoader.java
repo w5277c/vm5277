@@ -24,12 +24,11 @@ import java.net.URLClassLoader;
 import java.nio.file.Path;
 import java.util.Map;
 import ru.vm5277.common.AssemblerInterface;
-import ru.vm5277.common.NativeBinding;
-import ru.vm5277.common.Platform;
-import ru.vm5277.common.PlatformType;
-import ru.vm5277.common.SourceType;
-import ru.vm5277.common.RTOSParam;
+import ru.vm5277.common.Device;
+import ru.vm5277.common.enums.PlatformType;
+import ru.vm5277.common.enums.SourceType;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class PlatformLoader {
@@ -52,14 +51,14 @@ public class PlatformLoader {
 		}
 	}
 
-	public static CodeGenerator loadGenerator(Platform platform, File libsDir) throws Exception {
+	public static CodeGenerator loadGenerator(Device device, File libsDir) throws Exception {
 
 		if(IS_NATIVE_IMAGE) {
-			return new ru.vm5277.compiler.avr_codegen.Generator(platform);
+			return new ru.vm5277.compiler.avr_codegen.Generator(device);
 		}
 		else {
 			// Формируем имя JAR-файла (например, "codegen-avr.jar")
-			String jarName =  platform.getType().name().toLowerCase() + LIB_CG_POSTFIX + ".jar";
+			String jarName =  device.getPlatform().getType().name().toLowerCase() + LIB_CG_POSTFIX + ".jar";
 			File jarFile = new File(libsDir + File.separator + jarName);
 
 			if (!jarFile.exists()) throw new RuntimeException("Library not found: " + jarFile.getAbsolutePath());
@@ -67,12 +66,12 @@ public class PlatformLoader {
 			URLClassLoader classLoader = new URLClassLoader(new URL[] {jarFile.toURI().toURL()}, PlatformLoader.class.getClassLoader());
 
 			// Загружаем класс-генератор (ожидаемое имя: ru.vm5277.compiler.PLATFORM_codegen.Generator)
-			String className = LIB_CG_CLASSPREFIX + platform.getType().name().toLowerCase() + LIB_CG_CLASSPOSTFIX;
+			String className = LIB_CG_CLASSPREFIX + device.getPlatform().getType().name().toLowerCase() + LIB_CG_CLASSPOSTFIX;
 			Class<?> generatorClass = classLoader.loadClass(className);
-			Constructor<?> constructor = generatorClass.getConstructor(Platform.class);
+			Constructor<?> constructor = generatorClass.getConstructor(Device.class);
 
 			// Создаем экземпляр, передавая параметры
-			return (CodeGenerator) constructor.newInstance(platform);
+			return (CodeGenerator) constructor.newInstance(device);
 		}
 	}
 	
@@ -84,7 +83,7 @@ public class PlatformLoader {
 				assembler = new ru.vm5277.avr_asm.Assembler();
 			}
 			if(null!=assembler) {
-				return assembler.exec(mc, null, sourcePath, sourcePaths, AssemblerInterface.STRICT_LIGHT, outputFilename, mapFile, listBW, null, null);
+				return assembler.exec(mc, null, sourcePath, sourcePaths, StrictLevel.LIGHT, outputFilename, mapFile, listBW, null, null);
 			}
 			return false;
 		}
@@ -103,8 +102,7 @@ public class PlatformLoader {
 			Class<?> asmClass = classLoader.loadClass(className);
 			Method method = asmClass.getMethod(	"exec", MessageContainer.class, String.class, Path.class, Map.class, int.class, String.class, File.class,
 												BufferedWriter.class);
-			return (boolean) method.invoke(	asmClass.newInstance(), mc, null, sourcePath, sourcePaths, AssemblerInterface.STRICT_LIGHT, outputFilename, mapFile,
-											listBW);
+			return (boolean) method.invoke(asmClass.newInstance(), mc, null, sourcePath, sourcePaths, StrictLevel.LIGHT, outputFilename, mapFile, listBW);
 		}
 	}
 }

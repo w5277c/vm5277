@@ -23,5 +23,5 @@ public interface ImportableScope {
 	public void addStaticImport(String importPath, String alias) throws CompileException;
 	public void addCI(CIScope cis, boolean isInternal) throws CompileException;
 	public boolean checkStaticImportExists(String path);
-	public CIScope resolveCI(String name, boolean isQualifiedAccess);
+	public CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess);
 }

@@ -44,9 +44,9 @@ class Main {
 
 		s1 = !b1;
 		f1 = !b1;
-		f1 = (fixed)-s1;
-		f1 = (fixed)++s1;
-		f1 = (fixed)--s1;
+		f1 = (fixed)-s1; //TODO здесь и ниже - пока не работает - запись ведется побитово, необходимо lo byte short -> int byte fixed
+		f1 = (fixed)++s1; //!
+		f1 = (fixed)--s1; //!
 		f1 = (fixed)s1++;
 		f1 = (fixed)s1--;
 
@@ -57,9 +57,9 @@ class Main {
 
 		System.out(!b1 || b2);
 
-		System.outChar('\n'); System.out(s1);
-		System.outChar('\n'); System.out(s2);
-		System.outChar('\n'); System.out(f1);
-		System.outChar('\n'); System.out(b2);
+		System.out('\n' + s1);
+		System.out('\n' + s2);
+		System.out('\n' + f1);
+		System.out('\n' + b2);
 	}
 }

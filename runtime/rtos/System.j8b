@@ -17,20 +17,33 @@
 public class System {
 	public static native void setParam(byte paramId, byte value);
 
-	public static native void outChar(byte b);
-
+	public static native void out(char c);
 	public static native void out(cstr text);
-	public static native void out(byte i);
-	public static native void out(short i);
+	public static native void out(byte b);
+	public static native void out(short s);
 	public static native void out(int i);
-	public static native void out(fixed i);
-	public static native void out(bool i);
+	public static native void out(fixed f);
+	public static native void out(bool b);
 	public static native void out(Exception ex);
+	public static native void outHex(byte b);
+	public static native void outHex(short s);
+	public static native void outHex(int i);
+	public static native void outHex(byte[] bytes, short len) throws ArrayBoundsException;
 
-	public static native bool hasInput();
+	public static native bool hasInput();	// Если возвращаемый тип bool, то результат во флаге нуля (флаг Z для AVR)
 	public static native byte in();
 	public static native byte in(short timeout) throws IOException;
 
+	public static native void fill(byte[] arr, short len, byte fill) throws ArrayBoundsException;
+
+	public static native short uptimeUs();	// ~65мс до переполнения
+	public static native int uptimeMs();	// ~49 дней до переполнения
+	public static native int uptimeS();		// ~1 год до переполнения
+	public static native int uptimeShr8(); 	// миллисекунды/256 ~34 года до переполнения
+
+	public static native byte random();
+
+	public static native void showDRAMMap();
 
 	public static native void halt();
 	public static native void reset();

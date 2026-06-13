@@ -16,13 +16,16 @@
 
 package ru.vm5277.lsp.server;
 
+import java.util.ArrayList;
+import java.util.List;
+import ru.vm5277.common.lexer.Keyword;
 import ru.vm5277.common.lexer.SourceBuffer;
 import ru.vm5277.common.lexer.Lexer;
 import ru.vm5277.common.lexer.LexerType;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.lexer.tokens.Token;
 
-public class J8BLanguageServer implements LanguageServer {
+public class J8BLanguageServer extends LanguageServer {
 	private	final	Lexer	lexer	= new Lexer(LexerType.J8B);
 
 	@Override
@@ -31,7 +34,31 @@ public class J8BLanguageServer implements LanguageServer {
 		if(null==token || TokenType.EOF==token.getType()) {
 			return null;
 		}
+		
+		if(TokenType.LABEL==token.getType()) {
+			labels.add(token.getRaw());
+		}
+
 		return new LSPToken(token);
+	}
+	
+	@Override
+	public List<Token> tokenize(SourceBuffer sb) {
+		List<Token> result = new ArrayList<>();
+		while(sb.available()) {
+			result.add(lexer.parseToken(sb));
+		}
+		return result;
+	}
+
+	public static List<String> getKeywords() {
+		List<String> result = new ArrayList<>();
+		for(Keyword keyword : Keyword.getItems()) {
+			if(LexerType.ALL==keyword.getLexerType() || LexerType.J8B==keyword.getLexerType()) {
+				result.add(keyword.getName());
+			}
+		}
+		return result;
 	}
 }
 

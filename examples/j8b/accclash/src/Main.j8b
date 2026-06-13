@@ -23,10 +23,10 @@ class Main {
 		byte b3; b3 = 0x03;
 		byte b4; b4 = 0x04;
 
-		System.out("\nЗначение выражения (b1+b2) + (b3+b4), где b1="); System.out(b1);
-		System.out(",b2=");System.out(b2);
-		System.out(",b3=");System.out(b3);
-		System.out(",b4="); System.out(b4);
+		System.out("\nЗначение выражения (b1+b2) + (b3+b4), где b1=" + b1);
+		System.out(",b2=" + b2);
+		System.out(",b3=" + b3);
+		System.out(",b4=" + b4);
 		System.out(":");
 		System.out((b1+b2) + (b3+b4));
 		System.out("\ndone");

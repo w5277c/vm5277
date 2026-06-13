@@ -31,6 +31,7 @@ import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
 import ru.vm5277.compiler.semantic.ExceptionScope;
@@ -45,8 +46,8 @@ public class CatchBlock extends BlockNode {
 	private	Set<ExceptionScope>		eScopes			= new HashSet<>();
 	private	CGScope					cgHeader		= new CGScope();
 	
-	public CatchBlock(TokenBuffer tb, MessageContainer mc, List<ExpressionNode> args, String varName) throws CompileException {
-		super(tb, mc, "catch");
+	public CatchBlock(Instance inst, TokenBuffer tb, List<ExpressionNode> args, String varName) throws CompileException {
+		super(inst, tb, "catch");
 		
 		this.args = args;
 		this.varName = varName;
@@ -201,7 +202,7 @@ public class CatchBlock extends BlockNode {
 			for(AstNode node : children) {
 				//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
 				if(!(node instanceof VarNode)) {
-					node.codeGen(cg, null, false, excs);
+					node.codeGen(cg, false, excs);
 				}
 			}
 		}
@@ -211,7 +212,7 @@ public class CatchBlock extends BlockNode {
 		}
 		
 		((CGBlockScope)cgScope).build(cg, false, excs);
-		((CGBlockScope)cgScope).restoreRegsPool();
+		((CGBlockScope)cgScope).releaseRegsPool();
 
 		return null;
 	}

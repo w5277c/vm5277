@@ -23,11 +23,11 @@ import java.util.List;
 import java.util.Map;
 import ru.vm5277.avr_asm.InstrReader;
 import ru.vm5277.avr_asm.Instruction;
-import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.CodeFixer;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.items.CGIAsm;
 import ru.vm5277.common.cg.items.CGIAsmCondJump;
+import ru.vm5277.common.cg.items.CGIAsmJump;
 import ru.vm5277.common.cg.items.CGItem;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
@@ -47,7 +47,10 @@ public class Fixer extends CodeFixer {
 		CodeGenerator.treeToList(scope, list);
 		
 		for(CGItem item : list) {
-			if(item instanceof CGIAsm) {
+			if(item instanceof CGIAsmCondJump && ((CGIAsmCondJump)item).isExpansionRequired()) {
+				// Для расширенного условного перехода размер уже известен
+			}
+			else if(item instanceof CGIAsm) {
 				CGIAsm asmItem = (CGIAsm)item;
 				Map<String, Instruction> instructions = instrReader.getInstrByMn().get(asmItem.getInstr());
 				if(null==instructions || instructions.isEmpty()) {
@@ -56,7 +59,7 @@ public class Fixer extends CodeFixer {
 				asmItem.setSizeInBytes(instructions.values().iterator().next().getWSize()*0x02);
 			}
 		}
-		
+
 		return list;
 	}
 
@@ -88,24 +91,16 @@ public class Fixer extends CodeFixer {
 				if(!item.isDisabled() && item instanceof CGIAsm) {
 					if(item instanceof CGIAsmCondJump) {
 						CGIAsmCondJump acj = (CGIAsmCondJump)item;
-						Integer labelOffset = labelsMap.get(acj.getLabelName());
-						if(null!=labelOffset) {
-							int wDelta = (labelOffset-offset)/2;
-							if(wDelta<-64 || wDelta>63) {
-								CGLabelScope skipLbScope = new CGLabelScope(null, CodeGenerator.genId(), LabelNames.SKIP, true);
-								//TODO костыль, я не могу изменить основной листинг чтобы вписать еще два элемента (инструкцию и метку).
-								//но могу расширить CGIAsmCondJump чтобы его код содержал вместо 1 инструкции - 2 инструкции и метку.
-								//Основная проблема - прыжок может быть больше чем позволит rjmp 
-								acj.useJump(Utils.brInstrInvert(acj.getInstr()), "rjmp", RJMP_INSTR_SIZE, skipLbScope.getName());
-//								acj.setInstr(Utils.brInstrInvert(acj.getInstr()));
-//								acj.setLabelName(skipLbScope.getName());
-//								int index = list.indexOf(acj);
-//								CGIAsm aij = new CGIAsmJump("jmp", acj.getLabelName(), false);
-//								aij.setSizeInBytes(JMP_INSTR_SIZE);
-//								list.add(index, aij);
-//								list.add(index+1, skipLbScope);
-
-								modified = true;
+						if(!acj.isExpansionRequired()) {
+							Integer labelOffset = labelsMap.get(acj.getLabelName());
+							if(null!=labelOffset) {
+								int wDelta = (labelOffset-offset)/2;
+								if(wDelta<-64 || wDelta>63) {
+									acj.requireExpansion(	Utils.brInstrInvert(acj.getInstr()), "pc+0x02",
+															new CGIAsmJump(Generator.JUMP_INSTR, acj.getLabelName(), false),
+															JMP_INSTR_SIZE);
+									modified = true;
+								}
 							}
 						}
 					}

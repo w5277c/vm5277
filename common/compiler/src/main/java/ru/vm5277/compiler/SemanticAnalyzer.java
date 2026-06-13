@@ -20,10 +20,10 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.Optimization;
+import ru.vm5277.common.enums.OptimizationType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.lexer.J8BKeyword;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -46,6 +46,9 @@ public class SemanticAnalyzer {
 				if(node.preAnalyze()) {
 					if(node.declare(gScope)) {
 						node.postAnalyze(gScope, cg, parent);
+						if(OptimizationType.NONE!=Main.getOptimizationType()) {
+							node.codeOptimization(gScope, cg);
+						}
 					}
 				}
 			}
@@ -56,7 +59,7 @@ public class SemanticAnalyzer {
 				// Выполняем если все declare отработали и никаких отложенных.
 				if(AstNode.getDeclarationPendingNodes().isEmpty()) {
 					if(clazz.postAnalyze(gScope, cg, parent)) {
-						if(Optimization.NONE!=Main.getOptLevel()) {
+						if(OptimizationType.NONE!=Main.getOptimizationType()) {
 							clazz.codeOptimization(gScope, cg);
 						}
 					}
@@ -87,7 +90,7 @@ public class SemanticAnalyzer {
 				// Все отложенные выполнены и ошибок не было
 				if(result) {
 					if(clazz.postAnalyze(gScope, cg, parent)) {
-						if(Optimization.NONE!=Main.getOptLevel()) {
+						if(OptimizationType.NONE!=Main.getOptimizationType()) {
 							clazz.codeOptimization(gScope, cg);
 						}
 					}

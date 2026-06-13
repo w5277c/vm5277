@@ -16,13 +16,41 @@
 
 package ru.vm5277.maven;
 
+import java.io.File;
+import java.nio.file.Path;
 import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
+import ru.vm5277.common.Toolkit;
 
-@Mojo(name = "package", defaultPhase = LifecyclePhase.PACKAGE)
+@Mojo(name = "package", defaultPhase = LifecyclePhase.PACKAGE, threadSafe = true)
 public class J8bPackageMojo extends J8bMojo {
 	@Override
-	public void execute() throws MojoExecutionException {
+	public void execute() throws MojoExecutionException, MojoFailureException {
+		if(skip) return;
+
+		// Проверяем, что это не родительский проект
+		if("pom".equals(project.getPackaging())) {
+			getLog().warn("J8B package goal cannot be executed on parent POM project.");
+			getLog().warn("Please run 'mvn package' from a specific module directory instead.");
+			return;
+		}
+		
+		File outputSubDirectory = new File(outputDirectory, "default");
+		if(!session.getRequest().getActiveProfiles().isEmpty()) outputSubDirectory = new File(outputDirectory, session.getRequest().getActiveProfiles().get(0));
+		if(!outputSubDirectory.exists()) {
+			outputSubDirectory.mkdirs();
+		}
+
+		doClean(log, prebuildDirectory);
+		doClean(log, outputSubDirectory);
+
+		if(!Toolkit.checkToolkit(verbose ? log : null, Path.of(toolkitPath), downloadUrl, true)) {
+			throw new MojoExecutionException("Toolkit not found, can't download toolkit from: " + downloadUrl + ", please try later.");
+		}
+
+		doCompile();
+		doAssemble(outputSubDirectory);
 	}
 }

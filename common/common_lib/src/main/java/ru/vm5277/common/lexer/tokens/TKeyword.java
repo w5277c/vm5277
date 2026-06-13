@@ -30,6 +30,7 @@ public class TKeyword extends Token {
             stringBuilder.append(sb.peek());
 			sb.next();
         }
+		raw = stringBuilder.toString();
         String id = (LexerType.ASM==lexerType ? stringBuilder.toString().toLowerCase() : stringBuilder.toString());
 		Keyword keyword = Keyword.fromString(id, lexerType);
 		

@@ -13,8 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-	.include "atmega328p.inc"
-	.include "devices/common.def"
+
+	.include "atmega328p.asm"
+	.include "devices/_common.def"
 
 ;---CONSTANTS-----------------------------------------------
 	.SET	_MCALL_SIZE								= 0x02	;Размер макроса MCALL/MJMP: 1(RCALL)-2(CALL)
@@ -24,7 +25,8 @@
 	.EQU	OS_IR_QNT								= 0x1a	;Количество перырваний
 	.EQU	OS_PCINT_PORTS_QNT						= 0x03	;Количество портов поддерживающих внешние прерывания(PCINT)
 	.EQU	OS_RAM_BORDER_SIZE						= 0x20	;Минимальное допустимое расстояние между вершинами FREE_RAM и STACK
-
+	.SET	OS_TASKS_QNT							= 0x08	;По умолчанию одновременно разрешено только 8 задач
+	
 .IFNDEF OS_STACK_SIZE
 	.SET	OS_STACK_SIZE							= 0xc0	;Общий стек(192 байта)
 .ENDIF
@@ -59,13 +61,13 @@
 	.EQU	C5_IR_WDT								= 0x06
 	.EQU	C5_IR_TIMER2_COMPA						= 0x07
 	.EQU	C5_IR_TIMER2_COMPB						= 0x08
-	.EQU	C5_IR_TIMER2_OVF						= 0x09
+	.EQU	C5_IR_RESERVED_CORE_USTIMER				= 0x09
 	.EQU	C5_IR_TIMER1_CAPT						= 0x0a
 	.EQU	C5_IR_TIMER1_COMPA						= 0x0b
 	.EQU	C5_IR_TIMER1_COMPB						= 0x0c
 	.EQU	C5_IR_TIMER1_OVF						= 0x0d
-	.EQU	C5_IR_RESERVED_CORE_TIMER1				= 0x0e
-	.EQU	C5_IR_RESERVED_CORE_TIMER2				= 0x0f
+	.EQU	C5_IR_RESERVED_CORE_TIMER				= 0x0e
+	.EQU	C5_IR_TIMER0_COMPA      				= 0x0f
 	.EQU	C5_IR_TIMER0_OVF						= 0x10
 	.EQU	C5_IR_SPI								= 0x11
 	.EQU	C5_IR_UART_RX							= 0x12
@@ -96,7 +98,11 @@ _OS_PCINT_0_VECTOR:
 	CALL	_OS_IR_HANDLER									; Watchdog Time-out Interrupt
 	CALL	_OS_IR_HANDLER									; Timer/Counter2 Compare Match A
 	CALL	_OS_IR_HANDLER									; Timer/Counter2 Compare Match B
-	CALL	_OS_IR_HANDLER									; Timer/Counter2 Overflow
+.IF OS_FT_USTIMER == 0x01									; Timer/Counter2 Overflow
+	JMP		_OS_USTIMER_HANDLER
+.ELSE
+	CALL	_OS_IR_HANDLER
+.ENDIF
 	CALL	_OS_IR_HANDLER									; Timer/Counter1 Capture Event
 	CALL	_OS_IR_HANDLER									; Timer/Counter1 Compare Match A
 	CALL	_OS_IR_HANDLER									; Timer/Counter1 Compare Match B
@@ -118,6 +124,8 @@ _OS_PCINT_0_VECTOR:
 	CALL	_OS_IR_HANDLER									; 2-wire Serial Interface
 	CALL	_OS_IR_HANDLER									; Store Program Memory Ready
 .ENDIF
+
+;TODO можно оптимизировать - проверять на включенную фичу
 PORTS_TABLE:												;Таблица из адресов IO PINx регистров (-,B,C,D)
 	.db	0x00,0x23,0x26,0x29
 PCINT_TABLE:
@@ -135,36 +143,46 @@ INT_TABLE:
 
 ;ATOMIC_REQUIRED
 .MACRO _OS_POWER_ON
-	PUSH TEMP_L
-	LDS TEMP_L,PRR
-	ANDI TEMP_L,low(~(1<<@0))
-	STS PRR,TEMP_L
-	POP TEMP_L
+	PUSH ACCUM_L
+	LDS ACCUM_L,PRR
+	ANDI ACCUM_L,low(~(1<<@0))
+	STS PRR,ACCUM_L
+	POP ACCUM_L
 .ENDMACRO
 ;ATOMIC_REQUIRED
 .MACRO _OS_POWER_OFF
-	PUSH TEMP_L
-	LDS TEMP_L,PRR
-	ORI TEMP_L,low(1<<@0)
-	STS PRR,TEMP_L
-	POP TEMP_L
+	PUSH ACCUM_L
+	LDS ACCUM_L,PRR
+	ORI ACCUM_L,low(1<<@0)
+	STS PRR,ACCUM_L
+	POP ACCUM_L
 .ENDMACRO
 
 ;ATOMIC_REQUIRED
-.MACRO _OS_TIMERS_RESTART									;TODO добавить инициализацию для 0B таймера
+.MACRO _OS_TIMER_INIT_NR
 	_OS_POWER_ON PRTIM0										;Подпитываю TIMER0
-	PUSH TEMP_L
-	LDI TEMP_L,(0<<WGM01)|(0<<WGM00)
-	STS TCCR0A,TEMP_L
-	LDI TEMP_L,(0<<CS02)|(1<<CS01)|(0<<CS00)				;/8 - for 16MHz
-	STS TCCR0B,TEMP_L
+	LDI ACCUM_L,(1<<WGM01)|(0<<WGM00)
+	STS TCCR0A,ACCUM_L
+	LDI ACCUM_L,(0<<CS02)|(1<<CS01)|(0<<CS00)				;/8
+	STS TCCR0B,ACCUM_L
 	STS TCNT0,C0x00
-	LDI TEMP_L,_OS_TIMER_FREQ-0x01							;0x64 - 100(16MHz)
-	STS OCR0A,TEMP_L
-	LDI TEMP_L,(1<<OCF0A)
-	STS TIFR0,TEMP_L
+	LDI ACCUM_L,_OS_TIMER_FREQ-0x01
+	STS OCR0A,ACCUM_L
+	LDI ACCUM_L,(1<<OCF0A)
+	STS TIFR0,ACCUM_L
+	LDI ACCUM_L,(1<<OCIE0A)
+	STS TIMSK0,ACCUM_L
+.ENDMACRO
 
-	LDI TEMP_L,(1<<OCIE0A)
-	STS TIMSK0,TEMP_L										; TODO проверить
-	POP TEMP_L
+.MACRO _OS_USTIMER_INIT_NR
+	_OS_POWER_ON PRTIM2										;Подпитываю TIMER2
+	LDI ACCUM_L,(0<<WGM22)|(0<<WGM21)|(0<<WGM20)            ;Normal mode
+	STS TCCR2A,ACCUM_L
+	LDI ACCUM_L,(0<<CS22)|(1<<CS21)|(0<<CS20)				;/8
+	STS TCCR2B,ACCUM_L
+	STS TCNT2,C0x00
+	LDI ACCUM_L,(1<<TOV2)
+	STS TIFR2,ACCUM_L
+	LDI ACCUM_L,(1<<TOIE2)                                   ;Overflow Interrupt Enable
+	STS TIMSK2,ACCUM_L
 .ENDMACRO

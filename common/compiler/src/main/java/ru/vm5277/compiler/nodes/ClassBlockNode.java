@@ -26,20 +26,20 @@ import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 import ru.vm5277.common.lexer.Keyword;
+import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 
 public class ClassBlockNode extends AstNode {
 	protected	List<AstNode>	children	= new ArrayList<>();
 	private		ClassNode		classNode;
 	
-	public ClassBlockNode(TokenBuffer tb, MessageContainer mc, ClassNode classNode) throws CompileException {
-		super(tb, mc);
+	public ClassBlockNode(Instance inst, TokenBuffer tb, ClassNode classNode) throws CompileException {
+		super(inst, tb);
         
 		this.classNode = classNode;
 		
@@ -50,29 +50,28 @@ public class ClassBlockNode extends AstNode {
 
 			// Обработка классов с модификаторами
 			if (tb.match(TokenType.OOP, J8BKeyword.CLASS)) {
-				ClassNode cNode = new ClassNode(tb, mc, modifiers, true, null);
+				ClassNode cNode = new ClassNode(inst, tb, modifiers, true, classNode.getImported());
 				children.add(cNode);
 				continue;
 			}
 			// Обработка enum с модификаторами
 			if (tb.match(TokenType.OOP) && J8BKeyword.ENUM == tb.current().getValue()) {
-				EnumNode eNode = new EnumNode(tb, mc, modifiers);
+				EnumNode eNode = new EnumNode(inst, tb, modifiers);
 				children.add(eNode);
 				continue;
 			}
 			// Обработка интерфейсов с модификаторами
 			if (tb.match(TokenType.OOP, J8BKeyword.INTERFACE)) {
-				InterfaceNode iNode = new InterfaceNode(tb, mc, modifiers, null, null);
+				InterfaceNode iNode = new InterfaceNode(inst, tb, modifiers, null, classNode.getImported());
 				children.add(iNode);
 				continue;
 			}
 			// Обработка exception с модификаторами
 			if (tb.match(TokenType.OOP, J8BKeyword.EXCEPTION)) {
-				ExceptionNode eNode = new ExceptionNode(tb, mc, modifiers, null);
+				ExceptionNode eNode = new ExceptionNode(inst, tb, modifiers, null);
 				children.add(eNode);
 				continue;
 			}
-
 
 			// Определение типа (примитив, класс или конструктор)
 			VarType type = checkPrimtiveType();
@@ -95,22 +94,22 @@ public class ClassBlockNode extends AstNode {
 
 			if(tb.match(Delimiter.LEFT_PAREN)) { //'(' Это метод
 				if(isClassName) {
-					children.add(new MethodNode(tb, mc, modifiers, null, classNode.getName(), classNode));
+					children.add(new MethodNode(inst, tb, modifiers, null, classNode.getName(), classNode));
 				}
 				else {
-					children.add(new MethodNode(tb, mc, modifiers, type, name, classNode));
+					children.add(new MethodNode(inst, tb, modifiers, type, name, classNode));
 				}
 				continue;
 			}
 
 			if(null != type) {
-				children.add(new FieldNode(tb, mc, classNode, modifiers, type, name));
+				children.add(new FieldNode(inst, tb, classNode, modifiers, type, name));
 				continue;
 			}
 
 			if(tb.match(Delimiter.LEFT_BRACE)) {
 				try {
-					children.add(new BlockNode(tb, mc, "class '" + name + "'"));
+					children.add(new BlockNode(inst, tb, "class '" + name + "'"));
 				}
 				catch(CompileException e) {}
 				continue;
@@ -123,8 +122,8 @@ public class ClassBlockNode extends AstNode {
 		try {consumeToken(tb, Delimiter.RIGHT_BRACE);}catch(CompileException e) {markFirstError(e);}
     }
 
-	public ClassBlockNode(MessageContainer mc) throws CompileException {
-		super(null, mc);
+	public ClassBlockNode(Instance inst) throws CompileException {
+		super(inst, null);
 	}
 	
 	@Override
@@ -225,12 +224,12 @@ public class ClassBlockNode extends AstNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 		
 		for(AstNode node : children) {
-			node.codeGen(cg, cgScope, false, excs);
+			node.codeGen(cg, false, excs);
 		}
 		
 		return null;

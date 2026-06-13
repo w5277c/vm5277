@@ -60,14 +60,20 @@ public class Node {
 				throw new CompileException("Expected delimiter " + delimiter + ", but got " + tb.current().getValue(), tb.getSP());
 			}
         }
-		else throw new CompileException("Expected " + TokenType.DELIMITER + ", but got " + tb.current().getType(), tb.getSP());
+		else {
+			throw new CompileException("Expected " + TokenType.DELIMITER + ", but got " + tb.current().getType(), tb.getSP());
+		}
     }
 	public static Token consumeToken(TokenBuffer tb, Operator operator) throws CompileException {
 		if (TokenType.OPERATOR == tb.current().getType()) {
             if(operator == tb.current().getValue()) return tb.consume();
-			else throw new CompileException("Expected operator " + operator + ", but got " + tb.current().getValue(), tb.getSP());
+			else {
+				throw new CompileException("Expected operator " + operator + ", but got " + tb.current().getValue(), tb.getSP());
+			}
         }
-		else throw new CompileException("Expected " + TokenType.OPERATOR + ", but got " + tb.current().getType(), tb.getSP());
+		else {
+			throw new CompileException("Expected " + TokenType.OPERATOR + ", but got " + tb.current().getType(), tb.getSP());
+		}
     }
 
 	public WarningMessage markWarning(String text) {

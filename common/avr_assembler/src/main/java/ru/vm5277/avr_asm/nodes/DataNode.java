@@ -26,6 +26,7 @@ import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.avr_asm.semantic.LiteralExpression;
 import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.avr_asm.semantic.IdExpression;
+import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.exceptions.CompileException;
@@ -59,7 +60,7 @@ public class DataNode extends Node {
 			while(true) {
 				SourcePosition _sp = tb.getSP();
 				byte[] tmp = null;
-				Expression expr = Expression.parse(tb, scope, mc);
+				Expression expr = Expression.parse(tb, scope, mc, null);
 				if(expr instanceof LiteralExpression && ((LiteralExpression)expr).getValue() instanceof String) {
 					tmp = ((String)((LiteralExpression)expr).getValue()).getBytes(StandardCharsets.US_ASCII);
 					if(scope.isListEnabled()) {
@@ -116,10 +117,10 @@ public class DataNode extends Node {
 			
 			if(0 != baos.size()) {
 				if(0 != (baos.size()&0x01)) {
-					if(Assembler.STRICT_STRONG == Scope.getStrincLevel()) {
+					if(StrictLevel.STRONG==Scope.getStrincLevel()) {
 						throw new CompileException("Odd-sized FLASH data", sp);
 					}
-					else if(Assembler.STRICT_LIGHT == Scope.getStrincLevel()) {
+					else if(StrictLevel.LIGHT==Scope.getStrincLevel()) {
 						mc.add(new WarningMessage("Odd-sized FLASH data", sp));
 					}
 					baos.write(0x00);

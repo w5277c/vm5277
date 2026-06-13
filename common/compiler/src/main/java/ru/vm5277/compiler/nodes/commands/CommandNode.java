@@ -22,9 +22,9 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import ru.vm5277.common.AssemblerInterface;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
@@ -38,6 +38,7 @@ import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.lexer.tokens.TNumber;
 import ru.vm5277.common.lexer.tokens.Token;
+import ru.vm5277.compiler.Instance;
 
 public abstract class CommandNode extends AstNode {
 	public static class AstCase extends AstNode {
@@ -110,8 +111,8 @@ public abstract class CommandNode extends AstNode {
 
 	protected	CGScope	cgScope;
 	
-	public CommandNode(TokenBuffer tb, MessageContainer mc) {
-		super(tb, mc);
+	public CommandNode(Instance inst, TokenBuffer tb) {
+		super(inst, tb);
 	}
 	
 	protected boolean isLoopNode(CommandNode node) {
@@ -138,7 +139,7 @@ public abstract class CommandNode extends AstNode {
 		return false;
 	}
 	
-	protected AstCase parseCase(TokenBuffer tb, MessageContainer mc) throws CompileException {
+	protected AstCase parseCase(Instance inst, TokenBuffer tb) throws CompileException {
 		consumeToken(tb); // Потребляем "case"
 
 		// Парсим значение или диапазон
@@ -154,10 +155,10 @@ public abstract class CommandNode extends AstNode {
 				}
 				for(int i=num; i<=to; i++) {
 					if(!values.add(i)) {
-						if(AssemblerInterface.STRICT_STRONG==Main.getStrictLevel()) {
+						if(StrictLevel.STRONG==Main.getStrictLevel()) {
 							throw new CompileException("Duplicate case value: " + i);
 						}
-						else if(AssemblerInterface.STRICT_LIGHT==Main.getStrictLevel()) {
+						else if(StrictLevel.LIGHT==Main.getStrictLevel()) {
 							markWarning("Duplicate case value: " + i);
 						}
 					}
@@ -165,10 +166,10 @@ public abstract class CommandNode extends AstNode {
 			}
 			else {
 				if(!values.add(num)) {
-					if(AssemblerInterface.STRICT_STRONG==Main.getStrictLevel()) {
+					if(StrictLevel.STRONG==Main.getStrictLevel()) {
 						throw new CompileException("Duplicate case value: " + num);
 					}
-					else if(AssemblerInterface.STRICT_LIGHT==Main.getStrictLevel()) {
+					else if(StrictLevel.LIGHT==Main.getStrictLevel()) {
 						markWarning("Duplicate case value: " + num);
 					}
 				}
@@ -183,7 +184,7 @@ public abstract class CommandNode extends AstNode {
 		consumeToken(tb, Delimiter.COLON);
 		
 		BlockNode blockNode = null;
-		blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "command") : new BlockNode(tb, mc, parseStatement(), "command");
+		blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(inst, tb, "command") : new BlockNode(inst, tb, parseStatement(inst), "command");
 		
 		return new AstCase(values, blockNode);
 	}

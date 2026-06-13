@@ -24,13 +24,15 @@ import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.Scope;
 import static ru.vm5277.compiler.Main.debugAST;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.cg.CGExcs;
+import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.EnumScope;
 import ru.vm5277.compiler.semantic.ExceptionScope;
+import ru.vm5277.compiler.semantic.InterfaceScope;
 
 //Выражение описывающее доступ к типу которое может состоять из других типпов (по аналогии с FS: путь к файлу, без имени саммого файла, только директории)
 public class TypeReferenceExpression extends ExpressionNode {
@@ -38,24 +40,24 @@ public class TypeReferenceExpression extends ExpressionNode {
 	private				String					lastId;
 	protected			CIScope					cis;
 	
-	public TypeReferenceExpression(TokenBuffer tb, MessageContainer mc, TypeReferenceExpression parentExpr, String lastId) {
-		super(tb, mc);
+	public TypeReferenceExpression(Instance inst, TokenBuffer tb, TypeReferenceExpression parentExpr, String lastId) {
+		super(inst, tb);
 		
 		this.parentExpr = parentExpr;
 		this.lastId = lastId;
 	}
 
 	// Для Enum
-	public TypeReferenceExpression(TokenBuffer tb, MessageContainer mc, TypeReferenceExpression parentExpr, String lastId, VarType type) {
-		super(tb, mc);
+	public TypeReferenceExpression(Instance inst, TokenBuffer tb, TypeReferenceExpression parentExpr, String lastId, VarType type) {
+		super(inst, tb);
 		
 		this.parentExpr = parentExpr;
 		this.lastId = lastId;
 		this.type = type;
 	}
 
-	public TypeReferenceExpression(TokenBuffer tb, MessageContainer mc, TypeReferenceExpression parentExpr, String lastId, CIScope cis) {
-		super(tb, mc);
+	public TypeReferenceExpression(Instance inst, TokenBuffer tb, TypeReferenceExpression parentExpr, String lastId, CIScope cis) {
+		super(inst, tb);
 		
 		this.parentExpr = parentExpr;
 		this.lastId = lastId;
@@ -95,11 +97,11 @@ public class TypeReferenceExpression extends ExpressionNode {
 		if(null!=parentExpr) {
 			result&=parentExpr.declare(scope);
 			if(null!=parentExpr.getScope()) {
-				cis = parentExpr.getScope().resolveCI(lastId, true);
+				cis = parentExpr.getScope().resolveCI(null, lastId, true);
 			}
 		}
 		else {
-			cis = scope.getThis().resolveCI(lastId, false);
+			cis = scope.getThis().resolveCI(null, lastId, false);
 		}
 
 		if(null==cis) {
@@ -111,7 +113,7 @@ public class TypeReferenceExpression extends ExpressionNode {
 			if(cis instanceof ExceptionScope) {
 				type = VarType.EXCEPTION;
 			}
-			else if(cis instanceof ClassScope || cis instanceof EnumScope) {
+			else if(cis instanceof ClassScope || cis instanceof EnumScope || cis instanceof InterfaceScope) {
 				type = VarType.fromClassName((((CIScope)cis).getName()));
 			}
 			else {
@@ -160,7 +162,7 @@ public class TypeReferenceExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		//cg.setAcc(new Operand(VarType.CLASS, OperandType.TYPE, varType.getId()));
 		return null;
 	}

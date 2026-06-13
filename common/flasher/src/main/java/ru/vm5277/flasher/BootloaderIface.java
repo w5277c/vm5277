@@ -24,10 +24,10 @@ import jssc.SerialPortException;
 import jssc.SerialPortList;
 import jssc.SerialPortTimeoutException;
 import ru.vm5277.common.DatatypeConverter;
-import ru.vm5277.common.PlatformType;
+import ru.vm5277.common.enums.PlatformType;
 import ru.vm5277.common.bldr.BldrRequest;
 import ru.vm5277.common.bldr.BldrResult;
-import ru.vm5277.common.bldr.BldrType;
+import ru.vm5277.common.enums.BldrType;
 import ru.vm5277.common.firmware.Segment;
 
 public class BootloaderIface implements Closeable {
@@ -36,6 +36,8 @@ public class BootloaderIface implements Closeable {
 		private	byte			bldrVersion;
 		private	PlatformType	platform;
 		private	int				signature;
+		private	short			stdinPort		= 0xff;
+		private	short			stdoutPort		= 0xff;
 		private byte[]			uid				= new byte[0x08];
 		private	short			fwVersion;
 		private	boolean			singleWireMode	= true;
@@ -49,6 +51,8 @@ public class BootloaderIface implements Closeable {
 			bldrVersion = ((byte)(data[offset++]&0x3f));
 			platform = PlatformType.values()[data[offset++]];
 			signature = ((data[offset++]&0xff)<<0x18) + ((data[offset++]&0xff)<<0x10) + ((data[offset++]&0xff)<<0x08) + (data[offset++]&0xff);
+			stdinPort = ((byte)(data[offset++]&0xff));
+			stdoutPort = ((byte)(data[offset++]&0xff));
 			System.arraycopy(data, offset, uid, 0x00, 0x08);
 			offset+=0x08;
 			fwVersion = data[offset];
@@ -78,10 +82,32 @@ public class BootloaderIface implements Closeable {
 			return signature;
 		}
 		
+		public short getStdinPort() {
+			return stdinPort;
+		}
+		public short getStdoutPort() {
+			return stdoutPort;
+		}
+		
+		public String getStdioStr() {
+			if(0xff==stdoutPort) {
+				return null;
+			}
+			if(0xff==stdinPort) {
+				return "P" + String.valueOf((char)('A' + (stdoutPort >> 0x04))) + (stdoutPort&0x0f);
+			}
+			else {
+				return	"P" + String.valueOf((char)('A' + (stdinPort >> 0x04))) + (stdinPort&0x0f) + "/" +
+						"P" + String.valueOf((char)('A' + (stdoutPort >> 0x04))) + (stdoutPort&0x0f);
+			}
+		}
+		
 		@Override
 		public String toString() {
+			String stdioStr = getStdioStr();
 			return	"BLDR " + bldrType.toString() + " v." + String.format("%02x", bldrVersion) + ": " +
-					platform + ", sig:" + String.format("%08x", signature) + ", uid:" + DatatypeConverter.printHexBinary(uid);
+					platform.name() + ", sig:" + String.format("%08x", signature) + ", uid:" + DatatypeConverter.printHexBinary(uid) +
+					(null==stdioStr ? "" : ", stdio port:" + stdioStr);
 		}
 	}
 
@@ -107,11 +133,11 @@ public class BootloaderIface implements Closeable {
 			SerialPort sp = open(deviceName, waitTime);
 			if(null!=sp) {
 				serialPort = sp;
-				Main.showMsg("\n", true);
+				Main.showMsg("\n", false);
 				return true;
 			}
 			else {
-				Main.showMsg("\n", true);
+				Main.showMsg("\n", false);
 				Main.showErr(	"[ERROR] Bootloader handshake failed at " + cpuFreq + "MHz. Verify device " + deviceName  +
 								" has vm5277 bootloader and is connected.");
 			}
@@ -122,9 +148,9 @@ public class BootloaderIface implements Closeable {
 			long timestamp = System.currentTimeMillis();
 			String progress = "|/-\\";
 			int progressPos=0;
-			Main.showMsg(""+progress.charAt(progressPos++), true);
+			if(0!=waitTime) Main.showMsg(""+progress.charAt(progressPos++), true);
 			while(firstIter || ((System.currentTimeMillis()-timestamp) < waitTime)) {
-				Main.showMsg("\b"+progress.charAt(progressPos++), true);
+				if(0!=waitTime) Main.showMsg("\b"+progress.charAt(progressPos++), true);
 				if(progressPos==progress.length()) progressPos=0;
 				firstIter = false;
 				String[] serialPortsNames = SerialPortList.getPortNames();
@@ -133,15 +159,15 @@ public class BootloaderIface implements Closeable {
 						SerialPort sp = open(spName, -1);
 						if(null!=sp) {
 							serialPort = sp;
-							Main.showMsg("\b", true);
+							if(0!=waitTime) Main.showMsg("\b", true);
 							return true;
 						}
 					}
 				}
 				try {Thread.sleep(20);}catch(Exception ex) {}
 			}
-			Main.showMsg("\b", true);
-			Main.showErr("[ERROR] No VM5277 bootloader found at " + cpuFreq + "MHz. Verify device has vm5277 bootloader and is connected");
+			if(0!=waitTime) Main.showMsg("\b", true);
+			Main.showErr("[ERROR] No vm5277 bootloader found at " + cpuFreq + "MHz. Verify device has vm5277 bootloader and is connected");
 			return false;
 		}
 	}
@@ -149,9 +175,11 @@ public class BootloaderIface implements Closeable {
 	private SerialPort open(String spName, int _waitTime) {
 		int retryCntr = 1;
 		for(; retryCntr<=retries; retryCntr++) {
+			SerialPort _serialPort = null;
 			try {
-				SerialPort _serialPort = new SerialPort(spName);
+				_serialPort = new SerialPort(spName);
 				if(_serialPort.openPort()) {
+					Thread.sleep(100); // Фикс для адруино, при подключении МК аппаратно перезагружается
 					long timestamp = System.currentTimeMillis();
 					_serialPort.setParams(baudrate, 8, 1, SerialPort.PARITY_NONE);
 					while(_serialPort.isOpened()) {
@@ -176,11 +204,13 @@ public class BootloaderIface implements Closeable {
 						Thread.sleep(10);
 					}
 				}
-				Thread.sleep(50);
+				else {
+					Thread.sleep(50);
+				}
 			}
 			catch(Exception ex) {
 			}
-			try {serialPort.closePort();}catch(Exception ex2) {}
+			try {_serialPort.closePort();}catch(Exception ex2) {}
 		}
 		return null;
 	}
@@ -201,15 +231,15 @@ public class BootloaderIface implements Closeable {
 			sp.writeBytes(requestData);
 			byte[] recvData = readWithTimeout(sp, 1024, 20);
 			if(null!=recvData) {
-				if(0x14==recvData.length && BldrResult.MAGIC==recvData[0x00] && checkXORSumm(recvData, 0x00, 0x14) && 0x0f==getDataSize(recvData, 0x00,
+				if(0x16==recvData.length && BldrResult.MAGIC==recvData[0x00] && checkXORSumm(recvData, 0x00, 0x16) && 0x11==getDataSize(recvData, 0x00,
 																																		recvData.length)) {
 					DeviceInfo dInfo = new DeviceInfo(false);
 					dInfo.parse(recvData, 0x04);
 					return dInfo;
 				}
-				if(requestData.length+0x14==recvData.length && BldrResult.MAGIC==recvData[requestData.length] &&
-					checkXORSumm(recvData, requestData.length, 0x14) &&
-					0x0f==getDataSize(recvData, requestData.length, recvData.length-requestData.length)) {
+				if(requestData.length+0x16==recvData.length && BldrResult.MAGIC==recvData[requestData.length] &&
+					checkXORSumm(recvData, requestData.length, 0x16) &&
+					0x11==getDataSize(recvData, requestData.length, recvData.length-requestData.length)) {
 
 					DeviceInfo dInfo = new DeviceInfo(true);
 					dInfo.parse(recvData, requestData.length+0x04);

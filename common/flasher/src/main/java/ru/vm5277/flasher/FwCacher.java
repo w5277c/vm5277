@@ -23,7 +23,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Scanner;
 import ru.vm5277.common.DatatypeConverter;
-import ru.vm5277.common.PlatformType;
+import ru.vm5277.common.enums.PlatformType;
 import ru.vm5277.common.firmware.IntelHex.IntelHexParser;
 
 public class FwCacher {
@@ -93,7 +93,7 @@ public class FwCacher {
 	
 
 	private static String buildFilename(PlatformType _platform, int _signature, byte[] _uid) {
-		return	_platform.toString().toLowerCase() + "-" + String.format("%08X", _signature) + File.separator +
+		return	_platform.name().toLowerCase() + "-" + String.format("%08X", _signature) + File.separator +
 				DatatypeConverter.printHexBinary(_uid) + ".bin";
 	}
 }

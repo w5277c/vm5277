@@ -68,7 +68,8 @@ public class CGIAsm extends CGItem {
 	
 	@Override
 	public String getSource() {
-		return "\t" + getText() + "\n";
+		String tmp = getText();
+		return null==tmp ? "" : "\t" + getText() + "\n";
 	}
 	
 	@Override

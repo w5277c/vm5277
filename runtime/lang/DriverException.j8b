@@ -1,0 +1,9 @@
+public exception DriverException extends RuntimeException {
+	NO_RESPONSE,
+	INIT_FAILED,
+	TIMEOUT,
+	NOT_SUPPORTED,
+	NOT_FOUND,
+	CHECKSUM_ERROR,
+	BUSY;
+}

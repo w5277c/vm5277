@@ -19,16 +19,16 @@ package ru.vm5277.compiler.nodes.commands;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
-import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.CGBranch;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.CodegenResult;
+import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -39,7 +39,7 @@ import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.Instance;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
@@ -59,8 +59,8 @@ public class ForNode extends CommandNode {
 	private	boolean			alwaysTrue;
 	private	boolean			alwaysFalse;
 	
-    public ForNode(TokenBuffer tb, MessageContainer mc) {
-        super(tb, mc);
+    public ForNode(Instance inst, TokenBuffer tb) {
+        super(inst, tb);
         
         consumeToken(tb); // Потребляем "for"
         try {consumeToken(tb, Delimiter.LEFT_PAREN);} catch(CompileException e) {markFirstError(e);}
@@ -78,10 +78,10 @@ public class ForNode extends CommandNode {
 				if(null != type) {
 					String name = null;
 					try {name = consumeToken(tb, TokenType.IDENTIFIER).getStringValue();} catch(CompileException e) {markFirstError(e);}
-					this.init = new VarNode(tb, mc, new HashSet<>(), type, name);
+					this.init = new VarNode(inst, tb, new HashSet<>(), type, name);
 				}
 				else {
-					this.init = new ExpressionNode(tb, mc).parse();
+					this.init = new ExpressionNode(inst, tb).parse();
 					try {consumeToken(tb, Delimiter.SEMICOLON);} catch(CompileException e) {markFirstError(e);}
 				}
 			}
@@ -101,7 +101,7 @@ public class ForNode extends CommandNode {
         
         // Условие
         try {
-			this.condition = (tb.match(Delimiter.SEMICOLON) ? null : new ExpressionNode(tb, mc).parse());
+			this.condition = (tb.match(Delimiter.SEMICOLON) ? null : new ExpressionNode(inst, tb).parse());
 		}
 		catch(CompileException e) {
 			markFirstError(e);
@@ -115,7 +115,7 @@ public class ForNode extends CommandNode {
         
         // Итерация
         try {
-			this.iteration = (tb.match(Delimiter.RIGHT_PAREN) ? null : new ExpressionNode(tb, mc).parse());
+			this.iteration = (tb.match(Delimiter.RIGHT_PAREN) ? null : new ExpressionNode(inst, tb).parse());
 		}
 		catch(CompileException e) {
 			markFirstError(e);
@@ -130,7 +130,7 @@ public class ForNode extends CommandNode {
 		
         // Основной блок
 		try {
-			blockNode = (tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "body") : new BlockNode(tb, mc, parseStatement(), "body"));
+			blockNode = (tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(inst, tb, "body") : new BlockNode(inst, tb, parseStatement(inst), "body"));
 		}
 		catch(CompileException e) {
 			markFirstError(e);
@@ -140,7 +140,7 @@ public class ForNode extends CommandNode {
         if(tb.match(J8BKeyword.ELSE)) {
 			consumeToken(tb);
 			try {
-				elseBlockNode = (tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "else") : new BlockNode(tb, mc, parseStatement(), "else"));
+				elseBlockNode = (tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(inst, tb, "else") : new BlockNode(inst, tb, parseStatement(inst), "else"));
 			}
 			catch(CompileException e) {
 				markFirstError(e);
@@ -180,10 +180,10 @@ public class ForNode extends CommandNode {
         sb.append(condition != null ? condition : ";");
         sb.append(iteration != null ? iteration : "");
         sb.append(") ");
-        sb.append(getBody());
+        sb.append(blockNode);
         
-        if(getElseBlock()!=null) {
-            sb.append(" else ").append(getElseBlock());
+        if(null!=elseBlockNode) {
+            sb.append(" else ").append(elseBlockNode);
         }
         
         return sb.toString();
@@ -233,7 +233,7 @@ public class ForNode extends CommandNode {
 		debugAST(this, DECLARE, true, getFullInfo());
 		
 		// Создаем новую область видимости для всего цикла
-		forScope = new BlockScope(scope);
+		forScope = new BlockScope(scope, false);
 
 		// Объявление блока инициализации
 		if(null!=init) {
@@ -252,13 +252,13 @@ public class ForNode extends CommandNode {
 
 		// Объявление тела цикла
 		if(null!=blockNode) {
-			bodyScope = new BlockScope(forScope);
+			bodyScope = new BlockScope(forScope, true);
 			result&=blockNode.declare(bodyScope);
 		}
 		
 		// Объявление else-блока (если есть)
 		if(null!=elseBlockNode) {
-			elseScope = new BlockScope(forScope);
+			elseScope = new BlockScope(forScope, false);
 			result&=elseBlockNode.declare(elseScope);
 		}
 		
@@ -319,8 +319,8 @@ public class ForNode extends CommandNode {
 		}
 
 		// Анализ тела цикла
-		if(null!=getBody()) {
-			getBody().postAnalyze(bodyScope, cg, cgScope);
+		if(null!=blockNode) {
+			blockNode.postAnalyze(bodyScope, cg, cgScope);
 		}
 		
 		// Помещаем метку на блок управления переменной
@@ -342,12 +342,12 @@ public class ForNode extends CommandNode {
 		// Помещаем метку else блока
 		cgScope.append(((CGLoopBlockScope)cgScope).getElseLbScope());
 		// Анализ else-блока
-		if(null!=getElseBlock()) {
-			getElseBlock().postAnalyze(elseScope, cg, cgScope);
+		if(null!=elseBlockNode) {
+			elseBlockNode.postAnalyze(elseScope, cg, cgScope);
 		}
 		
 		// Проверяем бесконечный цикл с возвратом
-		if(condition instanceof LiteralExpression && Boolean.TRUE.equals(((LiteralExpression)condition).getValue()) && isControlFlowInterrupted(getBody())) {
+		if(condition instanceof LiteralExpression && Boolean.TRUE.equals(((LiteralExpression)condition).getValue()) && isControlFlowInterrupted(blockNode)) {
 			markWarning("Code after infinite while loop is unreachable");
 		}
 
@@ -434,7 +434,7 @@ public class ForNode extends CommandNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
 		
@@ -444,30 +444,46 @@ public class ForNode extends CommandNode {
 			cgScope.setBranch(branch);
 
 			if(null!=init) {
-				init.codeGen(cg, null, false, excs);
+				init.codeGen(cg, false, excs);
 			}
 //TODO См. в IfNode, необходима проверка на результат condition.codeGen	
 			if(null!=condition && !alwaysTrue) {
-				condition.codeGen(cg, null, false, excs);
+				Object obj = condition.codeGen(cg, false, excs);
+//TODO				if(obj==CodegenResult.TRUE) {
+//					return trueExpr.codeGen(cg, toAccum, excs);
+//				}
+//				else if(obj==CodegenResult.FALSE) {
+//					return falseExpr.codeGen(cg, toAccum, excs);
+//				}
+//				else
+				if(obj==CodegenResult.RESULT_IN_ACCUM) {
+					cg.boolAccCond(cgScope, branch, true);
+				}
+				else if(obj==CodegenResult.RESULT_IN_FLAG) {
+					cg.boolFlagCond(cgScope, false, branch);
+				}
+				else if(obj==CodegenResult.RESULT_IN_INV_FLAG) {
+					cg.boolFlagCond(cgScope, true, branch);
+				}
 			}
 
 			if(null!=blockNode) {
-				blockNode.codeGen(cg, null, false, excs);
+				blockNode.codeGen(cg, false, excs);
 			}
 
 			if(null!=iteration) {
-				iteration.codeGen(cg, null, false, excs);
+				iteration.codeGen(cg, false, excs);
 			}
 
 			cg.jump(jumpNext, ((CGLoopBlockScope)cgScope).getStartLbScope());
 		}
 		
 		if(null!=elseBlockNode) {
-			elseBlockNode.codeGen(cg, null, false, excs);
+			elseBlockNode.codeGen(cg, false, excs);
 		}
 		
 		((CGBlockScope)cgScope).build(cg, false, excs);
-		((CGBlockScope)cgScope).restoreRegsPool();
+		((CGBlockScope)cgScope).releaseRegsPool();
 
 		return result;
 	}

@@ -15,7 +15,9 @@
  */
 package ru.vm5277.common.cg;
 
-public class RegPair {
+import ru.vm5277.common.exceptions.CompileException;
+
+public class RegPair implements Comparable<RegPair> {
 	private	byte	reg;
 	private	boolean	free	= true;
 	
@@ -30,12 +32,18 @@ public class RegPair {
 	public boolean isFree() {
 		return free;
 	}
-	public void setFree(boolean free) {
+	public void setFree(boolean free) throws CompileException {
+		if(this.free==free) throw new CompileException("Double " + (free ? "free" : "use") + " for r" + reg);
 		this.free = free;
 	}
 	
 	@Override
 	public String toString() {
-		return free ? Byte.toString(reg) : "";
+		return Byte.toString(reg) + (free ? "[FREE]" : "[USED]");
+	}
+
+	@Override
+	public int compareTo(RegPair pair) {
+		return Byte.compare(reg, pair.getReg());
 	}
 }

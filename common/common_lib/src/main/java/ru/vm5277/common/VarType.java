@@ -25,6 +25,10 @@ import java.util.Set;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class VarType {
+	public	static	final	String					CLASSNAME_MAIN		= "Main";
+	public	static	final	String					CLASSNAME_THREAD	= "Thread";
+	public	static	final	String					CLASSNAME_TIMER		= "Timer";
+	
 	public	static	final	double					FIXED_MIN			= -128.0d;
 	public	static	final	double					FIXED_MAX			= 127.99609375d;
 	private	static	final	Map<String, VarType>	CLASS_TYPES			= new HashMap<>();
@@ -38,19 +42,20 @@ public class VarType {
 	public	static	final	VarType			VOID		= new VarType(1, "void");
 	public	static	final	VarType			BOOL		= new VarType(2, "bool");
 	public	static	final	VarType			BYTE		= new VarType(3, "byte");
-	public	static	final	VarType			SHORT		= new VarType(4, "short");
-	public	static	final	VarType			INT			= new VarType(5, "int");
-	public	static	final	VarType			FIXED		= new VarType(6, "fixed") {
+	public	static	final	VarType			CHAR		= new VarType(4, "char");
+	public	static	final	VarType			SHORT		= new VarType(5, "short");
+	public	static	final	VarType			INT			= new VarType(6, "int");
+	public	static	final	VarType			FIXED		= new VarType(7, "fixed") {
 		@Override
 		public boolean isFixedPoint() { return true; }
 	};
-	public	static	final	VarType			CSTR		= new VarType(7, "cstr");
-	public	static	final	VarType			NULL		= new VarType(8, "null");
+	public	static	final	VarType			CSTR		= new VarType(8, "cstr");
+	public	static	final	VarType			NULL		= new VarType(9, "null");
 	public	static	final	VarType			EXCEPTION	= new VarType(-1, "exception");
 	public	static	final	VarType			CLASS		= new VarType(-1, "class");
 	public	static	final	VarType			UNKNOWN		= new VarType(-1, "?");
 		
-	private	static			int				idCntr		= 9;
+	private	static			int				idCntr		= 10;
 
 	private					int				id;
 	private			final	String			name;
@@ -78,14 +83,14 @@ public class VarType {
 
 	// Конструктор для массивов
     public static VarType arrayOf(VarType elementType) {
-        VarType type = new VarType(9, "array");
+        VarType type = new VarType(10, "array");
         type.isArray = true;
         type.elementType = elementType;
         return type;
     }
 	
 	public static VarType arrayOf(VarType elementType, int size) {
-		VarType type = new VarType(9, "array");
+		VarType type = new VarType(10, "array");
 		type.isArray = true;
 		type.elementType = elementType;
 		type.arraySize = size;
@@ -215,16 +220,24 @@ public class VarType {
 		return this == BOOL;
 	}
 	
+	public boolean isString() {
+		return this == CSTR;
+	}
+	
+	public boolean isText() {
+		return this == CSTR || this == CHAR;
+	}
+
 	public boolean isPrimitive() {
-		return this == BOOL || this == BYTE || this == SHORT || this == INT || this == FIXED || this == CSTR;
+		return this == BOOL || this == BYTE || this == CHAR || this == SHORT || this == INT || this == FIXED || this == CSTR;
 	}
 
 	public boolean isNumeric() {
-		return this == BYTE || this == SHORT || this == INT || this == FIXED;
+		return this == BYTE || this == CHAR || this == SHORT || this == INT || this == FIXED;
 	}
 
-	public boolean isIntegral() {
-		return this == BYTE || this == SHORT || this == INT;
+	public boolean isInteger() {
+		return this == BYTE || this == CHAR || this == SHORT || this == INT;
 	}
 
 	public boolean isVoid() {
@@ -244,10 +257,13 @@ public class VarType {
 			throw new CompileException("Value cannot be null");
 		}
 		
-		if(isIntegral()) {
+		if(isInteger()) {
 			long l = value.longValue();
 			if(this==BYTE && (l<0 || l> 0xff)) {
 				throw new CompileException("byte value out of range (0..255). Given:" + l);
+			}
+			if(this==CHAR && (l<0 || l> 0xff)) {
+				throw new CompileException("char value out of range (0..255). Given:" + l);
 			}
 			if(this==SHORT && (l<0 || l> 0xffff)) {
 				throw new CompileException("short value out of range (0..65535). Given: " + l);
@@ -268,6 +284,7 @@ public class VarType {
 		if(this == VOID) return 0;
 		if(this == BOOL) return 1;
 		if(this == BYTE) return 1;
+		if(this == CHAR) return 1;
 		if(this.isEnum) return 1;
 		if(this == SHORT) return 2;
 		if(this == FIXED) return 2;
@@ -280,6 +297,15 @@ public class VarType {
 		return isArray;
 	}
     
+	public static VarType getReference(int refSize) {
+		switch(refSize) {
+			case 0x01: return VarType.BYTE;
+			case 0x02: return VarType.SHORT;
+			default:
+				return VarType.INT;
+		}
+	}
+	
 	public VarType getElementType() {
 		return elementType;
 	}

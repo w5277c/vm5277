@@ -1,0 +1,52 @@
+/*
+ * Copyright 2025 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+class Main {
+    static final short DELAY = 50;
+
+	public static void main() {
+		GPIO.modeOut(GPIO.PB0);
+		GPIO.modeOut(GPIO.PB1);
+		GPIO.modeOut(GPIO.PB2);
+
+		while(true) {
+			for(byte i=0; i<3; i++) {
+			    blinkRed();
+			}
+			for(byte i=0; i<3; i++) {
+			    blinkBlue();
+			}
+			for(byte i=0; i<3; i++) {
+			    blinkGreen();
+			}
+		}
+	}
+
+	public static void blinkRed() {
+	    GPIO.invert(GPIO.PB2);
+	    Thread.sleep(DELAY);
+	}
+
+	public static void blinkGreen() {
+	    GPIO.invert(GPIO.PB1);
+	    Thread.sleep(DELAY);
+	}
+
+	public static void blinkBlue() {
+	    GPIO.invert(GPIO.PB0);
+	    Thread.sleep(DELAY);
+	}
+}

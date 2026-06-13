@@ -46,7 +46,7 @@
 	.EQU	RESP_BLDR_WRONG_PAGESIZE				= 0x8a	;Некорректный размер страницы
 	.EQU	RESP_BLDR_DENIED						= 0x8b	;Отклонено
 
-;Тело запроса REQ_BLDR_INFO (DATA_SIZE:0x0f)
+;Тело запроса REQ_BLDR_INFO (DATA_SIZE:0x11)
 ;+----------------------------------------------+
 ;|0x05:0x01-BLDR VERSION (7,6-type,5-0-version) |			;00-стандартный бутлоадер(atmega), 01-сокращенный(tiny)
 ;+----------------------------------------------+
@@ -54,9 +54,11 @@
 ;+----------------------------------------------+
 ;|0x07:0x04-MCU SIGNATURE                       |
 ;+----------------------------------------------+
-;|0x0b:0x08-MCU UID                             |
+;|0x0b:0x02-STDION RX/TX PORT(S)                |
 ;+----------------------------------------------+
-;|0x13:0x01-FIRMWARE VERSION (0xff-empty)       |
+;|0x0c:0x08-MCU UID                             |
+;+----------------------------------------------+
+;|0x15:0x01-FIRMWARE VERSION (0xff-empty)       |
 ;+----------------------------------------------+
 
 ;Тело запроса REQ_BLDR_PAGE_VERIFY и REQ_BLDR_PAGE_WRITE(DATA_SIZE:0x02+PAGE_SIZE)
@@ -79,11 +81,11 @@
 
 ;Остальные запросы тел не имеют
 
-	.DEF	COK										= r3;
-	.DEF	CMAGIC									= r4;
+	.DEF	COK										= r8;	//=US_CNTR_H
+	.DEF	CMAGIC									= r9;	//=US_CNTR_EL
 
 	.EQU	BITDELAY_CONST							= 0x13
-	.EQU	BLDR_VERSION							= 0b01000000 | 0x00000000 ;7,6 - тип, 5-0 - версия
+	.EQU	BLDR_VERSION							= 0b01000001 | 0x00000001 ;7,6 - тип, 5-0 - версия
 	.EQU	BLDR_START_WADDR						= BOOT_512W_ADDR
 	.EQU	_BLDR_BUFFER_SIZE						= 0x08 + FLASH_PAGESIZE	;Максимально допустимый размер запроса
 	.EQU	_BLDR_PROTOCOL_HEADER_SIZE				= 0x05	;Размер заголовка с учетом XOR SUM
@@ -101,6 +103,11 @@ BLDR_START__DATA:											;BOOT_512W_ADDR+0x05
 	.db	BLDR_VERSION,PLATFORM_ID							;Версия загрузчика и ид типа платформы
 	.db	low(DEVICE_SIGNATURE>>0x18),low(DEVICE_SIGNATURE>>0x10)	;Сигнатура чипа
 	.db	low(DEVICE_SIGNATURE>>0x08),low(DEVICE_SIGNATURE)
+.IFDEF STDIN_PORTNUM
+	.db STDIN_PORTNUM<<0x04|STDIN_PINNUM,STDOUT_PORTNUM<<0x04|STDOUT_PINNUM		;STDIO порт(ы) - для верхнего уровня
+.ELSE 
+	.db 0xff,STDOUT_PORTNUM<<0x04|STDOUT_PINNUM				;Аналогично для 1wire режима
+.ENDIF
 	.db (V_UID>>0x08)&0xff,(V_UID)&0xff						;Уникальный идентификатор чипа (2B-vendor, 6B-device)
 	.db (D_UID>>0x28)&0xff,(D_UID>>0x20)&0xff,(D_UID>>0x18)&0xff,(D_UID>>0x10)&0xff,(D_UID>>0x08)&0xff,(D_UID)&0xff
 .IFDEF KEY1	
@@ -131,15 +138,6 @@ _BLDR_START__DATASKIP:
 
 	EOR FLAGS,FLAGS
 
-;PB2
-SBI DDRB,5
-SBI PORTB,5
-
-SBI PINB,5
-SBI PINB,5
-SBI PINB,5
-SBI PINB,5
-
 .IFDEF STDIO_PORT_REGID
 	CBI STDIO_DDR_REGID,STDIO_PINNUM						;Гарантируем режим входа на пине
 	CBI STDIO_PORT_REGID,STDIO_PINNUM						;Внутренняя подтяжка
@@ -153,14 +151,10 @@ SBI PINB,5
 	LDI ZH,0x00												;Проверка наличия прошивки программы, если 0xffff то прошивка не обнаружена
 	LDI ZL,0x00
 	LPM TEMP_L,Z+
-	CPI TEMP_L,0xff
-	BRNE _BLDR_START__PROGRAMM_DETECTED
-	LPM TEMP_L,Z
-	CPI TEMP_L,0xff
+	LPM TEMP_H,Z
+	AND TEMP_L,TEMP_H
+	INC TEMP_L
 	BREQ _BLDR_START__LOOP									;Если прошивки нет, то переходим сразу в режим бутлоадера
-_BLDR_START__PROGRAMM_DETECTED:
-
-
 
 	LDI TEMP_H,BITDELAY_CONST
 	RCALL _BLDR_UART_BIT_DELAY
@@ -188,13 +182,6 @@ _BLDR_START__WATCHDOG_LOOP:
 
 _BLDR_START__MAIN_LOOP:
 _BLDR_START__LOOP:
-SBI PINB,5
-SBI PINB,5
-SBI PINB,5
-SBI PINB,5
-SBI PINB,5
-SBI PINB,5
-
 	RCALL BLDR_UART_RECV_NR
 	CPI XH,0xff
 	BREQ _BLDR_START__LOOP
@@ -210,7 +197,6 @@ SBI PINB,5
 	CP ACCUM_L,CMAGIC
 	BRNE _BLDR_START__LOOP
 	
-	;RCALL _BLDR_UART_FRAME_DELAY
 	SBIW XL,0x01											;Вычитаем байт XORSUM
 	
 	LDI YH,high(SRAM_START)
@@ -233,9 +219,9 @@ SBI PINB,5
 	ST Y+,CMAGIC
 	ST Y+,COK
 	ST Y+,C0x00
-	LDI ACCUM_L,0x0f
+	LDI ACCUM_L,0x11
 	ST Y+,ACCUM_L
-	LDI TEMP_L,0x0e
+	LDI TEMP_L,0x10
 	LDI ZH,high(BLDR_START__DATA*2)
 	LDI ZL,low(BLDR_START__DATA*2)
 _BLDR_START__LOOP_BLDR_INFO_LOOP:
@@ -247,8 +233,8 @@ _BLDR_START__LOOP_BLDR_INFO_LOOP:
 	LDI ZL,low(BLDR_START_WADDR*2-0x01)
 	LPM ACCUM_L,Z
 	ST Y,ACCUM_L
-	LDI XH,high(_BLDR_PROTOCOL_HEADER_SIZE-0x01+0x0f)
-	LDI XL,low(_BLDR_PROTOCOL_HEADER_SIZE-0x01+0x0f)
+	LDI XH,high(_BLDR_PROTOCOL_HEADER_SIZE-0x01+0x11)
+	LDI XL,low(_BLDR_PROTOCOL_HEADER_SIZE-0x01+0x11)
 	RCALL BLDR_UART_SEND_NR
 	RJMP _BLDR_START__LOOP
 _BLDR_START__LOOP_NOT_BLDR_INFO:
@@ -470,23 +456,13 @@ _BLDR_ANSWER:												;Не восстанавливает X,Y,ACCUM_L,TEMP_H
 ;-----------------------------------------------------------
 	LDI YH,high(SRAM_START)
 	LDI YL,low(SRAM_START)
-	RCALL _BLDR_MAKE_HEADER
-	LDI XH,high(_BLDR_PROTOCOL_HEADER_SIZE-0x01)
-	LDI XL,low(_BLDR_PROTOCOL_HEADER_SIZE-0x01)
-	RJMP BLDR_UART_SEND_NR
-
-;-----------------------------------------------------------
-_BLDR_MAKE_HEADER:											;Не восстанавливает Y
-;-----------------------------------------------------------
-;Заполняем заголовок для ответа
-;IN: ACCUM_L-код ответа
-;-----------------------------------------------------------
 	ST Y+,CMAGIC
 	ST Y+,ACCUM_L
 	ST Y+,C0x00
 	ST Y+,C0x00
-	RET
-
+	LDI XH,high(_BLDR_PROTOCOL_HEADER_SIZE-0x01)
+	LDI XL,low(_BLDR_PROTOCOL_HEADER_SIZE-0x01)
+	RJMP BLDR_UART_SEND_NR
 
 ;===========================================================
 ;========UART=FUNCTIONS=====================================
@@ -628,7 +604,9 @@ BLDR_UART_SEND_BYTE:
 ;-----------------------------------------------------------
 	PUSH_T16
 	PUSH ACCUM_L
-	
+
+	CLI
+
 .IFDEF STDIO_PORT_REGID
 	CBI STDIO_PORT_REGID,STDIO_PINNUM						;Выставляем START
 .ELSE
@@ -663,6 +641,9 @@ BLDR_UART_SEND_BYTE_NR__BITLOOP:
 .ELSE
 	SBI STDOUT_PORT_REGID,STDOUT_PINNUM
 .ENDIF
+
+	SEI
+
 	LDI TEMP_H,BITDELAY_CONST-1
 	RCALL _BLDR_UART_BIT_DELAY
 	
@@ -739,8 +720,10 @@ _BLDR_FLASHPAGE_WRITE_NR__WLOOP:
 	
 	LDI ACCUM_L,(1<<PGWRT)|(1<<SPMEN)
 	RCALL _BLDR_FLASHPAGE_DO_SMP_NR
+.IFDEF RWWSRE
 	LDI ACCUM_L,(1<<RWWSRE)|(1<<SPMEN)
 	RCALL _BLDR_FLASHPAGE_DO_SMP_NR
+.ENDIF
 	RET
 
 ;-----------------------------------------------------------
@@ -751,8 +734,10 @@ _BLDR_FLASHPAGE_ERASE_NR:									;NR-NO_RESTORE - не восстанавлив
 ;-----------------------------------------------------------
 	LDI ACCUM_L,(1<<PGERS)|(1<<SPMEN)
 	RCALL _BLDR_FLASHPAGE_DO_SMP_NR
+.IFDEF RWWSRE
 	LDI ACCUM_L,(1<<RWWSRE)|(1<<SPMEN)
 	RCALL _BLDR_FLASHPAGE_DO_SMP_NR
+.ENDIF
 	RET
 
 ;-----------------------------------------------------------

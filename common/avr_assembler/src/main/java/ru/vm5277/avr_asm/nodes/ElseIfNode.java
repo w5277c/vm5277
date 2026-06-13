@@ -28,8 +28,9 @@ public class ElseIfNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException, CriticalParseException {
 		SourcePosition sp = tb.getSP();
 		Long value = 0x00l;
-		Expression expr = Expression.parse(tb, scope, mc);
-		if(!scope.getIncludeSymbol().isBlockSkip()) {
+		StringBuilder listSb = new StringBuilder();
+		Expression expr = Expression.parse(tb, scope, mc, listSb);
+//		if(!scope.getIncludeSymbol().hasTrue()) {
 			Long _value = Expression.getLong(expr, sp);
 			if(null==_value) {
 				tb.skipLine();
@@ -38,10 +39,10 @@ public class ElseIfNode {
 			else {
 				value = _value;
 			}
-		}
-		scope.getIncludeSymbol().blockElseIf(0x01!=value, sp);
+//		}
+		scope.getIncludeSymbol().blockElseIf(0x01==value, sp);
 		
-		scope.list(".ELSEIF " + " # " + (0 != value));
+		scope.list(".ELSEIF " + listSb.toString() + "#" + (0 != value) + ", " + scope.getIncludeSymbol().debugInfo());
 		
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}

@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+ //TODO похоже в массивах путаница с LE/BE, в основном BE, а должно быть LE
+
 .include "dmem/dram.asm"
 .include "math/mul16.asm"
 
@@ -66,37 +68,38 @@ J8BPROC_ARR_REFCOUNT_DEC:
 ;IN: X-адрес заголовка массива
 ;-----------------------------------------------------------
 	PUSH ACCUM_L
-	PUSH ACCUM_H
-	PUSH XL
-	PUSH XH
 	ADIW XL,0x01
 	LD ACCUM_L,X
 	CPI ACCUM_L,0x00
 	BREQ _J8BPROC_ARR_REFCOUNT__END
 	DEC ACCUM_L
 	ST X,ACCUM_L
-	BRNE _J8BPROC_ARR_REFCOUNT__END
+	BRNE _J8BPROC_ARR_REFCOUNT__END		
+
+	PUSH_Z
+	MOVW ZL,XL
+	SBIW ZL,0x01
 	;Освобождение ресурса
-	PUSH RESULT
-	PUSH FLAGS
+PUSH ACCUM_L
+PUSH RESULT
+PUSH FLAGS
 	SBIW XL,0x01
 	LD RESULT,X												;Загружаю глубину массива
 	MOV FLAGS,RESULT										;Загружаю размер типа
 	ANDI RESULT,0x03
-	PUSH RESULT
+PUSH RESULT
 	SWAP FLAGS
 	ANDI FLAGS,0x03
-	ADIW XL,0x02
 	ADIW XL,0x03
-	LD ACCUM_L,X+											;Загружаю первую размерность
+	LD ACCUM_L,X+											;Загружаю первую размерность (LE)
 	LD ACCUM_H,X+
 	TST RESULT
 	BREQ _J8BPROC_ARR_REFCOUNT__SKIP_LOOP
 	PUSH ACCUM_EL
 	PUSH ACCUM_EH
 _J8BPROC_ARR_REFCOUNT__LOOP:								;Умножаю на последующие размерности(если есть)
-	LD ACCUM_EL, X+
-	LD ACCUM_EH, X+
+	LD ACCUM_EL,X+
+	LD ACCUM_EH,X+
 	MCALL OS_MUL16
 	DEC RESULT
 	BRNE _J8BPROC_ARR_REFCOUNT__LOOP
@@ -112,24 +115,21 @@ _J8BPROC_ARR_REFCOUNT__COMPTOTAL_LOOP:						;Умножаю на размер я
 	DEC FLAGS
 	BRNE _J8BPROC_ARR_REFCOUNT__COMPTOTAL_LOOP
 _J8BPROC_ARR_REFCOUNT__COMPTOTAL_END:
-	POP RESULT												;Добавляем размер заголовка
+POP RESULT												;Добавляем размер заголовка
 	LSL RESULT
 	SUBI RESULT,low(0x100-0x05)
 	ADD ACCUM_L,RESULT
 	ADC ACCUM_H,C0x00
 
-	PUSH ZL
-	PUSH ZH
-	MOVW ZL,XL
+	MOVW XL,ZL
 	MCALL OS_DRAM_FREE
-	POP ZH
-	POP ZL
 
 	POP FLAGS
 	POP RESULT
-	POP XH
-	POP XL
+;	POP XH
+;	POP XL
 	POP ACCUM_H
+	POP_Z
 _J8BPROC_ARR_REFCOUNT__END:
 	POP ACCUM_L
 	RET

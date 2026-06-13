@@ -17,7 +17,7 @@
 package ru.vm5277.avr_asm;
 
 import ru.vm5277.common.lexer.ASMKeyword;
-import ru.vm5277.common.SourceType;
+import ru.vm5277.common.enums.SourceType;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import ru.vm5277.avr_asm.nodes.DataNode;
@@ -45,6 +45,9 @@ public class Parser {
 	
 	public Parser(List<Token> tokens, Scope scope, MessageContainer mc, Map<Path, SourceType> sourcePaths, int tabSize, List<String> includes)
 																																throws CriticalParseException {
+		if(0x01<tokens.size() && TokenType.EOF==tokens.get(tokens.size()-1).getType() && TokenType.NEWLINE!=tokens.get(tokens.size()-2).getType()) {
+			tokens.add(tokens.size()-1, new Token(TokenType.NEWLINE)); 
+		}
 		this.tb = new TokenBuffer(tokens.iterator());
 		this.scope = scope;
 		this.mc = mc;
@@ -55,6 +58,10 @@ public class Parser {
 	}
 	
 	public Parser(List<Token> tokens, Scope scope, MessageContainer mc, Map<Path, SourceType> sourcePaths, int tabSize) throws CriticalParseException {
+		if(0x01<tokens.size() && TokenType.EOF==tokens.get(tokens.size()-1).getType() && TokenType.NEWLINE!=tokens.get(tokens.size()-2).getType()) {
+			tokens.add(tokens.size()-1, new Token(TokenType.NEWLINE)); 
+		}
+		
 		this.tb = new TokenBuffer(tokens.iterator());
 		this.scope = scope;
 		this.mc = mc;
@@ -100,7 +107,7 @@ public class Parser {
 					continue;
 				}
 
-				if(scope.getIncludeSymbol().isBlockSkip()) {
+				if(!scope.getIncludeSymbol().isTrue()) {
 					if(tb.match(TokenType.DIRECTIVE)) {
 						String kd = ((Keyword)tb.consume().getValue()).getName();
 						if(ASMKeyword.IF.getName().equals(kd)) {IfNode.parse(tb, scope, mc); continue;}
@@ -143,6 +150,7 @@ public class Parser {
 						if(ASMKeyword.DW.getName().equals(kd)) {secondPassNodes.add(new DataNode(tb, scope, mc, 2)); continue;}
 						if(ASMKeyword.DD.getName().equals(kd)) {secondPassNodes.add(new DataNode(tb, scope, mc, 4)); continue;}
 						if(ASMKeyword.DQ.getName().equals(kd)) {secondPassNodes.add(new DataNode(tb, scope, mc, 8)); continue;}
+						if(ASMKeyword.RNDB.getName().equals(kd)) {RndDataNode.parse(tb, scope, mc); continue;}
 						if(ASMKeyword.LIST.getName().equals(kd)) {scope.setListEnabled(true); continue;}
 						if(ASMKeyword.NOLIST.getName().equals(kd)) {scope.setListEnabled(false); continue;}
 						if(ASMKeyword.OVERLAP.getName().equals(kd)) {scope.setOverlapAllowed(true); continue;}

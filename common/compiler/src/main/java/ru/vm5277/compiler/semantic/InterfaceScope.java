@@ -21,9 +21,16 @@ import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class InterfaceScope extends CIScope {
+	private	final	String	runtimePatth;
 	
 	public InterfaceScope(String name, Scope parent, List<VarType> impl) throws CompileException {
+		this(name, null, parent, impl);
+	}
+	
+	public InterfaceScope(String name, String runtimePath, Scope parent, List<VarType> impl) throws CompileException {
 		super(parent);
+		
+		this.runtimePatth = runtimePath;
 		
 		if(name==null || name.isEmpty()) {
 			throw new CompileException("Class name cannot be empty");
@@ -31,5 +38,9 @@ public class InterfaceScope extends CIScope {
 		
 		this.name = name;
 		this.implTypes = impl;
+	}
+	
+	public String getRuntimePath() {
+		return runtimePatth;
 	}
 }

@@ -32,7 +32,7 @@ public class LexerTests {
     @Test
     public void testBasicTypesAndKeywords() throws Exception {		
 		String source = "true false null " + 
-						"void bool byte short int fixed cstr " +
+						"void bool byte char short int fixed cstr " +
 						"if do while for return continue break switch " +
 						"static final private public native atomic " +
 						"class interface implements this " +
@@ -41,7 +41,7 @@ public class LexerTests {
 		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
         List<Token> tokens = lexer.getTokens();
         
-        assertEquals(37, tokens.size() - 1); // -1 для EOF
+        assertEquals(38, tokens.size() - 1); // -1 для EOF
         
 		int pos=0;
 		// Проверка литералов
@@ -59,6 +59,8 @@ public class LexerTests {
 		assertEquals(J8BKeyword.BOOL, tokens.get(pos++).getValue());
 		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
 		assertEquals(J8BKeyword.BYTE, tokens.get(pos++).getValue());
+		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
+		assertEquals(J8BKeyword.CHAR, tokens.get(pos++).getValue());
 		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
 		assertEquals(J8BKeyword.SHORT, tokens.get(pos++).getValue());
 		assertEquals(TokenType.TYPE, tokens.get(pos).getType());

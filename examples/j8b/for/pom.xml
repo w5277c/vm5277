@@ -6,7 +6,6 @@
 		<groupId>ru.vm5277.j8b.examples</groupId>
 		<artifactId>j8b-examples-parent</artifactId>
 		<version>1.0-SNAPSHOT</version>
-		<relativePath>../pom.xml</relativePath>
 	</parent>
 
 	<artifactId>for</artifactId>

@@ -15,7 +15,7 @@
  */
 package ru.vm5277.avr_asm.nodes;
 
-import ru.vm5277.common.SourceType;
+import ru.vm5277.common.enums.SourceType;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.HashMap;
@@ -24,6 +24,7 @@ import ru.vm5277.avr_asm.Assembler;
 import ru.vm5277.avr_asm.Parser;
 import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
+import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.exceptions.CriticalParseException;
@@ -55,7 +56,7 @@ public class IncludeNode {
 		}
 
 		if(!scope.addImport(sourcePath.toString())) {
-			if(Assembler.STRICT_STRONG == Scope.getStrincLevel()) {
+			if(StrictLevel.STRONG==Scope.getStrincLevel()) {
 				mc.add(new WarningMessage("File '" + importPath + "' already imported", sp));
 			}
 		}
@@ -67,7 +68,7 @@ public class IncludeNode {
 				Map<Path, SourceType> innerSourcePaths = new HashMap<>(sourcePaths);
 				innerSourcePaths.put(sourcePath.getParent(), SourceType.LIB);
 				parser = new Parser(lexer.getTokens(), scope, mc, innerSourcePaths, tabSize);
-				
+				mc.addLineQnt(lexer.getLinesQnt());
 			}
 			catch(IOException e) {
 				mc.add(new ErrorMessage(e.getMessage(), sp));

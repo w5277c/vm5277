@@ -43,5 +43,6 @@ public class LabelNames {
 	public	static	String	CATCH_SKIP			= PREFIX + "catchskip";
 	public	static	String	THROW_SKIP			= PREFIX + "throwskip";
 	public	static	String	SKIP				= PREFIX + "skip";
+	public	static	String	INVOKE_END			= PREFIX + "invokeend";
 	
 }

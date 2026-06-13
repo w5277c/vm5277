@@ -15,9 +15,11 @@
  */
 package ru.vm5277.common.cg.scopes;
 
-public class CGCommandScope extends CGScope {
-	public CGCommandScope(CGScope parent, String name) {
-		super(parent, -1, name);
+import ru.vm5277.common.cg.CodeGenerator;
+
+public class CGCommandScope extends CGBlockScope {
+	public CGCommandScope(CodeGenerator cg, CGScope parent, String name) {
+		super(cg, parent, -1, name);
 	}
 	
 	@Override

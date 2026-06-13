@@ -16,9 +16,9 @@
 package ru.vm5277.compiler.nodes;
 
 import java.util.List;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
-import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
@@ -27,6 +27,7 @@ import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.Instance;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.Scope;
@@ -36,8 +37,8 @@ public class ParameterNode extends AstNode {
     private	final	String	name;
 	private			boolean	isFinal;
 	
-	public ParameterNode(TokenBuffer tb, MessageContainer mc) throws CompileException {
-		super(tb, mc);
+	public ParameterNode(Instance inst, TokenBuffer tb) throws CompileException {
+		super(inst, tb);
 		
 		if(tb.match(TokenType.MODIFIER, J8BKeyword.FINAL)) {
             consumeToken(tb); // Потребляем 'final'
@@ -52,8 +53,8 @@ public class ParameterNode extends AstNode {
 		name = (String)consumeToken(tb, TokenType.IDENTIFIER).getValue();
 	}
 
-	public ParameterNode(MessageContainer mc, boolean isFinal, VarType type, String name) throws CompileException {
-		super(null, mc);
+	public ParameterNode(Instance inst, boolean isFinal, VarType type, String name) throws CompileException {
+		super(inst, null);
 		
 		this.isFinal = isFinal;
 		this.type = type;
@@ -137,7 +138,7 @@ public class ParameterNode extends AstNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		return null;
 	}
 	

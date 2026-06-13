@@ -17,21 +17,22 @@
 package ru.vm5277.compiler.nodes.commands;
 
 import java.util.List;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
-import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.CodegenResult;
+import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.Instance;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.semantic.MethodScope;
@@ -41,13 +42,13 @@ public class ReturnNode extends CommandNode {
 	private	ExpressionNode	expr;
 	private	VarType			type;
 	
-	public ReturnNode(TokenBuffer tb, MessageContainer mc) {
-		super(tb, mc);
+	public ReturnNode(Instance inst, TokenBuffer tb) {
+		super(inst, tb);
 		
 		consumeToken(tb); // Потребляем "return"
 		
 		try {
-			this.expr = (tb.match(Delimiter.SEMICOLON) ? null : new ExpressionNode(tb, mc).parse());
+			this.expr = (tb.match(Delimiter.SEMICOLON) ? null : new ExpressionNode(inst, tb).parse());
 		}
 		catch(CompileException e) {markFirstError(e);}
         
@@ -64,8 +65,8 @@ public class ReturnNode extends CommandNode {
 		return this;
 	}
 
-	public ReturnNode(MessageContainer mc, ExpressionNode expr) {
-		super(null, mc);
+	public ReturnNode(Instance inst, ExpressionNode expr) {
+		super(inst, null);
 		
 		this.expr = expr;
 	}
@@ -179,14 +180,15 @@ public class ReturnNode extends CommandNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
 
-		//CGScope cgs = (null == parent ? cgScope : parent);
+		CodegenResult result = null;
 		
+		cg.accumLock(type);
 		if(null!=expr) {
-			if(CodegenResult.RESULT_IN_ACCUM!=expr.codeGen(cg, cgScope, true, excs)) {
+			if(CodegenResult.RESULT_IN_ACCUM!=expr.codeGen(cg, true, excs)) {
 				throw new CompileException("Accum not used for operand:" + expr);
 			}
 		}
@@ -204,13 +206,15 @@ public class ReturnNode extends CommandNode {
 			markError("COPMILER BUG: block scope without method scope");
 		}
 		else {
-			cg.jump(cgScope, ((CGBlockScope)scope).getELabel());
+			cg.eReturn(cgScope, type, ((CGBlockScope)scope).getELabel());
 
 			if(null!=expr) {
-				return CodegenResult.RESULT_IN_ACCUM;
+				result = CodegenResult.RESULT_IN_ACCUM;
 			}
 		}
-		return null;
+		
+		cg.accumUnlock();
+		return result;
 	}
 
 	@Override
@@ -220,7 +224,7 @@ public class ReturnNode extends CommandNode {
 	
 	@Override
 	public String toString() {
-		return expr.toString();
+		return null==expr ? "" : expr.toString();
 	}
 
 	public String getFullInfo() {

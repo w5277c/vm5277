@@ -30,7 +30,7 @@ public class EquNode {
 		String name = ((String)Node.consumeToken(tb, TokenType.IDENTIFIER).getValue()).toLowerCase();
 		Node.consumeToken(tb, Operator.ASSIGN);
 		SourcePosition sp = tb.getSP();
-		Expression expr = Expression.parse(tb, scope, mc);
+		Expression expr = Expression.parse(tb, scope, mc, null);
 		Long value = Expression.getLong(expr, tb.getSP());
 		if(null==value) {
 			tb.skipLine();

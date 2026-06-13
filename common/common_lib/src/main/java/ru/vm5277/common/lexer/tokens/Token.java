@@ -30,6 +30,7 @@ import ru.vm5277.common.lexer.Keyword;
 public class Token {
 	private		final	static	DecimalFormat	df	= new DecimalFormat("0.####################", DecimalFormatSymbols.getInstance(Locale.ENGLISH));
 	protected					TokenType		type;
+	protected					String			raw					= "???";
 	protected					Object			value;
 	protected					SourceBuffer	sb;
 	protected					SourcePosition	sp;
@@ -39,6 +40,9 @@ public class Token {
 	public Token(SourceBuffer sb) {
 		this.sb = sb;
 		this.sp = sb.snapSP();
+	}
+	public Token(TokenType type) {
+		this.type = type;
 	}
 	public Token(SourceBuffer sb, SourcePosition sp) {
 		this.sb = sb;
@@ -74,6 +78,10 @@ public class Token {
 			if(Keyword.NULL == kw) return null;
 		}
 		return value;
+	}
+	
+	public String getRaw() {
+		return raw;
 	}
 	
 	public String getStringValue() {

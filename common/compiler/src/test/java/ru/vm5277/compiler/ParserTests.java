@@ -32,13 +32,13 @@ public class ParserTests {
 	public void constantFoldingTest() throws Exception {
 		String source = "class A{	int i1=5+3-4/2*10; int i2=10%3; int i3=0b11001011 & 0x0f; int i4=0b11001011 | 04; int i5= 2*(4+3); int i6=5+4*3;" +
 								"	fixed f1=2.5+3.5; fixed f2=5-1.5; fixed f3=4.5/1.5; fixed f4=25*0.1;" +
-								"	byte[] s1=\"a\"+\"b\"; byte[] s2=\"a\"+123; byte[] s3=\"z\"+0.9; byte[] s4=\"ZX Spectru\"+'m'; byte[] s5=\"1\"+'z';" +
+								"	cstr s1=\"a\"+\"b\"; cstr s2=\"a\"+123; cstr s3=\"z\"+0.9; cstr s4=\"ZX Spectru\"+'m'; cstr s5=\"1\"+'z';" +
 								"	bool b1=true && false; bool b2=true || false; bool b3=true == true; bool b4=true!=true; bool b5 = !true;" +
 								"	bool b6=!(65>3); bool b7=3<=3; bool b8=5%2==1; " +
 								"	int t1=-5; int t2=5+i1+i2-2-i3; int t3=7==10-6/2?7:2; int t4=5<3 ? 7:2; int t5=true?1:0;}";
 
 		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
-		ASTParser parser = new ASTParser(null, null, lexer.getTokens(), new MessageContainer(100, true, false), 0x04);
+		ASTParser parser = new ASTParser(new Instance(0x04), null, lexer.getTokens());
 
 		FieldNode field = (FieldNode)parser.getClazz().getBody().getChildren().get(0);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
@@ -93,7 +93,7 @@ public class ParserTests {
 		field = (FieldNode)parser.getClazz().getBody().getChildren().get(12);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof String);
-		assertEquals("z0.9", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
+		assertEquals("z0.90", toStringValue(((LiteralExpression)field.getInitializer()).getValue()));
 		field = (FieldNode)parser.getClazz().getBody().getChildren().get(13);
 		assertEquals(true, field.getInitializer() instanceof LiteralExpression);
 		assertEquals(true, ((LiteralExpression)field.getInitializer()).getValue() instanceof String);
@@ -171,7 +171,7 @@ public class ParserTests {
 	public void incrementDecrementTest() throws Exception {
 		String source = "class A{ public A() {int i=1; i++; i--; ++i; --i;}}";
 		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
-		new ASTParser(null, null, lexer.getTokens(), new MessageContainer(), 0x04);
+		new ASTParser(new Instance(0x04), null, lexer.getTokens());
 		assertEquals(0, lexer.getInvalidTokens().size());
 	}
 	
@@ -179,7 +179,7 @@ public class ParserTests {
 	public void ifTest() throws Exception {
 		String source = "class A{ public A() { int r=0; if(5>3) r=1; if(6>3) {r=1;} else r=2; if(5>3) {r=1;r++;} else {r=2;r++;}}}";
 		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
-		new ASTParser(null, null, lexer.getTokens(), new MessageContainer(100, true, false), 0x04);
+		new ASTParser(new Instance(0x04), null, lexer.getTokens());
 		assertEquals(0, lexer.getInvalidTokens().size());
 	}
 	
@@ -187,7 +187,7 @@ public class ParserTests {
 	public void doWhileTest() throws Exception {
 		String source = "class A{ public A() { int i=0; do { i++; } while(i<10);}}";
 		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
-		new ASTParser(null, null, lexer.getTokens(), new MessageContainer(100, true, false), 0x04);
+		new ASTParser(new Instance(0x04), null, lexer.getTokens());
 		assertEquals(0, lexer.getInvalidTokens().size());
 	}
 
@@ -195,7 +195,7 @@ public class ParserTests {
 	public void whileTest() throws Exception {
 		String source = "class A{ public A() { int i=0; while(i<10) { i++; }}}";
 		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
-		new ASTParser(null, null, lexer.getTokens(), new MessageContainer(100, true, false), 0x04);
+		new ASTParser(new Instance(0x04), null, lexer.getTokens());
 		assertEquals(0, lexer.getInvalidTokens().size());
 	}
 
@@ -203,7 +203,7 @@ public class ParserTests {
 	public void forTest() throws Exception {
 		String source = "class A{ public A() { int i=0; for(int f=0; f<10; f++) { if(1==f) continue; if(2==f) break; } else {i+=10;}}}";
 		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
-		new ASTParser(null, null, lexer.getTokens(), new MessageContainer(100, true, false), 0x04);
+		new ASTParser(new Instance(0x04), null, lexer.getTokens());
 		assertEquals(0, lexer.getInvalidTokens().size());
 	}
 
@@ -211,7 +211,7 @@ public class ParserTests {
 	public void returnTest() throws Exception {
 		String source = "class A{ public int A() { return 123+i;} void B() { return;}}";
 		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
-		new ASTParser(null, null, lexer.getTokens(), new MessageContainer(100, true, false), 0x04);
+		new ASTParser(new Instance(0x04), null, lexer.getTokens());
 		assertEquals(0, lexer.getInvalidTokens().size());
 	}
 
@@ -219,7 +219,7 @@ public class ParserTests {
 	public void switchTest() throws Exception { //TODO
 		String source ="class A{ public int A() { int t=0; switch(t) { case 0: return 1; case 1..10: return 2; case 11: {t++; return 3;} default: return 4;}}}";
 		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
-		new ASTParser(null, null, lexer.getTokens(), new MessageContainer(100, true, false), 0x04);
+		new ASTParser(new Instance(0x04), null, lexer.getTokens());
 		assertEquals(0, lexer.getInvalidTokens().size());
 	}
 
@@ -227,7 +227,7 @@ public class ParserTests {
 	public void someTest1() throws Exception {
 		String source ="class A{ public int A() { if(count %2 == 0) {} }}";
 		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
-		new ASTParser(null, null, lexer.getTokens(), new MessageContainer(100, true, false), 0x04);
+		new ASTParser(new Instance(0x04), null, lexer.getTokens());
 		assertEquals(0, lexer.getInvalidTokens().size());
 	}
 	
@@ -235,7 +235,7 @@ public class ParserTests {
 	public void someTest2() throws Exception {
 		String source ="class A{ public int A() { return -a-b; }}";
 		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
-		new ASTParser(null, null, lexer.getTokens(), new MessageContainer(100, true, false), 0x04);
+		new ASTParser(new Instance(0x04), null, lexer.getTokens());
 		assertEquals(0, lexer.getInvalidTokens().size());
 	}
 	

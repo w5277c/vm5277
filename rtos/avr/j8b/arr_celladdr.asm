@@ -24,12 +24,18 @@ J8BPROC_ARR_CELLADDR:
 ;-----------------------------------------------------------
 ;Вычисляет адрес ячейки массива
 ;IN: X-адрес заголовка массива, индексы расположены в стеке
+;в LE порядке (ADDR+0-L,ADDR+1-H)
 ;OUT: X-адрес на ячейку
 ;-----------------------------------------------------------
+	PUSH RESULT
 	PUSH YL
 	PUSH YH
 	LDS YL,SPL
+.IFDEF SPH
 	LDS YH,SPH
+.ELSE 
+	LDI YH,0x00
+.ENDIF
 
 	PUSH ACCUM_L
 	PUSH ACCUM_H
@@ -38,54 +44,54 @@ J8BPROC_ARR_CELLADDR:
 	PUSH ZL
 	PUSH ZH
 	PUSH FLAGS
-	PUSH RESULT
 
 	LD RESULT,X												;Глубина и флаги массива
-	MOV FLAGS,RESULT										;Для определения размера ячейки
+	MOV FLAGS,RESULT										;Для определения глубины (=RESULT+1)
 	ANDI RESULT,0x03
 
 	MOVW ZL,XL
-	ADIW ZL,0x03											;dim0(из 0-2)
+	ADIW ZL,0x03											;dim2/1/0
 
+	ADIW XL,0x05											;Смещаюсь на dim1 или data (header+dim0)
 	MOV ACCUM_EL,RESULT										;Учитываем динамический размер заголовка(dim0:5байт,dim1:7байт,dim2:9байт)
-	LSL ACCUM_EL
+	LSL ACCUM_EL											;В конце процедуры прибалю 5(header+dim0)
 	ADD XL,ACCUM_EL
-	ADC XH,C0x00
+	ADC XH,C0x00											;Смещаюсь на data
 
 	;Вычисляем адрес ячейки с учетом глубины, размерностей и индексов
-	ADIW YL,0x02+0x02										;index0(из 0-2, 0x02-количество PUSH)
+	ADIW YL,0x04+0x02										;index0
 
-	LDD ACCUM_L,Y+0x00										;index0
+	LDD ACCUM_L,Y+0x00										;index0(внешний arr[!]/arr[!][]/arr[!][][])
 	LDD ACCUM_H,Y+0x01
 	CPI RESULT,0x00
 	BREQ _J8BPROC_ARR_CELLADDR__COMPINDEX_END
 
-	LDD ACCUM_EL,Z+0x02										;dim1
+	LDD ACCUM_EL,Z+0x02										;dim1 - LE
 	LDD ACCUM_EH,Z+0x03
 	RCALL OS_MUL16
 	CPI RESULT,0x01
 	BRNE _J8BPROC_ARR_CELLADDR__COMPINDEX_3D
-	LDD ACCUM_EL,Y+0x02										;index1
+	LDD ACCUM_EL,Y+0x02										;index1(arr[][!]/arr[][!][])
 	ADD ACCUM_L,ACCUM_EL
 	LDD ACCUM_EH,Y+0x03
 	ADC ACCUM_H,ACCUM_EH
 	RJMP _J8BPROC_ARR_CELLADDR__COMPINDEX_END
 _J8BPROC_ARR_CELLADDR__COMPINDEX_3D:
-	LDD ACCUM_EL,Z+0x04										;dim2
+	LDD ACCUM_EL,Z+0x04										;dim2 - LE
 	LDD ACCUM_EH,Z+0x05
 	RCALL OS_MUL16
 	PUSH ACCUM_H
 	PUSH ACCUM_L
-	LDD ACCUM_L,Y+0x02										;index1
+	LDD ACCUM_L,Y+0x02										;index1(arr[][!]/arr[][!][])
 	LDD ACCUM_H,Y+0x03
-	LDD ACCUM_EL,Z+0x04										;dim2
+	LDD ACCUM_EL,Z+0x04										;dim2 - LE
 	LDD ACCUM_EH,Z+0x05
 	RCALL OS_MUL16
 	POP ACCUM_EL
 	ADD ACCUM_L,ACCUM_EL
 	POP ACCUM_EH
 	ADC ACCUM_H,ACCUM_EH
-	LDD ACCUM_EL,Y+0x04										;index2
+	LDD ACCUM_EL,Y+0x04										;index2(внутренний arr[][][!])
 	ADD ACCUM_L,ACCUM_EL
 	LDD ACCUM_EH,Y+0x05
 	ADC ACCUM_H,ACCUM_EH
@@ -101,12 +107,9 @@ _J8BPROC_ARR_CELLADDR__COMPTOTAL_LOOP:
 	BRNE _J8BPROC_ARR_CELLADDR__COMPTOTAL_LOOP
 _J8BPROC_ARR_CELLADDR__COMPTOTAL_END:
 
-	SUBI ACCUM_L,low(-0x03)
-	SBCI ACCUM_H,high(-0x03)
 	ADD XL,ACCUM_L
 	ADC XH,ACCUM_H
 
-	POP RESULT
 	POP FLAGS
 	POP ZH
 	POP ZL
@@ -116,5 +119,30 @@ _J8BPROC_ARR_CELLADDR__COMPTOTAL_END:
 	POP ACCUM_L
 	POP YH
 	POP YL
+
+	;Необходимо извлечь из стека индексы
+	INC RESULT												;Вычисляю размер блока индексов в стеке (2*размерность массива)
+	LSL RESULT
+	
+	CLI
+	POP ATOM_L												;Оригинальный RESULT 
+	POP ATOM_EH												;Адрес возврата
+	POP ATOM_EL
+.IFDEF SPH													;Восстанавливаю стек перед сохранением индексов
+	LDS _SPL,SPL
+	LDS _SPH,SPH
+	ADD _SPL,RESULT
+	ADC _SPH,C0x00
+	STS SPL,_SPL
+	STS SPH,_SPH
+.ELSE
+	LDS _SPL,SPL
+	ADD _SPL,RESULT
+	STS SPL,_SPL
+.ENDIF
+	MOV RESULT,ATOM_L
+	PUSH ATOM_EL
+	PUSH ATOM_EH
+	SEI
 	RET
 .ENDIF

@@ -29,12 +29,14 @@ import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGTryBlockScope;
 import ru.vm5277.common.VarType;
-import ru.vm5277.common.compiler.Optimization;
+import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.enums.J8BException;
+import ru.vm5277.common.enums.OptimizationType;
 import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.Main;
 import ru.vm5277.compiler.nodes.CatchBlock;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
@@ -47,15 +49,15 @@ public class TryNode extends CommandNode {
 	private	BlockNode				tryBlock;
 	public	List<CatchBlock>		catchBlocks	= new ArrayList<>();
 	
-	public TryNode(TokenBuffer tb, MessageContainer mc) {
-		super(tb, mc);
+	public TryNode(Instance inst, TokenBuffer tb) {
+		super(inst, tb);
 		
         consumeToken(tb); // Потребляем "try"
 		
 		// Блок try
 		if(tb.match(Delimiter.LEFT_BRACE)) {
 			try {
-				tryBlock = new BlockNode(tb, mc, false, true, "try");
+				tryBlock = new BlockNode(inst, tb, false, true, "try");
 
 				// Парсим параметр catch (byte errCode)
 				while(tb.match(J8BKeyword.CATCH)) {
@@ -75,7 +77,7 @@ public class TryNode extends CommandNode {
 							consumeToken(tb, Delimiter.RIGHT_PAREN);
 							
 							if(tb.match(Delimiter.LEFT_BRACE)) {
-								catchBlocks.add(new CatchBlock(tb, mc, args, varName));
+								catchBlocks.add(new CatchBlock(inst, tb, args, varName));
 							}
 						}
 						else {
@@ -151,8 +153,8 @@ public class TryNode extends CommandNode {
 		boolean result = true;
 		cgScope = cg.enterCommand(parent, "try");
 		
-		CGScope tryScope = new CGScope(parent, CGScope.genId(), "try");
-		CGScope catchScope = new CGScope(parent, CGScope.genId(), "catch");
+		CGScope tryScope = new CGBlockScope(cg, parent, CGScope.genId(), "try");
+		CGScope catchScope = new CGBlockScope(cg, parent, CGScope.genId(), "catch");
 
 		// Сначала выполняет обработку catch блоков, так как минимум нам нужно заполнить в BlockScope handlingExcsScopes
 		if(result) {
@@ -167,7 +169,7 @@ public class TryNode extends CommandNode {
 
 		if(result) {
 			BlockScope tryBlockScope = tryBlock.getScope();
-			int runtimeExceptionId = VarType.getExceptionId(ExceptionScope.RUNTIME_EXCEPTION_NAME);
+			int runtimeExceptionId = VarType.getExceptionId(J8BException.RuntimeException.name());
 			for(CatchBlock cBlock : catchBlocks) {
 				Set<Integer> ids = new HashSet<>();
 				
@@ -193,7 +195,7 @@ public class TryNode extends CommandNode {
 
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
 
@@ -208,10 +210,10 @@ public class TryNode extends CommandNode {
 		}
 		newExcs.getRuntimeChecks().putAll(excs.getRuntimeChecks());
 
-		tryBlock.codeGen(cg, cgScope, false, newExcs);
+		tryBlock.codeGen(cg, false, newExcs);
 
 		for(CatchBlock cBlock : catchBlocks) {
-			if(Optimization.NONE==Main.getOptLevel()) {
+			if(OptimizationType.NONE==Main.getOptimizationType()) {
 				cBlock.codeGen(cg, cgScope, false, excs, true);
 				l1:
 				for(ExceptionScope eScope : cBlock.getExceptionScopes()) {

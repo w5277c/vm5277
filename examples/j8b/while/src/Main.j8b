@@ -18,11 +18,11 @@ class Main {
 	public static void main() {
 		
 		byte i=3;
-		System.out("\nbyte i="); System.out(i);
+		System.out("\nbyte i=" + i);
 		
 		System.out("\nЦикл while(i<10), с нкрементом i и break на 5: ");
 		while(i<10) {
-			System.out(i); System.outChar(' ');
+			System.out(i + ' ');
 			i++;
 			if(i==5) break;
 		}
@@ -32,19 +32,19 @@ class Main {
 			System.out(i);
 		}
 
-		System.out("\nЦикл do{...}while(i<20), с инкрементом i: ");		
+		System.out("\nЦикл do{...}while(i<20), с инкрементом i: ");
 		do {
-			System.out(i); System.outChar(' ');
+			System.out(i + ' ');
 			i++;
 		}
 		while(i<20);
 
 		System.out("\nБесконечный цикл while(true), с паузой в 1 сек: ");		
 		while(true) {
-			Thread.waitS(1);
-			System.outChar('#');
+			Thread.sleepSeconds(1);
+			System.out('#');
 		}
 
-		System.out("\ndone");		
+		System.out("\ndone");
 	}
 }

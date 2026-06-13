@@ -16,6 +16,7 @@
 
 package ru.vm5277.common.cg;
 
+import ru.vm5277.common.NumUtils;
 import ru.vm5277.common.StrUtils;
 
 public class CGCells {
@@ -29,7 +30,9 @@ public class CGCells {
 		HEAP_ALT,		//[X] аналогично HEAP, но используя альтернативный индексный регистр(как для ARRAY) содержащий сразу адрес(без константного смещения)
 		STACK,			//[инструкция pop] значение лежащее на вершине стека
 		ARRAY,			//[X] Массив
-		LABEL;			//[Z] Метка
+		LABEL,			//[Z] Метка
+		CONST,			//число разбитое по ячейкам побайтно LE
+		FLAG;			//Флаг(бит) микроконтроллера (C для AVR)
 
 //		REF;	//адрес на объект(класс, массив)
 	}
@@ -111,6 +114,23 @@ public class CGCells {
 	
 	public int[] getIds() {
 		return ids;
+	}
+	
+	public void setConst(long k) {
+		size = NumUtils.getBytesRequired(k);
+		ids = new int[size];
+		for(int i=0;i<size; i++) {
+			ids[i] = (int)(k&0xff);
+			k = k>>8;
+		}
+	}
+	
+	public long getConst() {
+		long result = 0;
+		for(int i=0; i<ids.length; i++) {
+			result += (ids[i]<<(i*8));
+		}
+		return result;
 	}
 	
 	@Override

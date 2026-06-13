@@ -19,12 +19,13 @@
 public class RTOSParam {
 	public	final	static	byte	CORE_FREQ		= 0x00;
 	public	final	static	byte	MCU				= 0x01;
-	public	final	static	byte	DEVEL_MODE		= 0x02;
-	public	final	static	byte	STDIO_PORT		= 0x03;
-	public	final	static	byte	ACTLED_PORT		= 0x04;
-	public	final	static	byte	SHOW_WELCOME	= 0x05;
-	public	final	static	byte	MULTITHREADING	= 0x06;
-	public	final	static	byte	INIT_DELAY		= 0x07;
-	public	final	static	byte	HALT_OK_MODE	= 0x08;
-	public	final	static	byte	HALT_ERR_MODE	= 0x09;
+	public	final	static	byte	SOFT_RESET		= 0x02;
+	public	final	static	byte	BLDR_API_REUSE	= 0x03;
+	public	final	static	byte	STDIO_PORT		= 0x04;
+	public	final	static	byte	ACTLED_PORT		= 0x05;
+	public	final	static	byte	SHOW_WELCOME	= 0x06;
+	public	final	static	byte	INIT_DELAY		= 0x08;
+	public	final	static	byte	HALT_OK_MODE	= 0x09;
+	public	final	static	byte	HALT_ERR_MODE	= 0x0a;
+	public	final	static	byte	DIAG_MODE		= 0x0c;
 }

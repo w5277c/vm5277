@@ -20,21 +20,21 @@ import java.util.List;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.VarType;
-import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.cg.CGBranch;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.CodegenResult;
+import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.compiler.Instance;
 
 public class TernaryExpression extends ExpressionNode {
 	private			ExpressionNode	condition;
@@ -44,9 +44,8 @@ public class TernaryExpression extends ExpressionNode {
 	private			boolean			alwaysFalse;
 	private			CGBranch		branch		= new CGBranch();
 
-	public TernaryExpression(	TokenBuffer tb, MessageContainer mc, SourcePosition sp, ExpressionNode condition, ExpressionNode trueExpr,
-								ExpressionNode falseExpr) {
-		super(tb, mc, sp);
+	public TernaryExpression(Instance inst, TokenBuffer tb, SourcePosition sp, ExpressionNode condition, ExpressionNode trueExpr, ExpressionNode falseExpr) {
+		super(inst, tb, sp);
 
 		this.condition = condition;
 		this.trueExpr = trueExpr;
@@ -90,8 +89,7 @@ public class TernaryExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		if(null!=cgScope) cgScope.disable();
-		cgScope = cg.enterExpression(parent,  toString());
+		cgScope = cg.enterExpression(parent, cgScope, toString());
 		
 		// Проверяем условие и ветки
 		result&=condition.postAnalyze(scope, cg, cgScope);
@@ -194,7 +192,7 @@ public class TernaryExpression extends ExpressionNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
 
@@ -202,32 +200,35 @@ public class TernaryExpression extends ExpressionNode {
 		cgScope.setBranch(branch);
 		
 		if(alwaysTrue) {
-			return trueExpr.codeGen(cg, cgScope, toAccum, excs);
+			return trueExpr.codeGen(cg, toAccum, excs);
 		}
 		if(alwaysFalse) {
-			return falseExpr.codeGen(cg, cgScope, toAccum, excs);
+			return falseExpr.codeGen(cg, toAccum, excs);
 		}
 
-		Object obj = condition.codeGen(cg, cgScope, true, excs);
+		Object obj = condition.codeGen(cg, true, excs);
 		if(obj==CodegenResult.TRUE) {
-			return trueExpr.codeGen(cg, cgScope, toAccum, excs);
+			return trueExpr.codeGen(cg, toAccum, excs);
 		}
 		else if(obj==CodegenResult.FALSE) {
-			return falseExpr.codeGen(cg, cgScope, toAccum, excs);
+			return falseExpr.codeGen(cg, toAccum, excs);
 		}
 		else if(obj==CodegenResult.RESULT_IN_ACCUM) {
 			cg.boolAccCond(cgScope, branch, true);
 		}
 		else if(obj==CodegenResult.RESULT_IN_FLAG) {
-			cg.boolFlagCond(cgScope, branch);
+			cg.boolFlagCond(cgScope, false, branch);
+		}
+		else if(obj==CodegenResult.RESULT_IN_INV_FLAG) {
+			cg.boolFlagCond(cgScope, true, branch);
 		}
 
 		CGLabelScope endScope = new CGLabelScope(null, CGScope.genId(), LabelNames.TERNARY_END, true);
 		
-		trueExpr.codeGen(cg, cgScope, toAccum, excs);
+		trueExpr.codeGen(cg, toAccum, excs);
 		cg.jump(cgScope, endScope);
 		cgScope.append(branch.getEnd());
-		falseExpr.codeGen(cg, cgScope, toAccum, excs);
+		falseExpr.codeGen(cg, toAccum, excs);
 		cgScope.append(endScope);
 
 		return (toAccum ? CodegenResult.RESULT_IN_ACCUM : null);

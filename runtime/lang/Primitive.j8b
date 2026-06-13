@@ -61,4 +61,8 @@ public class Primitive {
 		public static final short MASK = 0xFFFF;
 		public static final byte SIZE = 2;
 	}
+
+	public static native fixed rawToFixed(byte i, byte f);
+	public static native fixed rawToShort(byte b0, byte b1);
+	public static native fixed rawToInt(byte b0, byte b1, byte b2, byte b3);
 }

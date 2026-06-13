@@ -67,7 +67,7 @@ _OS_PCINT_HANDLER:
 
 	;TEMP_H-номер PCINT или порта, где 0=PORTB, TEMP_EL-текущее состояние порта, TEMP_EH-биты измененных пинов
 	;Если OS_FT_STDIN включена, то проверяем событие для пина STDIO_PORT
-.IF OS_FT_STDIN
+.IF OS_FT_STDIN == 0x01
 	PUSH ACCUM_L
 .IFDEF STDIO_PORT_REGID
 	CPI TEMP_H,STDIO_PORTNUM-1
@@ -90,14 +90,14 @@ _OS_PCINT_HANDLER:
 	LDI TEMP_L,0x06											;Выдерживаем паузу для чтения UART
 	DEC TEMP_L
 	BRNE PC-0x01
-.IF OS_FT_DEV_MODE
+.IF OS_FT_BLDR_API_REUSE == 0x01
 	MCALL PROC__BLDR_UART_RECV_BYTE_NR
 .ELSE
 	MCALL OS_STDIN_NR
 .ENDIF
 	BREQ __OS_PCINT_HANDLER__STDIN_SKIP						;Z=1 - ошибка приема
-.IF OS_FT_DEV_MODE
-	CPI ACCUM_L,0x12										;Проверка на слово 0x7700 как команду перехода в бутлоадер
+.IF OS_FT_SOFT_RESET == 0x01
+	CPI ACCUM_L,0x12										;Проверка на MAGIC как команду перехода в бутлоадер
 	BRNE __OS_PCINT_HANDLER__PUT_TO_BUFFER
 	JMP PROC__BLDR_INIT										;Переход на бутлоадер
 __OS_PCINT_HANDLER__PUT_TO_BUFFER:

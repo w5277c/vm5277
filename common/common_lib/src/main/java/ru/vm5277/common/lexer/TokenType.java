@@ -27,7 +27,7 @@ public enum TokenType {
 	IDENTIFIER,
 	LABEL,
 	NUMBER,
-	NOTE,
+	NOTE,		//Тип представление музыки (ноты)
 	OPERATOR,
 	DELIMITER,
 	STRING,
@@ -42,6 +42,9 @@ public enum TokenType {
 	//ASM only
 	DIRECTIVE,	//Директива ассемблера
 	MNEMONIC,	//Мнемоника ассемблера
-	INDEX_REG,
-	MACRO_PARAM;
+	INDEX_REG,	//Индексные регистры (xl,xh,yl,yh,zl,zg,z,x,y для AVR)
+	MACRO,		//Имя макроса, не используется в парсере, но используется в LSP сервере (вероятно нужно убрать после реализации парсинга в LSP)
+	MACRO_PARAM, //Параметр в макросе
+	
+	REGISTER;	//Регистры МК (r0-r31 для AVR)
 }

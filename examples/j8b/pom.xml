@@ -12,33 +12,43 @@
 
 
 	<modules>
-		<module>primitives</module>
-		<module>hello</module>
-		<module>while</module>
-		<module>switch</module>
-		<module>exception</module>
-		<module>for</module>
-		<module>enum</module>
-		<module>math</module>
-		<module>isas</module>
-		<module>cast</module>
-		<module>unary</module>
-		<module>gpio</module>
 		<module>accclash</module>
-		<module>return</module>
-		<module>conditions</module>
-		<module>methodcall</module>
-		<module>newobj</module>
-		<module>pairalloc</module>
-		<module>regreuse</module>
-		<module>static</module>
-		<module>inlining</module>
+		<module>ansi</module>
 		<module>arrays1</module>
 		<module>arrays2</module>
 		<module>arrays3</module>
+		<module>bench_crc8</module>
+		<module>cast</module>
+		<module>conditions</module>
+		<module>cstr</module>
+		<module>enum</module>
+		<module>exception</module>
+		<module>for</module>
+		<module>gpio</module>
+		<module>hello</module>
+		<module>if</module>
+		<module>inlining</module>
+		<module>isas</module>
+		<module>math</module>
+		<module>methodcall</module>
+		<module>newobj</module>
+		<module>pairalloc</module>
+		<module>primitives</module>
+		<module>random</module>
+		<module>regreuse</module>
+		<module>return</module>
+		<module>rgb</module>
+		<module>rgbrand</module>
+		<module>static</module>
 		<module>stdin</module>
 		<module>stdout</module>
-		<module>if</module>
+		<module>switch</module>
+		<module>temp</module>
+		<module>thread</module>
+		<module>timer1</module>
+		<module>unary</module>
+		<module>usdelay</module>
+		<module>while</module>
 	</modules>
 	
 	<properties>
@@ -46,11 +56,7 @@
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>
 		<j8b.packaging.version>0.1.0</j8b.packaging.version>
-		<j8b.plugin.version>0.1.0</j8b.plugin.version>
-		<j8b.target>avr:atmega168p</j8b.target>
-		<j8b.targetFreq>16</j8b.targetFreq>
-		<j8b.targetStdio>PB5</j8b.targetStdio>
-		<j8b.verboseOutput>true</j8b.verboseOutput>
+		<j8b.plugin.version>0.2.0</j8b.plugin.version>
 		<j8b.sourceDirectory>src</j8b.sourceDirectory>
 		<j8b.output.base>${project.build.directory}</j8b.output.base>
 	</properties>
@@ -62,29 +68,41 @@
 				<activeByDefault>true</activeByDefault>
 			</activation>
 			<properties>
-				<j8b.target>avr:atmega168p</j8b.target>
 				<j8b.targetFreq>16</j8b.targetFreq>
-				<j8b.targetStdio>PD3/PD4</j8b.targetStdio>
-				<j8b.output.subdir>default</j8b.output.subdir>
 			</properties>
 		</profile>
 		<profile>
-		<id>1w</id>
+		<id>attiny13a</id>
 			<properties>
-				<j8b.target>avr:atmega168p</j8b.target>
-				<j8b.targetFreq>16</j8b.targetFreq>
-				<j8b.targetStdio>PC4</j8b.targetStdio>
-				<j8b.output.subdir>default-1w</j8b.output.subdir>
+				<j8b.target>avr:attiny13a</j8b.target>
+				<j8b.targetFreq>9.6</j8b.targetFreq>
+				<j8b.targetStdio>PB2</j8b.targetStdio>
 			</properties>
 		</profile>
-
+		<profile>
+		<id>attiny2313a</id>
+			<properties>
+				<j8b.target>avr:attiny2313a</j8b.target>
+				<j8b.targetFreq>8</j8b.targetFreq>
+				<j8b.targetStdio>PB7</j8b.targetStdio>
+			</properties>
+		</profile>
+		<profile>
+			<id>arduino-nano</id>
+			<properties>
+				<j8b.target>avr:atmega328p</j8b.target>
+				<j8b.targetFreq>16</j8b.targetFreq>
+				<j8b.targetStdio>PD0/PD1</j8b.targetStdio>
+				<j8b.softReset>false</j8b.softReset>
+			</properties>
+		</profile>
 		<profile>
 			<id>arduino-uno</id>
 			<properties>
 				<j8b.target>avr:atmega328p</j8b.target>
 				<j8b.targetFreq>16</j8b.targetFreq>
 				<j8b.targetStdio>PD0/PD1</j8b.targetStdio>
-				<j8b.output.subdir>arduino-uno</j8b.output.subdir>
+				<j8b.softReset>false</j8b.softReset>
 			</properties>
 		</profile>
 	</profiles>
@@ -113,10 +131,10 @@
 				<version>${j8b.plugin.version}</version>
 				<executions>
 					<execution>
-						<id>compile-j8b</id>
-						<phase>compile</phase>
+						<id>package-j8b</id>
+						<phase>package</phase>
 						<goals>
-							<goal>compile</goal>
+							<goal>package</goal>
 						</goals>
 					</execution>
 				</executions>
@@ -125,8 +143,7 @@
 					<target>${j8b.target}</target>
 					<targetFreq>${j8b.targetFreq}</targetFreq>
 					<targetStdio>${j8b.targetStdio}</targetStdio>
-					<outputDirectory>${j8b.output.base}/${j8b.output.subdir}</outputDirectory>
-					<verboseOutput>${j8b.verboseOutput}</verboseOutput>
+					<verbose>${j8b.verbose}</verbose>
 				</configuration>
 			</plugin>
 		</plugins>

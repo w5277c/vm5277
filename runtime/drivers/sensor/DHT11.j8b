@@ -1,0 +1,101 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import hal.RTOSDispatcher;
+
+public class DHT11 implements THSensor {
+	private byte port;
+	private final byte[] DATA = new byte[4];
+
+	public DHT11(byte port) {
+		this.port = port;
+	}
+
+	public void read() throws DriverException {
+ 		RTOSDispatcher.lock();
+
+		GPIO.modeOut(port);
+		GPIO.setLo(port);
+		Thread.sleep(18);
+		GPIO.setHi(port);
+
+		short timestamp = System.uptimeUs();
+		while((System.uptimeUs()-timestamp)<40) {}
+        GPIO.modeIn(port);
+        GPIO.setLo(port);
+        if(GPIO.get(port)) {
+			RTOSDispatcher.unlock();
+        	DriverException.throw(DriverException.NO_RESPONSE);
+        }
+		timestamp += 40;
+
+		while((System.uptimeUs()-timestamp)<80) {}
+        if(!GPIO.get(port)) {
+			RTOSDispatcher.unlock();
+            DriverException.throw(DriverException.INIT_FAILED);
+        }
+		timestamp += 80;
+
+		while((System.uptimeUs()-timestamp)<80) {}
+
+		byte sum = 0;
+		for(byte i=0; i<4; i++) { // Читаем данные
+			byte b = readByte();
+			DATA[i] = b;
+			sum += b;
+		}
+		if(sum!=readByte()) { // Сверяем контрольную сумму
+            RTOSDispatcher.unlock();
+            DriverException.throw(DriverException.CHECKSUM_ERROR);
+		}
+
+		RTOSDispatcher.unlock();
+	}
+
+	private byte readByte() throws DriverException {
+		byte result = 0;
+
+		for(byte i=0; i<8; i++) {
+			short timestamp = System.uptimeUs();
+			while(!GPIO.get(port)) { // Ждем высокий уровень или таймаут
+				if((System.uptimeUs()-timestamp)>100) {
+					RTOSDispatcher.unlock();
+					DriverException.throw(DriverException.TIMEOUT);
+				}
+			}
+			timestamp = System.uptimeUs();
+            while((System.uptimeUs()-timestamp)<30) {}
+			result ]<< GPIO.get(port); // if(GPIO.get(port)) {result |= (1<<(i-1));}
+
+			timestamp = System.uptimeUs();
+			while(GPIO.get(port)) { // Ждем низкий уровень или таймаут
+				if((System.uptimeUs()-timestamp)>100) {
+					RTOSDispatcher.unlock();
+					DriverException.throw(DriverException.TIMEOUT);
+				}
+			}
+		}
+		return result;
+	}
+
+	public fixed getTemperature() {
+		return Primitive.rawToFixed(DATA[3]*26, DATA[2]);
+	}
+
+	public fixed getHumidity() {
+		return Primitive.rawToFixed(DATA[1]*26, DATA[0]);
+	}
+}

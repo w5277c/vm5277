@@ -36,7 +36,7 @@ import ru.vm5277.avr_asm.nodes.DataNode;
 import ru.vm5277.avr_asm.nodes.MacroNode;
 import ru.vm5277.avr_asm.nodes.MnemNode;
 import ru.vm5277.avr_asm.nodes.Node;
-import ru.vm5277.common.SourceType;
+import ru.vm5277.common.enums.SourceType;
 import ru.vm5277.common.firmware.IntelHexFormatter;
 import ru.vm5277.avr_asm.scope.MacroCallSymbol;
 import ru.vm5277.avr_asm.scope.Scope;
@@ -44,8 +44,10 @@ import ru.vm5277.avr_asm.scope.VariableSymbol;
 import ru.vm5277.common.AssemblerInterface;
 import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.StrUtils;
+import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.exceptions.CriticalParseException;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.exceptions.MessageContainerIsFullException;
 import ru.vm5277.common.lexer.Lexer;
 import ru.vm5277.common.lexer.LexerType;
 import ru.vm5277.common.messages.ErrorMessage;
@@ -53,6 +55,7 @@ import ru.vm5277.common.messages.MessageContainer;
 
 public class Assembler implements AssemblerInterface {
 	public	final	static	String	VERSION			= StrUtils.readVersion(Assembler.class);
+	public	final	static	String	HEXFILE_POSTFIX	= "_cseg.hex";
 	public			static	int		tabSize			= 4;
 	public			static	boolean	isWindows;
 	public			static	Path	toolkitPath;
@@ -72,16 +75,13 @@ public class Assembler implements AssemblerInterface {
 			showHelp();
 			return 0;
 		}
-		if(0x01 == args.length) {
-			if(args[0x00].equals("-v") || args[0x00].equals("--version")) {
-				System.out.println("AVR assembler version: " + VERSION);
-				return 0;
-			}
+		if(0x01 == args.length && args[0x00].equals("-v") || args[0x00].equals("--version")) {
+			System.out.println("AVR assembler version: " + VERSION);
 		}
 
 		String mcu = null;
 		Map<Path, SourceType> sourcePaths	= new HashMap<>();
-		int stirctLevel = STRICT_LIGHT;
+		StrictLevel stirctLevel = StrictLevel.LIGHT;
 		int maxErrors = 30;
 		quiet = false;
 		String format = "hex";
@@ -106,7 +106,7 @@ public class Assembler implements AssemblerInterface {
 				}
 				else if(arg.equals("-I") || arg.equals("--include")) {
 					if(null==toolkitPath) {
-						showInvalidToolkitDir(toolkitPath, null);
+						showInvalidToolkitDir(null);
 						return 1;
 					}
 					sourcePaths.put(FSUtils.resolve(toolkitPath, args[++i]), SourceType.LIB);
@@ -129,7 +129,7 @@ public class Assembler implements AssemblerInterface {
 				}
 				else if(arg.equals("-d") || arg.equals("--device")) {
 					mcu = args[++i];
-					includes.add(mcu + ".inc");
+					includes.add(mcu + ".asm");
 					continue;
 				}
 				else if(arg.equals("-D") || arg.equals("--define")) {
@@ -175,9 +175,8 @@ public class Assembler implements AssemblerInterface {
 				}
 				else if(arg.equals("-s") || arg.equals("--strict")) {
 					String strictStr = args[++i];
-					if(strictStr.equals("strong")) stirctLevel = STRICT_STRONG;
-					else if(strictStr.equals("none")) stirctLevel = STRICT_NONE;
-					else if(!strictStr.equals("light")) {
+					stirctLevel = StrictLevel.fromName(strictStr);
+					if(null==stirctLevel) {
 						showInvalidStrictLevel(strictStr);
 						return 1;
 					}
@@ -200,7 +199,7 @@ public class Assembler implements AssemblerInterface {
 		if(!quiet) showDisclaimer();
 		
 		if(null==toolkitPath) {
-			showInvalidToolkitDir(toolkitPath, null);
+			showInvalidToolkitDir(null);
 			return 1;
 		}
 
@@ -233,13 +232,18 @@ public class Assembler implements AssemblerInterface {
 		if(1==Paths.get(outputFileName).getNameCount()) outputFileName = baseDir.resolve(outputFileName).normalize().toString();
 		
 		long timestamp = System.currentTimeMillis();
-		if(!quiet) System.out.println("Parsing " + sourcePath.toString()  + " ...");
+		if(!quiet) System.out.println("Parsing " + sourcePath.toString());
 		boolean success = false;
 		try {
 			success = new Assembler().exec(mc, mcu, sourcePath, sourcePaths, stirctLevel, outputFileName, mapFile, listWriter, defines, includes);
 		}
 		catch(Exception ex) {
+			mc.add(new ErrorMessage(ex.getMessage(), null));
 			success = false;
+		}
+		
+		if(success) {
+			if(!quiet) System.out.println("Generated " + outputFileName + HEXFILE_POSTFIX);
 		}
 		
 		float time = (System.currentTimeMillis() - timestamp) / 1000f;
@@ -248,7 +252,7 @@ public class Assembler implements AssemblerInterface {
 	}
 
 	@Override
-	public boolean exec(MessageContainer mc, String mcu, Path sourcePath, Map<Path, SourceType> sourcePaths, int stirctLevel,
+	public boolean exec(MessageContainer mc, String mcu, Path sourcePath, Map<Path, SourceType> sourcePaths, StrictLevel stirctLevel,
 						String outputFileName, File mapFile, BufferedWriter listWriter, Map<String, Long> defines, List<String> includes) throws Exception {
 		
 		if(null == toolkitPath) {
@@ -269,10 +273,14 @@ public class Assembler implements AssemblerInterface {
 		
 		Lexer lexer = new Lexer(LexerType.ASM, sourcePath.toFile(), scope.getTokenProvider(), tabSize, false);
 		//lexer.print();
-
+		
 		try {
 			Parser parser = new Parser(lexer.getTokens(), scope, mc, sourcePaths, tabSize, includes);
 			secondPass(scope, mc, parser.getSecondPassNodes());
+			mc.addLineQnt(lexer.getLinesQnt());
+		}
+		catch(MessageContainerIsFullException ex) {
+			System.out.println("Maximum error limit reached");
 		}
 		catch(Exception e) {
 			e.printStackTrace();
@@ -293,15 +301,32 @@ public class Assembler implements AssemblerInterface {
 		}
 		else {
 			if(!scope.getCSeg().isEmpty()) {
-				IntelHexFormatter formatter = new IntelHexFormatter(new File(outputFileName + "_cseg.hex"));
+				IntelHexFormatter formatter = new IntelHexFormatter(new File(outputFileName + HEXFILE_POSTFIX));
 				scope.getCSeg().build(formatter);
 				formatter.close();
 				if(!quiet) scope.getCSeg().printStat();
 			}
 			
 			if(!quiet) System.out.println();
-			if(!quiet) System.out.println("parsed: " + mc.getLineQnt() + " lines");
-			System.out.println("Assemble SUCCESS, warnings:" + mc.getWarningCntr());
+			if(!quiet) System.out.println("parsed: " + mc.getLineQnt() + " lines"); //TODO показывает 0
+
+			int total = scope.getCSeg().getTotal();
+			int wSize = scope.getCSeg().getWSize();
+			if(total>wSize) {
+				mc.add(new ErrorMessage("Firmware size exceeds MCU flash memory. " +
+										"Total: " + (total*2) + " bytes " + String.format("%.1f", 100d*total/wSize) + "%", null));
+				System.out.println("Assemble FAIL, warnings:" + mc.getWarningCntr() + ", errors:" + mc.getErrorCntr() + "/" + mc.getMaxErrorQnt());
+				return false;
+			}
+			else {
+				if(!quiet) {
+					System.out.println("Assemble SUCCESS, warnings:" + mc.getWarningCntr());
+				}
+				else {
+					System.out.println("Assemble SUCCESS, warnings:" + mc.getWarningCntr() + ", total: " + (total*2) + " bytes " +
+										String.format("%.1f", 100d*total/wSize) + "%");
+				}
+			}
 			return true;
 		}
 	}
@@ -328,18 +353,11 @@ public class Assembler implements AssemblerInterface {
 	}
 	
 	private static void showDisclaimer() {
-		System.out.println(";j8b AVR Assembler for vm5277 Embedded Toolkit");
-		System.out.println(";Version: " + VERSION + " | License: Apache-2.0");
-		System.out.println(";================================================================");
-		System.out.println(";WARNING: This project is under active development.");
-		System.out.println(";The primary focus is on functionality; testing is currently limited.");
-		System.out.println(";Please report any bugs found to: konstantin@5277.ru");
-		System.out.println(";================================================================");
+		System.out.println("AVR Assembler v." + VERSION + " for vm5277 Embedded Toolkit");
 	}
-
 	
 	private static void showHelp() {
-		System.out.println("j8b AVR assembler for vm5277 Embedded Toolkit");
+		System.out.println("AVR assembler for vm5277 Embedded Toolkit");
 		System.out.println("Version: " + VERSION + " | License: Apache-2.0");
 		System.out.println("-------------------------------------------");
 		System.out.println();
@@ -369,7 +387,7 @@ public class Assembler implements AssemblerInterface {
 		System.out.println("  -l, --list <file>       Generate assembly listing file");
 		System.out.println("  -D, --define <symbol>[=<value>]] Define symbol (.equ direcive");
 		System.out.println();
-		System.out.println("  -q,  --quiet            Quiet mode (minimal output)");
+		System.out.println("  -q, --quiet             Quiet mode (minimal output)");
 		System.out.println("  -v, --version           Display version");
 		System.out.println("  -h, --help              Show this help");
 		System.out.println();
@@ -392,13 +410,9 @@ public class Assembler implements AssemblerInterface {
 		System.err.println("Project location: " + Paths.get("").toAbsolutePath().resolve("platform"));
 	}
 	
-	private static void showInvalidToolkitDir(Path toolkitPath, Path subPath) {
-		System.err.println("[ERROR] Toolkit directory not found or empty");
+	private static void showInvalidToolkitDir(Path toolkitPath) {
+		System.err.println("[ERROR] Toolkit directory not found or empty:" + toolkitPath.toString());
 		System.err.println();
-		if(null!=subPath) {
-			System.err.println("Tried to access: " + subPath.toString());
-			System.err.println();
-		}
 		System.err.println("Possible solutions:");
 		System.err.println("1. Specify custom path with --path (-P) option");
 		System.err.println("2. Add toolkit directory(vm5277) to system environment variables");

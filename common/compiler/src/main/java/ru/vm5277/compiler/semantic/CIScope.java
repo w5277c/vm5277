@@ -19,8 +19,10 @@ package ru.vm5277.compiler.semantic;
 // Общий scope для Class и Interface
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -80,20 +82,38 @@ public abstract class CIScope extends Scope implements ImportableScope {
 		}
 	}
 	
-	public boolean isImplements(VarType ifaceType) {
+	/**
+	 * Проверяет, реализует ли данный класс/интерфейс указанный тип.
+	 * Учитывает прямое наследование (extends/implements) и рекурсивно проверяет цепочку расширения интерфейсов.
+	 *
+	 * @param varType проверяемый тип (интерфейс или класс)
+	 * @return true, если данный тип совместим с varType
+	 */
+	public boolean isImplements(VarType varType) {
+		// Проверяем, не является ли проверяемый тип самим текущим классом/интерфейсом
+		if(varType.getClassName().equals(name)) return true;
+		// Если список наследования пуст, дальше проверять нечего
 		if(implTypes.isEmpty()) return false;
-		if(ifaceType.isPrimitive()) return false;
-		if(ifaceType.isObject()) return true;
+		// Примитивные типы не участвуют в отношениях наследования
+		if(varType.isPrimitive()) return false;
+		// Все классы неявно наследуются от Object
+		if(varType.isObject()) return true;
+		// Перебираем все типы, указанные в extends и implements
 		for(VarType type : implTypes) {
-			if(ifaceType==type) return true;
-			CIScope cis = resolveCI(type.getName(), false);
+			// Прямое совпадение с родительским классом или интерфейсом
+			if(varType==type) return true;
+			// Разрешаем тип по имени через область видимости
+			CIScope cis = resolveCI(null, type.getName(), false);
+			// Рекурсивно проверяем только интерфейсы (они могут расширять другие интерфейсы)
+			// Классы не проверяем рекурсивно, т.к. множественное наследование классов запрещено
 			if(null!=cis && cis instanceof InterfaceScope) {
-				if(cis.isImplements(ifaceType)) return true;
+				if(cis.isImplements(varType)) return true;
 			}
 		}
+		// Тип не найден в иерархии наследования
 		return false;
-	}
-	
+	}	
+
 	public List<VarType> getImpl() {
 		return implTypes;
 	}
@@ -114,7 +134,9 @@ public abstract class CIScope extends Scope implements ImportableScope {
 	
 	public void addMethod(MethodSymbol method) throws CompileException {
 		for(CIScope iScope : imported.values()) {
-			iScope.resolveMethod(method.getName(), (VarType[])method.getParameterTypes().toArray(), false);
+//			VarType[] arr = (VarType[])method.getParameterTypes().toArray();
+//			String mName = method.getName();
+			iScope.resolveMethod(method.getName(), method.getParameterTypes().toArray(new VarType[0]), false);
 		}
 
 		String methodSignature = method.getSignature();
@@ -127,9 +149,14 @@ public abstract class CIScope extends Scope implements ImportableScope {
 	}
 
 	public int getMethodSN(String methodName, String signature) {
+		// Ведем подсчет методов которые должны быть реализованы в классе (не учитываем static и native)
+		int methodQnt = 0;
 		for(int i=0; i<methods.size(); i++) {
 			MethodSymbol mSymbol = methods.get(i);
-			if(mSymbol.getName().equals(methodName) && mSymbol.getSignature().equals(signature)) return i;
+			if(mSymbol.getName().equals(methodName) && mSymbol.getSignature().equals(signature)) return methodQnt;
+			if(!mSymbol.isStatic && !mSymbol.isNative && null!=mSymbol.getCGScope()) { //null!=mSymbol.getCGScope() - нет скопа - значит никому не нужен (код не сгенерировался)
+				methodQnt++;
+			}
 		}
 		return -1;
 	}
@@ -149,6 +176,18 @@ public abstract class CIScope extends Scope implements ImportableScope {
 		for (MethodSymbol method : methods) {
 			if (method.getName().equals(methodName) && isApplicable(method, argTypes)) {
 				return method;
+			}
+		}
+		
+		// Проверяем реализации в интерфейсах
+		for(VarType type : implTypes) {
+			CIScope cis = resolveCI(null, type.getName(), false);
+			if(null!=cis) {
+				for(MethodSymbol method : cis.getMethods(methodName)) {
+					if(method.isNative || method.isStatic) {
+						return method;
+					}
+				}
 			}
 		}
 
@@ -183,6 +222,14 @@ public abstract class CIScope extends Scope implements ImportableScope {
 
 	@Override
 	public CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess) {
+		return resolveCI(caller, name, isQualifiedAccess, new HashSet<>());
+	}
+	protected CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess, Set<CIScope> checked) {
+		if(checked.contains(this)) {
+			return null;
+		}
+		checked.add(this);
+		
 		if(this.name.equals(name)) return this;
 		
 		if(isQualifiedAccess) {
@@ -193,11 +240,23 @@ public abstract class CIScope extends Scope implements ImportableScope {
 		if(null!=cis) return cis;
 		
 		//TODO здесь необходимо проверять доступ по модификаторам и caller
+		for(CIScope imp : imported.values()) {
+			if(imp instanceof CIScope) {
+				cis = imp.resolveCI(caller, name, false, checked);
+				if(null!=cis) return cis;
+			}
+		}
+
 		cis = imported.get(name);
 		if(null!=cis) return cis;
 		
 		if(null!=parent) {
-			return parent.resolveCI(null==caller ? this : caller, name, false);
+			if(parent instanceof CIScope) {
+				return ((CIScope)parent).resolveCI(null==caller ? this : caller, name, false, checked);
+			}
+			else {
+				return parent.resolveCI(null==caller ? this : caller, name, false);
+			}
 		}
 		return null;
 	}
@@ -215,11 +274,13 @@ public abstract class CIScope extends Scope implements ImportableScope {
 		Symbol symbol = fields.get(name);
 		if(null!=symbol) return symbol;
 		
-		for(VarType type : implTypes) {
+		// Зачем? Интерфейсы не содержат поля, только статику.... пока уберем, наблюдается ошибка зацикливания
+	/*		for(VarType type : implTypes) {
 			CIScope cis = resolveCI(null==caller ? this : caller, type.getName(), false);
 			symbol = cis.resolveField(null==caller ? this : caller, name, false);
 			if(null!=symbol) return symbol;
 		}
+*/
 		//TODO static inports
 		// Делегируем в родительскую область видимости
 		return parent!=null ? parent.resolveField(null==caller ? this : caller, name, false) : null;
@@ -266,6 +327,7 @@ public abstract class CIScope extends Scope implements ImportableScope {
 				}
 			}
 
+			if(cScope.getParent() instanceof GlobalScope) break;
 			cScope = (ClassScope)cScope.getParent();
 		}
 		return result;

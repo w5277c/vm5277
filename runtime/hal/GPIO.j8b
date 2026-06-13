@@ -17,6 +17,23 @@
 // Алиасы SCK, RX, SDA и прочие здесь не размещаются, их место в обертках соответствующих драйверов.
 
 public class GPIO {
+	public	final	static	byte	PORTA	= 0x00;
+	public	final	static	byte	PORTB	= 0x01;
+	public	final	static	byte	PORTC	= 0x02;
+	public	final	static	byte	PORTD	= 0x03;
+	public	final	static	byte	PORTE	= 0x04;
+	public	final	static	byte	PORTF	= 0x05;
+	public	final	static	byte	PORTG	= 0x06;
+	public	final	static	byte	PORTH	= 0x07;
+	public	final	static	byte	PORTI	= 0x08;
+	public	final	static	byte	PORTJ	= 0x09;
+	public	final	static	byte	PORTK	= 0x0a;
+	public	final	static	byte	PORTL	= 0x0b;
+	public	final	static	byte	PORTM	= 0x0c;
+	public	final	static	byte	PORTN	= 0x0d;
+	public	final	static	byte	PORTO	= 0x0e;
+	public	final	static	byte	PORTP	= 0x0f;
+	
 	public	final	static	byte	PA0	= 0x00;
 	public	final	static	byte	PA1	= 0x01;
 	public	final	static	byte	PA2	= 0x02;
@@ -76,7 +93,10 @@ public class GPIO {
 
 	public static native void setHi(byte port);
 	public static native void setLo(byte port);
+	public static native bool get(byte port);
+	public static native void setPortState(byte port, byte state);
 	public static native void invert(byte port);
 	public static native void modeOut(byte port);
 	public static native void modeIn(byte port);
+	public static native void setPortMode(byte port, byte mode);
 }

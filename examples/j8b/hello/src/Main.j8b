@@ -17,5 +17,11 @@
 class Main {
 	public static void main() {
 		System.out("Hello world!\nПривет мир!\n");
+
+		GPIO.modeOut(GPIO.PB5);
+		while(true) {
+		    Thread.sleep(100);
+            GPIO.invert(GPIO.PB5);
+        }
 	}
 }

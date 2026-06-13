@@ -28,8 +28,8 @@ class Main {
 		i1 = 0x04050607;
 		t1 = 0x08;
 
-		System.outChar('\n'); System.out(b1);
-		System.outChar('\n'); System.out(i1);
-		System.outChar('\n'); System.out(t1);
+		System.out('\n' + b1);
+		System.out('\n' + i1);
+		System.out('\n' + t1);
 	}
 }

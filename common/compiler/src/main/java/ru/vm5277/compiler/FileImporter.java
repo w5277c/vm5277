@@ -49,18 +49,17 @@ public class FileImporter {
 			importedFiles.add(importPath);
 		}
 
-		File file = runtimePath.resolve(importPath).normalize().toFile();
-		if (!file.exists()) {
+		File file = (null==runtimePath ? null : runtimePath.resolve(importPath).normalize().toFile());
+		if(null==file || !file.exists()) {
 			file = basePath.resolve(importPath).normalize().toFile();
 			if(!file.exists()) {
-				mc.add(new ErrorMessage("Imported file not found: " + importPath, null));
-				file = null;
+				return null;
 			}
 		}
 		if(null != file) {
 			Lexer lexer = new Lexer(LexerType.J8B, file, null, tabSize, false);
 			return lexer.getTokens();
 		}
-		return new ArrayList<>();
+		return null;
 	}
 }

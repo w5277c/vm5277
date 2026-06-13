@@ -21,9 +21,9 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
-import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CGExcs;
@@ -51,6 +51,7 @@ import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 import ru.vm5277.common.lexer.Keyword;
+import ru.vm5277.compiler.Instance;
 
 public class MethodNode extends AstNode {
 	private	final	Set<Keyword>			modifiers;
@@ -63,9 +64,9 @@ public class MethodNode extends AstNode {
 	private			boolean					canThrow	= false;
 	private			List<ExpressionNode>	throws_		= new ArrayList<>();
 	
-	public MethodNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, VarType returnType, String name, ObjectTypeNode objectTypeNode)
+	public MethodNode(Instance inst, TokenBuffer tb, Set<Keyword> modifiers, VarType returnType, String name, ObjectTypeNode objectTypeNode)
 																																	throws CompileException {
-		super(tb, mc);
+		super(inst, tb);
 		
 		this.modifiers = modifiers;
 		this.returnType = returnType;
@@ -73,7 +74,7 @@ public class MethodNode extends AstNode {
 		this.objTypeNode = objectTypeNode;
 
         consumeToken(tb); // Потребляем '('
-		this.parameters = parseParameters(mc);
+		this.parameters = parseParameters(inst);
         consumeToken(tb); // Потребляем ')'
 		
 		// Проверяем наличие throws
@@ -92,7 +93,7 @@ public class MethodNode extends AstNode {
 
 		if(tb.match(Delimiter.LEFT_BRACE)) {
 			try {
-				blockNode = new BlockNode(tb, mc, "method '" + name + "'");
+				blockNode = new BlockNode(inst, tb, "method '" + name + "'");
 			}
 			catch(CompileException e) {}
 		}
@@ -123,12 +124,12 @@ public class MethodNode extends AstNode {
 		return canThrow;
 	}
 	
-	private List<ParameterNode> parseParameters(MessageContainer mc) {
+	private List<ParameterNode> parseParameters(Instance inst) {
         List<ParameterNode> params = new ArrayList<>();
         
 		while(!tb.match(TokenType.EOF) && !tb.match(Delimiter.RIGHT_PAREN)) {
 			try {
-				params.add(new ParameterNode(tb, mc));
+				params.add(new ParameterNode(inst, tb));
 				if (tb.match(Delimiter.COMMA)) {
 					consumeToken(tb); // Потребляем ','
 					continue;
@@ -169,6 +170,10 @@ public class MethodNode extends AstNode {
 
 	public String getName() {
 		return name;
+	}
+	
+	public ObjectTypeNode getObjTypeNode() {
+		return  objTypeNode;
 	}
 	
 	public Set<Keyword> getModifiers() {
@@ -280,7 +285,7 @@ public class MethodNode extends AstNode {
 				}
 				else if(scope instanceof InterfaceScope) {
 					try{
-						validateModifiers(modifiers, J8BKeyword.PUBLIC);
+						validateModifiers(modifiers, J8BKeyword.PUBLIC, J8BKeyword.PRIVATE, J8BKeyword.STATIC, J8BKeyword.NATIVE);
 					}
 					catch(CompileException e) {
 						addMessage(e);
@@ -353,7 +358,7 @@ public class MethodNode extends AstNode {
 						//TODO что насчет пути для импорта?
 						// Формируем список идентификаторов исключений с учетом иерархии наследования
 						String path = ((TypeReferenceExpression)expr).getQualifiedPath();
-						CIScope ciScope = scope.resolveCI(path, false);
+						CIScope ciScope = scope.resolveCI(null, path, false);
 						if(ciScope instanceof ExceptionScope) {
 
 							methodScope.addExceptionScope((ExceptionScope)ciScope);
@@ -490,13 +495,18 @@ public class MethodNode extends AstNode {
 
 	public void firstCodeGen(CodeGenerator cg, CGExcs excs) throws CompileException {
 		cgDone = true;
+
+// TODO забываю об инициализации staticInitContainer в CodeGenerator.build
+//		CGLabelScope mainLabel = new CGLabelScope(null, -1, "Main", true);
+//		mainLabel.setPersist();
+//		cgScope.prepend(mainLabel);
 		
 		if(null!=blockNode) {
 			excs.setMethodEndLabel(blockNode.getCGScope().getELabel());
 			blockNode.firstCodeGen(cg, excs);
 		}
 
-		objTypeNode.codeGen(cg, null, false, excs);		
+		objTypeNode.codeGen(cg, false, excs);		
 
 		if(!(objTypeNode instanceof InterfaceNode)) {
 			((CGMethodScope)cgScope).build(cg, excs);
@@ -506,12 +516,15 @@ public class MethodNode extends AstNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 
-		((CGClassScope)cgScope.getParent()).addMethod((CGMethodScope)cgScope);
+		// Не статические методы в интерфейсе не имеют тела
+		if(objTypeNode instanceof InterfaceNode && !symbol.isStatic()) return null;
 		
+		((CGClassScope)cgScope.getParent()).addMethod((CGMethodScope)cgScope);
+
 		
 		//В данном месте runtimeChecks должен быть сформирован на базе throws а не на базе обернутых catch
 		if(null!=blockNode) {
@@ -530,11 +543,11 @@ public class MethodNode extends AstNode {
 			}
 */
 			newExcs.setMethodEndLabel(blockNode.getCGScope().getELabel());
-			blockNode.codeGen(cg, cgScope, false, newExcs);
+			blockNode.codeGen(cg, false, newExcs);
 			excs.getProduced().addAll(newExcs.getProduced());
 		}
 		
-		objTypeNode.codeGen(cg, cgScope, false, excs);
+		objTypeNode.codeGen(cg, false, excs);
 
 		if(!(objTypeNode instanceof InterfaceNode)) {
 			((CGMethodScope)cgScope).build(cg, excs);

@@ -29,6 +29,7 @@ import ru.vm5277.common.cg.items.CGIAsmIReg;
 import ru.vm5277.common.cg.items.CGIAsmJump;
 import ru.vm5277.common.cg.items.CGIAsmLd;
 import ru.vm5277.common.cg.items.CGIAsmMv;
+import ru.vm5277.common.cg.items.CGIRAsm;
 import ru.vm5277.common.cg.items.CGItem;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
@@ -40,7 +41,56 @@ import ru.vm5277.common.exceptions.CompileException;
 
 public class Optimizer extends CodeOptimizer {
 	private	static final int RJMP_INSTR_SIZE	= 0x02;
+	private	static final int JMP_INSTR_SIZE		= 0x04;
 	
+	@Override
+	public void accNarrowing(List<CGItem> list, byte[] accRegs) throws CompileException {
+		// Не корректная архитектура
+/*		byte[] requiredRegs = null;
+		for(CGItem item : list) {
+			if(item.isDisabled()) continue;
+			
+			if(item instanceof CGIMeta) {
+				if(((CGIMeta)item).getMeta().startsWith("START_METHOD:")) {
+					String meta = ((CGIMeta)item).getMeta();
+					requiredRegs = StrUtils.parseHexBinary(meta.substring("START_METHOD:".length(), meta.indexOf(" ")));
+					continue;
+				}
+				else if(((CGIMeta)item).getMeta().startsWith("END_METHOD")) {
+					requiredRegs = null;
+					continue;
+				}
+			}
+			if(null!=requiredRegs && 0!=requiredRegs.length) {
+				if(item instanceof CGIRAsm) {
+					CGIRAsm rAsm = ((CGIRAsm)item);
+					boolean skip = false;
+					byte reg = getRegIndex(rAsm.getReg());
+
+					// Проверяем испоьзуется ли этот регистр в качестве аргумента
+					for(byte requiredReg : requiredRegs) {
+						if(requiredReg==reg) {
+							skip = true;
+							break;
+						}
+					}
+
+					if(!skip) {
+						// Регистр не используется в качестве аргмуента. Проверяем, что регистр принадлежит аккумулятору
+						// Внимательно при переиспользовании старшего регистра аккумулятора для временного хранения - этот функционал его тоже отключит
+						for(byte accReg : accRegs) {
+							if(accReg==reg) {
+								//rAsm.setInstr(";" + rAsm.getInstr()); - для диагностики
+								rAsm.disable();
+								break;
+							}
+						}
+					}
+				}
+			}
+		}*/
+	}
+
 	@Override
 	public boolean optimizeJumpInstr(List<CGItem> list) throws CompileException {
 		boolean result = false;
@@ -75,6 +125,22 @@ public class Optimizer extends CodeOptimizer {
 								if(delta>=-2048 && delta<=2047) {
 									aj.setInstr("rjmp");
 									aj.setSizeInBytes(RJMP_INSTR_SIZE);
+									changed = true;
+									result = true;
+								}
+							}
+						}
+					}
+					else if(item instanceof CGIAsmCondJump) {
+						CGIAsmCondJump acj = (CGIAsmCondJump)item;
+						if(acj.isExpansionRequired() && acj.getJumpInstr().getInstr().equals("jmp")) {
+							Integer labelOffset = labelsMap.get(acj.getJumpInstr().getLabelName());
+							if(null!=labelOffset) {
+								int delta = offset-labelOffset;
+								if(delta>=-2048 && delta<=2047) {
+									acj.getJumpInstr().setInstr("rjmp");
+									acj.getJumpInstr().setSizeInBytes(RJMP_INSTR_SIZE);
+									acj.setSizeInBytes(acj.getSizeInBytes() - (JMP_INSTR_SIZE-RJMP_INSTR_SIZE));
 									changed = true;
 									result = true;
 								}
@@ -132,14 +198,14 @@ public class Optimizer extends CodeOptimizer {
 			
 			offset = 0;
 			for(int i=0; i<asmList.size()-2; i++) {
-				CGItem item1 = list.get(i);
-				CGItem item2 = list.get(i+1);
-				CGItem item3 = list.get(i+2);
+				CGItem item1 = asmList.get(i);
+				CGItem item2 = asmList.get(i+1);
+				CGItem item3 = asmList.get(i+2);
 				if(item1 instanceof CGIAsmCondJump && item2 instanceof CGIAsmJump && item3 instanceof CGLabelScope) {
 					CGIAsmCondJump acj = (CGIAsmCondJump)item1;
 					CGIAsmJump aj = (CGIAsmJump)item2;
 					String name = ((CGLabelScope)item3).getName();
-					if(!aj.isExternal() && acj.getLabelName().equals(name)) {
+					if(!aj.isExternal() && !acj.isExpansionRequired() && acj.getLabelName().equals(name)) {
 						Integer labelOffset = labelsMap.get(aj.getLabelName());
 						if(null!=labelOffset) {
 							int wDelta = (labelOffset-offset)/2;
@@ -292,8 +358,13 @@ public class Optimizer extends CodeOptimizer {
 						}
 					}
 
-					if(null!=k && (k==0x00||k==0x01||k==0xff)) {
-						String kStr = "c0x" + (0==k ? "00" : (1==k ? "01" : "ff"));
+					if(null!=k && (k==0x00||k==0x01||k==0x02||k==0xff)) {
+						String kStr = "C0x00";
+						switch(k) {
+							case 0x01: kStr = "C0x01"; break;
+							case 0x02: kStr = "C0x02"; break;
+							case 0xff: kStr = "C0xff"; break;
+						}
 						if((ai2.getInstr().equals("st") || ai2.getInstr().equals("std") || ai2.getInstr().equals("sts")) &&
 							ai2.getPostfix().endsWith(",r"+reg)) {
 
@@ -351,11 +422,60 @@ public class Optimizer extends CodeOptimizer {
 						if(null==cnst && null!=lConst && null!=hConst) {
 							cnst = hConst * 256 + lConst; //TODO проверить
 						}
-						if(null!=cnst && 0>=cnst && -64<cnst) {
+						if(null!=cnst) { 
+							if(0>=cnst && -64<cnst) {
+								ai1.disable();
+								ai2.setInstr("adiw");
+								ai2.setPostfix("r" + dstReg1 + ","+ cnst*(-1));
+								isChanged = true;
+							}
+							else if(0<cnst && 64>cnst) {
+								ai1.disable();
+								ai2.setInstr("adiw");
+								ai2.setPostfix("r" + dstReg1 + ","+ cnst*(-1));
+								isChanged = true;
+							}
+
+						}
+					}
+					continue;
+				}
+
+				if(ai1 instanceof CGIRAsm && ai2 instanceof CGIRAsm &&
+					((ai1.getInstr().equals("subi") && ai2.getInstr().equals("sbci")) || (ai1.getInstr().equals("add") && ai2.getInstr().equals("adc")))) {
+					int dstReg1 = Integer.parseInt(replaceAliasToReg(((CGIRAsm)ai1).getReg()).substring(1));
+					int dstReg2 = Integer.parseInt(replaceAliasToReg(((CGIRAsm)ai2).getReg()).substring(1));
+
+					if((26==dstReg1 && 27==dstReg2) || (28==dstReg1 && 29==dstReg2) || (30==dstReg1 && 31==dstReg2)) {
+						Integer cnst=null;
+						Integer hConst=null;
+						Integer lConst=null;
+						int pos = ai1.getPostfix().indexOf("low");
+						if(ai1.getPostfix().startsWith("low")) {
+							cnst = Integer.parseInt(ai1.getPostfix().substring(4, ai1.getPostfix().length()-1));
+						}
+						else {
+							lConst = Integer.parseInt(ai1.getPostfix());
+						}
+						if(null==cnst && null!=lConst) {
+							if(!ai2.getPostfix().startsWith("high")) {
+								hConst = Integer.parseInt(ai2.getPostfix());
+							}
+						}
+						if(null==cnst && null!=lConst && null!=hConst) {
+							cnst = hConst * 256 + Math.abs(lConst); //TODO проверить
+						}
+						if(0==cnst) {
 							ai1.disable();
-							ai2.setInstr("adiw");
-							ai2.setPostfix("r" + dstReg1 + ","+ cnst*(-1));
-							isChanged = true;
+							ai2.disable();
+						}
+						else {
+							if(ai1.getInstr().equals("subi")) {
+								cnst *= -1;
+							}
+							if(updateMathPAir(ai1, (byte)dstReg1, ai2, cnst)) {
+								isChanged = true;
+							}
 						}
 					}
 					continue;
@@ -387,6 +507,22 @@ public class Optimizer extends CodeOptimizer {
 			}
 		}
 	}
+	
+	private boolean updateMathPAir(CGIAsm ai1, byte reg, CGIAsm ai2, int cnst) throws CompileException {
+		if(0>cnst && -64<cnst) {
+			ai1.setInstr("sbiw");
+			ai1.setPostfix("" + cnst*(-1));
+			ai2.disable();
+			return true;
+		}
+		else if(0<cnst && 64>cnst) {
+			ai1.setInstr("adiw");
+			ai1.setPostfix("" + cnst);
+			ai2.disable();
+			return true;
+		}
+		return false;
+	}
 
 	private String replaceAliasToReg(String regStr) {
 		return	regStr.replaceAll("xl", "r26").replaceAll("xh", "r27").replaceAll("yl", "r28").replaceAll("yh", "r29")
@@ -394,5 +530,9 @@ public class Optimizer extends CodeOptimizer {
 				.replaceAll("accum_l", "r16").replaceAll("accum_h", "r17").replaceAll("accum_el", "r18").replaceAll("accum_eh", "r19")
 				.replaceAll("temp_l", "r24").replaceAll("temp_h", "r25").replaceAll("temp_el", "r22").replaceAll("temp_eh", "r23")
 				.replaceAll("j8b_atom", "r15");
+	}
+	
+	private byte getRegIndex(String reg) {
+		return Byte.parseByte(replaceAliasToReg(reg).replaceFirst("r", ""));
 	}
 }

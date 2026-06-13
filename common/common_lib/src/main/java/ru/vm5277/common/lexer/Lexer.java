@@ -39,6 +39,7 @@ public class Lexer {
 	protected			ExternalTokenProvider	extTokenProvider;
 	protected	final	List<Token>				tokens		= new ArrayList<>();
 	protected			boolean					allTokens	= true;
+	protected			int						linesQnt	= 0;
 	
 	public Lexer(LexerType type) {
 		this.type = type;
@@ -206,7 +207,7 @@ public class Lexer {
 					}
 					// Добавляем проверку на метку
 					if(sb.available() && ':'==sb.peek()) {
-						token = new TLabel(token.getStringValue(), sb);
+						token = new TLabel(token, sb);
 					}
 				}
 				return token;
@@ -306,5 +307,9 @@ public class Lexer {
 			}
 		}
 		return false;
+	}
+	
+	public int getLinesQnt() {
+		return null==sb ? 0 : sb.getLineQnt();
 	}
 }

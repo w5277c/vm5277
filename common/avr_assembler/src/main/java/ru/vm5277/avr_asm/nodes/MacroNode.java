@@ -15,7 +15,7 @@
  */
 package ru.vm5277.avr_asm.nodes;
 
-import ru.vm5277.common.SourceType;
+import ru.vm5277.common.enums.SourceType;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -68,7 +68,7 @@ public class MacroNode extends Node {
 		
 		List<Expression> params = new ArrayList<>();
 		while(!tb.match(TokenType.EOF) && !tb.match(TokenType.NEWLINE)) {
-			params.add(Expression.parse(tb, scope, mc));
+			params.add(Expression.parse(tb, scope, mc, null));
 
 			if(tb.match(TokenType.EOF) || tb.match(TokenType.NEWLINE)) break;
 			Node.consumeToken(tb, Delimiter.COMMA);

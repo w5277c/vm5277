@@ -18,33 +18,22 @@ package ru.vm5277.common.cg.items;
 
 import ru.vm5277.common.exceptions.CompileException;
 
-public class CGIAsmMv extends CGIAsm {
-	private		String dstReg;
-	private		String srcReg;
-	
+public class CGIAsmMv extends CGIRAsm {
 	public CGIAsmMv(String instr, String dstReg, String srcReg) throws CompileException {
-		super(instr, null);
-		
-		this.dstReg = dstReg;
-		this.srcReg = srcReg;
+		super(instr, dstReg, srcReg);
 	}
 
 	public String getDstReg() {
-		return dstReg;
+		return reg;
 	}
 	public void setDstReg(String dstReg) {
-		this.dstReg = (null==dstReg ? null : dstReg.toLowerCase());
+		this.reg = (null==dstReg ? null : dstReg.toLowerCase());
 	}
 
 	public String getSrcReg() {
-		return srcReg;
+		return postfix;
 	}
 	public void setSrcReg(String srcReg) {
-		this.srcReg = (null==srcReg ? null : srcReg);
-	}
-	
-	@Override
-	public String getText() {
-		return instr + " " + dstReg + "," + srcReg;
+		this.postfix = (null==srcReg ? null : srcReg);
 	}
 }

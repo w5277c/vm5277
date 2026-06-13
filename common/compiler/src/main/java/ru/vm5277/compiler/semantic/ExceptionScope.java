@@ -21,10 +21,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.enums.J8BException;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class ExceptionScope extends CIScope {
-	public	final	static	String			RUNTIME_EXCEPTION_NAME	= "RuntimeException";
 	private					int				id;
 	private					ExceptionScope	extScope;
 	private					List<String>	values;
@@ -84,7 +84,7 @@ public class ExceptionScope extends CIScope {
 	public boolean isUnchecked() {
 		ExceptionScope scope_ = this;
 		while(null!=scope_) {
-			if(RUNTIME_EXCEPTION_NAME.equals(scope_.getName())) {
+			if(J8BException.RuntimeException.name().equals(scope_.getName())) {
 				return true;
 			}
 			scope_ = scope_.getExtScope();

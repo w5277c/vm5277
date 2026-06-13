@@ -18,27 +18,12 @@ package ru.vm5277.common.cg.items;
 
 import ru.vm5277.common.exceptions.CompileException;
 
-public class CGIAsmLd extends CGIAsm {
-	private		String reg;
-	private		String constant;
-	
+public class CGIAsmLd extends CGIRAsm {
 	public CGIAsmLd(String instr, String reg, String constant) throws CompileException {
-		super(instr, null);
-		
-		this.reg = reg;
-		this.constant = constant;
+		super(instr, reg, constant);
 	}
 
-	public String getReg() {
-		return reg;
-	}
-	
 	public String getConstant() {
-		return constant;
-	}
-
-	@Override
-	public String getText() {
-		return instr + " " + reg + "," + constant;
+		return postfix;
 	}
 }

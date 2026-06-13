@@ -27,9 +27,12 @@ public class BlockScope extends Scope {
 	protected	final	Map<String, Symbol>			variables			= new HashMap<>();
 	private		final	Map<String, LabelSymbol>	labels				= new HashMap<>();
 	private		final	Set<ExceptionScope>			handlingExcsScopes	= new HashSet<>();
+	private		final	boolean						inLoop;
 	
-	public BlockScope(Scope parent) {
+	public BlockScope(Scope parent, boolean inLoop) {
 		super(parent);
+		
+		this.inLoop = inLoop;
 	}
 
 	public void addVariable(Symbol symbol) throws CompileException {
@@ -108,6 +111,10 @@ public class BlockScope extends Scope {
 			current = (current.getParent() instanceof BlockScope) ? (BlockScope)current.getParent() : null;
 		}
 		return null;
+	}
+	
+	public boolean getInLoop() {
+		return inLoop;
 	}
 	
 	@Override

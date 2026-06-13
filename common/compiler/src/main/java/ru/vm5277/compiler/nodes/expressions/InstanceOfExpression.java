@@ -18,18 +18,19 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.Arrays;
 import java.util.List;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
-import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.CodegenResult;
+import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
+import ru.vm5277.compiler.Instance;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -48,8 +49,8 @@ public class InstanceOfExpression extends ExpressionNode {
 	private	Scope			scope;
 	private	boolean			fulfillsContract;	//Флаг реализации интерфейса
 	
-	public InstanceOfExpression(TokenBuffer tb, MessageContainer mc, ExpressionNode leftExpr, ExpressionNode rightExpr, String varName) {
-		super(tb, mc);
+	public InstanceOfExpression(Instance inst, TokenBuffer tb, ExpressionNode leftExpr, ExpressionNode rightExpr, String varName) {
+		super(inst, tb);
 		
 		this.leftExpr = leftExpr;
 		this.rightExpr = rightExpr;
@@ -158,8 +159,7 @@ public class InstanceOfExpression extends ExpressionNode {
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 		
 		this.scope = scope;
-		if(null!=cgScope) cgScope.disable();
-		cgScope = cg.enterExpression(parent, toString());
+		cgScope = cg.enterExpression(parent, cgScope, toString());
 
 		result&=leftExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
@@ -206,7 +206,7 @@ public class InstanceOfExpression extends ExpressionNode {
 					fulfillsContract = true;
 				}
 				else {
-					CIScope leftCIS = scope.getThis().resolveCI(leftType.getClassName(), false);
+					CIScope leftCIS = scope.getThis().resolveCI(null, leftType.getClassName(), false);
 					fulfillsContract = leftCIS.isImplements(rightType);
 				}
 			}
@@ -249,7 +249,7 @@ public class InstanceOfExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		//Обходимся без рантайма, пока в левой части примитив или это константа
 		//Но нужно вызывать рантайм, если встречаем объект, так как только в рантайм данных есть информация о типе переменной
 		
@@ -258,7 +258,7 @@ public class InstanceOfExpression extends ExpressionNode {
 		Symbol varSymbol = getSrcSymbol();
 		if(varSymbol.isFinal()) return (isCompatibleWith(scope, varSymbol.getType(), rightType) ? CodegenResult.TRUE : CodegenResult.FALSE);
 
-		leftExpr.codeGen(cg, cgScope, false, excs);
+		leftExpr.codeGen(cg, false, excs);
 
 		// TODO весь код можно вынести в RTOS j8b утилиты и просто вызывать как функцию
 		boolean heapSaved=false;

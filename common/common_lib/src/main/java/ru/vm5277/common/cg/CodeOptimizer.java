@@ -38,6 +38,7 @@ import ru.vm5277.common.exceptions.CompileException;
 
 public abstract class CodeOptimizer {
 
+	public abstract void accNarrowing(List<CGItem> list, byte[] accRegs) throws CompileException;
 	public abstract boolean optimizeJumpInstr(List<CGItem> list) throws CompileException;
 	public abstract boolean optimizeBranchInstr(List<CGItem> list) throws CompileException;
 //	public abstract void optimizeBranchChains(CGScope scope) throws CompileException;
@@ -64,6 +65,7 @@ public abstract class CodeOptimizer {
 					CGIAsmLd regLoad2 = (CGIAsmLd)item2;
 					if(regLoad1.getReg().equalsIgnoreCase(regLoad2.getReg())) {
 						regLoad1.disable();
+						break;
 					}
 				}
 			}
@@ -140,7 +142,7 @@ public abstract class CodeOptimizer {
 	
 	public void optimizePushConst(CGScope scope, char iReg) {
 		ArrayList<CGItem> list=new ArrayList();
-		CodeGenerator.treeToList(scope, list, "ConstToCellBy"+iReg);
+		CodeGenerator.treeToList(scope, list, "ConstToCellBy"+iReg, true);
 		
 		for(int i=0; i<list.size()-1; i++) {
 			CGItem item1 = list.get(i);
@@ -169,7 +171,12 @@ public abstract class CodeOptimizer {
 				usedLabels.add(((CGIAsmJump)item).getLabelName().toLowerCase());
 			}
 			else if(item instanceof CGIAsmCondJump) {
-				usedLabels.add(((CGIAsmCondJump)item).getLabelName().toLowerCase());
+				if(((CGIAsmCondJump)item).isExpansionRequired()) {
+					usedLabels.add(((CGIAsmCondJump)item).getJumpInstr().getLabelName().toLowerCase());
+				}
+				else {
+					usedLabels.add(((CGIAsmCondJump)item).getLabelName().toLowerCase());
+				}
 			}
 			else if(item instanceof CGIAsmLdLabel) {
 				usedLabels.add(((CGIAsmLdLabel)item).getLabelName().toLowerCase());
@@ -179,7 +186,7 @@ public abstract class CodeOptimizer {
 			}
 			else if(item instanceof CGLabelScope) {
 				CGLabelScope label = (CGLabelScope)item;
-				if(label.isUsed()) {
+				if(label.isUsed() && !label.isPersist()) {
 					labels.put(label.getName().toLowerCase(), label);
 				}
 			}
@@ -205,8 +212,11 @@ public abstract class CodeOptimizer {
 	public void optimizeJumpChains(CGScope scope) {
 		ArrayList<CGItem> list = new ArrayList();
 		Map<String,String> replacementMap = new HashMap<>();
-
-		while(true) {
+		boolean structureChanged = true;
+		
+		while(structureChanged) {
+			structureChanged = false;
+			
 			list.clear();
 			replacementMap.clear();
 			
@@ -224,6 +234,18 @@ public abstract class CodeOptimizer {
 								replacementMap.put(name, ((CGIAsmJump)nextItem).getLabelName());
 								item.disable();
 								nextItem.disable();
+								structureChanged = true;
+							}
+						}
+					}
+					else if(list.get(i-1) instanceof CGIAsmCondJump) {
+						CGIAsmCondJump acj = (CGIAsmCondJump)list.get(i-1);
+						if(!acj.isExpansionRequired()) {
+							CGItem nextItem = list.get(i+1);
+							if(nextItem instanceof CGIAsmJump) {
+								if(!((CGIAsmJump)nextItem).isExternal() && !name.equals(((CGIAsmJump)nextItem).getLabelName())) {
+									replacementMap.put(name, ((CGIAsmJump)nextItem).getLabelName());
+								}
 							}
 						}
 					}
@@ -241,7 +263,7 @@ public abstract class CodeOptimizer {
 				for (String source : replacementMap.keySet()) {
 					String target = replacementMap.get(source);
 					String newTarget = replacementMap.get(target);
-					if(null != newTarget) {
+					if(null!=newTarget) {
 						replacementMap.put(source, newTarget);
 						changed = true;
 
@@ -254,14 +276,14 @@ public abstract class CodeOptimizer {
 					if(item instanceof CGIAsmJump) {
 						CGIAsmJump oldJump = (CGIAsmJump)item;
 						String target = replacementMap.get(oldJump.getLabelName());
-						if(null != target) {
+						if(null!=target) {
 							oldJump.setLabelName(target);
 						}
 					}
 					else if(item instanceof CGIAsmCondJump) {
 						CGIAsmCondJump oldJump = (CGIAsmCondJump)item;
 						String target = replacementMap.get(oldJump.getLabelName());
-						if(null != target) {
+						if(null!=target) {
 							oldJump.setLabelName(target);
 						}
 					}

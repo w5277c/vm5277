@@ -24,20 +24,21 @@ import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.cg.CGBranch;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.CodegenResult;
+import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
+import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 
 public class UnaryExpression extends ExpressionNode {
@@ -45,8 +46,8 @@ public class UnaryExpression extends ExpressionNode {
     private			ExpressionNode	operand;
     private			boolean			isUsed		= false;
 	
-    public UnaryExpression(TokenBuffer tb, MessageContainer mc, SourcePosition sp, Operator operator, ExpressionNode operand) {
-        super(tb, mc, sp);
+    public UnaryExpression(Instance inst, TokenBuffer tb, SourcePosition sp, Operator operator, ExpressionNode operand) {
+        super(inst, tb, sp);
         
 		this.operator = operator;
         this.operand = operand;
@@ -106,8 +107,7 @@ public class UnaryExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		if(null!=cgScope) cgScope.disable();
-		cgScope = cg.enterExpression(parent, toString());
+		cgScope = cg.enterExpression(parent, cgScope, toString());
 		//if(null != symbol) symbol.setCGScope(cgScope);
 		
 		result&=operand.postAnalyze(scope, cg, cgScope);
@@ -135,7 +135,7 @@ public class UnaryExpression extends ExpressionNode {
 					}
 					break;
 				case BIT_NOT:
-					if(!type.isIntegral()) {
+					if(!type.isInteger()) {
 						markError("Bitwise ~ requires integer type");
 						result = false;
 					}
@@ -191,14 +191,12 @@ public class UnaryExpression extends ExpressionNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean accumStore, CGExcs excs) throws CompileException {
-		return codeGen(cg, parent, false, false, accumStore, excs);
+	public Object codeGen(CodeGenerator cg, boolean accumStore, CGExcs excs) throws CompileException {
+		return codeGen(cg, false, false, accumStore, excs);
 	}
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean isInvert, boolean opOr, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean isInvert, boolean opOr, boolean toAccum, CGExcs excs) throws CompileException {
 		Object result = null;
 		excs.setSourcePosition(sp);
-		
-		//CGScope cgs = null == parent ? cgScope : parent;
 		
 		CGBranch branch = null;
 		CGScope _scope = cgScope;
@@ -209,19 +207,23 @@ public class UnaryExpression extends ExpressionNode {
 		}
 
 		boolean newBranch = false;
-		if(Operator.NOT==operator && null==branch) { // Встретили первую логическую операцию, необходим branch
-			branch = new CGBranch();
-			cgScope.setBranch(branch);
-			newBranch = true;
-		}
+		
+// Бага - оставил в виде напоминания
+// Убрал - а если это присваивание? Например b1=!b2; И вообще сейчас мне не понятна вообще эта логика с переходом по branch для NOT
+//		if(Operator.NOT==operator && null==branch) { // Встретили первую логическую операцию, необходим branch
+//			branch = new CGBranch();
+//			cgScope.setBranch(branch);
+//			newBranch = true;
+//		}
 
+		cg.accumLock(type);
 		if(operand instanceof BinaryExpression) {
-			if(Operator.NOT==operator) {
-				((BinaryExpression)operand).codeGen(cg, cgScope, !isInvert, !opOr, toAccum, excs);
+			if(Operator.NOT==operator && null!=branch) {
+				((BinaryExpression)operand).codeGen(cg, !isInvert, !opOr, toAccum, excs);
 			}
 			else {
 				if(toAccum) {
-					if(CodegenResult.RESULT_IN_ACCUM!=((BinaryExpression)operand).codeGen(cg, cgScope, isInvert, opOr, true, excs)) {
+					if(CodegenResult.RESULT_IN_ACCUM!=((BinaryExpression)operand).codeGen(cg, isInvert, opOr, true, excs)) {
 						throw new CompileException("Accum not used for operand:" + operand);					
 					}
 					cg.eUnary(cgScope, operator, new CGCells(CGCells.Type.ACC), toAccum, excs);
@@ -234,11 +236,11 @@ public class UnaryExpression extends ExpressionNode {
 		}
 		else if(operand instanceof VarFieldExpression) {
 			VarFieldExpression ve = (VarFieldExpression)operand;
-			if(Operator.NOT==operator) {
-				ve.codeGen(cg, cgScope, !isInvert, !opOr, branch, excs);
+			if(Operator.NOT==operator && null!=branch) {
+				ve.codeGen(cg, !isInvert, !opOr, branch, excs);
 			}
 			else {
-				ve.codeGen(cg, cgScope, false, excs);
+				ve.codeGen(cg, false, excs);
 				CGCellsScope cScope = (CGCellsScope)operand.getSymbol().getCGScope(CGCellsScope.class);
 				cg.eUnary(cgScope, operator, cScope.getCells(), toAccum, excs);
 				if(toAccum)	 {
@@ -248,7 +250,7 @@ public class UnaryExpression extends ExpressionNode {
 		}
 		else if(operand instanceof ArrayExpression) {
 			ArrayExpression ae = (ArrayExpression)operand;
-			ae.codeGen(cg, null, false, excs);
+			ae.codeGen(cg, false, excs);
 			CGCellsScope cScope = (CGCellsScope)operand.getSymbol().getCGScope(CGCellsScope.class);
 			cg.eUnary(cgScope, operator, cScope.getCells(), toAccum, excs);
 			if(toAccum)	 {
@@ -257,14 +259,35 @@ public class UnaryExpression extends ExpressionNode {
 		}
 		else if(operand instanceof UnaryExpression) {
 			if(Operator.NOT==operator) {
-				((UnaryExpression)operand).codeGen(cg, cgScope, !isInvert, !opOr, false, excs);
+				((UnaryExpression)operand).codeGen(cg, !isInvert, !opOr, false, excs);
 			}
 			else {
-				((UnaryExpression)operand).codeGen(cg, cgScope, !isInvert, opOr, false, excs);
+				((UnaryExpression)operand).codeGen(cg, !isInvert, opOr, false, excs);
+			}
+		}
+		else if(operand instanceof MethodCallExpression) {
+			MethodCallExpression mce = (MethodCallExpression)operand;
+			Object mceResult = mce.codeGen(cg, true, excs);
+			if(CodegenResult.RESULT_IN_ACCUM==mceResult) {
+				cg.eUnary(cgScope, operator, new CGCells(CGCells.Type.ACC), toAccum, excs);
+				if(toAccum)	 {
+					result = CodegenResult.RESULT_IN_ACCUM;
+				}
+			}
+			else if(CodegenResult.RESULT_IN_FLAG==mceResult) {
+				if(Operator.NOT==operator) {
+					result = CodegenResult.RESULT_IN_INV_FLAG;
+				}
+				else {
+					throw new CompileException("Unsupported operand '" + operand + " in unary expression", sp);
+				}
+			}
+			else {
+				throw new CompileException("Accum not used for operand:" + operand);
 			}
 		}
 		else {
-			throw new CompileException("Unsupported operand '" + operand + " in unary expression");
+			throw new CompileException("Unsupported operand '" + operand + " in unary expression", sp);
 		}
 		
 		if(newBranch && branch.isUsed()) {
@@ -275,7 +298,8 @@ public class UnaryExpression extends ExpressionNode {
 			cg.constToAcc(cgScope, 1, 0, false);
 			cgScope.append(lbScope);
 		}
-
+		
+		cg.accumUnlock();
 		return result;
 	}
 	
@@ -286,7 +310,7 @@ public class UnaryExpression extends ExpressionNode {
 
 	@Override
 	public String toString() {
-		return operator.toString() + operand;
+		return operator.toString() +  "(" + operand + ")";
 	}
 	
 	public String getFullInfo() {

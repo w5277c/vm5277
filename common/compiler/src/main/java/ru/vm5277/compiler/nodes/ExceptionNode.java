@@ -20,9 +20,9 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
-import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
@@ -40,6 +40,7 @@ import ru.vm5277.compiler.semantic.GlobalScope;
 import ru.vm5277.compiler.semantic.ImportableScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.lexer.Keyword;
+import ru.vm5277.compiler.Instance;
 
 public class ExceptionNode extends ObjectTypeNode {
 	private			List<String>	values;
@@ -47,8 +48,8 @@ public class ExceptionNode extends ObjectTypeNode {
 	private			CIScope			extScope;
 	private			int				id;
 	
-	public ExceptionNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, List<ObjectTypeNode> importedClasses) throws CompileException {
-		super(tb, mc, modifiers, null, importedClasses);
+	public ExceptionNode(Instance inst, TokenBuffer tb, Set<Keyword> modifiers, List<ObjectTypeNode> imported) throws CompileException {
+		super(inst, tb, modifiers, null, imported);
 		
 		if(null!=name) {
 			id = VarType.addException(this.name);
@@ -150,8 +151,8 @@ public class ExceptionNode extends ObjectTypeNode {
 			ImportableScope iScope = (scope instanceof GlobalScope ? (GlobalScope)scope : scope.getThis());
 			iScope.addCI(ciScope, true);
 
-			if(null!=importedClasses) {
-				for(ObjectTypeNode imported : importedClasses) {
+			if(null!=imported) {
+				for(ObjectTypeNode imported : imported) {
 					result&=imported.declare(ciScope);
 
 					if(result) {
@@ -173,7 +174,7 @@ public class ExceptionNode extends ObjectTypeNode {
 			}
 
 			if(result && !ext.isEmpty()) {
-				extScope = scope.resolveCI(ext.get(0), false);
+				extScope = scope.resolveCI(null, ext.get(0), false);
 				if(null==extScope) {
 					markError("Exception not found: " + ext.get(0));
 					result = false;
@@ -217,7 +218,7 @@ public class ExceptionNode extends ObjectTypeNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		return null;
 	}
 	

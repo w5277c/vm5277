@@ -24,7 +24,7 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.CodegenResult;
+import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
@@ -33,7 +33,7 @@ import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
@@ -47,20 +47,20 @@ public class DoWhileNode extends CommandNode {
 	private	boolean			alwaysTrue;
 	private	boolean			alwaysFalse;
 
-	public DoWhileNode(TokenBuffer tb, MessageContainer mc) {
-		super(tb, mc);
+	public DoWhileNode(Instance inst, TokenBuffer tb) {
+		super(inst, tb);
 
 		consumeToken(tb);
 		// Тело цикла
 		try {
-			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(tb, mc, "do-while1") : new BlockNode(tb, mc, parseStatement(), "do-while2");
+			blockNode = tb.match(Delimiter.LEFT_BRACE) ? new BlockNode(inst, tb, "do-while1") : new BlockNode(inst, tb, parseStatement(inst), "do-while2");
 		}
 		catch(CompileException e) {markFirstError(e);}
 
 		try {
 			consumeToken(tb, TokenType.COMMAND, J8BKeyword.WHILE);
 			consumeToken(tb, Delimiter.LEFT_PAREN);
-			this.condition = new ExpressionNode(tb, mc).parse();
+			this.condition = new ExpressionNode(inst, tb).parse();
 			consumeToken(tb, Delimiter.RIGHT_PAREN);
 		}
 		catch(CompileException e) {
@@ -97,7 +97,7 @@ public class DoWhileNode extends CommandNode {
 		boolean result = true;
 		
 		// Создаем новую область видимости для тела цикла
-		blockScope = new BlockScope(scope);
+		blockScope = new BlockScope(scope, true);
 
 		// Объявляем элементы тела цикла
 		result&=blockNode.declare(blockScope);
@@ -181,20 +181,35 @@ public class DoWhileNode extends CommandNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone) return null;
 		cgDone = true;
 		
 		CodegenResult result = null;
-		//CGScope cgs = null == parent ? cgScope : parent;
 		cgScope.setBranch(branch);
 		
 		if(!alwaysFalse) {
-			blockNode.codeGen(cg, cgScope, false, excs);
+			blockNode.codeGen(cg, false, excs);
 		}
 //TODO См. в IfNode, необходима проверка на результат condition.codeGen	
 		if(!alwaysFalse && !alwaysTrue) {
-			condition.codeGen(cg, cgScope, false, excs);
+			Object obj = condition.codeGen(cg, false, excs);
+//TODO			if(obj==CodegenResult.TRUE) {
+//				return trueExpr.codeGen(cg, toAccum, excs);
+//			}
+//			else if(obj==CodegenResult.FALSE) {
+//				return falseExpr.codeGen(cg, toAccum, excs);
+//			}
+//			else
+			if(obj==CodegenResult.RESULT_IN_ACCUM) {
+				cg.boolAccCond(cgScope, branch, true);
+			}
+			else if(obj==CodegenResult.RESULT_IN_FLAG) {
+				cg.boolFlagCond(cgScope, false, branch);
+			}
+			else if(obj==CodegenResult.RESULT_IN_INV_FLAG) {
+				cg.boolFlagCond(cgScope, true, branch);
+			}
 		}
 
 		if(!alwaysFalse) {
@@ -205,7 +220,7 @@ public class DoWhileNode extends CommandNode {
 		cgScope.append(((CGLoopBlockScope)cgScope).getEndLbScope());
 		
 		((CGBlockScope)cgScope).build(cg, false, excs);
-		((CGBlockScope)cgScope).restoreRegsPool();
+		((CGBlockScope)cgScope).releaseRegsPool();
 
 		return result;
 	}

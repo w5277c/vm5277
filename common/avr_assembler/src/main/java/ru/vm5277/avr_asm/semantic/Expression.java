@@ -52,16 +52,16 @@ public class Expression extends Node {
 	protected Expression() {
 	}
 
-	public static Expression parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
-		Expression result = parseBinary(tb, scope, mc, 0);
+	public static Expression parse(TokenBuffer tb, Scope scope, MessageContainer mc, StringBuilder listSb) throws CompileException {
+		Expression result = parseBinary(tb, scope, mc, 0, listSb);
 		if(null==result) return result;
 		Expression folded = fold(result, tb.getSP());
 		return null==folded ? result : folded;
 	}
 	
 	// TODO свертывание не выполняется для BinaryExpression из parseFunction
-	private static Expression parseBinary(TokenBuffer tb, Scope scope, MessageContainer mc, int minPrecedence) throws CompileException {
-        Expression left = parseUnary(tb, scope, mc);
+	private static Expression parseBinary(TokenBuffer tb, Scope scope, MessageContainer mc, int minPrecedence, StringBuilder listSb) throws CompileException {
+        Expression left = parseUnary(tb, scope, mc, listSb);
 
 		while (tb.match(TokenType.OPERATOR)) {
             Operator operator = ((Operator)tb.current().getValue());
@@ -70,9 +70,10 @@ public class Expression extends Node {
             if (precedence == null || precedence<minPrecedence) {
 				break;
 			}
-            tb.consume();
+            if(null!=listSb) listSb.append(tb.current().getValue() + " ");
+			tb.consume();
 	
-			Expression right = parseBinary(tb, scope, mc, precedence + (operator.isAssignment() ? 0 : 1));
+			Expression right = parseBinary(tb, scope, mc, precedence + (operator.isAssignment() ? 0 : 1), listSb);
 	
 			BinaryExpression binaryExpr = new BinaryExpression(tb, scope, mc, left, operator, right);
 			Expression folded = fold(binaryExpr, tb.getSP());
@@ -82,29 +83,32 @@ public class Expression extends Node {
         return left;
     }
 	
-	private static Expression parseUnary(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
+	private static Expression parseUnary(TokenBuffer tb, Scope scope, MessageContainer mc, StringBuilder listSb) throws CompileException {
 		if (tb.match(TokenType.OPERATOR)) {
 			Operator operator = ((Operator)tb.current().getValue()); //TODO check it
 			if(operator.isUnary()) {
+				if(null!=listSb) listSb.append(tb.current().getValue() + " ");
 				tb.consume();
-
-				Expression expr = parsePrimary(tb, scope, mc);
+				
+				Expression expr = parsePrimary(tb, scope, mc, listSb);
 				UnaryExpression unaryExpr = new UnaryExpression(tb, scope, mc, operator, expr);
 				Expression folded = fold(unaryExpr, tb.getSP());
 				return (null != folded ? folded : unaryExpr);
 //				return new UnaryExpression(tb, scope, mc, operator, parseUnary(tb, scope, mc));
 			}
 		}
-		return parsePrimary(tb, scope, mc);
+		return parsePrimary(tb, scope, mc, listSb);
 	}
 
-	private static Expression parsePrimary(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
+	private static Expression parsePrimary(TokenBuffer tb, Scope scope, MessageContainer mc, StringBuilder listSb) throws CompileException {
 		Token token = tb.current();
 		
 		if(tb.match(TokenType.MACRO_PARAM)) {
 			if(scope.isMacroDeploy()) {
+				if(null!=listSb) listSb.append(tb.current().getValue() + " ");
 				tb.consume();
 				Integer index = (Integer)(consumeToken(tb, TokenType.NUMBER)).getValue();
+				if(null!=listSb) listSb.append(index);
 				MacroCallSymbol marcoCall = scope.getMarcoCall();
 				Expression result = marcoCall.getParams().get(index);
 				return result;
@@ -114,34 +118,42 @@ public class Expression extends Node {
 			}
 		}
 		else if(tb.match(TokenType.NUMBER) || tb.match(TokenType.STRING) || tb.match(TokenType.CHARACTER) || tb.match(TokenType.LITERAL)) {
+			if(null!=listSb) listSb.append(tb.current().getValue() + " ");
 			tb.consume();
 			return new LiteralExpression(token.getValue());
 		}
 		else if(tb.match(Delimiter.LEFT_PAREN)) {
+			if(null!=listSb) listSb.append(tb.current().getValue() + " ");
 			tb.consume();
-			Expression expr = parseBinary(tb, scope, mc, 0);
+			Expression expr = parseBinary(tb, scope, mc, 0, listSb);
+			if(null!=listSb) listSb.append(tb.current().getValue() + " ");
 			Node.consumeToken(tb, Delimiter.RIGHT_PAREN);
 			return expr;
 		}
 		else if(tb.match(TokenType.INDEX_REG)) {
+			if(null!=listSb) listSb.append(tb.current().getValue() + " ");
 			IRegExpression expr = new IRegExpression((String)tb.consume().getValue());
 			if((!tb.match(TokenType.IDENTIFIER) && !tb.match(TokenType.NUMBER)) || (!expr.isInc() && !expr.isDec())) {
 				return expr;
 			}
 			return new BinaryExpression(tb, scope, mc, new IRegExpression(expr.getId(), false, false),
-										expr.isDec() ? Operator.MINUS : Operator.PLUS, parseBinary(tb, scope, mc, 0));
+										expr.isDec() ? Operator.MINUS : Operator.PLUS, parseBinary(tb, scope, mc, 0, listSb));
 		}
 		else if(tb.match(TokenType.COMMAND)) {
+			if(null!=listSb) listSb.append(tb.current().getValue() + " ");
 			String name = ((Keyword)tb.consume().getValue()).getName();
 			if(tb.match(Delimiter.LEFT_PAREN)) {
+				if(null!=listSb) listSb.append(tb.current().getValue() + " ");
 				tb.consume();
-				Expression result = parseFunction(tb, scope, mc, name);
+				Expression result = parseFunction(tb, scope, mc, name, listSb);
+				if(null!=listSb) listSb.append(tb.current().getValue() + " ");
 				consumeToken(tb, Delimiter.RIGHT_PAREN);
 				return result;
 			}
 			throw new CompileException("Missing opening parenthesis '(' for command '" + name + "'", tb.current().getSP());
 		}
 		else if(tb.match(TokenType.IDENTIFIER)) {
+			if(null!=listSb) listSb.append(tb.current().getValue() + " ");
 			return new IdExpression(tb, scope, mc, ((String)tb.consume().getValue()).toLowerCase());
 		}
 		else {
@@ -149,8 +161,8 @@ public class Expression extends Node {
         }
     }
 	
-	private static Expression parseFunction(TokenBuffer tb, Scope scope, MessageContainer mc, String name) throws CompileException {
-		Expression expr = Expression.parse(tb, scope, mc);
+	private static Expression parseFunction(TokenBuffer tb, Scope scope, MessageContainer mc, String name, StringBuilder listSb) throws CompileException {
+		Expression expr = Expression.parse(tb, scope, mc, listSb);
 		
 		Long value = null;
 		try {value = getLong(expr, null);} catch(CompileException e) {}

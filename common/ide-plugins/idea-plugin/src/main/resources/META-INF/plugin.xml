@@ -1,0 +1,46 @@
+<!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
+<idea-plugin>
+    <id>ru.vm5277.idea_plugin</id>
+    <name>VM5277EmbeddedToolkitPlugin</name>
+    <vendor url="https://vm5277.ru">w5277c</vendor>
+    <description><![CDATA[
+    <h1>VM5277: Embedded Development for 8-bit MCUs</h1>
+    <p>
+        IDE support for the VM5277 toolkit — a Java-like OOP language (J8B) and RTOS for cross-platform development on AVR, PIC, and STM8 microcontrollers.
+    </p>
+
+    <h2>Features</h2>
+    <ul>
+        <li><strong>J8B Language:</strong> Syntax highlighting for the Java-like J8B language (classes, interfaces, exceptions).</li>
+        <li><strong>AVR Assembler:</strong> Syntax highlighting for generated AVR assembly code.</li>
+        <li><strong>Build & Flash:</strong> Compile J8B source and flash your AVR device (e.g., Arduino Uno) directly from a Run Configuration.</li>
+        <li><strong>Maven Integration:</strong> Import and manage J8B Maven projects with automatic profile synchronization from <code>pom.xml</code>.</li>
+        <li><strong>Bootloader Tool:</strong> GUI dialog to flash a bootloader onto a new device via serial port.</li>
+    </ul>
+
+    <p>
+        <em>Early development stage. Visit <a href="https://github.com/w5277c/vm5277">github.com/w5277c/vm5277</a> for the full toolkit and documentation.</em>
+    </p>
+]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+    <depends>org.jetbrains.idea.maven</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <moduleBuilder builderClass="ru.vm5277.plugin.project.NewProjectModuleBuilder"/>
+        <postStartupActivity implementation="ru.vm5277.plugin.executing.MavenStartup"/>
+        <configurationType implementation="ru.vm5277.plugin.executing.ExecuteConfigurationType"/>
+        <fileType name="J8B File" implementationClass="ru.vm5277.plugin.j8b.FileType" fieldName="INSTANCE" extensions="j8b" language="J8B"/>
+<!--    <annotator language="J8B" implementationClass="ru.vm5277.plugin.old.J8BAnnotator"/>
+        <lang.parserDefinition language="J8B" implementationClass="ru.vm5277.plugin.old.J8BParserDefinition"/>
+        <completion.contributor language="J8B" implementationClass="ru.vm5277.plugin.old.J8BCompletionContributor"/>-->
+        <lang.syntaxHighlighterFactory language="J8B" implementationClass="ru.vm5277.plugin.j8b.SyntaxHighlighterFactory"/>
+        <additionalTextAttributes scheme="Default" file="colorSchemes/J8BColors.xml"/>
+        <additionalTextAttributes scheme="Darcula" file="colorSchemes/J8BColorsDark.xml"/>
+        <fileType name="ASM File" implementationClass="ru.vm5277.plugin.asm.FileType" fieldName="INSTANCE" extensions="asm" language="ASM"/>
+        <lang.syntaxHighlighterFactory language="ASM" implementationClass="ru.vm5277.plugin.asm.AsmSyntaxHighlighterFactory"/>
+        <lang.inspectionSuppressor language="ASM" implementationClass="ru.vm5277.plugin.asm.ASMInspectionSuppressor"/>
+        <editorFactoryListener implementation="ru.vm5277.plugin.asm.EditorListener"/>
+        <editorFactoryListener implementation="ru.vm5277.plugin.j8b.EditorListener"/>
+    </extensions>
+</idea-plugin>

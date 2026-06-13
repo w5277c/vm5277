@@ -19,19 +19,20 @@ package ru.vm5277.compiler.nodes.expressions;
 import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.lexer.Operator;
-import ru.vm5277.common.Property;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
-import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import ru.vm5277.common.enums.Property;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.CodegenResult;
-import ru.vm5277.common.compiler.Optimization;
+import ru.vm5277.common.enums.CodegenResult;
+import ru.vm5277.common.enums.OptimizationType;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.Main;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -133,13 +134,13 @@ public class QualifiedPathExpression extends ExpressionNode {
 	
 	private	List<PathSegment>		segments			= new ArrayList<>();
 //	private	List<ExpressionNode>	expressions			= new ArrayList<>();
-	private	ExpressionNode			resolvedExpr		=null;
+	private	ExpressionNode			resolvedExpr		= null;
 	private	boolean					reassigned			= false;
 	private	Integer					lastAccessedSn		= null;
 	private	boolean					postAnalyzed		= false;
 	
-	public QualifiedPathExpression(TokenBuffer tb, MessageContainer mc) throws CompileException {
-		super(tb, mc);
+	public QualifiedPathExpression(Instance inst, TokenBuffer tb) throws CompileException {
+		super(inst, tb);
 	}
 	
 	public void addSegment(PathSegment segment) {
@@ -254,7 +255,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 							if(null!=resolvedExpr && (resolvedExpr instanceof EnumExpression || resolvedExpr.getType().isEnum())) {
 								i++;
 								if(null!=prop) {
-									ExpressionNode expr = new PropertyExpression(tb, mc, sp, resolvedExpr, prop, ((MethodSegment)secondSegment).getArguments());
+									ExpressionNode expr = new PropertyExpression(inst, tb, sp, resolvedExpr, prop, ((MethodSegment)secondSegment).getArguments());
 									resolvedExpr = expr;
 									result&=expr.declare(scope);
 									if(result) {
@@ -269,7 +270,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 							}
 							else if(null!=pathExpr && pathExpr.getScope() instanceof EnumScope) {
 								if(null!=prop) {
-									ExpressionNode expr = new PropertyExpression(tb, mc, sp, pathExpr, prop, ((MethodSegment)secondSegment).getArguments());
+									ExpressionNode expr = new PropertyExpression(inst, tb, sp, pathExpr, prop, ((MethodSegment)secondSegment).getArguments());
 									resolvedExpr = expr;
 									result&=expr.declare(scope);
 									if(result) {
@@ -284,7 +285,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 								continue;
 							}
 							else if(null!=prop && (Property.instanceId==prop || Property.typeId==prop || Property.code==prop)) {
-									ExpressionNode expr = new PropertyExpression(	tb, mc, sp, null==resolvedExpr ? pathExpr : resolvedExpr,
+									ExpressionNode expr = new PropertyExpression(	inst, tb, sp, null==resolvedExpr ? pathExpr : resolvedExpr,
 																					prop, ((MethodSegment)secondSegment).getArguments());
 									resolvedExpr = expr;
 									result&=expr.declare(scope);
@@ -296,7 +297,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 									continue;
 							}
 							else {
-								ExpressionNode expr = new MethodCallExpression(	tb, mc, sp,
+								ExpressionNode expr = new MethodCallExpression(	inst, tb, sp,
 																				null==resolvedExpr ? pathExpr : resolvedExpr,
 																				((QualifiedSegment)segment).getName(),
 																				((MethodSegment)secondSegment).getArguments());
@@ -304,7 +305,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 								if(result) {
 									result&=expr.postAnalyze(scope, cg, parent);
 									List<ExpressionNode> optimized = null;
-									if(result && Optimization.NONE!=Main.getOptLevel()) {
+									if(result && OptimizationType.NONE!=Main.getOptimizationType()) {
 										optimized = optimizeMethodCall((MethodCallExpression)expr);
 									}
 									if(null!=optimized) {
@@ -321,7 +322,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 											}
 										}
 										else {
-											resolvedExpr = new ExpressionsContainer(tb, mc);
+											resolvedExpr = new ExpressionsContainer(inst, tb);
 											for(ExpressionNode exprNode : optimized) {
 												result&=exprNode.declare(scope);
 												if(result) {
@@ -344,7 +345,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 
 					
 					if(segment instanceof ThisSegment) {
-						pathExpr = new ThisExpression(tb, mc, scope.getThis());
+						pathExpr = new ThisExpression(inst, tb, scope.getThis());
 						resolvedExpr = pathExpr;
 						result&=pathExpr.declare(scope);
 						if(result) {
@@ -361,7 +362,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 						}
 
 						if(null!=resolvedExpr && null!=prop) {
-							ExpressionNode expr = new PropertyExpression(tb, mc, sp, resolvedExpr, prop, new ArrayList<>());
+							ExpressionNode expr = new PropertyExpression(inst, tb, sp, resolvedExpr, prop, new ArrayList<>());
 							resolvedExpr = expr;
 							result&=expr.declare(scope);
 							if(result) {
@@ -371,7 +372,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 							continue;
 						}
 						else if(null!=pathExpr && pathExpr.getScope() instanceof EnumScope) {
-							resolvedExpr = new EnumExpression(tb, mc, pathExpr, qSeg.getName());
+							resolvedExpr = new EnumExpression(inst, tb, pathExpr, qSeg.getName());
 							result&=resolvedExpr.declare(scope);
 							if(result) {
 								result&=resolvedExpr.postAnalyze(scope, cg, parent);
@@ -381,7 +382,8 @@ public class QualifiedPathExpression extends ExpressionNode {
 						else {
 							symbol = null==pathExpr ? scope.resolveVar(qSeg.getName()) : pathExpr.getScope().resolveVar(qSeg.getName());
 							if(null!=symbol) {
-								ExpressionNode expr = new VarFieldExpression(tb, mc, sp, getSN(), null==resolvedExpr ? pathExpr : resolvedExpr,	qSeg.getName());
+								ExpressionNode expr = new VarFieldExpression(	inst, tb, sp, getSN(), null==resolvedExpr ? pathExpr : resolvedExpr,
+																				qSeg.getName());
 								resolvedExpr = expr;
 								result&=expr.declare(scope);
 								if(result) {
@@ -397,8 +399,8 @@ public class QualifiedPathExpression extends ExpressionNode {
 							else {
 								symbol = null==pathExpr ? scope.resolveField(qSeg.getName(), false) : pathExpr.getScope().resolveField(qSeg.getName(), true);
 								if(null!=symbol) {
-									ExpressionNode expr = new VarFieldExpression(tb, mc, sp, getSN(), null==resolvedExpr ?	pathExpr :
-																															resolvedExpr,	qSeg.getName());
+									ExpressionNode expr = new VarFieldExpression(inst, tb, sp, getSN(), null==resolvedExpr ?pathExpr :
+																															resolvedExpr, qSeg.getName());
 									resolvedExpr = expr;
 									result&=expr.declare(scope);
 									if(result) {
@@ -411,9 +413,10 @@ public class QualifiedPathExpression extends ExpressionNode {
 									continue;
 								}
 								else {
-									CIScope cis = null==pathExpr ? scope.resolveCI(qSeg.getName(), false) : pathExpr.getScope().resolveCI(qSeg.getName(), true);
+									CIScope cis = null==pathExpr ?	scope.resolveCI(null, qSeg.getName(), false) :
+																	pathExpr.getScope().resolveCI(null, qSeg.getName(), true);
 									if(null!=cis) {
-										pathExpr = new TypeReferenceExpression(tb, mc, pathExpr, qSeg.getName(), cis);
+										pathExpr = new TypeReferenceExpression(inst, tb, pathExpr, qSeg.getName(), cis);
 										result&=pathExpr.declare(scope);
 										if(result) {
 											result&=pathExpr.postAnalyze(scope, cg, parent);
@@ -432,7 +435,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 						result = false;
 					}
 					else if(segment instanceof ArraySegment) {
-						resolvedExpr = new ArrayExpression(tb, mc, sp, resolvedExpr, ((ArraySegment)segment).getIndices());
+						resolvedExpr = new ArrayExpression(inst, tb, sp, resolvedExpr, ((ArraySegment)segment).getIndices());
 						result&=resolvedExpr.declare(scope);
 						if(result) {
 							result&=resolvedExpr.postAnalyze(scope, cg, parent);
@@ -516,8 +519,8 @@ public class QualifiedPathExpression extends ExpressionNode {
 										Symbol paramSymbol = mSymbol.getParameters().get(j);
 										if(paramSymbol.getName().equals(argName)) {
 											VarFieldExpression vfe = (VarFieldExpression)expr.getPathExpr();
-											result.add(BinaryExpression.create(	tb, mc, expr.getSP(),
-																				new VarFieldExpression(	tb, mc, expr.getSP(), expr.getSN(), vfe,
+											result.add(BinaryExpression.create(	inst, tb, expr.getSP(),
+																				new VarFieldExpression(	inst, tb, expr.getSP(), expr.getSN(), vfe,
 																										((VarFieldExpression)be.getLeft()).getName(), true),
 																				Operator.ASSIGN, expr.getArguments().get(j)));
 											match = true;
@@ -550,13 +553,13 @@ public class QualifiedPathExpression extends ExpressionNode {
 					if(retExpr instanceof VarFieldExpression && ((AstHolder)((VarFieldExpression)retExpr).getSymbol()).getNode() instanceof FieldNode) {
 						FieldNode fNode = (FieldNode)((AstHolder)((VarFieldExpression)retExpr).getSymbol()).getNode();
 						List<ExpressionNode> result = new ArrayList<>();
-						result.add(new VarFieldExpression(tb, mc, sp, expr.getSN(), (VarFieldExpression)expr.getPathExpr(), fNode.getName(), true));
+						result.add(new VarFieldExpression(inst, tb, sp, expr.getSN(), (VarFieldExpression)expr.getPathExpr(), fNode.getName(), true));
 						return result;
 					}
 					else if(retExpr instanceof ThisExpression) {
 						List<ExpressionNode> result = new ArrayList<>();
 						//result.add(expr.getPathExpr());
-						result.add(new CastExpression(tb, mc, sp, expr.getType(), expr.getPathExpr()));
+						result.add(new CastExpression(inst, tb, sp, expr.getType(), expr.getPathExpr()));
 						return result;
 					}
 				}
@@ -567,9 +570,9 @@ public class QualifiedPathExpression extends ExpressionNode {
 
 	//Не ясная логика, например для выражения classInst.method(...) здесь два выражения, но сохрянять результат в аккумулятор нужно только вызовы метода
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(null!=resolvedExpr) {
-			resolvedExpr.codeGen(cg, cgScope, true, excs);
+			resolvedExpr.codeGen(cg, true, excs);
 		}
 		
 		return CodegenResult.RESULT_IN_ACCUM;

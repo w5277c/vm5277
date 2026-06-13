@@ -20,13 +20,15 @@ import ru.vm5277.common.lexer.SourceBuffer;
 import ru.vm5277.common.lexer.TokenType;
 
 public class TLabel extends Token {
-	public TLabel(String keyword, SourceBuffer sb) {
-		super(sb);
+	public TLabel(Token keyword, SourceBuffer sb) {
+		super(sb, keyword.getSP());
 		
 		type = TokenType.LABEL;
 		sb.next();
-		value = keyword;
+		raw = keyword.getRaw();
+		value = keyword.getStringValue();
 		
-		length = sb.getPos()-(sp.getPos()-keyword.length());
+		
+		length = keyword.getLength()+0x01;
 	}
 }

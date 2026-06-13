@@ -92,7 +92,7 @@ public class CGIAsmIReg extends CGIAsm {
 	
 	@Override
 	public String getText() {
-		if(null==reg) return "";
+		if(null==reg) return null;
 		if(isLdInstr) {
 			return "ldd " + reg + "," + ireg + "+" + offset;
 		}
@@ -107,7 +107,12 @@ public class CGIAsmIReg extends CGIAsm {
 		
 		StringBuilder result = new StringBuilder();
 		if(!prefCont.isEMpty()) {
-			result.append(prefCont.getSource()).append("\n");
+			try {
+				result.append(prefCont.getSource()).append("\n");
+			}
+			catch(Exception ex) {
+				result.append("!!!EX:" + ex.getMessage()).append("\n");
+			}
 		}
 		result.append(getText()).append("\n");
 		result.append("[").append(ireg).append("]");
@@ -115,7 +120,12 @@ public class CGIAsmIReg extends CGIAsm {
 			result.append("[ARG]");
 		}
 		if(!postCont.isEMpty()) {
-			result.append(postCont.getSource()).append("\n");
+			try {
+				result.append(postCont.getSource()).append("\n");
+			}
+			catch(Exception ex) {
+				result.append("!!!EX:" + ex.getMessage()).append("\n");
+			}
 		}
 		return result.toString();
 	}

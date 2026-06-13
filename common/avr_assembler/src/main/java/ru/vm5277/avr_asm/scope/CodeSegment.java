@@ -101,6 +101,15 @@ public class CodeSegment {
 		System.out.println(" Total\t:  " + total + " words (" + (total*2) + " bytes) " + String.format("%.1f", 100d*total/wSize) + "%");
 	}
 
+	public int getTotal() {
+		int total = 0;
+		for(Integer startAddr : blocksByStartAddr.keySet()) {
+			CodeBlock block = blocksByStartAddr.get(startAddr);
+			total += (block.getWSize() - block.getOverlap());
+		}
+		return total;
+	}
+
 	public void build(FirmwareFormatter fwFormatter) throws IOException {
 		List<CodeBlock> sorted = new ArrayList<>(blocksByStartAddr.values());
 		Collections.sort(sorted, new Comparator<CodeBlock>() {

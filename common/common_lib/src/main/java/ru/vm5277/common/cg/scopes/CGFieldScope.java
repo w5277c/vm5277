@@ -32,7 +32,7 @@ public class CGFieldScope extends CGCellsScope {
 	
 	public void build() throws CompileException {
 		cells = ((CGClassScope)parent).memAllocate(size, isStatic);
-		if(VERBOSE_LO <= verbose) append(new CGIText(";build " + toString() + ", allocated " + cells));
+		if(VERBOSE_LO <= verbose) prepend(new CGIText(";build " + toString() + ", allocated " + cells));
 		((CGClassScope)parent).addField(this);
 	}
 	

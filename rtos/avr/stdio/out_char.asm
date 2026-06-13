@@ -22,9 +22,9 @@
 ;А в конце в режим входа. Попутно сохраняя и востанавливая регистры TEMP_L,ACCUM_L
 ;Вызываемые процедуры их не восстанавливают.
 
-	.include "stdio/stdout.asm"
 
 .IFNDEF OS_OUT_CHAR
+	.include "stdio/stdout.asm"
 ;-----------------------------------------------------------
 OS_OUT_CHAR:
 ;-----------------------------------------------------------
@@ -37,7 +37,7 @@ OS_OUT_CHAR:
 	MCALL OS_STDIO_SEND_MODE_NR
 .ENDIF
 .ENDIF
-.IF OS_FT_DEV_MODE
+.IF OS_FT_BLDR_API_REUSE == 0x01
 	MCALL PROC__BLDR_UART_SEND_BYTE_NR
 .ELSE
 	MCALL OS_STDOUT_SEND_BYTE

@@ -1,0 +1,9 @@
+public interface OutputStream {
+    void write(byte b);
+    void write(char c);
+    void write(short s);
+    void write(int i);
+    void write(byte[] buf);
+    void write(byte[] buf, short off, short len);
+    void flush();
+}

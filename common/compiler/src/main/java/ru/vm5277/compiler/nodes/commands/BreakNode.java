@@ -17,22 +17,22 @@
 package ru.vm5277.compiler.nodes.commands;
 
 import java.util.List;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
-import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGBlockScope;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.CodegenResult;
+import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.lexer.TokenType;
-import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.Instance;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.LabelSymbol;
@@ -42,8 +42,8 @@ public class BreakNode extends CommandNode {
     private	String		label;
 	private LabelSymbol symbol;
 	
-	public BreakNode(TokenBuffer tb, MessageContainer mc) {
-        super(tb, mc);
+	public BreakNode(Instance inst, TokenBuffer tb) {
+        super(inst, tb);
         
         consumeToken(tb);
         
@@ -139,10 +139,8 @@ public class BreakNode extends CommandNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		CodegenResult result = null;
-		
-		//CGScope cgs = null == parent ? cgScope : parent;
 		
 		if(null==label) {
 			CGLabelScope lbScope = ((CGLoopBlockScope)cgScope.getScope(CGLoopBlockScope.class)).getEndLbScope();

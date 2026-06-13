@@ -16,14 +16,10 @@
 
 class Main {
 	public static void main() {
-		cstr textReady="Ready!\n";
-		cstr textGot="got:";
-		System.out(textReady);
+		System.out("Ready!\n");
 		while(true) {		
-			byte ch = System.in();
-			System.out(textGot);
-			System.outChar(ch);
-			System.outChar('\n');
+			char ch = System.in();
+			System.out("got:" + ch + '\n');
 		}
 	}
 }

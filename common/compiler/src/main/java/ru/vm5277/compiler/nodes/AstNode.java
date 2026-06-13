@@ -33,6 +33,7 @@ import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.CGAccum;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.compiler.nodes.commands.BreakNode;
 import ru.vm5277.compiler.nodes.commands.ContinueNode;
@@ -56,63 +57,65 @@ import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 import ru.vm5277.common.lexer.Keyword;
 import ru.vm5277.common.lexer.tokens.Token;
+import ru.vm5277.compiler.Instance;
 
 public abstract class AstNode extends SemanticAnalyzer {
     private				static	int						globalCntr	= 0;
     protected					int						sn;
+	protected					Instance				inst;
 	protected					TokenBuffer				tb;
 	protected					SourcePosition			sp;
 	private						ErrorMessage			error;
-	protected					MessageContainer		mc;
 	protected					Symbol					symbol;
 	protected					boolean					cgDone;
 	protected					boolean					disabled;
 	protected					CGScope					cgScope;
 	protected			static	HashMap<AstNode, Scope>	declarationPendingNodes	= new HashMap<>();
+	protected			static	Set<String>				persists				= new HashSet<>();
 	
 	protected AstNode() {
 		sn = globalCntr++;
 	}
 	
-	protected AstNode(TokenBuffer tb, MessageContainer mc) {
+	protected AstNode(Instance inst, TokenBuffer tb) {
 		sn = globalCntr++;
 		
+		this.inst = inst;
 		this.tb = tb;
 		this.sp = (null==tb ? null : tb.current().getSP());
-		this.mc = mc;
     }
 
-	protected AstNode(TokenBuffer tb, MessageContainer mc, SourcePosition sp) {
+	protected AstNode(Instance inst, TokenBuffer tb, SourcePosition sp) {
 		sn = globalCntr++;
 		
+		this.inst = inst;
 		this.tb = tb;
 		this.sp = sp;
-		this.mc = mc;
     }
 
-	protected AstNode parseCommand() throws CompileException {
+	protected AstNode parseCommand(Instance inst) throws CompileException {
 		Keyword kw = (Keyword)tb.current().getValue();
-		if(J8BKeyword.IF == kw) return new IfNode(tb, mc);
-		if(J8BKeyword.FOR == kw) return new ForNode(tb, mc);
-		if(J8BKeyword.DO == kw) return new DoWhileNode(tb, mc);
-		if(J8BKeyword.WHILE == kw) return new WhileNode(tb, mc);
-		if(J8BKeyword.CONTINUE == kw) return new ContinueNode(tb, mc);
-		if(J8BKeyword.BREAK == kw) return new BreakNode(tb, mc);
-		if(J8BKeyword.RETURN == kw) return new ReturnNode(tb, mc);
-		if(J8BKeyword.SWITCH == kw) return new SwitchNode(tb, mc);
-		if(J8BKeyword.TRY == kw) return new TryNode(tb, mc);
+		if(J8BKeyword.IF == kw) return new IfNode(inst, tb);
+		if(J8BKeyword.FOR == kw) return new ForNode(inst, tb);
+		if(J8BKeyword.DO == kw) return new DoWhileNode(inst, tb);
+		if(J8BKeyword.WHILE == kw) return new WhileNode(inst, tb);
+		if(J8BKeyword.CONTINUE == kw) return new ContinueNode(inst, tb);
+		if(J8BKeyword.BREAK == kw) return new BreakNode(inst, tb);
+		if(J8BKeyword.RETURN == kw) return new ReturnNode(inst, tb);
+		if(J8BKeyword.SWITCH == kw) return new SwitchNode(inst, tb);
+		if(J8BKeyword.TRY == kw) return new TryNode(inst, tb);
 		markFirstError(error);
 		throw new CompileException("Unexpected command token " + tb.current(), sp);
 	}
 
-	protected AstNode parseStatement() throws CompileException {
+	protected AstNode parseStatement(Instance inst) throws CompileException {
 		sp = tb.getSP();
 		if (tb.match(TokenType.COMMAND)) {
-			return parseCommand();
+			return parseCommand(inst);
 		}
 		else if (tb.match(TokenType.IDENTIFIER) || tb.match(TokenType.OPERATOR) || tb.match(TokenType.OOP, J8BKeyword.THIS)) {
 			// Делегируем всю работу парсеру выражений
-			ExpressionNode expr = new ExpressionNode(tb, mc).parse();
+			ExpressionNode expr = new ExpressionNode(inst, tb).parse();
 			if(!tb.match(Delimiter.SEMICOLON)) {
 				markError("Invalid expression statement - unexpected content after '" + expr + "'");
 				tb.skip(Delimiter.SEMICOLON);
@@ -123,7 +126,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 			return expr;
 		}
 		else if (tb.match(Delimiter.LEFT_BRACE)) {
-			return new BlockNode(tb, mc, "statement");
+			return new BlockNode(inst, tb, "statement");
 		}
 		CompileException e = parserError("Unexpected statement token: " + tb.current());
 		tb.skip(Delimiter.SEMICOLON, Delimiter.LEFT_BRACE);
@@ -143,7 +146,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 			typeName.append(".").append(token.getValue().toString());
 		}
 
-		return new TypeReferenceExpression(tb, mc, null, typeName.toString());
+		return new TypeReferenceExpression(inst, tb, null, typeName.toString());
 	}
 
 	protected VarType checkPrimtiveType() throws CompileException {
@@ -152,6 +155,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 			if(J8BKeyword.VOID == kw) return VarType.VOID;
 			if(J8BKeyword.BOOL == kw) return VarType.BOOL;
 			if(J8BKeyword.BYTE == kw) return VarType.BYTE;
+			if(J8BKeyword.CHAR == kw) return VarType.CHAR;
 			if(J8BKeyword.SHORT == kw) return VarType.SHORT;
 			if(J8BKeyword.INT == kw) return VarType.INT;
 			if(J8BKeyword.FIXED == kw) return VarType.FIXED;
@@ -231,7 +235,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 					if(0x03<result.size()) {
 						throw new CompileException("Maximum array nesting depth is 3", sp);
 					}
-					result.add(new ExpressionNode(tb, mc).parse());
+					result.add(new ExpressionNode(inst, tb).parse());
 				}
 				else {
 					result.add(null);
@@ -325,7 +329,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 	}*/
 	
 	protected QualifiedPathExpression parseFullQualifiedExpression(TokenBuffer tb) throws CompileException {
-		QualifiedPathExpression path = new QualifiedPathExpression(tb, mc);
+		QualifiedPathExpression path = new QualifiedPathExpression(inst, tb);
 
 		// Первый идентификатор
 		if(tb.match(TokenType.OOP, J8BKeyword.THIS)) {
@@ -366,7 +370,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 				//Изменяем логику - вместо проверки конкретных токенов 
 				//просто парсим выражение целиком
 				//Необходимо для поддерки приведения типов
-				args.add(new ExpressionNode(tb, mc).parse());
+				args.add(new ExpressionNode(inst, tb).parse());
 
 				// Если после выражения нет запятой - выходим из цикла
 				if (!tb.match(Delimiter.COMMA)) break;
@@ -383,7 +387,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		List<ExpressionNode> indices = new ArrayList<>();
 		while(true) {
 			consumeToken(tb, Delimiter.LEFT_BRACKET);
-			indices.add(new ExpressionNode(tb, mc).parse());
+			indices.add(new ExpressionNode(inst, tb).parse());
 			consumeToken(tb, Delimiter.RIGHT_BRACKET);
 			if(!tb.match(Delimiter.LEFT_BRACKET)) {
 				break;
@@ -476,7 +480,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		if (source.isClassType() && target.isClassType()) {
 			if(null == source.getClassName()) return false;
 			if(source.getClassName().equals(target.getClassName())) return true;
-			CIScope cis = scope.getThis().resolveCI(target.getName(), false);
+			CIScope cis = scope.getThis().resolveCI(null, target.getName(), false);
 			return null!=cis && cis instanceof InterfaceScope;
 		}
 
@@ -531,7 +535,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 			if(left.getClassName().equals(right.getClassName())) {
 				return true;
 			}
-			CIScope cis = scope.getThis().resolveCI(left.getName(), false);
+			CIScope cis = scope.getThis().resolveCI(null, left.getName(), false);
 			return null!=cis && cis instanceof InterfaceScope;
 		}
 		
@@ -598,10 +602,10 @@ public abstract class AstNode extends SemanticAnalyzer {
 	}
 
 	public void addMessage(Message message) {
-		mc.add(message);
+		inst.getMessageContainer().add(message);
 	}
 	public void addMessage(Exception e) {
-		mc.add(new ErrorMessage(e.getMessage(), sp));
+		inst.getMessageContainer().add(new ErrorMessage(e.getMessage(), sp));
 	}
 	
 	public void markFirstError(CompileException e) {
@@ -640,8 +644,8 @@ public abstract class AstNode extends SemanticAnalyzer {
 		if(null != message && null == error) error = message;
 	}
 	
-	public MessageContainer getMessageContainer() {
-		return mc;
+	public Instance getInstance() {
+		return inst;
 	}
 
 	public Symbol getSymbol() {
@@ -651,8 +655,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 	public abstract List<AstNode> getChildren();
 	
 	// Формирует код AST ноды единожды(см. cgDone), загружает результат в аккумулятор, если включен toAccum
-	// Код записываем в parent, но если null, то записываем в cg.getScope() он содержит текущий cgScope AST ноды
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException { 
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException { 
 		throw new UnsupportedOperationException(this.toString());
 	}
 	
@@ -660,14 +663,13 @@ public abstract class AstNode extends SemanticAnalyzer {
 		return depCodeGen(cg, symbol, excs);
 	}
 	protected CGScope depCodeGen(CodeGenerator cg, Symbol symbol, CGExcs excs) throws CompileException {
-		if(null != symbol && symbol instanceof AstHolder) {
+		if(null!=symbol && symbol instanceof AstHolder && !symbol.isNative()) {
 			AstNode node = ((AstHolder)symbol).getNode();
 			if(null != node) {
 				// Генерация кода зависимостей не должна влиять на текущий размер аккумулятора
-				int accSize = cg.getAccum().getSize();
-				boolean isFixed = cg.getAccum().isFixed();
-				Object obj = node.codeGen(cg, null, false, excs);
-				cg.getAccum().set(accSize, isFixed);
+				CGAccum accum = cg._getAcc().clone();
+				Object obj = node.codeGen(cg, false, excs);
+				cg._setAcc(accum);
 				if(null != obj) return symbol.getCGScope();
 			}
 		}

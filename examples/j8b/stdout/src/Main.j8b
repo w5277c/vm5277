@@ -16,61 +16,57 @@
 
 class Main {
 	public static void main() {
-		System.outChar('#');
-		System.outChar('\n');
+		System.out('#');
+		System.out('\n');
 
-		System.out("Constant string");
-		System.outChar('\n');
+		System.out("Constant string\n");
 
-		System.out("Константная строка в кодировке KOI8-r");
-		System.outChar('\n');
+		System.out("Константная строка в кодировке KOI8-r\n");
 
 		System.out(0xff);
-		System.outChar('\n');
+		System.out('\n');
 		
 		System.out(0xffff);
-		System.outChar('\n');
+		System.out('\n');
 
 		System.out(0xffffffff);
-		System.outChar('\n');
+		System.out('\n');
 
 		System.out(1.99);
-		System.outChar('\n');
+		System.out('\n');
 
 		System.out(1.01);
-		System.outChar('\n');
+		System.out('\n');
 
 		System.out(1.09);
-		System.outChar('\n');
+		System.out('\n');
 		System.out(1.10);
-		System.outChar('\n');
+		System.out('\n');
 		System.out(1.11);
-		System.outChar('\n');
+		System.out('\n');
 
 		System.out(127.99);
-		System.outChar('\n');
+		System.out('\n');
 
 		System.out(10.991);
-		System.outChar('\n');
+		System.out('\n');
 
 		System.out(-1.9);
-		System.outChar('\n');
+		System.out('\n');
 
 		System.out(-127.99);
-		System.outChar('\n');
+		System.out('\n');
 
 		System.out(-128);
-		System.outChar('\n');
+		System.out('\n');
 
 		System.out(true);
-		System.outChar('\n');
+		System.out('\n');
 
 		System.out(false);
-		System.outChar('\n');
+		System.out('\n');
 
 		System.out(12==3*4);
-		System.outChar('\n');
-
-
+		System.out('\n');
 	}
 }

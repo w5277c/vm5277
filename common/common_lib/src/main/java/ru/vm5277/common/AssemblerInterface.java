@@ -16,18 +16,16 @@
 
 package ru.vm5277.common;
 
+import ru.vm5277.common.enums.SourceType;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.messages.MessageContainer;
 
 public interface AssemblerInterface {
-	public	final	static	int										STRICT_STRONG	= 1;
-	public	final	static	int										STRICT_LIGHT	= 2;
-	public	final	static	int										STRICT_NONE		= 3;
-
-	public boolean exec(MessageContainer mc, String mcu, Path sourcePath, Map<Path, SourceType> sourcePaths, int stirctLevel, String outputFileName,
+	public boolean exec(MessageContainer mc, String mcu, Path sourcePath, Map<Path, SourceType> sourcePaths, StrictLevel stirctLevel, String outputFileName,
 						File mapFile, BufferedWriter listWriter, Map<String, Long> defines, List<String> imports) throws Exception;
 }

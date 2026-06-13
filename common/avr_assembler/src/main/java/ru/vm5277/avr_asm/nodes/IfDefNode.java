@@ -30,9 +30,9 @@ public class IfDefNode {
 		if(id.equals("key1")) {
 			int t=344343;
 		}
-		scope.getIncludeSymbol().blockStart(null == scope.resolveVariable(id) && null == scope.resolveLabel(id), sp);
+		scope.getIncludeSymbol().blockStart(null!=scope.resolveVariable(id) || null!=scope.resolveLabel(id), sp);
 
-		scope.list(".IFDEF " + id + " # " + !scope.getIncludeSymbol().isBlockSkip());
+		scope.list(".IFDEF " + id + " # " + scope.getIncludeSymbol().isTrue() + ", "  + scope.getIncludeSymbol().debugInfo());
 
 		Node.consumeToken(tb, TokenType.NEWLINE);
 	}

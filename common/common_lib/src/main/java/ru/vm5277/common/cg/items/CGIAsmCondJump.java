@@ -18,16 +18,20 @@ package ru.vm5277.common.cg.items;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.exceptions.CompileException;
 
+// Этот элемент особенный - он может состоять из нескольких элементов в итоговом листинге, хотя для всех этапов кроме последнего он выглядит как один элемент
+// Уникальность в необходимости расширения диапазона перехода, если метка условного перехода недосягаема.
+// В этом случае необходимо инвертировать условный переход с переходом на PC+2, где следующей(пропускаемой) инструкцией будет прыжок(JMP) на недосягаемую ранее метку
+// null!=jumpInstr говорит о том, что метка не досягаема и при формировании итоговых инструкций нужно учитывать расширенный вариант.
+
 public class CGIAsmCondJump extends CGIAsm {
+	private	CGIAsmJump jumpInstr;
 
 	public CGIAsmCondJump(String instr, CGLabelScope lbScope) throws CompileException {
-		super(instr, null);
-		postfix = lbScope.getName();
+		super(instr, lbScope.getName());
 	}
 
 	public CGIAsmCondJump(String instr, String labelName) throws CompileException {
-		super(instr, null);
-		postfix = labelName;
+		super(instr, labelName);
 	}
 
 	public String getLabelName() {
@@ -37,9 +41,30 @@ public class CGIAsmCondJump extends CGIAsm {
 		this.postfix = labelName;
 	}
 	
-	//TODO костыль
-	public void useJump(String condInstr, String jumpInstr, int size, String label) {
-		this.instr = condInstr;
-		postfix = label + "\n\t" + jumpInstr + " " + postfix + "\n" + label + ":";
+	public void requireExpansion(String invertedInstr, String postfix, CGIAsmJump jumpInstr, int jumpInstrSize) throws CompileException {
+		if(null!=this.jumpInstr) throw new CompileException(toString() + " expansion already required");
+		
+		this.instr = invertedInstr;
+		this.postfix = postfix;
+		this.jumpInstr = jumpInstr;
+		
+		setSizeInBytes(getSizeInBytes() + jumpInstrSize);
+	}
+	public boolean isExpansionRequired() {
+		return null!=jumpInstr;
+	}
+	
+	public CGIAsmJump getJumpInstr() {
+		return jumpInstr;
+	}
+	
+	@Override
+	public String getSource() {
+		StringBuilder sb = new StringBuilder();
+		sb.append(super.getSource());
+		if(null!=jumpInstr) {
+			sb.append(jumpInstr.getSource());
+		}
+		return sb.toString();
 	}
 }

@@ -21,4 +21,23 @@
 			<j8b.debug>true</j8b.debug>
 		</properties>
 	</action>
+    <action>
+        <actionName>buildAsm</actionName>
+        <packagings>
+            <packaging>j8b</packaging>
+        </packagings>
+        <goals>
+            <goal>j8b:assemble</goal>
+        </goals>
+    </action>
+    <action>
+        <actionName>runAsm</actionName>
+        <packagings>
+            <packaging>j8b</packaging>
+        </packagings>
+        <goals>
+            <goal>j8b:assemble</goal>
+            <goal>j8b:iflash</goal>
+        </goals>
+    </action>
 </actions>

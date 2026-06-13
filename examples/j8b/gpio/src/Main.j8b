@@ -16,12 +16,10 @@
 
 class Main {
     public static void main() {
-		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
-
 		byte port = GPIO.PB5;
 		GPIO.modeOut(port);
 		while(true) {
-			Thread.waitMS(50);
+			Thread.sleep(50);
 			GPIO.invert(port);
 		}
     }

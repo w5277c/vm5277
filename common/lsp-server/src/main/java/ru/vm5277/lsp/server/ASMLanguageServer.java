@@ -16,9 +16,17 @@
 
 package ru.vm5277.lsp.server;
 
-import java.util.HashSet;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
+import ru.vm5277.common.AsmInstrSimpleReader;
+import ru.vm5277.common.DefReader;
+import ru.vm5277.common.FSUtils;
+import ru.vm5277.common.Platform;
+import ru.vm5277.common.enums.PlatformType;
 import ru.vm5277.common.lexer.ExternalTokenProvider;
+import ru.vm5277.common.lexer.Keyword;
 import ru.vm5277.common.lexer.SourceBuffer;
 import ru.vm5277.common.lexer.Lexer;
 import ru.vm5277.common.lexer.LexerType;
@@ -26,32 +34,53 @@ import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.lexer.tokens.Token;
 
-public class ASMLanguageServer implements LanguageServer {
-	private	final	static	String		instrStr	=
-		"ADD,ADC,ADIW,SUB,SUBI,SBC,SBCI,SBIW,AND,ANDI,OR,ORI,EOR,COM,NEG,SBR,CBR,INC,DEC,TST,CLR,SER,MUL,MULS,MULSU,FMUL,FMULSU," +
-		"RJMP,IJMP,JMP,RCALL,ICALL,CALL,RET,RETI,CPSE,CP,CPC,CPI,SBRC,SBRS,SBIC,SBIS,BRBS,BRBC,BREQ,BRNE,BRCS,BRCC,BRSH,BRLO,BRMI,BRPL,BRGE,BRLT,BRHS,BRHC,BRTS,BRTC,BRVS,BRVC,BRIE,BRID," +
-		"SBI,CBI,LSL,LSR,ROL,ROR,ASR,SWAP,BSET,BCLR,BST,BLD,SEC,CLC,SEN,CLN,SEZ,CLZ,SEI,CLI,SES,CLS,SEV,CLV,SET,CLT,SEH,CLH," +
-		"MOV,MOVW,LDI,LD,LDD,LDS,ST,STD,STS,LPM,SPM,IN,OUT,PUSH,POP," +
-		"NOP,SLEEP,WDR,BREAK";
-	private	final	static	Set<String>	instrSet	= new HashSet<>();
-	private					Lexer		lexer		= new Lexer(LexerType.ASM, tokenProvider);
-
-	static {
-		String parts[] = instrStr.split("\\,");
-		for(String part : parts) {
-			instrSet.add(part.toLowerCase().trim());
+public class ASMLanguageServer extends LanguageServer {
+	private	final	static	PlatformType			platformType	= PlatformType.AVR;
+	private					Lexer					lexer;
+	private					AsmInstrSimpleReader	insrReader;
+	
+	public ASMLanguageServer(final PlatformType platformType, String mcuName) {
+		try {
+			Path toolkitPath = FSUtils.getToolkitPath();
+			Path defsPath = toolkitPath.resolve("defs").resolve(platformType.name().toLowerCase()).normalize();
+			Path rtosPath = toolkitPath.resolve("rtos").resolve(platformType.name().toLowerCase()).normalize();
+			Path devicesPath = rtosPath.resolve("devices").normalize();
+			final Platform platform = new Platform(rtosPath, platformType);
+			
+			insrReader = new AsmInstrSimpleReader(defsPath);
+			final DefReader defReader = new DefReader();
+			if(null!=defsPath) {
+				defReader.parse(defsPath.resolve("common.asm"));
+				defReader.parse(defsPath.resolve(mcuName + ".asm"));
+			}
+			if(null!=devicesPath) {
+				defReader.parse(devicesPath.resolve("_common.def"));
+				defReader.parse(devicesPath.resolve("_features.def"));
+				defReader.parse(devicesPath.resolve(mcuName + ".def"));
+			}
+			
+			ExternalTokenProvider tokenProvider = new ExternalTokenProvider() {
+				@Override
+				public Token getExternalToken(SourceBuffer sb, SourcePosition sp, String str) {
+					if(defReader.getMacros().contains(str)) {
+						return new Token(sb, sp, TokenType.MACRO, str.toLowerCase()); //TODO - временно, нужно убрать после реализации парсинга в LSP 
+					}
+					if(platform.getRegisters().contains(str) || null!=defReader.getRegister(str)) {
+						return new Token(sb, sp, TokenType.REGISTER, str.toLowerCase());
+					}
+					else if(insrReader.getInstrs().contains(str.toLowerCase())) {
+						return new Token(sb, sp, TokenType.MNEMONIC, str.toLowerCase());
+					}
+					return null;
+				}
+			};
+			
+			lexer = new Lexer(LexerType.ASM, tokenProvider);
+		}
+		catch(Exception ex) {
+			ex.printStackTrace();
 		}
 	}
-	
-	private	final	static	ExternalTokenProvider	tokenProvider	= new ExternalTokenProvider() {
-		@Override
-		public Token getExternalToken(SourceBuffer sb, SourcePosition sp, String str) {
-			if(instrSet.contains(str.toLowerCase())) {
-				return new Token(sb, sp, TokenType.MNEMONIC, str.toLowerCase());
-			}
-			return null;
-		}
-	};
 
 	@Override
 	public LSPToken readNextToken(SourceBuffer sb) {
@@ -59,6 +88,34 @@ public class ASMLanguageServer implements LanguageServer {
 		if(null==token || TokenType.EOF==token.getType()) {
 			return null;
 		}
+		
+		if(TokenType.LABEL==token.getType()) {
+			labels.add(token.getRaw());
+		}
+		
 		return new LSPToken(token);
+	}
+
+	@Override
+	public List<Token> tokenize(SourceBuffer sb) {
+		List<Token> result = new ArrayList<>();
+		while(sb.available()) {
+			result.add(lexer.parseToken(sb));
+		}
+		return result;
+	}
+	
+	public Set<String> getInstructions() {
+		return insrReader.getInstrs();
+	}
+	
+	public static List<String> getKeywords() {
+		List<String> result = new ArrayList<>();
+		for(Keyword keyword : Keyword.getItems()) {
+			if(LexerType.ALL==keyword.getLexerType() || LexerType.ASM==keyword.getLexerType()) {
+				result.add(keyword.getName().toUpperCase());
+			}
+		}
+		return result;
 	}
 }

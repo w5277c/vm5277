@@ -16,30 +16,35 @@
 
 package ru.vm5277.compiler.nodes;
 
+import java.io.File;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.common.lexer.Keyword;
+import ru.vm5277.common.lexer.tokens.Token;
+import ru.vm5277.compiler.ASTParser;
+import ru.vm5277.compiler.FileImporter;
+import ru.vm5277.compiler.Instance;
 
 public abstract class ObjectTypeNode extends AstNode {
-	protected			List<ObjectTypeNode>	importedClasses;
+	protected			List<ObjectTypeNode>	imported; // Импорты в области видимости этого объекта
 	protected			CIScope					ciScope;
 	protected			Set<Keyword>			modifiers;
 	protected			String					name;
-	protected			String					parentClassName;
+	protected			String					classPath;
 	protected			List<String>			impl			= new ArrayList<>();
-	
-	public ObjectTypeNode(TokenBuffer tb, MessageContainer mc, Set<Keyword> modifiers, String parentClassName, List<ObjectTypeNode> importedClasses)
-																																	throws CompileException {
-		super(tb, mc);
+
+	public ObjectTypeNode(Instance inst, TokenBuffer tb, Set<Keyword> modifiers, String classPath, List<ObjectTypeNode> imported) throws CompileException {
+		super(inst, tb);
 		
-		this.importedClasses = importedClasses;
+		this.imported = imported;
 		this.modifiers = modifiers;
-		this.parentClassName = parentClassName;
+		this.classPath = classPath;
 		
 		// Парсинг заголовка класса
         consumeToken(tb);	// Пропуск class токена
@@ -49,6 +54,32 @@ public abstract class ObjectTypeNode extends AstNode {
 		catch(CompileException e) {markFirstError(e);} // ошибка в имени, оставляем null
 	}
 	
+	
+	protected void resolveSameDirImport(Instance inst, File sourceFile, String className) {
+		// Проверяем в импортах
+		for(ObjectTypeNode node : imported) {
+			if(node.getName().equals(className)) {
+				return;
+			}
+		}
+		// Если в импортах не нашли - проверяем текущую директорию
+		Path basePath = Paths.get(sourceFile.getAbsolutePath()).getParent();
+		FileImporter fileImporter = new FileImporter(null, basePath, inst.getMessageContainer());
+		try {
+			List<Token> importedTokens = fileImporter.importFile(className + ".j8b", inst.getTabSize());
+			if(null!= importedTokens && !importedTokens.isEmpty()) {
+				// Рекурсивный парсинг импортированного файла
+				ASTParser importedParser = new ASTParser(inst, basePath, importedTokens);
+				if(null!=importedParser.getClazz()) {
+					imported.add(importedParser.getClazz());
+				}
+			}
+		}
+		catch(Exception ex) {
+			markError(ex.getMessage());
+		}
+	}
+
 	public String getName() {
 		return name;
 	}
@@ -58,11 +89,19 @@ public abstract class ObjectTypeNode extends AstNode {
 	}
 
 	public String getFullName() {
-		return null == parentClassName ? name : parentClassName + "." + name;
+		return null == classPath ? name : classPath + "." + name;
 	}
 
 	public Set<Keyword> getModifiers() {
 		return modifiers;
+	}
+	
+	public boolean isImplemented(String ifaceName) {
+		return impl.contains(ifaceName);
+	}
+
+	public List<ObjectTypeNode> getImported() {
+		return imported;
 	}
 	
 	public abstract AstNode getBody();

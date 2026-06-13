@@ -20,13 +20,13 @@ import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class EmptyExpression extends ExpressionNode {
-	public EmptyExpression(TokenBuffer tb, MessageContainer mc) {
-		super(tb, mc);
+	public EmptyExpression(Instance inst, TokenBuffer tb) {
+		super(inst, tb);
 	}
 	
 	@Override
@@ -45,7 +45,7 @@ public class EmptyExpression extends ExpressionNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		return null;
 	}
 }

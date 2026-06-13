@@ -18,12 +18,12 @@
 
 .IFNDEF OS_STDOUT_SEND_BYTE
 .IF OS_FT_STDOUT == 0x01
-.IF OS_FT_DEV_MODE == 0x00
+.IF OS_FT_BLDR_API_REUSE == 0x00
 ;-----------------------------------------------------------
 OS_STDOUT_SEND_BYTE:
 ;-----------------------------------------------------------
 ;Вывод символа
-;IN: Z-адрес на PINx, ACCUM_L-байт
+;IN: ACCUM_L-байт
 ;-----------------------------------------------------------
 	PUSH_T16
 	PUSH ACCUM_L
@@ -34,7 +34,10 @@ OS_STDOUT_SEND_BYTE:
 
 .IFDEF STDIO_PORT_REGID
 	CBI STDIO_PORT_REGID,STDIO_PINNUM						;Выставляем START
+.ELSE
+	CBI STDOUT_PORT_REGID,STDOUT_PINNUM
 .ENDIF
+
 	LDI TEMP_H,_OS_STDIO_BITDELAY_CONST
 	MCALL OS_STDIO_1BIT_DELAY
 
@@ -68,7 +71,7 @@ OS_STDOUT_SEND_BYTE__LOOP:
 	POP TEMP_L
 	STS SREG,TEMP_L											;Восстанавливаем флаг I
 
-	LDI TEMP_H,_OS_STDIO_BITDELAY_CONST
+	LDI TEMP_H,_OS_STDIO_BITDELAY_CONST-1
 	RCALL OS_STDIO_1BIT_DELAY
 
 	POP ACCUM_L

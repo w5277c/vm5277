@@ -15,6 +15,7 @@
  */
 package ru.vm5277.common;
 
+import ru.vm5277.common.enums.RTOSFeature;
 import java.io.File;
 import java.text.ParseException;
 import java.util.Arrays;
@@ -23,6 +24,7 @@ public class NativeBinding {
 	private	String			signature;
 	private	String			path;
 	private	VarType[]		paramTypes;
+	private	String			cgFunctName;
 	private	String			rtosFilePath;
 	private	String			rtosFunction;
 	private	byte[][]		regs;
@@ -31,6 +33,7 @@ public class NativeBinding {
 	public NativeBinding(NativeBinding nb, VarType[] paramTypes) {
 		this.path = nb.getPath();
 		this.paramTypes = paramTypes;
+		this.cgFunctName = nb.getCgFunctName();
 		this.rtosFilePath = nb.getRTOSFilePath();
 		this.rtosFunction = nb.getRTOSFunction();
 		this.regs = nb.getRegs();
@@ -64,11 +67,14 @@ public class NativeBinding {
 					switch(paramsParts[i].trim().toLowerCase()) {
 						case "bool": paramTypes[i] = VarType.BOOL; break;
 						case "byte": paramTypes[i] = VarType.BYTE; break;
+						case "char": paramTypes[i] = VarType.CHAR; break;
 						case "short": paramTypes[i] = VarType.SHORT; break;
 						case "int": paramTypes[i] = VarType.INT; break;
 						case "fixed": paramTypes[i] = VarType.FIXED; break;
 						case "cstr": paramTypes[i] = VarType.CSTR; break;
 						case "exception": paramTypes[i] = VarType.EXCEPTION; break;
+						case "array": paramTypes[i] = VarType.CLASS; break; // Похоже стоит уйти от CLASS в сторону REFERENCE
+						case "this" : paramTypes[i] = VarType.VOID; break; // Используем VOID, чтобы не плодить лишние типы
 						default:
 							throw new ParseException("Invalid method parameter type " + paramsParts[i].trim() + "in: " + line, 0);
 					}
@@ -76,50 +82,63 @@ public class NativeBinding {
 			}
 		}
 
-		String[] rtosParts = parts[0x01].trim().split(":");
+		String secondParts[] = parts[0x01].trim().split("\\|", 0x02);
+		String[] rtosParts;
+		if(0x01==secondParts.length) {
+			rtosParts = secondParts[0x00].trim().split(":");
+		}
+		else {
+			cgFunctName = secondParts[0x00].trim().toLowerCase();
+			rtosParts = secondParts[0x01].trim().split(":");
+		}
+
 		if(0x02!=parts.length &&  0x03!=parts.length) {
 			throw new ParseException("Expected 2 or 3 parameters in rtos block, got [" + parts.length + "] in: " + line, 0);
 		}
-		rtosFilePath = rtosParts[0x00].trim();
-		
-		int pos = rtosFilePath.lastIndexOf(".");
-		if(-1 != pos) {
-			rtosFilePath = rtosFilePath.substring(0, pos).replace(".", File.separator) + rtosFilePath.substring(pos);
-		}
-		
-		rtosFunction = rtosParts[0x01].toLowerCase().trim();
-		try {
-			if(0x03 == rtosParts.length) {
-				String[] regStrs = rtosParts[0x02].trim().split(",");
-				if(0 != regStrs.length) {
-					regs = new byte[regStrs.length][];
-					for(int i=0; i<regStrs.length; i++) {
-						regs[i] = getSeparated(regStrs[i].trim().toLowerCase());
+		if(!rtosParts[0].trim().isEmpty()) {
+			rtosFilePath = rtosParts[0x00].trim();
+
+			int pos = rtosFilePath.lastIndexOf(".");
+			if(-1 != pos) {
+				rtosFilePath = rtosFilePath.substring(0, pos).replace(".", File.separator) + rtosFilePath.substring(pos);
+			}
+
+			rtosFunction = rtosParts[0x01].toLowerCase().trim();
+			try {
+				if(0x03 == rtosParts.length) {
+					String[] regStrs = rtosParts[0x02].trim().split(",");
+					if(0 != regStrs.length) {
+						regs = new byte[regStrs.length][];
+						for(int i=0; i<regStrs.length; i++) {
+							regs[i] = getSeparated(regStrs[i].trim().toLowerCase());
+						}
 					}
 				}
 			}
-		}
-		catch(Exception e) {
-			throw new ParseException("Expected registers numbers with coma separated in: " + line, 0);
-		}
-		
-		if(0x03 == parts.length) {
-			String[] features = parts[0x02].trim().split(",");
-			rtosFeatures = new RTOSFeature[features.length];
-			for(int i=0; i<features.length; i++) {
-				RTOSFeature feature = RTOSFeature.valueOf(features[i].toUpperCase());
-				if(null == feature) throw new ParseException("Unsupported RTOS feature: " + features[i] , 0);
-				rtosFeatures[i] = feature;
+			catch(Exception e) {
+				throw new ParseException("Expected registers numbers with coma separated in: " + line, 0);
+			}
+
+			if(0x03 == parts.length) {
+				String[] features = parts[0x02].trim().split(",");
+				rtosFeatures = new RTOSFeature[features.length];
+				for(int i=0; i<features.length; i++) {
+					RTOSFeature feature = RTOSFeature.valueOf(features[i].toUpperCase());
+					if(null == feature) throw new ParseException("Unsupported RTOS feature: " + features[i] , 0);
+					rtosFeatures[i] = feature;
+				}
 			}
 		}
+
 		signature = path + "(";
-		
 		if(null!=paramTypes) {
 			for(int i=0; i<paramTypes.length; i++) {
 				VarType argType = paramTypes[i];
-				signature += argType.getName();
-				if(i!=(paramTypes.length-1)) {
-					signature+=",";
+				if(VarType.VOID!=argType) { // Пропускаем аргумент VOID (он должен быть не видим в сигнатуре)
+					signature += argType.getName();
+					if(i!=(paramTypes.length-1)) {
+						signature+=",";
+					}
 				}
 			}
 		}
@@ -149,6 +168,10 @@ public class NativeBinding {
 	
 	public VarType[] getMethodParams() {
 		return paramTypes;
+	}
+	
+	public String getCgFunctName() {
+		return cgFunctName;
 	}
 	
 	public String getRTOSFilePath() {

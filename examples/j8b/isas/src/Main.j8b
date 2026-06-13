@@ -27,8 +27,8 @@ class Main {
 		public Short(short value) {
 			this.value = value;
 			
-			System.out("\nКонструктор Short, параметр value:"); System.out(value);
-			System.out("\nКонструктор Short, поле value после присвоения:"); System.out(this.value);
+			System.out("\nКонструктор Short, параметр value:" + value);
+			System.out("\nКонструктор Short, поле value после присвоения:" + this.value);
 		}
 
 		public Number getThis() {
@@ -37,7 +37,7 @@ class Main {
 
 		public byte toByte() {return (byte)value;}
 		public short toShort() {
-			System.out("\ntoShort() класса Short, возвращаем значение:"); System.out(value);
+			System.out("\ntoShort() класса Short, возвращаем значение:" + value);
 			return value;
 		}
 	}
@@ -48,8 +48,8 @@ class Main {
 		public Integer(int value) {
 			this.value = value;
 			
-			System.out("\nКонструктор Integer, параметр value:"); System.out(value);
-			System.out("\nКонструктор Integer, поле value после присвоения:"); System.out(this.value);
+			System.out("\nКонструктор Integer, параметр value:" + value);
+			System.out("\nКонструктор Integer, поле value после присвоения:" + this.value);
 		}
 
 		public Number getThis() {
@@ -58,7 +58,7 @@ class Main {
 
 		public byte toByte() {return (byte)value;}
 		public short toShort() {
-			System.out("\ntoShort() класса Integer, возвращаем значение:"); System.out((short)value);
+			System.out("\ntoShort() класса Integer, возвращаем значение:" + (short)value);
 			return (short)value;
 		}
 	}
@@ -83,7 +83,7 @@ class Main {
 			if(s.getThis() is Short as s2) {
 				System.out("\nthis типа Number класса s также наследован от Short, вызываем s2.toShort()");
 				short tmp2 = s2.toShort();				
-				System.out("\nvalue:"); System.out(tmp2);
+				System.out("\nvalue:" + tmp2);
 			}
 			else {
 				System.out("\nthis типа Number класса s не наследован от Short");

@@ -30,9 +30,9 @@ class Main {
 	}
 
 	private static byte add(byte b1, byte b2) {
-		System.out("\nВошли в метод add, арг1:"); System.out(b1); System.out(", арг2:"); System.out(b2);
+		System.out("\nВошли в метод add, арг1:" + b1 + ", арг2:" + b2);
 		byte methodResult = b1+b2;
-		System.out("\nВыходим из метода, результат:"); System.out(methodResult);
+		System.out("\nВыходим из метода, результат:" + methodResult);
 		return methodResult;
 	}
 	

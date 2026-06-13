@@ -20,7 +20,7 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 
-@Mojo(name = "install", defaultPhase = LifecyclePhase.INSTALL)
+@Mojo(name = "install", defaultPhase = LifecyclePhase.INSTALL, threadSafe = true)
 public class J8bInstallMojo extends J8bMojo {
 
 	@Override

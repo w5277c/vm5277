@@ -28,7 +28,7 @@ public class OrgNode {
 	public static void parse(TokenBuffer tb, Scope scope, MessageContainer mc) throws CompileException {
 		SourcePosition sp = tb.getSP();
 		CodeSegment cSeg = scope.getCSeg();
-		Expression expr = Expression.parse(tb, scope, mc);
+		Expression expr = Expression.parse(tb, scope, mc, null);
 		Long value = Expression.getLong(expr, sp);
 		if(null==value) {
 			tb.skipLine();

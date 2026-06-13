@@ -18,20 +18,21 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.Arrays;
 import java.util.List;
-import ru.vm5277.common.Property;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import ru.vm5277.common.enums.Property;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.CodegenResult;
+import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.Instance;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -47,8 +48,8 @@ public class PropertyExpression extends ExpressionNode {
 	private			List<ExpressionNode>	args;
 	private			EnumScope				enumScope;
 	
-	public PropertyExpression(TokenBuffer tb, MessageContainer mc, SourcePosition sp, ExpressionNode targetExpr, Property property, List<ExpressionNode> args) {
-		super(tb, mc, sp);
+	public PropertyExpression(Instance inst, TokenBuffer tb, SourcePosition sp, ExpressionNode targetExpr, Property property, List<ExpressionNode> args) {
+		super(inst, tb, sp);
 		
 		this.targetExpr = targetExpr;
 		this.property = property;
@@ -140,8 +141,7 @@ public class PropertyExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		if(null!=cgScope) cgScope.disable();
-		cgScope = cg.enterExpression(parent, toString());
+		cgScope = cg.enterExpression(parent, cgScope, toString());
 
 		result&=targetExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
@@ -218,8 +218,10 @@ public class PropertyExpression extends ExpressionNode {
 		else if(targetExpr instanceof ArrayExpression) {
 			type = targetExpr.getType();
 			if(args.isEmpty() && Property.length==property) {
-				if(targetExpr.getSymbol() instanceof AstHolder) {
-					AstHolder ah = (AstHolder)targetExpr.getSymbol();
+				type = VarType.SHORT;
+				ExpressionNode expr = ((ArrayExpression)targetExpr).getPathExpr();
+				if(expr.getSymbol() instanceof AstHolder) {
+					AstHolder ah = (AstHolder)expr.getSymbol();
 					if(ah.getNode() instanceof InitNodeHolder) {
 						InitNodeHolder inh = (InitNodeHolder)ah.getNode();
 						if(inh.getInitNode() instanceof NewArrayExpression) {
@@ -228,7 +230,7 @@ public class PropertyExpression extends ExpressionNode {
 					}
 				}
 
-				if(null==nae && Property.length == property) {
+				if(null==nae && Property.length==property) {
 					markError("Cannot determine array length: array initialization not found");
 					result = false;
 				}
@@ -390,12 +392,10 @@ public class PropertyExpression extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		CodegenResult result = null;
 		
-		//CGScope cgs = (null==parent ? cgScope : parent);
-		
-		targetExpr.codeGen(cg, null, false, excs);
+		targetExpr.codeGen(cg, false, excs);
 		
 		if(VarType.EXCEPTION==targetExpr.getType()) {
 			if(toAccum) {
@@ -411,7 +411,15 @@ public class PropertyExpression extends ExpressionNode {
 		else if(null==enumScope && !targetExpr.getType().isEnum() && !targetExpr.getType().isClassType()) {
 			//TODO нужно проверить!
 			boolean isView = false;
-			AstHolder ah = (AstHolder)targetExpr.getSymbol();
+			int dimentionPos=0;
+			AstHolder ah = null;
+			if(targetExpr instanceof ArrayExpression) {
+				ah = (AstHolder)((ArrayExpression)targetExpr).getPathExpr().getSymbol();
+				dimentionPos = ((ArrayExpression)targetExpr).getDepth();
+			}
+			else {
+				ah = (AstHolder)targetExpr.getSymbol();
+			}
 			if(ah.getNode() instanceof InitNodeHolder) {
 				InitNodeHolder inh = (InitNodeHolder)ah.getNode();
 				if(inh.getInitNode() instanceof ArrayExpression) {
@@ -422,7 +430,7 @@ public class PropertyExpression extends ExpressionNode {
 			if(toAccum) {
 				if(Property.length == property) {
 					if(!isView && null!=nae.getConstDimensions()) {
-						cg.constToAcc(cgScope, 0x02, nae.getConstDimensions()[0x00], false);
+						cg.constToAcc(cgScope, 0x02, nae.getConstDimensions()[dimentionPos], false);
 					}
 					else {
 						CGCellsScope cScope = (CGCellsScope)targetExpr.getSymbol().getCGScope();
@@ -456,11 +464,11 @@ public class PropertyExpression extends ExpressionNode {
 						cg.constToAcc(cgScope, 0x01, ((EnumExpression)targetExpr).getIndex(), false);
 					}
 					else {
-						targetExpr.codeGen(cg, cgScope, true, excs);
+						targetExpr.codeGen(cg, true, excs);
 					}
 				}
 				else { //ITEM
-					args.get(0).codeGen(cg, cgScope, true, excs);
+					args.get(0).codeGen(cg, true, excs);
 				}
 				result = CodegenResult.RESULT_IN_ACCUM;
 			}

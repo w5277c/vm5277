@@ -15,6 +15,8 @@
  */
 package ru.vm5277.common.cg.items;
 
+import ru.vm5277.common.exceptions.CompileException;
+
 public abstract class CGItem {
 	protected	boolean	disabled;
 	
@@ -25,5 +27,5 @@ public abstract class CGItem {
 		return disabled;
 	}
 	
-	public abstract String getSource();
+	public abstract String getSource() throws CompileException;
 }

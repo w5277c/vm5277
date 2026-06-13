@@ -30,8 +30,8 @@ public enum Operator {
 	// Битовые
 	BIT_AND("&"), BIT_OR("|"), BIT_XOR("^"), BIT_NOT("~"), SHL("<<"), SHR(">>"),
 	// Присваивание (простое и составное)
-	ASSIGN("="), PLUS_ASSIGN("+="), MINUS_ASSIGN("-="), MULT_ASSIGN("*="), DIV_ASSIGN("/="), MOD_ASSIGN("%="), AND_ASSIGN("&="), OR_ASSIGN("|="),
-	XOR_ASSIGN("^="), SHL_ASSIGN("<<="), SHR_ASSIGN(">>="),
+	ASSIGN("="), PLUS_ASSIGN("+="), MINUS_ASSIGN("-="), MULT_ASSIGN("*="), DIV_ASSIGN("/="), MOD_ASSIGN("%="), BIT_AND_ASSIGN("&="), BIT_OR_ASSIGN("|="),
+	BIT_XOR_ASSIGN("^="), BIT_NOT_ASSIGN("~="), SHL_ASSIGN("<<="), SHR_ASSIGN(">>="), ROR(">>["), ROL("]<<"),
 	//Тернарный и instanceof
 	TERNARY("?"), IS("is");
 
@@ -47,12 +47,15 @@ public enum Operator {
 		PRECEDENCE.put(Operator.MULT_ASSIGN, 1);
 		PRECEDENCE.put(Operator.DIV_ASSIGN, 1);
 		PRECEDENCE.put(Operator.MOD_ASSIGN, 1);
-		PRECEDENCE.put(Operator.AND_ASSIGN, 1);
-		PRECEDENCE.put(Operator.OR_ASSIGN, 1);
-		PRECEDENCE.put(Operator.XOR_ASSIGN, 1);
+		PRECEDENCE.put(Operator.BIT_AND_ASSIGN, 1);
+		PRECEDENCE.put(Operator.BIT_OR_ASSIGN, 1);
+		PRECEDENCE.put(Operator.BIT_XOR_ASSIGN, 1);
+		PRECEDENCE.put(Operator.BIT_NOT_ASSIGN, 1);
 		PRECEDENCE.put(Operator.SHL_ASSIGN, 1);
 		PRECEDENCE.put(Operator.SHR_ASSIGN, 1);
-		// 2. Логическое ИЛИ
+        PRECEDENCE.put(Operator.ROR, 1); // Аналог инструкции AVR ассемблера
+        PRECEDENCE.put(Operator.ROL, 1); // Аналог инструкции AVR ассемблера
+        // 2. Логическое ИЛИ
 		PRECEDENCE.put(Operator.OR, 2);
 	    // 3. Логическое И
 		PRECEDENCE.put(Operator.AND, 3);
@@ -134,7 +137,7 @@ public enum Operator {
 
 	// Проверяет, является ли оператор битовым
 	public boolean isBitwise() {
-		return this == BIT_AND || this == BIT_OR || this == BIT_XOR || this == BIT_NOT || this == SHL || this == SHR;
+		return this == BIT_AND || this == BIT_OR || this == BIT_XOR || this == BIT_NOT || this == SHL || this == SHR || this == ROR || this == ROL;
 	}
 
 	// Проверяет, является ли оператор арифметическим
@@ -146,7 +149,8 @@ public enum Operator {
 	// Проверяет, является ли оператор присваиванием
 	public boolean isAssignment() {
 		return	this == ASSIGN || this == PLUS_ASSIGN || this == MINUS_ASSIGN || this == MULT_ASSIGN || this == DIV_ASSIGN || this == MOD_ASSIGN || 
-				this == AND_ASSIGN || this == OR_ASSIGN || this == XOR_ASSIGN || this == SHL_ASSIGN || this == SHR_ASSIGN;
+				this == BIT_AND_ASSIGN || this == BIT_OR_ASSIGN || this == BIT_XOR_ASSIGN || this == BIT_NOT_ASSIGN || this == SHL_ASSIGN ||
+				this == SHR_ASSIGN || this == ROR || this == ROL;
 	}
 
 	// Проверяет, является ли оператор унарным
@@ -181,17 +185,22 @@ public enum Operator {
 	
 	public Operator toArithmetic() {
 		switch(this) {
-			case AND_ASSIGN: return BIT_AND;
+			case BIT_AND_ASSIGN: return BIT_AND;
 			case DIV_ASSIGN: return DIV;
 			case MINUS_ASSIGN: return MINUS;
 			case MOD_ASSIGN: return MOD;
 			case MULT_ASSIGN: return MULT;
-			case OR_ASSIGN: return BIT_OR;
+			case BIT_OR_ASSIGN: return BIT_OR;
 			case PLUS_ASSIGN: return PLUS;
 			case SHL_ASSIGN: return SHL;
 			case SHR_ASSIGN: return SHR;
-			case XOR_ASSIGN: return BIT_XOR;
+			case BIT_XOR_ASSIGN: return BIT_XOR;
+			case BIT_NOT_ASSIGN: return BIT_NOT;
 		}
 		return null;
+	}
+	
+	public boolean isAlpha() {
+		return Operator.IS == this;
 	}
 }

@@ -19,14 +19,19 @@
 .IF OS_FT_WELCOME == 0x01									;WELCOME требует STDOUT
 	.SET	OS_FT_STDOUT 							= 0x01
 .ENDIF
-.IF OS_FT_DEV_MODE == 0x01									;Режим разработчика использует STDIN и STDOUT
+.IF OS_FT_SOFT_RESET== 0x01									;Использует STDIN
 	.SET	OS_FT_STDIN 							= 0x01
-	.SET	OS_FT_STDOUT 							= 0x01
 .ENDIF
 .IF OS_FT_STDIN == 0x01										;Режим STDIN использует внешние прерывания
 	.SET	OS_FT_PCINT								= 0x01
 .ENDIF
-.IF OS_FT_TIMER == 0x01 || OS_FT_PCINT == 0x01				;Таймер и внешние прерывания зависят о таблицы прерываний
-	.SET	OS_FT_IR_TABLE							= 0x01
+.IF	OS_FT_TIMERTASK == 0x01									;Поддержка задачи-таймера требует многозадачность
+	.SET	OS_FT_MULTITHREADING					= 0x01
+.ENDIF
+.IF OS_FT_MULTITHREADING == 0x01							;Многопоточность использует таймер
+	.SET	OS_FT_TIMER 							= 0x01
+.ENDIF
+.IF OS_FT_TIMER == 0x01 || OS_FT_PCINT == 0x01 || OS_FT_USTIMER == 0x01
+	.SET	OS_FT_IR_TABLE							= 0x01		;Таймер и внешние прерывания зависят о таблицы прерываний
 .ENDIF
 

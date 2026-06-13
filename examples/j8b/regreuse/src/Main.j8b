@@ -28,7 +28,7 @@ class Main {
 			b = 10;
 			byte c;
 			c = 20;
-			System.outChar('\n'); System.out(b + c + a);
+			System.out('\n' + (b + c + a));
 		}
 
 		{
@@ -36,12 +36,12 @@ class Main {
 			d = 30;
 			byte e;
 			e = 40;
-			System.outChar('\n'); System.out(d + e);
+			System.out('\n' + (d + e));
 
 			{
 				byte f;
 				f = 50;
-				System.outChar('\n'); System.out(f);
+				System.out('\n' + f);
 			}
 		}
 
@@ -49,6 +49,6 @@ class Main {
 		g = 60;
 		byte h;
 		h = 70;
-		System.outChar('\n'); System.out(a + g + h);
+		System.out('\n' + (a + g + h));
 	}
 }

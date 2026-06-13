@@ -1,0 +1,45 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+public class CRC8 {
+	// Универсальный метод с параметрами алгоритма
+	public static byte calc(byte crc, byte octet, byte poly) {
+		crc ^= octet;
+		for(byte bit=0; bit<8; bit++) {
+			if((crc & 0x80)!=0) crc = (crc<<1) ^ poly;
+			else crc <<= 1;
+		}
+		return crc;
+	}
+
+	// CRC-8/MAXIM (для 1-Wire)
+	public static byte calcMaxim(byte[] data, short len) {
+		byte crc = 0x00;
+		for(short i=0; i<len; i++) {
+			crc = calc(crc, Math.reflect(data[i]), 0x31);
+		}
+		return Math.reflect(crc);
+	}
+
+	// CRC-8/SMBUS
+	public static byte calcSmbus(byte[] data, short len) {
+		byte crc = 0x00;
+		for(short i=0; i<len; i++) {
+			crc = calc(crc, data[i], 0x07);
+		}
+		return crc;
+	}
+}

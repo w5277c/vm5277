@@ -24,14 +24,15 @@ import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.ClassSymbol;
 import ru.vm5277.compiler.semantic.Scope;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
 import ru.vm5277.common.cg.CGExcs;
-import ru.vm5277.common.compiler.CodegenResult;
+import ru.vm5277.common.enums.CodegenResult;
+import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.semantic.CIScope;
 
 public class ThisExpression extends TypeReferenceExpression {
-	public ThisExpression(TokenBuffer tb, MessageContainer mc, CIScope cis) {
-		super(tb, mc, null, "this", cis);
+	public ThisExpression(Instance inst, TokenBuffer tb, CIScope cis) {
+		super(inst, tb, null, "this", cis);
 	}
 	
 	@Override
@@ -61,9 +62,7 @@ public class ThisExpression extends TypeReferenceExpression {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
-		//CGScope cgs = null == parent ? cgScope : parent;
-		
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(toAccum) {
 			cg.thisToAcc(cgScope);
 			return CodegenResult.RESULT_IN_ACCUM;

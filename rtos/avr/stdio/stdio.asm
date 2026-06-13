@@ -72,10 +72,9 @@ OS_STDIO_INIT_SET_PORT_NR:
 	LD TEMP_L,Z												;Текущее значение
 	ST Y,TEMP_L
 	STS SREG,TEMP_H
-
-	.IFDEF STDIO_PORT_REGID
-		SBI STDIO_PORT_REGID,STDIO_PINNUM						;Высокий уровень
-	.ENDIF
+.ENDIF
+.IFDEF STDIO_PORT_REGID
+	SBI STDIO_PORT_REGID,STDIO_PINNUM						;Высокий уровень
 .ENDIF
 .IFNDEF STDIO_PORT_REGID
 	CBI STDIN_DDR_REGID,STDIN_PINNUM						;Вход
@@ -131,7 +130,7 @@ OS_STDIO_RECV_MODE_NR:
 .ENDIF
 .ENDIF
 
-.IF OS_FT_DEV_MODE == 0x00
+.IF OS_FT_BLDR_API_REUSE == 0x00
 OS_STDIO_1BIT_DELAY:
 ;-----------------------------------------------------------
 ;Пауза между битами

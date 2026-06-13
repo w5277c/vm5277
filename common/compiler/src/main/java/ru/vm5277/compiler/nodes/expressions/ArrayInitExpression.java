@@ -24,7 +24,6 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.DataSymbol;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -32,6 +31,7 @@ import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.cg.CGArrCells;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.semantic.CIScope;
 
 public class ArrayInitExpression extends ExpressionNode {
@@ -65,17 +65,17 @@ public class ArrayInitExpression extends ExpressionNode {
 	private			List<ExpressionNode>	linearValues= new ArrayList<>();
 	private			List<ConstRange>		constRanges	= new ArrayList<>();
 	
-	public ArrayInitExpression(TokenBuffer tb, MessageContainer mc, SourcePosition sp, VarType type) {
-        super(tb, mc, sp);
+	public ArrayInitExpression(Instance inst, TokenBuffer tb, SourcePosition sp, VarType type) {
+        super(inst, tb, sp);
 	
 		try {
 			consumeToken(tb, Delimiter.LEFT_BRACE); // Потребляем '{'
 			while(!tb.match(TokenType.EOF)) {
 				if(tb.match(Delimiter.LEFT_BRACE)) { // Проверяем на '{'
-					valueExprs.add(new ArrayInitExpression(tb, mc, sp, type));
+					valueExprs.add(new ArrayInitExpression(inst, tb, sp, type));
 				}
 				else {
-					valueExprs.add(new ExpressionNode(tb, mc).parse());
+					valueExprs.add(new ExpressionNode(inst, tb).parse());
 				}
 				
 				if(tb.match(Delimiter.RIGHT_BRACE)) {
@@ -133,7 +133,7 @@ public class ArrayInitExpression extends ExpressionNode {
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
-		cgScope = cg.enterExpression(parent, toString());
+		cgScope = cg.enterExpression(parent, null, toString()); //TODO
 		
 		List<Object> consts = null;
 		int pos=-1;
@@ -156,7 +156,7 @@ public class ArrayInitExpression extends ExpressionNode {
 				VarType valueType = valueExpr.getType();
 				if(valueType.isClassType() && basedType.isClassType()) {
 					if(valueType != basedType) {
-						CIScope cis = scope.getThis().resolveCI(valueType.getClassName(), false);
+						CIScope cis = scope.getThis().resolveCI(null, valueType.getClassName(), false);
 						if(!cis.isImplements(basedType)) {
 							markError("Type mismatch: cannot assign " + valueType + " to " + basedType);
 							result = false;
@@ -165,7 +165,7 @@ public class ArrayInitExpression extends ExpressionNode {
 				}
 				else if (!isCompatibleWith(scope, basedType, valueType)) {
 					// Дополнительная проверка автоматического привдения целочисленной константы к fixed.
-					if(VarType.FIXED == basedType && valueExpr instanceof LiteralExpression && valueType.isIntegral()) {
+					if(VarType.FIXED == basedType && valueExpr instanceof LiteralExpression && valueType.isInteger()) {
 						long num = ((LiteralExpression)valueExpr).getNumValue();
 						if(num<VarType.FIXED_MIN || num>VarType.FIXED_MAX) {
 							markError("Type mismatch: cannot assign " + valueType + " to " + basedType);
@@ -305,7 +305,7 @@ public class ArrayInitExpression extends ExpressionNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		int size = (-1==basedType.getSize() ? cg.getRefSize() : basedType.getSize());
 		int rangeId=0;
 		for(int i=0; i<linearValues.size(); i++) {
@@ -329,11 +329,11 @@ public class ArrayInitExpression extends ExpressionNode {
 			
 			if(expr instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)expr;
-				boolean isFixed = le.isFixed() || VarType.FIXED == basedType;
+				boolean isFixed = le.getType().isFixedPoint()|| VarType.FIXED == basedType;
 				expr.getCGScope().append(cg.constToCells(expr.getCGScope(), isFixed ? le.getFixedValue() : le.getNumValue(), arrCells, isFixed));
 			}
 			else {
-				expr.codeGen(cg, null, true, excs);
+				expr.codeGen(cg, true, excs);
 				cg.accToArr(expr.getCGScope(), arrCells);
 			}
 		}

@@ -12,3 +12,8 @@
 /common/lsp-server/target/
 /common/mvn_plugin/target/
 /examples/j8b_template/target/
+/bin/avrdude*
+.intellijPlatform
+/common/ide-plugins/nb-plugin/target/
+/rtos/avr/.idea
+/tools/

@@ -34,6 +34,7 @@ import ru.vm5277.avr_asm.nodes.operands.RelativeAddr;
 import ru.vm5277.avr_asm.nodes.operands.IOReg;
 import ru.vm5277.avr_asm.semantic.BinaryExpression;
 import ru.vm5277.avr_asm.semantic.IRegExpression;
+import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.ErrorMessage;
@@ -75,10 +76,10 @@ public class MnemNode extends Node {
 		}
 
 		if(!tb.match(TokenType.NEWLINE) && !tb.match(TokenType.EOF)) {
-			expr1 = Expression.parse(tb, scope, mc);
+			expr1 = Expression.parse(tb, scope, mc, null);
 			if(tb.match(Delimiter.COMMA)) {
 				tb.consume();
-				expr2 = Expression.parse(tb, scope, mc);
+				expr2 = Expression.parse(tb, scope, mc, null);
 			}
 		}
 		
@@ -135,6 +136,13 @@ public class MnemNode extends Node {
 				if(Instruction.OPERAND_A.equals(operands[0x00]) && Instruction.OPERAND_K3.equals(operands[0x01])) {
 					parse(instr, new IOReg(scope, sp, expr1), new Const(mc, scope, sp, expr2, 0, 7, 3)); return true;
 				}
+				if(Instruction.OPERAND_K6.equals(operands[0x00]) && Instruction.OPERAND_R.equals(operands[0x01])) {
+					parse(instr, new Const(mc, scope, sp, expr1, 0, 63, 6), new Reg(scope, sp, expr2)); return true;
+				}
+				if(Instruction.OPERAND_R.equals(operands[0x00]) && Instruction.OPERAND_K6.equals(operands[0x01])) {
+					parse(instr, new Reg(scope, sp, expr1), new Const(mc, scope, sp, expr2, 0, 63, 6));
+					return true;
+				}
 				if(Instruction.OPERAND_RH.equals(operands[0x00]) && Instruction.OPERAND_K8.equals(operands[0x01])) {
 					parse(instr, new HReg(scope, sp, expr1), new Const(mc, scope, sp, expr2, 0, 255, 8)); return true;
 				}
@@ -158,10 +166,10 @@ public class MnemNode extends Node {
 						Reg reg = new Reg(scope, sp, expr2);
 						if(null != i) {
 							if(ire.getId() == (reg.getId()&0x01) && (ire.isDec() || ire.isInc())) {
-								if(Assembler.STRICT_STRONG == Scope.getStrincLevel()) {
+								if(StrictLevel.STRONG==Scope.getStrincLevel()) {
 									mc.add(new ErrorMessage("Undefined combination " + ire + " with " + expr2, sp));
 								}
-								else if(Assembler.STRICT_LIGHT == Scope.getStrincLevel()) {
+								else if(StrictLevel.LIGHT==Scope.getStrincLevel()) {
 									mc.add(new WarningMessage("Undefined combination " + ire + " with " + expr2, sp));
 								}
 							}
@@ -178,10 +186,10 @@ public class MnemNode extends Node {
 						Reg reg = new Reg(scope, sp, expr1);
 						if(null != i) {
 							if(ire.getId() == (reg.getId()&0x01) && (ire.isDec() || ire.isInc())) {
-								if(Assembler.STRICT_STRONG == Scope.getStrincLevel()) {
+								if(StrictLevel.STRONG==Scope.getStrincLevel()) {
 									mc.add(new ErrorMessage("Undefined combination " + ire + " with " + expr1, sp));
 								}
-								else if(Assembler.STRICT_LIGHT == Scope.getStrincLevel()) {
+								else if(StrictLevel.LIGHT==Scope.getStrincLevel()) {
 									mc.add(new WarningMessage("Undefined combination " + ire + " with " + expr1, sp));
 								}
 							}
@@ -299,9 +307,14 @@ public class MnemNode extends Node {
 				block.writeOpcode((int)(instr.getOpcode() | rd.getId()<<4 | k.getValue()&0x07));
 				break;
 			case 6:
-				if(0x01 != instr.getWSize()) throw new Exception();
-				byte id = (byte)((rd.getId()-24)/2);
-				block.writeOpcode((int)(instr.getOpcode() | id<<4 | k.getValue()&0x0f | (k.getValue()&0x30)<<2));
+				if(rd instanceof AReg) {
+					if(0x01 != instr.getWSize()) throw new Exception();
+					byte id = (byte)((rd.getId()-24)/2);
+					block.writeOpcode((int)(instr.getOpcode() | id<<4 | k.getValue()&0x0f | (k.getValue()&0x30)<<2));
+				}
+				else {
+					block.writeOpcode((int)(instr.getOpcode() | rd.getId()<<4 | k.getValue()&0x0f | (k.getValue()&0x30)<<5));
+				}
 				break;
 			case 16:
 				long opcode = (((long)instr.getOpcode())<<16) | k.getValue() | (rd.getId() << 20);
@@ -336,6 +349,9 @@ public class MnemNode extends Node {
 		if(16==k.getBits()) {
 			long opcode = (((long)instr.getOpcode())<<16) | k.getValue() | (rd.getId() << 20);
 			block.writeDoubleOpcode(opcode);
+		}
+		else if(6==k.getBits()) {
+			block.writeOpcode((int)(instr.getOpcode() | rd.getId()<<4 | k.getValue()&0x0f | (k.getValue()&0x30)<<5));
 		}
 		else throw new Exception();
 	}

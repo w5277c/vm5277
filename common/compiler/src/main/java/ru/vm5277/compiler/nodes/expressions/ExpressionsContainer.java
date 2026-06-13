@@ -18,22 +18,29 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.ArrayList;
 import java.util.List;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.CodegenResult;
+import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.common.lexer.SourcePosition;
+import ru.vm5277.compiler.Instance;
+import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class ExpressionsContainer extends ExpressionNode {
-	private	List<ExpressionNode> expressions		= new ArrayList<>();
+	protected	List<ExpressionNode>	expressions	= new ArrayList<>();
 	
-	public ExpressionsContainer(TokenBuffer tb, MessageContainer mc) {
-		super(tb, mc);
+	public ExpressionsContainer(Instance inst, TokenBuffer tb) {
+		super(inst, tb);
 	}
 	
+	public ExpressionsContainer(Instance inst, TokenBuffer tb, SourcePosition sp) {
+		super(inst, tb, sp);
+	}
+
 	public void add(ExpressionNode exprNode) {
 		expressions.add(exprNode);
 	}
@@ -63,9 +70,12 @@ public class ExpressionsContainer extends ExpressionNode {
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
+		debugAST(this, POST, true, getFullInfo() + " type:" + type);
+		cgScope = cg.enterExpression(parent, cgScope, toString());
+
 		for(int i=0; i<expressions.size(); i++) {
 			ExpressionNode expr = expressions.get(i);
-			result&=expr.postAnalyze(scope, cg, parent);
+			result&=expr.postAnalyze(scope, cg, cgScope);
 			if(result) {
 				// Резолвинг QualifiedPathExpression
 				ExpressionNode resolved = resolveQualifiedPathExpr(expr);
@@ -75,6 +85,8 @@ public class ExpressionsContainer extends ExpressionNode {
 				}
 			}
 		}
+		
+		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
 
@@ -86,7 +98,13 @@ public class ExpressionsContainer extends ExpressionNode {
 			try {
 				ExpressionNode optimizedExpr = expr.optimizeWithScope(scope, cg);
 				if(null!=optimizedExpr) {
-					expressions.set(i, optimizedExpr);
+					if(optimizedExpr instanceof ExpressionsContainer) {
+						expressions.remove(i);
+						expressions.addAll(i, ((ExpressionsContainer)optimizedExpr).getExprs());
+					}
+					else {
+						expressions.set(i, optimizedExpr);
+					}
 				}
 			}
 			catch(CompileException ex) {
@@ -96,13 +114,22 @@ public class ExpressionsContainer extends ExpressionNode {
 	}
 	
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		for(ExpressionNode expr : expressions) {
-			Object result = expr.codeGen(cg, parent, toAccum, excs);
+			Object result = expr.codeGen(cg, toAccum, excs);
 			if(toAccum && CodegenResult.RESULT_IN_ACCUM!=result) {
 				throw new CompileException("Accum not used for operand:" + expr);
 			}
 		}
 		return (toAccum ? CodegenResult.RESULT_IN_ACCUM : null);
-	}		
+	}
+	
+	@Override
+	public String toString() {
+		return "container";
+	}
+
+	public String getFullInfo() {
+		return getClass().getSimpleName() + " " + toString();
+	}
 }

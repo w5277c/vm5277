@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-	.include "stdio/stdout.asm"
-
 .IFNDEF OS_OUT_CSTR
+	.include "stdio/stdout.asm"
 ;--------------------------------------------------------
 OS_OUT_CSTR:
 ;--------------------------------------------------------
@@ -39,7 +38,7 @@ _OS_OUT_CSTR__LOOP:
 	LPM ACCUM_L,Z+
 	CPI ACCUM_L,0x00
 	BREQ _OS_OUT_CSTR__END
-.IF OS_FT_DEV_MODE
+.IF OS_FT_BLDR_API_REUSE == 0x01
 	MCALL PROC__BLDR_UART_SEND_BYTE_NR
 .ELSE
 	MCALL OS_STDOUT_SEND_BYTE

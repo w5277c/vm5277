@@ -1,0 +1,125 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+	.include "attiny13a.asm"
+	.include "devices/_common.def"
+
+;---CONSTANTS-----------------------------------------------
+	.SET	_MCALL_SIZE								= 0x01	;Размер макроса MCALL/MJMP: 1(RCALL)-2(CALL)
+	.SET	JMP_SUPPORT								= 0x00	;Поддержка JMP,CALL
+	.SET	MUL_SUPPORT								= 0x00	;Поддержка MUL,MULS,MULSU
+	.SET	BLDRSEC_SUPPORT							= 0x00	;Аппаратная защита секции бутлоадера
+	.EQU	OS_IR_QNT								= 0x0a	;Количество перырваний
+	.EQU	OS_PCINT_PORTS_QNT						= 0x01	;Количество портов поддерживающих внешние прерывания(PCINT)
+	.EQU	OS_RAM_BORDER_SIZE						= 0x01	;Минимальное допустимое расстояние между вершинами FREE_RAM и STACK
+	.SET	OS_TASKS_QNT							= 0x00	;По умолчанию многопоточность запрещена
+	
+.IFNDEF OS_STACK_SIZE
+	.SET	OS_STACK_SIZE							= -1	;Общий стек(-1 - вся свободная память)
+.ENDIF
+.IFNDEF OS_STDIN_CBUFFER_SIZE
+	.SET	OS_STDIN_CBUFFER_SIZE					= 0x04	;Размер буфера ввода (не менее 4)
+.ENDIF
+.IFNDEF OS_ETRACE_BUFFER_SIZE
+	.SET	OS_ETRACE_BUFFER_SIZE					= 0x03	;Размер буфера для трассировки исключений
+.ENDIF
+
+	.EQU	SCK										= PB2
+	.EQU	MISO									= PB1
+	.EQU	MOSI									= PB0
+
+	.SET	INT0_PORT								= PB1
+
+	;---IR---
+	.EQU	C5_IR_INT0								= 0x01
+	.EQU	C5_IR_PCINT0							= 0x02
+	.EQU	C5_IR_TIMER0_OVF						= 0x03
+	.EQU	C5_IR_EE_READY							= 0x04
+	.EQU	C5_IR_ANALOG_COMP						= 0x05
+	.EQU	C5_IR_RESERVED_CORE_TIMER1				= 0x06
+	.EQU	C5_IR_RESERVED_CORE_TIMER2				= 0x07
+	.EQU	C5_IR_WDT								= 0x08
+	.EQU	C5_IR_ADC								= 0x09
+
+.ORG 0x0000
+	RJMP	_OS_INIT										; Reset Handler
+.IF OS_FT_IR_TABLE == 0x01
+	RCALL	_OS_IR_HANDLER									; External Interrupt0 Handler
+_OS_PCINT_0_VECTOR:
+.IF OS_FT_PCINT
+	RCALL	_OS_PCINT_HANDLER								; Pin Change Interrupt Request 0
+.ELSE
+	RCALL	_OS_IR_HANDLER									; Pin Change Interrupt Request 0
+.ENDIF
+	RCALL	_OS_IR_HANDLER									; Timer/Counter0 Overflow
+	RCALL	_OS_IR_HANDLER									; EEPROM Ready
+	RCALL	_OS_IR_HANDLER									; Analog Comparator
+.IF OS_FT_TIMER == 0x01										; Timer/Counter0 Compare Match A
+	RJMP	_OS_TIMER1_HANDLER
+.ELSE
+	RCALL	_OS_IR_HANDLER
+.ENDIF
+	RCALL	_OS_IR_HANDLER									; Timer/Counter0 Compare Match B
+	RCALL	_OS_IR_HANDLER									; Watchdog Time-out Interrupt
+	RCALL	_OS_IR_HANDLER									; ADC Conversion Complete
+.ENDIF
+PORTS_TABLE:												;Таблица из адресов IO PINx регистров (-,B)
+	.db	0x00,0x36
+PCINT_TABLE:
+	.db	0x00,PCMSK0
+INT_TABLE:
+	.db	(1<<INT0),0x00
+
+.MACRO MCALL
+	RCALL @0
+.ENDMACRO
+.MACRO MJMP
+	RJMP @0
+.ENDMACRO
+
+;ATOMIC_REQUIRED
+.MACRO _OS_POWER_ON
+	PUSH ACCUM_L
+	LDS ACCUM_L,PRR
+	ANDI ACCUM_L,low(~(1<<@0))
+	STS PRR,ACCUM_L
+	POP ACCUM_L
+.ENDMACRO
+;ATOMIC_REQUIRED
+.MACRO _OS_POWER_OFF
+	PUSH ACCUM_L
+	LDS ACCUM_L,PRR
+	ORI ACCUM_L,low(1<<@0)
+	STS PRR,ACCUM_L
+	POP ACCUM_L
+.ENDMACRO
+
+;ATOMIC_REQUIRED
+.MACRO _OS_TIMER_INIT_NR
+	_OS_POWER_ON PRTIM0										;Подпитываю TIMER0
+	LDI ACCUM_L,(1<<WGM01)|(0<<WGM00)
+	STS TCCR0A,ACCUM_L
+	LDI ACCUM_L,(0<<CS02)|(1<<CS01)|(0<<CS00)				;/8
+	STS TCCR0B,ACCUM_L
+	STS TCNT0,C0x00
+	LDI ACCUM_L,_OS_TIMER_FREQ-0x01
+	STS OCR0A,ACCUM_L
+	LDI ACCUM_L,(1<<OCF0A)
+	STS TIFR0,ACCUM_L
+	LDI ACCUM_L,(1<<OCIE0A)
+	STS TIMSK0,ACCUM_L
+.ENDMACRO
+

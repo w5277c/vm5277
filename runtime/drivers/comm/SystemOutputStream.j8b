@@ -1,0 +1,13 @@
+public class SystemOutputStream implements OutputStream {
+    public SystemOutputStream() {}
+
+    public void write(byte b) {System.out(b);}
+    public void write(char c) {System.out(c);}
+    public void write(short s) {System.out(s);}
+    public void write(int i) {System.out(i);}
+	public void write(byte[] buf) {}//System.out(buf);}
+    public void write(byte[] buf, short off, short len) {
+    	for(off; off<len; off++) System.out(buf[off]);
+    }
+    public void flush() {}
+}

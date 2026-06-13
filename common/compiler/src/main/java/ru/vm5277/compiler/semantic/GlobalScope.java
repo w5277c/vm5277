@@ -40,10 +40,6 @@ public class GlobalScope extends Scope implements ImportableScope {
 	}
 
 	@Override
-	public CIScope resolveCI(String name, boolean isQualifiedAccess) {
-		return resolveCI(null, name, isQualifiedAccess);
-	}
-	@Override
 	public CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess) {
 		if(isQualifiedAccess) {
 			return internal.get(name);

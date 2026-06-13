@@ -15,7 +15,6 @@
  */
 package ru.vm5277.avr_asm.nodes.operands;
 
-import ru.vm5277.avr_asm.TokenBuffer;
 import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.lexer.SourcePosition;

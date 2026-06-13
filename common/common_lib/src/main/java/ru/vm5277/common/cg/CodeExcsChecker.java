@@ -24,9 +24,9 @@ import ru.vm5277.common.lexer.Operator;
 public abstract class CodeExcsChecker {
 	public abstract Integer getHandled(CGExcs excs, String exceptionName);
 	public abstract void stackOverflow(CodeGenerator cg, CGIContainer scope, CGExcs excs, int size, byte[] popRegIds) throws CompileException;
-	public abstract void mathOverflow(CodeGenerator cg, CGScope scope, CGExcs excs, Operator op, int size) throws CompileException;
+	public abstract void mathOverflow(CodeGenerator cg, CGScope scope, CGExcs excs, Operator op, byte[] regIds, boolean popRequired, boolean byZero) throws CompileException;
 	public abstract void divByZero(CodeGenerator cg, CGScope scope, CGExcs excs, byte[] regIds, boolean popRequired) throws CompileException;
-	public abstract void outOfMemory(CodeGenerator cg, CGScope scope, CGExcs excs) throws CompileException;
+	public abstract void outOfMemory(CodeGenerator cg, CGIContainer cont, CGExcs excs) throws CompileException;
 	public abstract void arrMathOverflow(CodeGenerator cg, CGScope scope, CGExcs excs, byte[] popRegIds) throws CompileException;
 	public abstract void arrOutOfMemory(CodeGenerator cg, CGScope scope, CGExcs excs, byte[] popRegIds) throws CompileException;
 	public abstract void invalidIndex(CodeGenerator cg, CGScope scope, CGExcs excs) throws CompileException;

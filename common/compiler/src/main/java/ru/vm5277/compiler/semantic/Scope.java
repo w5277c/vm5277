@@ -42,9 +42,6 @@ public abstract class Scope {
 	}
 
 	public abstract CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess);	
-	public CIScope resolveCI(String name, boolean isQualifiedAccess) {
-		return resolveCI(null, name, isQualifiedAccess);
-	}
 	public abstract Symbol resolveField(Scope caller, String name, boolean isQualifiedAccess) throws CompileException;
 	public Symbol resolveField(String name, boolean isQualifiedAccess) throws CompileException {
 		return resolveField(null, name, isQualifiedAccess);
@@ -75,5 +72,16 @@ public abstract class Scope {
 			_scope = _scope.getParent();
 		}
 		return null;
+	}
+	
+	public boolean isInLoop() {
+		Scope _scope = this;
+		while(null!=_scope) {
+			if(_scope instanceof BlockScope && ((BlockScope)_scope).getInLoop()) {
+				return true;
+			}
+			_scope = _scope.getParent();
+		}
+		return false;
 	}
 }

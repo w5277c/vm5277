@@ -16,15 +16,32 @@
 
 package ru.vm5277.maven;
 
+import java.nio.file.Path;
 import org.apache.maven.plugin.MojoExecutionException;
+import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
-import org.apache.maven.plugins.annotations.LifecyclePhase;
+import ru.vm5277.common.Toolkit;
 
-
-@Mojo(name = "compile", defaultPhase = LifecyclePhase.COMPILE)
+@Mojo(name = "compile", threadSafe = true)
 public class J8bCompileMojo extends J8bMojo {
+
 	@Override
-	public void execute() throws MojoExecutionException {
-		doCompile(false);
+	public void execute() throws MojoExecutionException, MojoFailureException {
+		if(skip) return;
+
+		// Проверяем, что это не родительский проект
+		if("pom".equals(project.getPackaging())) {
+			getLog().warn("J8B compile goal cannot be executed on parent POM project.");
+			getLog().warn("Please run 'mvn compile' from a specific module directory instead.");
+			return;
+		}
+		
+		doClean(log, prebuildDirectory);
+
+		if(!Toolkit.checkToolkit(verbose ? log : null, Path.of(toolkitPath), downloadUrl, true)) {
+			throw new MojoExecutionException("Toolkit not found, can't download toolkit from: " + downloadUrl + ", please try later.");
+		}
+		
+		doCompile();
 	}
 }

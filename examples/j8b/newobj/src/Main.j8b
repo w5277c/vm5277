@@ -57,5 +57,5 @@ class Main {
 		if(b1==b4) {
 			System.out(2);
 		}
-    }
+	}
 }

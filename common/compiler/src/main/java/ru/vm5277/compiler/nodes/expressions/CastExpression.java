@@ -17,7 +17,6 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.cg.CodeGenerator;
@@ -26,18 +25,20 @@ import java.util.Arrays;
 import ru.vm5277.common.cg.scopes.CGScope;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.cg.CGExcs;
+import ru.vm5277.compiler.Instance;
+import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 
 public class CastExpression extends ExpressionNode {
 	private			VarType			sourceType;
 	private			ExpressionNode	operand;
 
-	public CastExpression(TokenBuffer tb, MessageContainer mc, SourcePosition sp, VarType targetType, ExpressionNode operand) {
-		super(tb, mc, sp);
+	public CastExpression(Instance inst, TokenBuffer tb, SourcePosition sp, VarType targetType, ExpressionNode operand) {
+		super(inst, tb, sp);
 		
 		this.type = targetType;
 		this.operand = operand;
@@ -69,8 +70,7 @@ public class CastExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		if(null!=cgScope) cgScope.disable();
-		cgScope = cg.enterExpression(parent, toString());
+		cgScope = cg.enterExpression(parent, cgScope, toString());
 		
 		result &=operand.postAnalyze(scope, cg, cgScope);
 		if(result) {
@@ -114,9 +114,7 @@ public class CastExpression extends ExpressionNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
-		//CGScope cgs = (null==parent ? cgScope : parent);
-		
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		// Для констант мы можем задать размер аккумулятора изначально, это даст оптимальный код
 		// TODO точно? Проверить!
 		// Учет выражения (fixed)byte - ранее я убрал из этого условия VarFieldExpression, что-то оно ломало, нужно проверять
@@ -125,15 +123,12 @@ public class CastExpression extends ExpressionNode {
 		//Вопрос оптимизации - мы знаем в какой тип будет выполнено преобразование. Поэтому в аккумулятор можно загрузить только полезную часть
 		
 //		if(operand instanceof LiteralExpression || operand instanceof VarFieldExpression) {
-			if(sourceType!=type) {
-				int lSize = (-1 == sourceType.getSize() ? cg.getRefSize() : sourceType.getSize());
-				int rSize = (-1 == type.getSize() ? cg.getRefSize() : type.getSize());
-				cg.accResize(lSize<rSize ? sourceType : type);
-			}
-			Object result = operand.codeGen(cg, null, toAccum, excs);
-			if(sourceType!=type) {
-				cgScope.append(cg.accCast(sourceType, type));
-			}
+			cg.accumLock(type, !(operand instanceof BinaryExpression) && !(operand instanceof ArrayExpression));
+			Object result = operand.codeGen(cg, toAccum, excs);
+//			if(sourceType!=type) {
+//				cgScope.append(cg.accCast(sourceType, type));
+//			}
+			cg.accumUnlock();
 			return result;
 /*		}
 		else {

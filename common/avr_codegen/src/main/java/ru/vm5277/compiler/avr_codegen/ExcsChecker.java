@@ -18,8 +18,8 @@ package ru.vm5277.compiler.avr_codegen;
 
 import ru.vm5277.common.ExcsThrowPoint;
 import ru.vm5277.common.LabelNames;
-import ru.vm5277.common.RTOSFeature;
-import ru.vm5277.common.RTOSLibs;
+import ru.vm5277.common.enums.RTOSFeature;
+import ru.vm5277.common.enums.RTOSLibs;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeExcsChecker;
@@ -30,10 +30,12 @@ import ru.vm5277.common.cg.items.CGIAsmCondJump;
 import ru.vm5277.common.cg.items.CGIAsmJump;
 import ru.vm5277.common.cg.items.CGIAsmLd;
 import ru.vm5277.common.cg.items.CGIContainer;
+import ru.vm5277.common.cg.items.CGIRAsm;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import static ru.vm5277.common.cg.scopes.CGScope.genId;
+import ru.vm5277.common.enums.J8BException;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.lexer.Operator;
 import static ru.vm5277.compiler.avr_codegen.Generator.CALL_INSTR;
@@ -49,22 +51,23 @@ public class ExcsChecker extends CodeExcsChecker {
 		return null;
 	}
 	
+	//TODO Реализовать в рамках общей задачи проверки переполнения стека!
 	//UNCHECKED
 	@Override
 	public void stackOverflow(CodeGenerator cg, CGIContainer scope, CGExcs excs, int size, byte[] popRegIds) throws CompileException {
-		int id = VarType.getExceptionId("StackOverflowException");
+/*		int id = VarType.getExceptionId("StackOverflowException");
 		if(-1==id) return;
 
 		cg.setFeature(RTOSFeature.OS_FT_ETRACE);
 		excs.getProduced().add(id);
 		
 		CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, false);
-		CGLabelScope catchLbScope = excs.getRuntimeChecks().get(id);
+		CGLabelScope catchLbScope = excs.getRuntimeChecks().get(id);*/
 //TODO проверять Y - size с константой RTOS нижней границы стека
 /*
 		//scope.append(new CGIAsmCondJump("brcc", skipLbScope));
 		scope.append(new CGIAsmLd("ldi", "r16", Integer.toString(id)));*/
-		RTOSLibs.ETRACE_ADD.setRequired();
+/*		RTOSLibs.ETRACE_ADD.setRequired();*/
 /*		scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_etrace_addfirst", true));		
 		if(null!=popRegIds) {
 			for(byte popRegId : popRegIds) {
@@ -83,7 +86,8 @@ public class ExcsChecker extends CodeExcsChecker {
 	}
 
 	@Override
-	public void mathOverflow(CodeGenerator cg, CGScope scope, CGExcs excs, Operator op, int size) throws CompileException {
+	public void mathOverflow(CodeGenerator cg, CGScope scope, CGExcs excs, Operator op, byte[] regIds, boolean popRequired, boolean byZero)
+																																	throws CompileException {
 		int id = VarType.getExceptionId("MathOverflowException");
 		if(-1==id) return;
 		Integer throwableId = excs.getThrowable(id);
@@ -91,23 +95,31 @@ public class ExcsChecker extends CodeExcsChecker {
 			cg.setFeature(RTOSFeature.OS_FT_ETRACE);
 			excs.getProduced().add(id);
 			
-			CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, true);
+			CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, null==regIds);
 			CGLabelScope catchLbScope = excs.getRuntimeChecks().get(throwableId);
-			if(Operator.MULT==op) {
-				if(0x01==size) {
-					scope.append(new CGIAsmLd("cpi", "r17", "0x00"));
-					scope.append(new CGIAsmCondJump("breq", skipLbScope));
-				}
-				else if(0x02==size) {
-					scope.append(new CGIAsmLd("cpi", "r18", "0x00"));
-					scope.append(new CGIAsmCondJump("breq", skipLbScope));
-				}
-				else {
-					scope.append(new CGIAsmCondJump("brcc", skipLbScope));
-				}
+			
+			if(null==regIds) {
+				scope.append(new CGIAsmCondJump(byZero ? "breq" : "brcc", skipLbScope));
 			}
 			else {
-				scope.append(new CGIAsmCondJump("brcc", skipLbScope));
+				CGLabelScope throwLabel = new CGLabelScope(null, genId(), LabelNames.COMPARE_END, true);
+				for(int i=0; i<regIds.length; i++) {
+					byte regId = regIds[i];
+					scope.append(new CGIRAsm("cpi", "r" + regId, ",0x00"));
+					if(i<regIds.length-1) {
+						scope.append(new CGIAsmCondJump("brne", throwLabel));
+					}
+					else {
+						scope.append(new CGIAsmCondJump("breq", skipLbScope));
+					}
+				}
+
+				scope.append(throwLabel);
+				if(popRequired) {
+					for(byte regId : regIds) {
+						scope.append(new CGIAsm("pop", "r" + regId));
+					}
+				}
 			}
 			
 			scope.append(new CGIAsmLd("ldi", "r16", Integer.toString(id)));
@@ -166,8 +178,9 @@ public class ExcsChecker extends CodeExcsChecker {
 
 	//UNCHECKED
 	@Override
-	public void outOfMemory(CodeGenerator cg, CGScope scope, CGExcs excs) throws CompileException {
-		int id = VarType.getExceptionId("OutOfMemoryException");
+	public void outOfMemory(CodeGenerator cg, CGIContainer cont, CGExcs excs) throws CompileException {
+/*
+		int id = VarType.getExceptionId(J8BException.OutOfMemoryException.name());
 		if(-1==id) return;
 		
 		cg.setFeature(RTOSFeature.OS_FT_ETRACE);
@@ -192,7 +205,7 @@ public class ExcsChecker extends CodeExcsChecker {
 			catchLbScope.setUsed();
 			scope.append(new CGIAsmJump(Generator.JUMP_INSTR, catchLbScope, false));
 		}
-		scope.append(skipLbScope);
+		scope.append(skipLbScope);*/
 	}
 
 	@Override
@@ -228,6 +241,7 @@ public class ExcsChecker extends CodeExcsChecker {
 		}
 	}
 	
+	//TODO должен быть UNCHECKED, использовать стандартный OutOfMemory и ввести код=array
 	@Override
 	public void arrOutOfMemory(CodeGenerator cg, CGScope scope, CGExcs excs, byte[] popRegIds) throws CompileException {
 		int id = VarType.getExceptionId("ArrayInitException");

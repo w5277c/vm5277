@@ -17,9 +17,10 @@
 package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.List;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
-import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import ru.vm5277.common.ImplementInfo;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGExcs;
@@ -29,10 +30,16 @@ import ru.vm5277.common.cg.scopes.CGMethodScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.scopes.CGClassScope;
+import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.Instance;
+import ru.vm5277.compiler.Main;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
+import ru.vm5277.compiler.nodes.ClassNode;
+import ru.vm5277.compiler.nodes.MethodNode;
+import ru.vm5277.compiler.nodes.ObjectTypeNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 import ru.vm5277.compiler.semantic.AstHolder;
@@ -50,8 +57,8 @@ public class NewExpression extends ExpressionNode {
 	private	CIScope					cis;
 	private	String					methodName;
 	
-	public NewExpression(TokenBuffer tb, MessageContainer mc, SourcePosition sp, List<String> path) throws CompileException {
-		super(tb, mc, sp);
+	public NewExpression(Instance inst, TokenBuffer tb, SourcePosition sp, List<String> path) throws CompileException {
+		super(inst, tb, sp);
 		
 		this.path = path;
 		this.args = parseArguments(tb);
@@ -103,14 +110,13 @@ public class NewExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
-		if(null!=cgScope) cgScope.disable();
-		cgScope = cg.enterExpression(parent, toString());
+		cgScope = cg.enterExpression(parent, cgScope, toString());
 
 		try {
 			if(1<path.size()) {
 				cis = scope.getThis();
 				for(int i=0; i<path.size()-1; i++) {
-					cis = cis.resolveCI(path.get(i), i!=0);
+					cis = cis.resolveCI(null, path.get(i), i!=0);
 					if(null==cis || cis instanceof InterfaceScope) {
 						markError("Unresolved class scope '" + path.get(i) + "' in '" + toString() + "'");
 						result = false;
@@ -196,12 +202,20 @@ public class NewExpression extends ExpressionNode {
 
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
-		//CGScope cgs = null == parent ? cgScope : parent;
-
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		CIScope cis = (CIScope)((MethodSymbol)symbol).getScope().getParent();
 		String classNameStr = cis.getName();
 
+		if(cg.getDevice().isLowRAM() && StrictLevel.NONE!=Main.getStrictLevel()) {
+			if(StrictLevel.STRONG==Main.getStrictLevel()) {
+				markError("HEAP usage on low memory device " + cg.getDevice().getUniqueName());
+			}
+			else {
+				markWarning("HEAP usage on low memory device " + cg.getDevice().getUniqueName());
+			}
+		}
+
+		
 		int refTypeSize = 1; // TODO Определить значение на базе количества используемых типов класса
 		// Всегда сохраняем heapIReg, метод может использовать его в своих целях
 		cg.pushHeapReg(cgScope);
@@ -209,9 +223,53 @@ public class NewExpression extends ExpressionNode {
 		putArgsToStack(cg, cgScope, refTypeSize, excs);
 		depCodeGen(cg, excs);
 
-		CGMethodScope mScope = (CGMethodScope)((AstHolder)symbol).getNode().getCGScope().getScope(CGMethodScope.class);
-		cg.call(cgScope, mScope.getLabel());
 
+		// Проверяем, нужно ли принудительно генерировать код для методов, указанных в persist (методы, которые не должны быть исключены оптимизатором)
+		if(!persists.isEmpty() && null!=symbol && symbol instanceof MethodSymbol) {
+			MethodNode methodNode = (MethodNode)((MethodSymbol)symbol).getNode();
+			
+			// Получаем класс создаваемого экземпляра 
+			ObjectTypeNode objTypeNode = methodNode.getObjTypeNode();
+			if(null!=objTypeNode && objTypeNode instanceof ClassNode) {
+				ClassNode classNode = (ClassNode)objTypeNode;
+				CGClassScope cgClassScope = ((CGClassScope)classNode.getCGScope());
+				if(null!=cgClassScope) {
+					// Перебираем интерфейсы, указанные в объявлении класса (implements)
+					for(ImplementInfo imlementInfo : cgClassScope.getImlementInfos()) {
+						if(imlementInfo.getType().isClassType()) {
+							// Разрешаем интерфейс
+							CIScope resolveCI = classNode.getScope().resolveCI(null, imlementInfo.getType().getClassName(), false);
+							// Проверяем, что это интерфейс с runtime-путём (загружен из runtime директории)
+							if(resolveCI instanceof InterfaceScope && null!=((InterfaceScope)resolveCI).getRuntimePath()) {
+								InterfaceScope iScope = ((InterfaceScope)resolveCI);
+// Сверяем путь интерфейса и сигнатуры методов со списком persist
+								for(String signature : imlementInfo.getSignatures()) {
+									if(persists.contains(iScope.getRuntimePath() + "." + iScope.getName() + "." + signature)) {
+										// Нашли метод в persist — ищем его реализацию в классе
+										for(AstNode node : classNode.getBody().getChildren()) {
+											if(node instanceof MethodNode) {
+												MethodNode _methodNode = (MethodNode)node;
+												CGMethodScope _cgMethodScope = (CGMethodScope)_methodNode.getCGScope();
+												if(null!=_cgMethodScope && _cgMethodScope.getSignature().equals(signature)) {
+													// Нашли нужный метод — принудительно генерируем код
+													_methodNode.codeGen(cg, false, new CGExcs());
+													//TODO перенесено в отстройку самого метода.
+													//((CGMethodScope)_methodNode.getCGScope()).getLabel().setPersist();
+												}
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
+		CGMethodScope mScope = (CGMethodScope)((AstHolder)symbol).getNode().getCGScope().getScope(CGMethodScope.class);
+		cg.invokeConstr(cgScope, mScope.getLabel());
+		
 		return null;
 	}
 
@@ -244,20 +302,20 @@ public class NewExpression extends ExpressionNode {
 
 				if(argExpr instanceof LiteralExpression) {
 					// Выполняем зависимость
-					argExpr.codeGen(cg, cgs, false, excs);
+					argExpr.codeGen(cg, false, excs);
 					LiteralExpression le = (LiteralExpression)argExpr;
-					cg.pushConst(cgs, exprTypeSize, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed());
+					cg.pushConst(cgs, exprTypeSize, le.getType().isFixedPoint() ? le.getFixedValue() : le.getNumValue(), le.getType().isFixedPoint());
 				}
 				else if(argExpr instanceof VarFieldExpression) {
-					argExpr.codeGen(cg, cgs, false, excs);
+					argExpr.codeGen(cg, false, excs);
 					cg.pushCells(cgs, exprTypeSize, ((CGCellsScope)argExpr.getSymbol().getCGScope()).getCells());
 				}
 				else if(argExpr instanceof MethodCallExpression) {
-					argExpr.codeGen(cg, cgs, true, excs);
+					argExpr.codeGen(cg, true, excs);
 					cg.pushAccBE(cgs, paramVarType.getSize());
 				}
 				else if(argExpr instanceof BinaryExpression) {
-					argExpr.codeGen(cg, cgs, true, excs);
+					argExpr.codeGen(cg, true, excs);
 					cg.pushAccBE(cgs, paramVarType.getSize());
 				}
 				else if(argExpr instanceof EnumExpression) {

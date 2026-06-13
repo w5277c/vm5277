@@ -1,0 +1,59 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+class Main {
+    // Параметры теста
+    static final short ITERATIONS = 1000;
+    static final byte BUFFER_SIZE = 64;
+    // Тестовый буфер
+    static final byte[] TEST_DATA = new byte[BUFFER_SIZE];
+
+    public static void main() {
+        System.out("\n=== CRC8 Performance Benchmark ===\n");
+
+        // Инициализация тестовых данных
+        for(byte i=0; i<BUFFER_SIZE; i++) {
+            TEST_DATA[i] = i;
+        }
+
+        // Основной тест с замером времени
+        System.out("Running " + ITERATIONS + " iterations on " + BUFFER_SIZE + " bytes...\n");
+        int startTime = System.uptimeMs();
+
+        byte result = 0;
+        for(short i=0; i<ITERATIONS; i++) {
+        	result = Math.crc8(TEST_DATA, BUFFER_SIZE);
+        }
+
+        int elapsedMs = System.uptimeMs() - startTime;
+
+        // Результаты
+        System.out("\n=== Results ===\n");
+        System.out("CRC8 result: " + result + "\n");
+        System.out("Total time: " + elapsedMs + " ms\n");
+        System.out("Time per iteration: ");
+
+        // Вычисляем время на одну итерацию в микросекундах
+        short usPerIter = (short)(elapsedMs * 1000 / ITERATIONS);
+       	System.out(usPerIter + " us");
+
+        System.out("\nThroughput: ");
+        int kbps = ITERATIONS * BUFFER_SIZE * 1000 / 1024 / elapsedMs;
+        System.out(kbps + " KB/sec");
+
+       	System.out("\n=== Done ===\n");
+    }
+}

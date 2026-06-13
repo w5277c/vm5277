@@ -17,17 +17,24 @@
 package ru.vm5277.common.cg.scopes;
 
 public class CGLabelScope extends CGScope {
-	private	static	int		idCntr	= 0;
 	private			boolean	isUsed;
-	
+	private			boolean	isPersist	= false;
 	
 	public CGLabelScope(CGScope scope, Integer resId, String name, boolean isUsed) {
 		super();
 		
-		this.resId = (null == resId ? idCntr++ : resId);
+		this.resId = (null == resId ? genId() : resId);
 		this.name = (null == scope ?	((null!=name ? name : "") + (-1==this.resId ? "" : "_" + this.resId)) :
 										("j8b_" + scope.getLPath()) + "_" + (null!=name ? name  + "_" : "") + this.resId);
 		this.isUsed = isUsed;
+	}
+
+	public CGLabelScope(CGLabelScope parent, String postfix, int offset) {
+		super();
+		
+		this.resId = parent.getResId();
+		this.name = parent.getName() + (null==postfix || postfix.isEmpty() ? "" : "_" + postfix) + (0==offset ? "" : "+" + offset);
+		this.isUsed = true;
 	}
 
 	public void setUsed() {
@@ -36,6 +43,14 @@ public class CGLabelScope extends CGScope {
 	public boolean isUsed() {
 		return isUsed;
 	}
+	
+	public void setPersist() {
+		this.isPersist = true;
+	}
+	public boolean isPersist() {
+		return isPersist;
+	}
+	
 	
 	@Override
 	public String getSource() {

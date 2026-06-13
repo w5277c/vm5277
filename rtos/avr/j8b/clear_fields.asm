@@ -19,19 +19,17 @@
 J8BPROC_CLEAR_FIELDS_NR:									;NR-NO_RESTORE - не восстанавливает ACCUM_L/H
 ;-----------------------------------------------------------
 ;Заполнение нулями HEAP(блок полей)
-;IN: Z-адрес начала HEAP,ACCUM_L/H-размер HEAP
+;IN: Z-адрес начала HEAP,ACCUM_L/H-размер полей-1
 ;-----------------------------------------------------------
 	PUSH_Z
+
 	ADIW ZL,0x05
-	SUBI ACCUM_L,0x06
-	SBCI ACCUM_H,0x00
 _J8BPROC_CLEAR_FIELDS__LOOP:
-	BRCS _J8BPROC_CLEAR_FIELDS__END
 	ST Z+,C0x00
 	SUBI ACCUM_L,0x01
 	SBCI ACCUM_H,0x00
-	RJMP _J8BPROC_CLEAR_FIELDS__LOOP
-_J8BPROC_CLEAR_FIELDS__END:
+	BRCC _J8BPROC_CLEAR_FIELDS__LOOP
+
 	POP_Z
 	RET
 .ENDIF

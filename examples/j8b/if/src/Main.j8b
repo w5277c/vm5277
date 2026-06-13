@@ -20,8 +20,8 @@ class Main {
 
 		byte b1; b1=1;
 		byte b2; b2=2;
-		System.out("\nb1="); System.out(b1);
-		System.out("\nb2="); System.out(b2);
+		System.out("\nb1=" + b1);
+		System.out("\nb2=" + b2);
 		System.out("\nif(b1==1)");
 		if(b1==1) {
 			System.out("\nБлок then(истина)");

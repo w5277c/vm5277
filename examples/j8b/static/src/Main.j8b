@@ -27,8 +27,8 @@ class Main {
 		System.out(s1);
 		Test1.Test2.test=110;
 		byte ttt = Test1.Test2.test;
-		System.outChar('\n'); System.out(ttt);
-		System.outChar('\n'); System.out(b2);
+		System.out('\n' + ttt);
+		System.out('\n' + b2);
     }
 
 	class Test1 {

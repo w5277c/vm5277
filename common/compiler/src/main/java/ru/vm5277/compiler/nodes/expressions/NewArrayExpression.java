@@ -18,19 +18,23 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.ArrayList;
 import java.util.List;
-import ru.vm5277.common.RTOSFeature;
-import static ru.vm5277.common.SemanticAnalyzePhase.DECLARE;
-import static ru.vm5277.common.SemanticAnalyzePhase.POST;
-import static ru.vm5277.common.SemanticAnalyzePhase.PRE;
+import ru.vm5277.common.enums.RTOSFeature;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.compiler.CodegenResult;
+import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.CGAccum;
+import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.lexer.Delimiter;
+import ru.vm5277.compiler.Instance;
+import ru.vm5277.compiler.Main;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
@@ -41,10 +45,11 @@ public class NewArrayExpression extends ExpressionNode {
 	private	ArrayInitExpression		arrayInitiExpr;
 	private	int[]					constDimensions		= null;
 	private	CGScope					headerCgScope;
+	private	CGScope					bodyCgScope;
+	private	CGScope					tailCgScope;
 	
-	public NewArrayExpression(	TokenBuffer tb, MessageContainer mc, SourcePosition sp, VarType type, List<ExpressionNode> arrDimensions,
-								ArrayInitExpression aiExpr) {
-		super(tb, mc, sp);
+	public NewArrayExpression(Instance inst, TokenBuffer tb, SourcePosition sp, VarType type, List<ExpressionNode> arrDimensions, ArrayInitExpression aiExpr) {
+		super(inst, tb, sp);
 
 		this.type = type;
 		this.depth = type.getArrayDepth();
@@ -58,12 +63,12 @@ public class NewArrayExpression extends ExpressionNode {
 		CodeGenerator.setArraysUsage();
 	}
 
-	public NewArrayExpression(TokenBuffer tb, MessageContainer mc, SourcePosition sp, List<String> path) throws CompileException {
-		super(tb, mc, sp);
+	public NewArrayExpression(Instance inst, TokenBuffer tb, SourcePosition sp, List<String> path) throws CompileException {
+		super(inst, tb, sp);
 		
 		arrDimensions = parseArrayDimensions();
 		if(tb.match(Delimiter.LEFT_BRACE)) {
-			arrayInitiExpr = new ArrayInitExpression(tb, mc, sp, type);
+			arrayInitiExpr = new ArrayInitExpression(inst, tb, sp, type);
 		}
 	}
 
@@ -131,8 +136,7 @@ public class NewArrayExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		if(null!=cgScope) cgScope.disable();
-		cgScope = cg.enterExpression(parent, toString());
+		cgScope = cg.enterExpression(parent, cgScope, toString());
 		
 		headerCgScope = new CGScope(cgScope, CGScope.genId(), "header");
 		
@@ -162,6 +166,8 @@ public class NewArrayExpression extends ExpressionNode {
 			}
 		}
 
+		bodyCgScope = new CGScope(cgScope, CGScope.genId(), "body");
+		
 		if(null==constDimensions) {
 			cg.setFeature(RTOSFeature.OS_ARRAY_3D);
 		}
@@ -181,7 +187,8 @@ public class NewArrayExpression extends ExpressionNode {
 		if(null!=arrayInitiExpr) {
 			result&=arrayInitiExpr.postAnalyze(scope, cg, cgScope);
 		}
-
+		tailCgScope = new CGScope(cgScope, CGScope.genId(), "tail");
+		
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
@@ -189,6 +196,7 @@ public class NewArrayExpression extends ExpressionNode {
 	
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
+		boolean optimized = false;
 		for(int i=0; i<depth; i++) {
 			ExpressionNode expr = arrDimensions.get(i);
 			if(null!=expr) {
@@ -198,10 +206,28 @@ public class NewArrayExpression extends ExpressionNode {
 					if(null != optimizedExpr) {
 						expr = optimizedExpr;
 						arrDimensions.set(i, optimizedExpr);
+						optimized = true;
 					}
 				}
 				catch(CompileException ex) {
 					markError(ex);
+				}
+			}
+		}
+		
+		if(optimized) {
+			if(null==constDimensions) {
+				constDimensions = new int[]{0, 0, 0};
+				for(int i=0; i<depth; i++) {
+					ExpressionNode expr = arrDimensions.get(i);
+					if(0==i || null!=constDimensions) {
+						if(expr instanceof LiteralExpression) {
+							constDimensions[i] = (int)((LiteralExpression)expr).getNumValue();
+						}
+						else {
+							constDimensions = null;
+						}
+					}
 				}
 			}
 		}
@@ -214,7 +240,7 @@ public class NewArrayExpression extends ExpressionNode {
 		List<ExpressionNode> result = new ArrayList<>();
 		for(int i=0; i<0x03; i++) {
 			if(0==constDimensions[i]) break;
-			result.add(new LiteralExpression(tb, mc, constDimensions[i]));
+			result.add(new LiteralExpression(inst, tb, constDimensions[i]));
 		}
 		return result;
 	}
@@ -241,35 +267,48 @@ public class NewArrayExpression extends ExpressionNode {
 	}
 
 	@Override
-	public Object codeGen(CodeGenerator cg, CGScope parent, boolean toAccum, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		CodegenResult result = null;
 		excs.setSourcePosition(sp);
 		
+		if(cg.getDevice().isLowRAM() && StrictLevel.NONE!=Main.getStrictLevel()) {
+			if(StrictLevel.STRONG==Main.getStrictLevel()) {
+				markError("HEAP usage on low memory device " + cg.getDevice().getUniqueName());
+			}
+			else {
+				markWarning("HEAP usage on low memory device " + cg.getDevice().getUniqueName());
+			}
+		}
+
 		if(null==constDimensions) {
+			// Размер массива не извесен на этапе компиляциии
 			cg.pushStackReg(headerCgScope);
 			for(int i=arrDimensions.size()-1; i>=0; i--) {
 				ExpressionNode expr = arrDimensions.get(i);
 				if(expr instanceof LiteralExpression) {
+					//TODO если это literal - то значение известно на этапе компиляции - можно оптимизировать
 					//TODO 0x02 - количество байт под размер массива
-					cg.pushConst(headerCgScope, 0x02, ((LiteralExpression)expr).getNumValue(), false);
+					cg.pushConst(expr.getCGScope(), 0x02, ((LiteralExpression)expr).getNumValue(), false);
 				}
 				else {
-					expr.codeGen(cg, null, true, excs);
+					expr.codeGen(cg, true, excs);
 					//TODO 0x02 - количество байт под размер массива
-					headerCgScope.append(cg.accCast(null, VarType.SHORT));
-					cg.pushAccBE(headerCgScope, 0x02);
+					cg.pushAccLE(expr.getCGScope(), 0x02);
 				}
 			}
 		}
 		
-		cg.eNewArray(headerCgScope, type, depth, constDimensions, excs);
+		cg.eNewArray(bodyCgScope, type, depth, constDimensions, excs);
 		if(null==constDimensions) {
-			cg.popStackReg(headerCgScope);
+			cg.popStackReg(bodyCgScope);
 		}
 		if(null!=arrayInitiExpr) {
-			cg.pushAccBE(headerCgScope, 0x02);
-			arrayInitiExpr.codeGen(cg, null, false, excs);
-			cg.popAccBE(cgScope, 0x02);
+			// Генерация инициализационных данных не должна влиять на текущий размер аккумулятора (в том числе признак fixed)
+			CGAccum accum = cg._getAcc().clone();
+			cg.pushAccBE(bodyCgScope, 0x02);
+			arrayInitiExpr.codeGen(cg, false, excs);
+			cg._setAcc(accum);
+			cg.popAccBE(tailCgScope, 0x02);
 		}
 
 		return CodegenResult.RESULT_IN_ACCUM;
