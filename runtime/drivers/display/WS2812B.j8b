@@ -1,0 +1,102 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import rtos.RtosDispatcher;
+
+public class WS2812B implements BufferedGraphicsDisplay {
+	private short ioReg;
+	private byte width;
+	private byte height;
+	private byte[] rgbBuffer;
+
+	public WS2812B(byte port, byte width, byte height) {
+		this.width = width;
+		this.height = height;
+
+		// Так как нет аппаратной возможности пропускать пиксели - мы вынуждены выделять огромный видео буфер для всей рабочей области
+		rgbBuffer = new byte[width*height*3];
+
+		Gpio.modeOut(port);
+		Gpio.setLow(port);
+		this.ioReg = RtosCore.getIORegOutput(port);
+		RtosCore.delayUs(50);
+	}
+
+	@Override public void init() {
+		//clear();
+	}
+
+	@Override public void clear() {
+		//TODO не работает Array.fill(rgbBuffer, 0, rgbBuffer.length, 0);
+		// в ядре путаница с длиной ACCUM_EL/EH и TEMP_L/H
+		for(byte b=0; b<rgbBuffer.length; b++) {
+			rgbBuffer[b] = 0;
+		}
+		update();
+	}
+
+	@Override public void update() {
+		short offset = 0;
+		for(byte y=0; y<height; y++) {
+			for(byte x=0; x<width; x++) {
+				set(rgbBuffer[offset++], rgbBuffer[offset++], rgbBuffer[offset++]);
+			}
+		}
+		RtosCore.setIORegLow(ioReg);
+		RtosCore.delayUs(50);
+	}
+
+	@Override public void drawImage(byte[] data, short xPos, short yPos, short imgWidth, short imgHeight) {
+		if(null==data || 0==imgWidth || 0==imgHeight || xPos>=width || yPos>=height) {
+			return;
+		}
+
+		byte xEnd = (byte)(xPos + imgWidth);
+		byte yEnd = (byte)(yPos + imgHeight);
+
+		if(xEnd>width) xEnd = width;
+		if(yEnd>height) yEnd = height;
+
+		for(byte y=(byte)yPos; y<yEnd; y++) {
+			for (byte x=(byte)xPos; x<xEnd; x++) {
+				short dstOffset = (y*width+x)*3;
+				short srcOffset = ((y-yPos)*imgWidth+(x-xPos))*3;
+				rgbBuffer[dstOffset+0] = data[srcOffset+0];
+				rgbBuffer[dstOffset+1] = data[srcOffset+1];
+				rgbBuffer[dstOffset+2] = data[srcOffset+2];
+			}
+		}
+
+		update();
+	}
+
+	@Override public void drawPixel(short xPos, short yPos, int data) {
+		short offset = (yPos*width+xPos)*3;
+		rgbBuffer[offset+0] = Primitive.b2(data);
+		rgbBuffer[offset+1] = Primitive.b1(data);
+		rgbBuffer[offset+2] = Primitive.b0(data);
+	}
+
+	@Override public short getWidth() {return width;}
+	@Override public short getHeight() {return height;}
+	@Override public void setBacklight(boolean on) {}
+	@Override public void setBright(byte b) {}
+	@Override public byte getMaxBright() {return 0;}
+	@Override public void setContrast(byte b) {}
+	@Override public byte getMaxContrast() {return 0;}
+
+	public native void set(byte r, byte g, byte b);
+}

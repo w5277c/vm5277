@@ -22,14 +22,14 @@ J8BPROC_ETRACE_CLEAR:
 ;-----------------------------------------------------------
 ;Очищаем буфер точек прохода исключений
 ;-----------------------------------------------------------
-	PUSH_Y
+	PUSH_X
 	PUSH_T16
-	LDI_Y _OS_ETRACE_BUFFER
+	LDI_X _OS_ETRACE_BUFFER
 	LDI TEMP_L,low(OS_ETRACE_BUFFER_SIZE)
 	LDI TEMP_H,high(OS_ETRACE_BUFFER_SIZE)
 	MCALL OS_RAM_CLEAR16_NR
 	POP_T16
-	POP_Y
+	POP_X
 	RET
 
 .ENDIF

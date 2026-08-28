@@ -85,7 +85,7 @@
 	.DEF	CMAGIC									= r9;	//=US_CNTR_EL
 
 	.EQU	BITDELAY_CONST							= 0x13
-	.EQU	BLDR_VERSION							= 0b01000001 | 0x00000001 ;7,6 - тип, 5-0 - версия
+	.EQU	BLDR_VERSION							= 0b01000010 | 0x00000001 ;7,6 - тип, 5-0 - версия
 	.EQU	BLDR_START_WADDR						= BOOT_512W_ADDR
 	.EQU	_BLDR_BUFFER_SIZE						= 0x08 + FLASH_PAGESIZE	;Максимально допустимый размер запроса
 	.EQU	_BLDR_PROTOCOL_HEADER_SIZE				= 0x05	;Размер заголовка с учетом XOR SUM
@@ -106,7 +106,7 @@ BLDR_START__DATA:											;BOOT_512W_ADDR+0x05
 .IFDEF STDIN_PORTNUM
 	.db STDIN_PORTNUM<<0x04|STDIN_PINNUM,STDOUT_PORTNUM<<0x04|STDOUT_PINNUM		;STDIO порт(ы) - для верхнего уровня
 .ELSE 
-	.db 0xff,STDOUT_PORTNUM<<0x04|STDOUT_PINNUM				;Аналогично для 1wire режима
+	.db 0xff,STDIO_PORTNUM<<0x04|STDIO_PINNUM				;Аналогично для 1wire режима
 .ENDIF
 	.db (V_UID>>0x08)&0xff,(V_UID)&0xff						;Уникальный идентификатор чипа (2B-vendor, 6B-device)
 	.db (D_UID>>0x28)&0xff,(D_UID>>0x20)&0xff,(D_UID>>0x18)&0xff,(D_UID>>0x10)&0xff,(D_UID>>0x08)&0xff,(D_UID)&0xff
@@ -128,6 +128,13 @@ _BLDR_START__DATASKIP:
 	LDI ACCUM_L,low(SRAM_START+SRAM_SIZE-0x01)
 	STS SPL,ACCUM_L
 
+.IFNDEF WDIE												;Если WATCHDOG не поддерживает генерацию прерывания, то проверяем факт перезагрузки по WATCHDOG'у
+	LDS ACCUM_L,MCUCSR
+	SBRC ACCUM_L,WDRF
+	RCALL _BLDR_REBOOT
+    ANDI ACCUM_L,low(~(1<<WDRF))
+    OUT MCUCSR,ACCUM_L
+.ENDIF
 	RCALL BLDR_WATCHDOG_STOP
 
 	EOR C0x00,C0x00
@@ -163,15 +170,20 @@ _BLDR_START__DATASKIP:
 	LDS ACCUM_L,WDTCR
 	ORI ACCUM_L,(1<<WDCE)|(1<<WDE)
 	STS WDTCR,ACCUM_L
-	LDI ACCUM_L,(0<<WDE)|(1<<WDIE)|(0<<WDP3)|(1<<WDP2)|(1<<WDP1)|(0<<WDP0)
+.IFDEF WDIE
+	LDI ACCUM_L,(0<<WDE)|(1<<WDIE)|(1<<WDP2)|(1<<WDP1)|(0<<WDP0)
+.ELSE
+	LDI ACCUM_L,(0<<WDE)|(1<<WDP2)|(1<<WDP1)|(0<<WDP0)		;Не умеет генерировать прерывание - реализуем через сброс
+.ENDIF
 	STS WDTCR,ACCUM_L
 
 _BLDR_START__WATCHDOG_LOOP:
-.IFDEF STDIO_PORT_REGID
+.IFDEF STDIO_PORT_REGID										;Если обнаружили действие - останавливаем таймер и переходим на основной код бутлоадера
 	SBIC STDIO_PIN_REGID,STDIO_PINNUM
 .ELSE
 	SBIC STDIN_PIN_REGID,STDIN_PINNUM
 .ENDIF
+.IFDEF WDIF
 	RJMP PC+0x03
 	RCALL BLDR_WATCHDOG_STOP
 	RJMP _BLDR_START__MAIN_LOOP
@@ -179,6 +191,9 @@ _BLDR_START__WATCHDOG_LOOP:
 	SBRS ACCUM_L,WDIF
 	RJMP _BLDR_START__WATCHDOG_LOOP
 	RCALL _BLDR_REBOOT
+.ELSE
+	RJMP _BLDR_START__WATCHDOG_LOOP
+.ENDIF
 
 _BLDR_START__MAIN_LOOP:
 _BLDR_START__LOOP:
@@ -400,10 +415,14 @@ BLDR_WATCHDOG_STOP:
 	LDS ACCUM_L,MCUSR
 	ANDI ACCUM_L,low(~(1<<WDRF))
 	STS MCUSR,ACCUM_L
-	LDS ACCUM_L,(1<<WDCE)|(1<<WDE)
+	LDI ACCUM_L,(1<<WDCE)|(1<<WDE)
 	STS WDTCR,ACCUM_L
-	LDI ACCUM_L,(0<<WDE)|(1<<WDIF)
+.IFDEF WDIF
+	LDI ACCUM_L,(0<<WDE)|(1<<WDIF) 							;- не везде есть WDIF
 	STS WDTCR,ACCUM_L
+.ELSE
+	STS WDTCR,C0x00
+.ENDIF
 	POP ACCUM_L
 	RET
 ;-----------------------------------------------------------

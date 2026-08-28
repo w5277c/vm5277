@@ -125,6 +125,9 @@ public class ContinueNode extends CommandNode {
 
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
+		if(cgDone || disabled) return null;
+		cgDone = true;
+
 		CodegenResult result = null;
 		
 		if(null==label) {

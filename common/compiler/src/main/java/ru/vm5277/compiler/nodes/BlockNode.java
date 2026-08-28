@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import ru.vm5277.common.lexer.Operator;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
@@ -31,9 +32,10 @@ import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.scopes.CGVarScope;
+import ru.vm5277.common.enums.RTOSParam;
 import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.compiler.Main;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.commands.CommandNode.AstCase;
 import ru.vm5277.compiler.nodes.commands.DoWhileNode;
@@ -53,15 +55,19 @@ import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.lexer.Keyword;
+import ru.vm5277.common.lexer.tokens.TAnnotation;
+import ru.vm5277.common.messages.ErrorMessage;
+import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.Instance;
 
 public class BlockNode extends AstNode {
-	protected	List<AstNode>			children	= new ArrayList<>();
-	private		Map<String, LabelNode>	labels		= new HashMap<>();
-	private		boolean					isTry		= false;
-	protected	BlockScope				blockScope;
-	private		String					comment		= "";
-	
+	protected	Map<String, AnnotationParamNode>	annotations;
+	protected	List<AstNode>						children	= new ArrayList<>();
+	private		Map<String, LabelNode>				labels		= new HashMap<>();
+	private		boolean								isTry		= false;
+	protected	BlockScope							blockScope;
+	private		String								comment		= "";
+
 	public BlockNode(String comment) {
 		this.comment = comment;
 	}
@@ -101,29 +107,30 @@ public class BlockNode extends AstNode {
 				continue;
 			}
 			
+			Map<String, AnnotationParamNode> annotations = collectAnnotations(tb);
 			Set<Keyword> modifiers = collectModifiers(tb);
 
 			// Обработка классов с модификаторами
 			if (tb.match(TokenType.OOP) && J8BKeyword.CLASS == tb.current().getValue()) {
-				ClassNode cNode = new ClassNode(inst, tb, modifiers, true, null);
+				ClassNode cNode = new ClassNode(inst, tb, annotations, modifiers, true, new ArrayList<>());
 				children.add(cNode);
 				continue;
 			}
 			// Обработка enum с модификаторами
 			if (tb.match(TokenType.OOP) && J8BKeyword.ENUM == tb.current().getValue()) {
-				EnumNode eNode = new EnumNode(inst, tb, modifiers);
+				EnumNode eNode = new EnumNode(inst, tb, annotations, modifiers, null);
 				children.add(eNode);
 				continue;
 			}
 			// Обработка интерфейсов с модификаторами
 			if (tb.match(TokenType.OOP, J8BKeyword.INTERFACE)) {
-				InterfaceNode iNode = new InterfaceNode(inst, tb, modifiers, null, null);
+				InterfaceNode iNode = new InterfaceNode(inst, tb, annotations, modifiers, null, true, new ArrayList<>());
 				children.add(iNode);
 				continue;
 			}
 			// Обработка exception с модификаторами
 			if (tb.match(TokenType.OOP, J8BKeyword.EXCEPTION)) {
-				ExceptionNode eNode = new ExceptionNode(inst, tb, modifiers, null);
+				ExceptionNode eNode = new ExceptionNode(inst, tb, modifiers, new ArrayList<>());
 				children.add(eNode);
 				continue;
 			}
@@ -147,7 +154,7 @@ public class BlockNode extends AstNode {
 						String name = null;
 						try {name = consumeToken(tb, TokenType.IDENTIFIER).getStringValue();}catch(CompileException e) {markFirstError(e);} // Нет имени сущности, пытаемся парсить дальше
 
-						VarNode varNode = new VarNode(inst, tb, modifiers, type, name);
+						VarNode varNode = new VarNode(inst, tb, annotations, modifiers, type, name);
 						if(null!=name) children.add(varNode);
 						continue;
 					}
@@ -160,7 +167,11 @@ public class BlockNode extends AstNode {
 
 			// Обработка остальных statement (if, while, вызовы и т.д.)
 			try {
-				children.add(parseStatement(inst));
+				AstNode node = parseStatement(inst);
+				if(node instanceof BlockNode) {
+					((BlockNode)node).setAnnotations(annotations);
+				}
+				children.add(node);
 			}
 			catch(CompileException e) {
 				markFirstError(e);
@@ -170,32 +181,32 @@ public class BlockNode extends AstNode {
 		consumeToken(tb, Delimiter.RIGHT_BRACE);
     }
 
-	public static  boolean hasReturnStatement(AstNode node) {
-		if (null == node) return false;
+	public static boolean hasReturnStatement(AstNode node) {
+		if(null==node) return false;
 
 		// Если это return-выражение
-		if (node instanceof ReturnNode) return true;
+		if(node instanceof ReturnNode) return true;
 
 		// Проверяем дочерние блоки
-		if(null != node.getChildren()) {
-			for (AstNode _node : node.getChildren()) {
-				if (hasReturnStatement(_node)) {
+		if(null!=node.getChildren()) {
+			for(AstNode _node : node.getChildren()) {
+				if(hasReturnStatement(_node)) {
 					return true;
 				}
 			}
 		}
 
 		// Особые случаи для управляющих конструкций
-		if (node instanceof IfNode) {
+		if(node instanceof IfNode) {
 			IfNode ifNode = (IfNode)node;
 			// Проверяем обе ветки if
 			return hasReturnStatement(ifNode.getThenBlock()) && (ifNode.getElseBlock() == null || hasReturnStatement(ifNode.getElseBlock()));
 		}
-		else if (node instanceof SwitchNode) {
+		else if(node instanceof SwitchNode) {
 			// Для switch нужно проверить все case-блоки
 			SwitchNode switchNode = (SwitchNode)node;
-			for (AstCase c : switchNode.getCases()) {
-				if (!hasReturnStatement(c.getBlock())) {
+			for(AstCase c : switchNode.getCases()) {
+				if(!hasReturnStatement(c.getBlock())) {
 					return false;
 				}
 			}
@@ -224,6 +235,14 @@ public class BlockNode extends AstNode {
 		return blockScope;
 	}
 	
+	private void setAnnotations(Map<String, AnnotationParamNode> annotations) {
+		this.annotations = annotations;
+	}
+	public Map<String, AnnotationParamNode> getAnnotations() {
+		return annotations;
+	}
+
+	
 	@Override
 	public boolean preAnalyze() {
 		boolean result = true;
@@ -244,11 +263,11 @@ public class BlockNode extends AstNode {
 				if(noEffect) {
 					node.disable();
 					String text = "Statement '" + node.toString() + "' has no practical effect";
-					if(StrictLevel.STRONG==Main.getStrictLevel()) {
+					if(StrictLevel.STRONG==inst.getStrictLevel()) {
 						markError(text);
 						result = false;
 					}
-					else if(StrictLevel.LIGHT==Main.getStrictLevel()) {
+					else if(StrictLevel.LIGHT==inst.getStrictLevel()) {
 						markWarning(text);
 					}
 				}
@@ -279,6 +298,21 @@ public class BlockNode extends AstNode {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
 		cgScope = cg.enterBlock(parent, isTry, comment);
+		
+		if(null!=annotations) {
+			for(String annotation : annotations.keySet()) {
+				if(annotation.equals(TAnnotation.RTOS_PARAM_EQ) || annotation.equals(TAnnotation.RTOS_PARAM_NOT_EQ)) {
+					continue;
+				}
+				
+				if(StrictLevel.LIGHT==inst.getStrictLevel()) {
+					addMessage(new WarningMessage("Unsupported block annotation: @" + annotation, annotations.get(annotation).getSP()));
+				}
+				else if(StrictLevel.STRONG==inst.getStrictLevel()) {
+					addMessage(new ErrorMessage("Unsupported block annotation: @" + annotation, annotations.get(annotation).getSP()));
+				}
+			}
+		}
 		
 		for(int i=0; i<children.size(); i++) {
 			AstNode node = children.get(i);
@@ -332,17 +366,26 @@ public class BlockNode extends AstNode {
 	}
 	
 	public void firstCodeGen(CodeGenerator cg, CGExcs excs) throws CompileException {
+		if(cgDone || disabled) return;
 		cgDone = true;
+
 		int producedQnt = excs.getProduced().size();
 		
+		if(!codeGenCheckAnnotations(cg)) return;
+
 		for(AstNode node : children) {
 			//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
-			if(!node.isDisabled() && !(node instanceof VarNode)) {
-				if(node instanceof ExpressionNode) {
-					((ExpressionNode)node).codeGen(cg, false, excs);
+			if(!node.isDisabled()) {
+				if(!(node instanceof VarNode)) {
+					if(node instanceof ExpressionNode) {
+						((ExpressionNode)node).codeGen(cg, false, excs);
+					}
+					else {
+						node.codeGen(cg, false, excs);
+					}
 				}
 				else {
-					node.codeGen(cg, false, excs);
+					((CGVarScope)node.getCGScope()).makeUsedRegsShot();
 				}
 			}
 		}
@@ -352,6 +395,7 @@ public class BlockNode extends AstNode {
 			CGMethodScope mScope = (CGMethodScope)cgScope.getScope(CGMethodScope.class);
 			cg.getTargetInfoBuilder().addExcsThrowPoint(cg, sp, mScope.getSignature());
 		}*/
+		releaseVars(cg);
 	}
 
 	@Override
@@ -359,17 +403,95 @@ public class BlockNode extends AstNode {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 		
+		if(!codeGenCheckAnnotations(cg)) return null;
+		
 		for(AstNode node : children) {
 			//Не генерирую безусловно переменные, они будут сгенерированы только при обращении
 			if(!(node instanceof VarNode)) {
 				node.codeGen(cg, false, excs);
 			}
+			else {
+				((CGVarScope)node.getCGScope()).makeUsedRegsShot();
+			}
 		}
 		
 		((CGBlockScope)cgScope).build(cg, false, excs);
-		((CGBlockScope)cgScope).releaseRegsPool();
 		
+		releaseVars(cg);
 		return null;
+	}
+
+	private boolean codeGenCheckAnnotations(CodeGenerator cg) {
+		if(null!=annotations) {
+			AnnotationParamNode apn = annotations.get(TAnnotation.RTOS_PARAM_EQ);
+			if(null!=apn) {
+				Integer paramValue = null;
+				if(0x02==apn.getValues().size()) {
+					try {
+						RTOSParam param = RTOSParam.fromName(apn.getTextValue(0));
+						if(null!=param) {
+							Object tmp = cg.getDevice().getParam(param);
+							if(null==tmp) {
+								paramValue = 0;
+							}
+							else if(tmp instanceof Number) {
+								paramValue = ((Number)tmp).intValue();
+							}
+							else {
+								paramValue = Integer.valueOf(tmp.toString());
+							}
+						}
+					}
+					catch(Exception ex) {
+					}
+				}
+
+				if(null!=paramValue) {
+					if(!Objects.equals(paramValue, Integer.valueOf(apn.getNumValue(1)))) {
+						cgScope.disable();
+						return false;
+					}
+				}
+				else {
+					addMessage(new ErrorMessage("@" + apn.getAnnotationName() + ", unknown RTOS parameter or invalid format feature", apn.getSP()));
+				}
+			}
+
+			apn = annotations.get(TAnnotation.RTOS_PARAM_NOT_EQ);
+			if(null!=apn) {
+				Integer paramValue = null;
+				if(0x02==apn.getValues().size()) {
+					try {
+						RTOSParam param = RTOSParam.fromName(apn.getTextValue(0));
+						if(null!=param) {
+							Object tmp = cg.getDevice().getParam(param);
+							if(null==tmp) {
+								paramValue = 0;
+							}
+							else if(tmp instanceof Number) {
+								paramValue = ((Number)tmp).intValue();
+							}
+							else {
+								paramValue = Integer.valueOf(tmp.toString());
+							}
+						}
+					}
+					catch(Exception ex) {
+					}
+				}
+
+				if(null!=paramValue) {
+					if(Objects.equals(paramValue, Integer.valueOf(apn.getNumValue(1)))) {
+						cgScope.disable();
+						return false;
+					}
+				}
+				else {
+					addMessage(new ErrorMessage("@" + apn.getAnnotationName() + ", unknown RTOS parameter or invalid format feature", apn.getSP()));
+				}
+			}
+		}
+		return true;
 	}
 	
 	@Override

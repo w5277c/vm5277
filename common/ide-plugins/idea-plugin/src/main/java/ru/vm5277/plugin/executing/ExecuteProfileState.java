@@ -15,10 +15,12 @@ import com.intellij.openapi.project.Project;
 import org.jetbrains.annotations.NotNull;
 import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.StrUtils;
+import ru.vm5277.common.enums.Verbosity;
 import ru.vm5277.common.flash.FlashToolParam;
 import ru.vm5277.common.flash.InternalFlashTool;
 import ru.vm5277.common.mvn.MavenUtils;
 
+import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 
@@ -71,6 +73,9 @@ public class ExecuteProfileState extends CommandLineState {
 			throw new ExecutionException("Maven tool is not available");
 		}
 		commandLine.setExePath(mvnPath.toString());
+		if(configuration.isMvnQuiet()) {
+			commandLine.addParameters("--quiet");
+		}
 		commandLine.addParameters(runMode.getMvnCommand().split("\\s+"));
 
 		commandLine.addParameters("-P" + configuration.getName().replaceAll("\\s+", "_"));
@@ -108,7 +113,10 @@ public class ExecuteProfileState extends CommandLineState {
 		}
 		commandLine.addParameters("-Dj8b.optimization=" + configuration.getOptimizationType().toLowerCase());
 		commandLine.addParameters("-Dj8b.strict=" + configuration.getStrictLevel().toLowerCase());
-		commandLine.addParameters("-Dj8b.verbose=" + configuration.isVerboseOutput());
+		commandLine.addParameters("-Dj8b.verbosity=" + configuration.getVerbosity().toLowerCase());
+        if(configuration.isAddonsInclude()) {
+            commandLine.addParameters("-Dj8b.inludePaths=$vm5277" +  File.separator + "addons" + File.separator);
+        }
 		commandLine.setWorkDirectory(projectPath);
 
 		return commandLine;

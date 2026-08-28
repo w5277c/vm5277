@@ -56,7 +56,7 @@ public class CGCells {
 		this.type = type;
 		ids = new int[size];
 		this.size = size;
-		for(int i=0; i<size; i++) {
+		for(int i=0; i<size; i++) { // Порядок также корректен и для стека, см. Generator.normalizeIRegConst(вторая часть функции)
 			ids[i] = offset+i;
 		}
 	}

@@ -17,6 +17,7 @@
 package ru.vm5277.compiler.nodes.commands;
 
 import java.util.List;
+import ru.vm5277.common.LabelNames;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
@@ -30,11 +31,14 @@ import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.CGBranch;
+import ru.vm5277.common.cg.CGCells;
+import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Instance;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
+import ru.vm5277.compiler.nodes.expressions.bin.ComparisonExpression;
 import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.Scope;
 
@@ -166,30 +170,51 @@ public class ReturnNode extends CommandNode {
 	
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		expr.codeOptimization(scope, cg);
+		if(null!=expr) {
+			expr.codeOptimization(scope, cg);
 		
-		try {
-			ExpressionNode optimizedExpr = expr.optimizeWithScope(scope, cg);
-			if(null != optimizedExpr) {
-				expr = optimizedExpr;
+			try {
+				ExpressionNode optimizedExpr = expr.optimizeWithScope(scope, cg);
+				if(null != optimizedExpr) {
+					expr = optimizedExpr;
+				}
 			}
-		}
-		catch(CompileException ex) {
-			markError(ex);
+			catch(CompileException ex) {
+				markError(ex);
+			}
 		}
 	}
 
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
-		if(cgDone) return null;
+		if(cgDone || disabled) return null;
 		cgDone = true;
 
 		CodegenResult result = null;
 		
 		cg.accumLock(type);
 		if(null!=expr) {
-			if(CodegenResult.RESULT_IN_ACCUM!=expr.codeGen(cg, true, excs)) {
-				throw new CompileException("Accum not used for operand:" + expr);
+
+			CGBranch branch = new CGBranch();
+			if(VarType.BOOLEAN==type) {
+				expr.getCGScope().setBranch(branch);
+			}
+			
+			if(expr instanceof ComparisonExpression) {
+				expr.codeGen(cg, false, excs);
+			}
+			else {
+				if(CodegenResult.RESULT_IN_ACCUM!=expr.codeGen(cg, true, excs)) {
+					throw new CompileException("Accum not used for operand:" + expr);
+				}
+			}
+			if(branch.isUsed()) {
+				cg.constToAcc(expr.getCGScope(), 1, 1, false);
+				CGLabelScope lbScope = new CGLabelScope(null, null, LabelNames.LOCGIC_END, true);
+				cg.jump(expr.getCGScope(), lbScope);
+				expr.getCGScope().append(((CGBranch)branch).getEnd());
+				cg.constToAcc(expr.getCGScope(), 1, 0, false);
+				expr.getCGScope().append(lbScope);
 			}
 		}
 		
@@ -206,7 +231,7 @@ public class ReturnNode extends CommandNode {
 			markError("COPMILER BUG: block scope without method scope");
 		}
 		else {
-			cg.eReturn(cgScope, type, ((CGBlockScope)scope).getELabel());
+			cg.eReturn(cgScope, type, ((CGBlockScope)scope).getEndLabel());
 
 			if(null!=expr) {
 				result = CodegenResult.RESULT_IN_ACCUM;
@@ -214,6 +239,8 @@ public class ReturnNode extends CommandNode {
 		}
 		
 		cg.accumUnlock();
+		
+		releaseVars(cg);
 		return result;
 	}
 

@@ -17,6 +17,7 @@
 package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.Locale;
+import java.util.Objects;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.enums.CodegenResult;
@@ -32,9 +33,9 @@ import static ru.vm5277.common.VarType.FIXED_MAX;
 import static ru.vm5277.common.VarType.FIXED_MIN;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CGExcs;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.NEW;
 import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.compiler.Instance;
-import ru.vm5277.compiler.Main;
 
 //TODO RTOS умеет округлять? Проверить и выполнять округление по среднему
 
@@ -45,7 +46,9 @@ public class LiteralExpression extends ExpressionNode {
 	
 	public LiteralExpression(Instance inst, TokenBuffer tb, Object value) {
         super(inst, tb);
-        
+
+		debugAST(this, NEW, true, getFullInfo());
+
 		this.value = value;
 		type = VarType.UNKNOWN;
 		
@@ -57,7 +60,7 @@ public class LiteralExpression extends ExpressionNode {
 			
 		
 		if(null==value) type = VarType.NULL;
-		else if(value instanceof Boolean) type = VarType.BOOL;
+		else if(value instanceof Boolean) type = VarType.BOOLEAN;
 		else if(value instanceof Character) type = VarType.CHAR;
 		else if(value instanceof String) type = VarType.CSTR;
 		else if(value instanceof VarType) type = (VarType)value;
@@ -77,7 +80,9 @@ public class LiteralExpression extends ExpressionNode {
 
 	public LiteralExpression(Instance inst, TokenBuffer tb, Number value, VarType type) {
         super(inst, tb);
-        
+
+		debugAST(this, NEW, true, getFullInfo());
+		
 		this.value = value;
 		this.type = type;
 		this.fromVarField = true;
@@ -192,9 +197,9 @@ public class LiteralExpression extends ExpressionNode {
 						Double d = ((Double)value);
 						if(0>d) {
 							l = 0;
-							if(StrictLevel.NONE==Main.getStrictLevel()) {
+							if(StrictLevel.NONE==inst.getStrictLevel()) {
 							}
-							else if(StrictLevel.STRONG==Main.getStrictLevel()) {
+							else if(StrictLevel.STRONG==inst.getStrictLevel()) {
 								markError(String.format("Value is negative. Given: %.2f", d));
 								result = false;
 							}
@@ -203,9 +208,9 @@ public class LiteralExpression extends ExpressionNode {
 							}
 						}
 						else if((d - Math.floor(d)) >= 0.01d) {
-							if(StrictLevel.NONE==Main.getStrictLevel()) {
+							if(StrictLevel.NONE==inst.getStrictLevel()) {
 							}
-							else if(StrictLevel.STRONG==Main.getStrictLevel()) {
+							else if(StrictLevel.STRONG==inst.getStrictLevel()) {
 								markError(String.format("Value is not integer. Given: %.2f", d));
 								result = false;
 							}
@@ -218,9 +223,9 @@ public class LiteralExpression extends ExpressionNode {
 
 					if(VarType.INT==type && (l<0 || l> 0xffffffffl)) {
 						long newValue = l & 0xffffffffl;
-						if(StrictLevel.NONE==Main.getStrictLevel()) {
+						if(StrictLevel.NONE==inst.getStrictLevel()) {
 						}
-						else if(StrictLevel.STRONG==Main.getStrictLevel()) {
+						else if(StrictLevel.STRONG==inst.getStrictLevel()) {
 							markError("Value out of range (0..4294967295). Given: " + l);
 							result = false;
 						}
@@ -236,9 +241,9 @@ public class LiteralExpression extends ExpressionNode {
 						int tmp = (int)(d * 256d);
 						Double newValue = ((short)((tmp & 0x7FFF) | (tmp & 0x8000))) / 256d;
 
-						if(StrictLevel.NONE==Main.getStrictLevel()) {
+						if(StrictLevel.NONE==inst.getStrictLevel()) {
 						}
-						else if(StrictLevel.STRONG==Main.getStrictLevel()) {
+						else if(StrictLevel.STRONG==inst.getStrictLevel()) {
 							markError(String.format("fixed value out of range (" + FIXED_MIN + ".." + FIXED_MAX + "). Given: %.2f", d));
 							result = false;
 						}
@@ -277,6 +282,9 @@ public class LiteralExpression extends ExpressionNode {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
+		if(cgDone || disabled) return null;
+		cgDone = true;
+
 		//cg.setDataSymbol(cg.defineData(vScope.getResId(), -1, (String)le.getValue()));
 		//TODO попыка вынести запись в аккумулятор на свое место
 		if(toAccum) {
@@ -296,18 +304,29 @@ public class LiteralExpression extends ExpressionNode {
 					}
 				}
 			}
+			
+			releaseVars(cg);
 			return CodegenResult.RESULT_IN_ACCUM;
 		}
 
+		releaseVars(cg);
 		return null;
 	}
 	
 	@Override
 	public String toString() {
-		return Token.toStringValue(value);
+		return Token.toStringValue(null==value ? "NULL" : value);
     }
 	
+	@Override
 	public String getFullInfo() {
 		return getClass().getSimpleName() + " " + toString();
     }
+	
+	@Override
+	public boolean equals(Object obj) {
+		if(!(obj instanceof LiteralExpression)) return false;
+		LiteralExpression expr2 = (LiteralExpression)obj;
+		return Objects.equals(getStringValue(), expr2.getStringValue());
+	}
 }

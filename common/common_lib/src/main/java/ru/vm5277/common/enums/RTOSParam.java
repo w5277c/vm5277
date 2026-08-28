@@ -58,8 +58,21 @@ public enum RTOSParam {
 	// Размер точки трассировки (7, 15 бит)
 	ETRACE_POINT_BITSIZE(11, true, "Exception trace point bit size: 7 or 15 bits"),
 	
-	DIAG_MODE(12, false, "RTOS diagnostic mode");
+	DIAG_MODE(12, false, "RTOS diagnostic mode"),
 	
+	STIMER_QNT(13, true, "Quantity of software timers"),
+	
+	DRIVER_EXCEPTION_ID(14, true, "DriverException identifier"),
+	
+	// Отключение проверки наличия GPIO пина 
+	GPIO_PIN_NOCHECK(15, false, "Disable GPIO pin validation"),
+	
+	// Отключение проверки выхода за границы массива
+	ARRAY_INDEX_NOCHECK(16, false, "Disable array index bounds checking"),
+	
+	// Отключение проверки переполнения переменной в математических вычислениях
+	MATH_OVF_NOCHECK(17, false, "Disable arithmetic overflow detection");
+
 	private static final Map<Integer, RTOSParam> ids = new HashMap<>();
 	static {
 		for (RTOSParam type : RTOSParam.values()) {
@@ -102,5 +115,4 @@ public enum RTOSParam {
 	public String toString() {
 		return name().toUpperCase() + " - " + description;
 	}
-
 }

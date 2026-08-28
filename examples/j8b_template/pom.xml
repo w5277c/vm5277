@@ -93,7 +93,7 @@
 					<target>${j8b.target}</target>
 					<targetFreq>${j8b.targetFreq}</targetFreq>
 					<targetStdio>${j8b.targetStdio}</targetStdio>
-					<verbose>${j8b.verbose}</verbose>
+					<verbosity>${j8b.verbosity}</verbosity>
 				</configuration>
 			</plugin>
 		</plugins>

@@ -19,8 +19,8 @@
 
 class Main {
 	public static void main() {
-		bool bTrue; bTrue = true;
-		bool bFalse; bFalse = false;
+		boolean bTrue; bTrue = true;
+		boolean bFalse; bFalse = false;
 		byte bVal; bVal = 125;
 		short sVal; sVal = 32767;
 		int iVal; iVal = 0x7fffffff;

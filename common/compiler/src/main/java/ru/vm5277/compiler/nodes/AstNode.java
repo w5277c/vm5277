@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.CompileException;
@@ -34,6 +35,7 @@ import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.cg.CGAccum;
+import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.compiler.nodes.commands.BreakNode;
 import ru.vm5277.compiler.nodes.commands.ContinueNode;
@@ -42,7 +44,6 @@ import ru.vm5277.compiler.nodes.commands.ForNode;
 import ru.vm5277.compiler.nodes.commands.SwitchNode;
 import ru.vm5277.compiler.SemanticAnalyzer;
 import ru.vm5277.common.messages.Message;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.lexer.TokenType;
@@ -56,8 +57,10 @@ import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 import ru.vm5277.common.lexer.Keyword;
+import ru.vm5277.common.lexer.tokens.TAnnotation;
 import ru.vm5277.common.lexer.tokens.Token;
 import ru.vm5277.compiler.Instance;
+import ru.vm5277.compiler.semantic.FieldSymbol;
 
 public abstract class AstNode extends SemanticAnalyzer {
     private				static	int						globalCntr	= 0;
@@ -71,7 +74,6 @@ public abstract class AstNode extends SemanticAnalyzer {
 	protected					boolean					disabled;
 	protected					CGScope					cgScope;
 	protected			static	HashMap<AstNode, Scope>	declarationPendingNodes	= new HashMap<>();
-	protected			static	Set<String>				persists				= new HashSet<>();
 	
 	protected AstNode() {
 		sn = globalCntr++;
@@ -153,7 +155,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		if(tb.match(TokenType.TYPE)) {
 			Keyword kw = (Keyword)consumeToken(tb).getValue();
 			if(J8BKeyword.VOID == kw) return VarType.VOID;
-			if(J8BKeyword.BOOL == kw) return VarType.BOOL;
+			if(J8BKeyword.BOOLEAN == kw) return VarType.BOOLEAN;
 			if(J8BKeyword.BYTE == kw) return VarType.BYTE;
 			if(J8BKeyword.CHAR == kw) return VarType.CHAR;
 			if(J8BKeyword.SHORT == kw) return VarType.SHORT;
@@ -167,18 +169,27 @@ public abstract class AstNode extends SemanticAnalyzer {
 	}
 
 	protected boolean checkClassName(String className) {
-		if (tb.match(TokenType.IDENTIFIER)) {
+		if(tb.match(TokenType.IDENTIFIER)) {
 			String typeName = (String)tb.current().getValue();
-			if (typeName.equals(className)) {
+			if(typeName.equals(className)) {
 				consumeToken(tb);
 				return true;
 			}
 		}
 		return false;
 	}
+
 	protected VarType checkClassType() throws CompileException {
 		if(tb.match(TokenType.IDENTIFIER)) {
-			VarType type = VarType.fromClassName((String)tb.current().getValue());
+			String name = (String)tb.current().getValue();
+			VarType type = VarType.fromClassName(name);
+			if(null!=type) {
+				consumeToken(tb);
+				return checkArrayType(type);
+			}
+			// Возможно файл с необходимым типом еще не подгружен (лежит в этом-же каталоге)
+			inst.getPrimaryObject().resolveImportFromCurrentDir(inst, tb.getSP().getSourceFile(), name);	
+			type = VarType.fromClassName(name);
 			if(null!=type) {
 				consumeToken(tb);
 				return checkArrayType(type);
@@ -328,8 +339,8 @@ public abstract class AstNode extends SemanticAnalyzer {
 		return result;
 	}*/
 	
-	protected QualifiedPathExpression parseFullQualifiedExpression(TokenBuffer tb) throws CompileException {
-		QualifiedPathExpression path = new QualifiedPathExpression(inst, tb);
+	protected QualifiedPathExpression parseFullQualifiedExpression(TokenBuffer tb, boolean isNewOperator) throws CompileException {
+		QualifiedPathExpression path = new QualifiedPathExpression(inst, tb, isNewOperator);
 
 		// Первый идентификатор
 		if(tb.match(TokenType.OOP, J8BKeyword.THIS)) {
@@ -396,13 +407,29 @@ public abstract class AstNode extends SemanticAnalyzer {
 		return indices;
 	}
 	
+	public final Map<String, AnnotationParamNode> collectAnnotations(TokenBuffer tb) throws CompileException {
+        Map<String, AnnotationParamNode> result = new HashMap<>();
+        while (tb.match(TokenType.ANNOTATION)) {
+			TAnnotation ta = (TAnnotation)consumeToken(tb);
+			if(tb.match(Delimiter.LEFT_PAREN)) {
+				tb.consume();
+				result.put(ta.getStringValue(), new AnnotationParamNode(inst, tb, ta.getStringValue()));
+				consumeToken(tb, Delimiter.RIGHT_PAREN);
+			}
+			else {
+				result.put(ta.getStringValue(), null);
+			}
+        }
+        return result;
+    }
+		
 	public final Set<Keyword> collectModifiers(TokenBuffer tb) {
-        Set<Keyword> modifiers = new HashSet<>();
+        Set<Keyword> result = new HashSet<>();
         while (tb.match(TokenType.MODIFIER)) {
 			Keyword modifier = (Keyword)consumeToken(tb).getValue();
-			if(!modifiers.add(modifier)) markError("Duplicate modifier: " + modifier);
+			if(!result.add(modifier)) markError("Duplicate modifier: " + modifier);
         }
-        return modifiers;
+        return result;
     }
 	
 	protected boolean isControlFlowInterrupted(AstNode node) {
@@ -573,8 +600,12 @@ public abstract class AstNode extends SemanticAnalyzer {
     }
 	public Token consumeToken(TokenBuffer tb, Delimiter delimiter) throws CompileException {
 		if (TokenType.DELIMITER == tb.current().getType()) {
-            if(delimiter == tb.current().getValue()) return consumeToken(tb);
-			else throw parserError("Expected delimiter " + delimiter + ", but got " + tb.current().getValue());
+            if(delimiter == tb.current().getValue()) {
+				return consumeToken(tb);
+			}
+			else {
+				throw parserError("Expected delimiter " + delimiter + ", but got " + tb.current().getValue());
+			}
         }
 		else {
 			throw parserError("Expected " + TokenType.DELIMITER + ", but got " + tb.current().getType());
@@ -582,8 +613,12 @@ public abstract class AstNode extends SemanticAnalyzer {
     }
 	public Token consumeToken(TokenBuffer tb, TokenType type, Keyword keyword) throws CompileException {
 		if (type == tb.current().getType()) {
-            if(keyword == tb.current().getValue()) return consumeToken(tb);
-			else throw parserError("Expected keyword " + keyword + ", but got " + tb.current().getValue());
+            if(keyword == tb.current().getValue()) {
+				return consumeToken(tb);
+			}
+			else {
+				throw parserError("Expected keyword " + keyword + ", but got " + tb.current().getValue());
+			}
         }
 		else {
 			throw parserError("Expected " + TokenType.KEYWORD + ", but got " + tb.current().getType());
@@ -629,6 +664,12 @@ public abstract class AstNode extends SemanticAnalyzer {
 		addMessage(message);
 		return message;
 	}
+	public ErrorMessage markError(String text, SourcePosition sp) {
+		ErrorMessage message = new ErrorMessage(text, sp);
+		addMessage(message);
+		return message;
+	}
+
 	public WarningMessage markWarning(String text) {
 		WarningMessage message = new WarningMessage(text, sp);
 		addMessage(message);
@@ -674,6 +715,13 @@ public abstract class AstNode extends SemanticAnalyzer {
 			}
 		}
 		return null;
+	}
+	
+	protected void releaseVars(CodeGenerator cg) throws CompileException {
+		if(null==cgScope || cgScope.getLiveVars().isEmpty()) return;
+		for(CGVarScope vScope : cgScope.getLiveVars()) {
+			vScope.checkAndRelease(cg, cgScope);
+		}
 	}
 	
 	public CGScope getCGScope() {

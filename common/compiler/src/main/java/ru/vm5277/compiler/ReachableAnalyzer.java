@@ -40,7 +40,6 @@ class ReachableAnalyzer {
 								
 								fNode.getObjectTypeNode().codeGen(cg, false, excs);
 								fNode.codeGen(cg, false, excs);
-								//TODO пока статика работает не корректно cg.terminate(fNode.getCGScope(), false, true);
 							}
 						}
 						catch(CompileException ex) {

@@ -66,10 +66,10 @@ public class TryNode extends CommandNode {
 
 					if(tb.match(TokenType.IDENTIFIER)) {
 						List<ExpressionNode> args = new ArrayList<>();
-						args.add(parseFullQualifiedExpression(tb));
+						args.add(parseFullQualifiedExpression(tb, false));
 						while(tb.match(Delimiter.COMMA)) {
 							tb.consume();
-							args.add(parseFullQualifiedExpression(tb));
+							args.add(parseFullQualifiedExpression(tb, false));
 						}
 
 						if(tb.match(TokenType.IDENTIFIER)) {
@@ -196,7 +196,7 @@ public class TryNode extends CommandNode {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
-		if(cgDone) return null;
+		if(cgDone || disabled) return null;
 		cgDone = true;
 
 		//CGScope cgs = null == parent ? cgScope : parent;
@@ -213,7 +213,7 @@ public class TryNode extends CommandNode {
 		tryBlock.codeGen(cg, false, newExcs);
 
 		for(CatchBlock cBlock : catchBlocks) {
-			if(OptimizationType.NONE==Main.getOptimizationType()) {
+			if(OptimizationType.NONE==inst.getOptimizationType()) {
 				cBlock.codeGen(cg, cgScope, false, excs, true);
 				l1:
 				for(ExceptionScope eScope : cBlock.getExceptionScopes()) {
@@ -253,6 +253,7 @@ public class TryNode extends CommandNode {
 		}
 		excs.getProduced().addAll(newExcs.getProduced());
 		
+		releaseVars(cg);
 		return null;
 	}
 	

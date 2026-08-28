@@ -29,7 +29,7 @@ public class VarTypeTest {
 		assertTrue(AstNode.isCompatibleWith(null, VarType.INT, VarType.BYTE));
 		assertTrue(AstNode.isCompatibleWith(null, VarType.INT, VarType.SHORT));
 		
-        assertTrue(AstNode.isCompatibleWith(null, VarType.FIXED, VarType.BOOL));
+        assertTrue(AstNode.isCompatibleWith(null, VarType.FIXED, VarType.BOOLEAN));
     }
 
     @Test

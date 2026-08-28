@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+ //TODO вероятно блокировка диспетчера будет уровнем выше
+
 .IFNDEF J8BPROC_CLASS_REFCOUNT_INC_NR
 ;-----------------------------------------------------------
 J8BPROC_CLASS_REFCOUNT_INC_NR:
@@ -22,8 +24,11 @@ J8BPROC_CLASS_REFCOUNT_INC_NR:
 ;IN: ACCUM_L/H-адрес HEAP
 ;MOD:ACCUM_EL
 ;-----------------------------------------------------------
-	BLD ACCUM_EL,0x00										;Блокируем диспетчер
-	SET
+	CP ACCUM_L,C0x00
+	CPC ACCUM_H,C0x00
+	BREQ J8BPROC_CLASS_REFCOUNT_INC__END
+
+	MCALL OS_DISPATCHER_LOCK
 	PUSH_Z
 
 	MOVW ZL,ACCUM_L
@@ -35,7 +40,8 @@ J8BPROC_CLASS_REFCOUNT_INC_NR:
 J8BPROC_CLASS_REFCOUNT_INC__SKIP:
 
 	POP_Z
-	BST ACCUM_EL,0x00										;Снимаем блокировку диспетчера
+	MCALL OS_DISPATCHER_UNLOCK
+J8BPROC_CLASS_REFCOUNT_INC__END:
 	RET
 
 ;-----------------------------------------------------------
@@ -45,8 +51,11 @@ J8BPROC_CLASS_REFCOUNT_DEC_NR:
 ;IN: ACCUM_L/H-адрес HEAP
 ;MOD: ACCUM_L/H/EL/EH
 ;-----------------------------------------------------------
-	BLD ACCUM_EL,0x00										;Блокируем диспетчер
-	SET
+	CP ACCUM_L,C0x00
+	CPC ACCUM_H,C0x00
+	BREQ J8BPROC_CLASS_REFCOUNT_DEC__END
+
+	MCALL OS_DISPATCHER_LOCK
 	PUSH_Z
 
 	MOVW ZL,ACCUM_L
@@ -63,6 +72,7 @@ J8BPROC_CLASS_REFCOUNT_DEC__SKIP1:
 
 J8BPROC_CLASS_REFCOUNT_DEC__SKIP2:
 	POP_Z
-	BST ACCUM_EL,0x00										;Снимаем блокировку диспетчера
+	MCALL OS_DISPATCHER_UNLOCK
+J8BPROC_CLASS_REFCOUNT_DEC__END:
 	RET
 .ENDIF

@@ -9,20 +9,19 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.psi.tree.IElementType;
 import org.jetbrains.annotations.NotNull;
 import ru.vm5277.common.enums.PlatformType;
+import ru.vm5277.lsp.server.ASMLanguageServer;
 
 import java.awt.*;
 
 import static com.intellij.openapi.editor.colors.TextAttributesKey.createTextAttributesKey;
 
 public class AsmSyntaxHighlighter extends SyntaxHighlighterBase {
-    private	Project		project;
-    private	VirtualFile	virtualFile;
-	private PlatformType platformType;
-	private String mcu;
+    private	Project				project;
+    private	VirtualFile			virtualFile;
 
     private static class LazyHolder {
         public static final TextAttributesKey COLOR_MACRO = createTextAttributesKey(
-                "DARK_RED",
+                "DARKRED_MACRO",
                 new TextAttributes(
                         new Color(255, 92, 54),
                         null,
@@ -32,7 +31,7 @@ public class AsmSyntaxHighlighter extends SyntaxHighlighterBase {
                 )
         );
         public static final TextAttributesKey COLOR_REGS = createTextAttributesKey(
-                "DARK_RED",
+                "GOLD_REGS",
                 new TextAttributes(
                         new Color(184, 132, 11),
                         null,
@@ -43,17 +42,15 @@ public class AsmSyntaxHighlighter extends SyntaxHighlighterBase {
         );
     }
 
-    public AsmSyntaxHighlighter(Project project, VirtualFile virtualFile, PlatformType platformType, String mcu) {
+    public AsmSyntaxHighlighter(Project project, VirtualFile virtualFile) {
         this.project = project;
         this.virtualFile = virtualFile;
-		this.platformType  = platformType;
-		this.mcu = mcu;
     }
 
     @NotNull
     @Override
     public com.intellij.lexer.Lexer getHighlightingLexer() {
-        return new AsmLexer(project, platformType, mcu);
+        return new AsmLexer(project);
     }
 
     @NotNull

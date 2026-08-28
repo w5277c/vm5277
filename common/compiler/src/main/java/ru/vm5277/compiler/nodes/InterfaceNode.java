@@ -19,12 +19,14 @@ package ru.vm5277.compiler.nodes;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.common.lexer.Delimiter;
@@ -33,16 +35,23 @@ import ru.vm5277.compiler.semantic.ImportableScope;
 import ru.vm5277.compiler.semantic.InterfaceScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.lexer.Keyword;
+import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.compiler.Instance;
 
 public class InterfaceNode extends ObjectTypeNode {
 	private			InterfaceBodyNode	blockIfaceNode;
 	private			String				runtimePath;
-	
-	public InterfaceNode(Instance inst, TokenBuffer tb, Set<Keyword> modifiers, String classPath, List<ObjectTypeNode> importedClasses)
-																																	throws CompileException {
-		super(inst, tb, modifiers, classPath, importedClasses);
 
+	public InterfaceNode(	Instance inst, TokenBuffer tb, Map<String, AnnotationParamNode> annotations, Set<Keyword> modifiers, String classPath,
+							boolean isInner, List<ObjectTypeNode> importedClasses)													throws CompileException {
+		super(inst, tb, annotations, modifiers, classPath, importedClasses);
+
+		this.isInner = isInner;
+		
+		if(!isInner) {
+			inst.setPrimaryObject(this);
+		}
+		
 		if(null!=name) {
 			VarType.addClassName(this.name, false);
 		}
@@ -60,7 +69,7 @@ public class InterfaceNode extends ObjectTypeNode {
 			while(true) {
 				try {
 					String interfaceName = (String)consumeToken(tb, TokenType.IDENTIFIER).getValue();
-					resolveSameDirImport(inst, tb.getSP().getSourceFile(), interfaceName);
+					resolveImportFromCurrentDir(inst, tb.getSP().getSourceFile(), interfaceName);
 					//TODO QualifiedPath
 					impl.add(interfaceName);
 				}
@@ -90,7 +99,7 @@ public class InterfaceNode extends ObjectTypeNode {
 		}
 		
 		try{validateModifiers(modifiers, J8BKeyword.PUBLIC);} catch(CompileException e) {addMessage(e);}
-		
+
 		// Анализ тела интерфейса
 		blockIfaceNode.preAnalyze();
 
@@ -107,7 +116,7 @@ public class InterfaceNode extends ObjectTypeNode {
 				((ImportableScope)scope).addCI(ciScope, true);
 			}
 
-			if(null!=imported) {
+			if(null!=imported && !isInner) {
 				for(ObjectTypeNode imported : imported) {
 					result&=imported.declare(ciScope);
 
@@ -170,8 +179,6 @@ public class InterfaceNode extends ObjectTypeNode {
 			
 			((ImportableScope)scope).addCI(ciScope, true);
 
-			//TODO добавить импорты
-			
 			blockIfaceNode.declare(ciScope);
 		} 
 		catch (CompileException e) {
@@ -183,7 +190,14 @@ public class InterfaceNode extends ObjectTypeNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
+		boolean result = true;
+		
 		cgScope = cg.enterInterface(parent, VarType.fromClassName(name), name);
+
+		VarType driverType = VarType.fromClassName(VarType.CLASSNAME_RTOS_DRIVER);
+		if(null!=driverType && ciScope.isImplements(driverType)) {
+			isRtosDriver = true;
+		}
 
 		// Проверка что интерфейс не содержит конструкторов
 		for (AstNode decl : blockIfaceNode.getDeclarations()) {
@@ -197,38 +211,58 @@ public class InterfaceNode extends ObjectTypeNode {
 		}
 
 		
+		// Проверка вложенных интерфейсов
 		for (AstNode decl : blockIfaceNode.getDeclarations()) {
-			if (decl instanceof FieldNode) { // Проверка что все поля - public static final и инициализированы
+			if(decl instanceof InterfaceNode) {
+				result &= decl.postAnalyze(ciScope, cg, cgScope);
+			}
+			else if(decl instanceof EnumNode) {
+				result &= decl.postAnalyze(ciScope, cg, cgScope);
+			}
+		}
+
+		for(AstNode decl : blockIfaceNode.getDeclarations()) {
+			if(decl instanceof FieldNode) { // Проверка что все поля - public static final и инициализированы
 				FieldNode field = (FieldNode)decl;
 
-				if (!field.getModifiers().contains(J8BKeyword.PUBLIC)) markError("Interface field '" + field.getName() + "' must be public");
-				if (!field.getModifiers().contains(J8BKeyword.STATIC)) markError("Interface field '" + field.getName() + "' must be static");
-				if (!field.getModifiers().contains(J8BKeyword.FINAL)) markError("Interface field '" + field.getName() + "' must be final");
+				if(!field.getModifiers().contains(J8BKeyword.PUBLIC)) markError("Interface field '" + field.getName() + "' must be public");
+				if(!field.getModifiers().contains(J8BKeyword.STATIC)) markError("Interface field '" + field.getName() + "' must be static");
+				if(!field.getModifiers().contains(J8BKeyword.FINAL)) markError("Interface field '" + field.getName() + "' must be final");
 
-				if (null == field.getInitializer()) markError("Interface field '" + field.getName() + "' must be initialized");
+				if(null==field.getInitializer()) markError("Interface field '" + field.getName() + "' must be initialized");
+
+//				decl.postAnalyze(ciScope, cg, cgScope);
 			}
-			else if (decl instanceof MethodNode) { // Проверка что методы не имеют реализации
+			else if(decl instanceof MethodNode) { // Проверка что методы не имеют реализации
 				MethodNode method = (MethodNode)decl;
-				if (null != method.getBody()) {
+				if(!method.isStatic() && null!=method.getBody()) {
 					markError("Interface method '" + method.getName() + "' cannot have a body");
 				}
 			}
 		}
 
-		// Проверка вложенных интерфейсов
-		for (AstNode decl : blockIfaceNode.getDeclarations()) {
-			if (decl instanceof InterfaceNode) {
-				decl.postAnalyze(ciScope, cg, cgScope);
+		result &= blockIfaceNode.postAnalyze(ciScope, cg, cgScope);
+		
+		if(null!=annotations) {
+			for(String annotation : annotations.keySet()) {
+				if(StrictLevel.LIGHT==inst.getStrictLevel()) {
+					addMessage(new WarningMessage("Unsupported interface annotation: @" + annotation, annotations.get(annotation).getSP()));
+				}
+				else if(StrictLevel.STRONG==inst.getStrictLevel()) {
+					addMessage(new ErrorMessage("Unsupported interface annotation: @" + annotation, annotations.get(annotation).getSP()));
+				}
 			}
 		}
 
-		return true;
+		return result;
 	}
 
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
-		for(ObjectTypeNode node : imported) {
-			node.codeOptimization(scope, cg);
+		if(!isInner) {
+			for(ObjectTypeNode node : imported) {
+				node.codeOptimization(scope, cg);
+			}
 		}
 	}
 

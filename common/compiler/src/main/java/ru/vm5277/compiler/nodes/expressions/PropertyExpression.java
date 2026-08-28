@@ -18,6 +18,7 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import ru.vm5277.common.enums.Property;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
@@ -31,7 +32,6 @@ import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Instance;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -393,6 +393,9 @@ public class PropertyExpression extends ExpressionNode {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
+		if(cgDone || disabled) return null;
+		cgDone = true;
+
 		CodegenResult result = null;
 		
 		targetExpr.codeGen(cg, false, excs);
@@ -417,10 +420,10 @@ public class PropertyExpression extends ExpressionNode {
 				ah = (AstHolder)((ArrayExpression)targetExpr).getPathExpr().getSymbol();
 				dimentionPos = ((ArrayExpression)targetExpr).getDepth();
 			}
-			else {
+			else if(targetExpr.getSymbol() instanceof AstHolder) {
 				ah = (AstHolder)targetExpr.getSymbol();
 			}
-			if(ah.getNode() instanceof InitNodeHolder) {
+			if(null!=ah && ah.getNode() instanceof InitNodeHolder) {
 				InitNodeHolder inh = (InitNodeHolder)ah.getNode();
 				if(inh.getInitNode() instanceof ArrayExpression) {
 					isView = true;
@@ -429,13 +432,13 @@ public class PropertyExpression extends ExpressionNode {
 
 			if(toAccum) {
 				if(Property.length == property) {
-					if(!isView && null!=nae.getConstDimensions()) {
+					if(!isView && null!=nae && null!=nae.getConstDimensions()) {
 						cg.constToAcc(cgScope, 0x02, nae.getConstDimensions()[dimentionPos], false);
 					}
 					else {
 						CGCellsScope cScope = (CGCellsScope)targetExpr.getSymbol().getCGScope();
 						cg.cellsToArrReg(cgScope, cScope.getCells());
-						cg.arrSizetoAcc(cgScope, isView);
+						cg.arrSizetoAcc(cgScope, !isView);
 					}
 				}
 				result = CodegenResult.RESULT_IN_ACCUM;
@@ -474,6 +477,7 @@ public class PropertyExpression extends ExpressionNode {
 			}
 		}
 
+		releaseVars(cg);
 		return result;
 	}
 	
@@ -482,7 +486,18 @@ public class PropertyExpression extends ExpressionNode {
 		return targetExpr + "." + property;
 	}
 	
+	@Override
 	public String getFullInfo() {
 		return getClass().getSimpleName() + " " + toString();
 	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		if(!(obj instanceof PropertyExpression)) return false;
+		PropertyExpression expr2 = (PropertyExpression)obj;
+		if(!Objects.equals(targetExpr, expr2.getTargetExpr())) return false;
+		if(!Objects.equals(property, expr2.getProperty())) return false;
+		return Objects.equals(args, expr2.getArguments());
+	}
+
 }

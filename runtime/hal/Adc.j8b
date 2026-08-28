@@ -1,0 +1,60 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@RtosFeature("OS_FT_IRQ_ADC_BLOCK")
+public class Adc implements AdcContract {
+    @Native("_DRV_ADC__STAT_FIELD_REF")
+    private static AdcReference ref = AdcReference.INTERNAL_VREF;
+    @Native("_DRV_ADC__STAT_FIELD_PRESC")
+    private static byte prescaler = 64;
+    @Native("_DRV_ADC__STAT_FIELD_MODE")
+    private static AdcMode mode = AdcMode.SINGLE;
+    @Native("_DRV_ADC__STAT_FIELD_CALLBACK")
+    private static RtosCallback callback;
+	@Native("_DRV_ADC__STAT_FIELD_FLAGS")
+	private static byte flags;
+	@Native("_DRV_ADC__STAT_FIELD_RAWVALUE")
+	private static short rawValue;
+	@Native("_DRV_ADC__STAT_FIELD_CHANNEL")
+	private static byte channel;
+
+    @Override static public void setPrescaler(short _prescaler) {prescaler = (byte)_prescaler;}
+    @Override static public void setMode(AdcMode _mode) {mode = _mode;}
+    @Override static public void setCallback(RtosCallback _callback) {callback = _callback;}
+    @Override static boolean isEnabled() {return 0!=(flags&(1<<AdcContract.FLAG_ENABLED));}
+    @Override static boolean isBusy() {return 0!=(flags&(1<<AdcContract.FLAG_BUSY));}
+    @Override static short getRawValue() {return rawValue;}
+	@Override static byte getResolution() {return 10;} // Вероятно нужно вынести в RTOS, так как вероятно не все ADC у AVR 10 битные
+    @Override static public native void init() throws DriverException;
+    @Override static public native void start();
+    @Override static public native void shutdown();
+	// Эти параметры могу быть применены без повторного вызова init()
+    @Override static public native void setChannel(byte channel) throws DriverException;
+    @Override static public native void setReference(AdcReference ref) throws DriverException;
+
+    public static short read() throws DriverException {
+        start();
+        return waitRawValue();
+    }
+
+    public static short waitRawValue() throws DriverException {
+        while(isBusy()) {
+            if(!isEnabled()) DriverException.throw(DriverException.HARDWARE_FAIL);
+            Thread.sleep();
+        }
+        return rawValue;
+    }
+}

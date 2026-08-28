@@ -38,10 +38,25 @@ public abstract class CIScope extends Scope implements ImportableScope {
 	
 	public CIScope(Scope parent) {
 		super(parent);
+		
+		MethodScope mScope = new MethodScope(null, this);
+		MethodSymbol mSymbol = new MethodSymbol("getClassId", VarType.SHORT, new ArrayList<>(), true, false, false, false, true, mScope, null, false);
+		mScope.setSymbol(mSymbol);
+		methods.add(mSymbol);
+		mScope = new MethodScope(null, this);
+		mSymbol = new MethodSymbol("getClassTypeId", VarType.SHORT, new ArrayList<>(), true, false, false, false, true, mScope, null, false);
+		mScope.setSymbol(mSymbol);
+		methods.add(mSymbol);
 	}
 
 	public void setImplTypes(List<VarType> implTypes) {
 		this.implTypes = implTypes;
+		if(this instanceof ClassScope) {
+			GlobalScope gScope = getGlobalScope();
+			if(null!=gScope) {
+				gScope.addInterfaceImplementation(this, implTypes);
+			}
+		}
 	}
 
 	@Override
@@ -148,6 +163,7 @@ public abstract class CIScope extends Scope implements ImportableScope {
 		methods.add(method);
 	}
 
+	// Проверяем только методы текущего CIScope, если метод описан в другом CIScope (например лежит в implTypes) то это задача уровня выше
 	public int getMethodSN(String methodName, String signature) {
 		// Ведем подсчет методов которые должны быть реализованы в классе (не учитываем static и native)
 		int methodQnt = 0;
@@ -184,9 +200,10 @@ public abstract class CIScope extends Scope implements ImportableScope {
 			CIScope cis = resolveCI(null, type.getName(), false);
 			if(null!=cis) {
 				for(MethodSymbol method : cis.getMethods(methodName)) {
-					if(method.isNative || method.isStatic) {
+					//if(method.isNative || method.isStatic) { - явно не корректно для MethodCallExpression (стр. 237).
+					//Должны вернуть любой метод, вероятно проверка нужна где-то выше
 						return method;
-					}
+					//}
 				}
 			}
 		}
@@ -308,16 +325,12 @@ public abstract class CIScope extends Scope implements ImportableScope {
 	public List<AstNode> fillDepends(String signature) {
 		List<AstNode> result = new ArrayList<>();
 		
-		Scope parentScope = parent;
-		while(!(parentScope instanceof ClassScope)) {
-			parentScope = parentScope.getParent();
-		}
-		ClassScope cScope = (ClassScope)parentScope;
-
-		while(null != cScope) {
-			for(CIScope cis : cScope.getCIS()) {
-				if(cis instanceof ClassScope && cis.isImplements(VarType.fromClassName(name))) {
-					for(MethodSymbol mSymbol : cis.getMethods()) {
+		Scope tmp = getGlobalScope();
+		if(null!=tmp) {
+			Set<ClassScope> cScopes = ((GlobalScope)tmp).getInterfaceImplementations(VarType.fromClassName(name));
+			if(null!=cScopes) {
+				for(ClassScope cScope : cScopes) {
+					for(MethodSymbol mSymbol : cScope.getMethods()) {
 						if(mSymbol.getSignature().equals(signature)) {
 							if(null != mSymbol.getNode()) {
 								result.add(mSymbol.getNode());
@@ -326,9 +339,6 @@ public abstract class CIScope extends Scope implements ImportableScope {
 					}
 				}
 			}
-
-			if(cScope.getParent() instanceof GlobalScope) break;
-			cScope = (ClassScope)cScope.getParent();
 		}
 		return result;
 	}

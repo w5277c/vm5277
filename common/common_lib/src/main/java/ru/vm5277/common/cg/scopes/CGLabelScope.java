@@ -25,7 +25,7 @@ public class CGLabelScope extends CGScope {
 		
 		this.resId = (null == resId ? genId() : resId);
 		this.name = (null == scope ?	((null!=name ? name : "") + (-1==this.resId ? "" : "_" + this.resId)) :
-										("j8b_" + scope.getLPath()) + "_" + (null!=name ? name  + "_" : "") + this.resId);
+										("j8b_" + (scope.getLName().isEmpty() ? "" : scope.getLPath()) + "_") + (null!=name ? name  + "_" : "") + this.resId);
 		this.isUsed = isUsed;
 	}
 

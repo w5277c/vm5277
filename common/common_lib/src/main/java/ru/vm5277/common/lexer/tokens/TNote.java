@@ -22,21 +22,29 @@ import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.lexer.SourceBuffer;
 
-// Нотная запись для полифонии, пример m/8e5-e5-e5-c5-e5-/4g5-g4, т.е. e5 = Ми, c5 = До, g5 = Соль (без диезов-заглавная буква)
-public class TNote extends Token {
-	StringBuilder	strValue	= new StringBuilder();
-	
-	// Структура байта:
-	// [7] = 0: нота | 1: длительность/пауза
-	//
-	// Для нот (бит 7=0):
-	//   [6:4] - октава (0-7, соответствует MIDI октавам 1-8)
-	//   [3:0] - нота (0-11: где регистр буквы определяет диез)
-	//
-	// Для длительности (бит 7=1):
-	//   [6]   - 1=пауза, 0=обычная длительность
-	//   [5:0] - значение длительности (0:/1, 1:/4, 2:/8, 3:/16)
+	// Нотная запись для полифонии, пример /8e5-e5-e5-c5-e5-/4g5-g4
+	// Формат ноты: [нота][#?][октава]
+	// Нота: c, d, e, f, g, a, b (всегда в нижнем регистре)
+	// # - диез (опционально)
+	// Октава: 0-7 (по умолчанию 4)
+	// Примеры: c4, c#4, e5, g5
 
+	public class TNote extends Token {
+		StringBuilder strValue = new StringBuilder();
+
+		// Структура байта:
+		// [7] = 0: нота | 1: длительность/пауза
+		//
+		// Для нот (бит 7=0):
+		//	[6:4] - октава (0-7, соответствует MIDI октавам 0-7)
+		//	[3:0] - нота (0-11, где 0=C, 1=C#, 2=D, ... 11=B)
+		//
+		// Для длительности (бит 7=1):
+		//	[6]   - 1=пауза, 0=обычная длительность
+		//	[5:0] - значение длительности (0:/1, 1:/4, 2:/8, 3:/16)
+
+	private	static	final	byte[]	NOTE_MAP	= {0, 2, 4, 5, 7, 9, 11};
+		
 	public TNote(SourceBuffer sb) throws CompileException {
 		super(sb);
 		
@@ -50,58 +58,89 @@ public class TNote extends Token {
 		while(sb.available() && ' '!=sb.peek()) {
 			char ch = sb.peek();
 			strValue.append(ch);
+			sb.next();
 			
 			// Пропуск разделителей
 			if('-'==ch) {
-				sb.next();
+				continue;
+			}
+
+			if('p'==ch || 'r'==ch) {
+				byteBuffer.add((byte) (0x80|0x40|currentDuration));
+				strValue.append('p');
 				continue;
 			}
 
 			// Обработка длительности (например, "/8")
 			if('/'==ch) {
-				sb.next();
 				ch = sb.peek();
+				sb.next();
 				if(!sb.available() || !Character.isDigit(ch)) {
 					skipToken(sb);
 					throw new CompileException("Invalid duration");
 				}
+				char ch2 = '0';
+				if(sb.available()) {
+					ch2 = sb.peek();
+					if(!Character.isDigit(ch2)) {
+						ch2 = '0';
+					}
+					else {
+						sb.next();
+					}
+				}
+				currentDuration = (byte)(Character.getNumericValue(ch2)*16 + Character.getNumericValue(ch));
 				strValue.append(ch);
-				currentDuration = (byte) (Character.getNumericValue(ch) & 0x3F);
-				sb.next();
-				byteBuffer.add((byte) (0x80 | currentDuration)); // Бит 7=1 (длительность)
+				if(currentDuration>=32) currentDuration = 31;
+				if(0==currentDuration) currentDuration = 1;
+				byteBuffer.add((byte)(0x80|currentDuration)); // Бит 7=1 (длительность)
 				continue;
 			}
 			
 			// Обработка ноты (регистр определяет альтерацию)
 			if(Character.isLetter(ch)) {
-				boolean isSharp = Character.isUpperCase(ch);
 				char noteLower = Character.toLowerCase(ch);
-				int noteValue = "cdefgab".indexOf(noteLower);
 
-				if(-1==noteValue) {
+				boolean isSharp = false;
+				if(sb.available() && '#'==sb.peek()) {
+					isSharp = true;
+					strValue.append('#');
+					sb.next();
+				}
+				
+				boolean octaveOvf = false;
+				if(isSharp) {
+					if('e'==noteLower) {
+						noteLower = 'f';
+						isSharp = false;
+					}
+					if('b'==noteLower) {
+						noteLower = 'c';
+						isSharp = false;
+						octaveOvf = true;
+					}
+				}
+				
+				int noteIndex = "cdefgab".indexOf(noteLower);
+				if(-1==noteIndex) {
 					skipToken(sb);
 					throw new CompileException("Invalid note: " + ch);
 				}
-				if(isSharp) {
-					if (noteLower == 'e') noteLower = 'f';
-					if (noteLower == 'b') noteLower = 'c';
-					isSharp = false;
-				}
+
 				// Код ноты: 0-11
-				int packedNote = noteValue * 2 + (isSharp ? 1 : 0);
-				if (packedNote > 11) packedNote = 11; // Для 'b' (си) нет диеза
+				int packedNote = NOTE_MAP[noteIndex] + (isSharp ? 1 : 0);
 
 				// Октава (по умолчанию 4)
 				int octave = 4;
-				ch = sb.peek(1);
-				if(sb.available(2) && Character.isDigit(ch)) {
+				ch = sb.peek();
+				if(sb.available(1) && Character.isDigit(ch)) {
 					octave = Character.getNumericValue(ch) - 1;
 					strValue.append(ch);
 					sb.next();
 				}
-
+				if(octaveOvf) octave++;
+				
 				byteBuffer.add((byte) ((octave << 4) | packedNote));
-				sb.next();
 				continue;
 			}
 			sb.next();

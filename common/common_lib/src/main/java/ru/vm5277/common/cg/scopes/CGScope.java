@@ -19,8 +19,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import ru.vm5277.common.cg.CGBranch;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
+import java.util.Set;
 import ru.vm5277.common.cg.RegPair;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGItem;
@@ -33,14 +34,15 @@ public class CGScope extends CGIContainer {
 	private				static	int						idCntr		= 0;
 	protected					String					name;
 	protected					CGScope					parent;
-	protected	final	static	Map<Integer, CGScope>	scopesMap	= new HashMap<>();
-
+	protected					CGScope					bottom		= null;
 	protected					CGBranch				branch		= null;
+	
+	protected					Set<CGVarScope>			liveVars	= new HashSet<>(); // Живые пермененны этого scope
 	
 	protected					int						resId;
 	private						int						sbPos		= 0;
 	public				static	int						verbose;
-			
+
 	public static synchronized int genId() {
 		return idCntr++;
 	}
@@ -50,7 +52,7 @@ public class CGScope extends CGIContainer {
 	}
 
 	public CGScope() {
-		name = "root";
+		name = "";
 	}
 	
 	public CGScope(CGScope parent, int resId, String name) {
@@ -60,7 +62,6 @@ public class CGScope extends CGIContainer {
 		
 		if(null != parent) {
 			parent.append(this);
-			scopesMap.put(resId, this);
 		}
 	}
 	
@@ -71,29 +72,40 @@ public class CGScope extends CGIContainer {
 		
 		if(null!=parentScope) {
 			if(null!=oldScope) {
-				parentScope.replace(this, oldScope);
+				parentScope.replace(oldScope, this);
 			}
 			else {
 				parentScope.append(this);
 			}
-			scopesMap.put(resId, this);
 		}
 	}
 
 	public CGScope getParent() {
 		return parent;
 	}
-	public void setParent(CGScope parent) {
-		this.parent = parent;
-		parent.append(this);
+	public void swap(CGScope cgScope1, CGScope cgScope2) throws CompileException {
+		int index1 = items.indexOf(cgScope1);
+		if(-1==index1) {
+			throw new CompileException("COMPILER BUG: CGScope " + cgScope1 + " not found in parent");
+		}
+		int index2 = items.indexOf(cgScope2);
+		if(-1==index2) {
+			throw new CompileException("COMPILER BUG: CGScope " + cgScope2 + " not found in parent");
+		}
+		items.set(index1, cgScope2);
+		items.set(index2, cgScope1);
 	}
 	
 	public int getResId() {
 		return resId;
 	}
 	
-	public CGScope getScope(int resId) {
-		return scopesMap.get(resId);
+	public CGScope getBottom() {
+		if(null==bottom) bottom = new CGScope();
+		return bottom;
+	}
+	public boolean bottomUsed() {
+		return null!=bottom && !bottom.items.isEmpty();
 	}
 	
 	public String getPath(Character delimeter) {
@@ -137,7 +149,7 @@ public class CGScope extends CGIContainer {
 	
 	public<T> CGScope getScope(Class<T> clazz) {
 		CGScope _scope = this;
-		while(null != _scope) {
+		while(null!=_scope) {
 			if(clazz.isInstance(_scope)) return _scope;
 			_scope = _scope.getParent();
 		}
@@ -145,14 +157,14 @@ public class CGScope extends CGIContainer {
 	}
 	
 	// Вероятно эта парная аллокация полезна только для AVR. Похоже нужно будет вынести в библиотеку кодогенератора
-	protected RegPair[] findRegsPair(HashMap<Byte, RegPair> regsPool) throws CompileException {
+	protected RegPair[] findRegsPair(Set<RegPair> usedRegsShot, HashMap<Byte, RegPair> regsPool) throws CompileException {
 		List<RegPair> tmp = new ArrayList<>(regsPool.values());
 		Collections.sort(tmp);
 
 		for(RegPair pair1 : tmp) {
-			if(pair1.isFree() && 0==(pair1.getReg()&0x01)) {
+			if(pair1.isFree() && 0==(pair1.getReg()&0x01) && (null==usedRegsShot || !usedRegsShot.contains(pair1))) {
 				for(RegPair pair2 : tmp) {
-					if(pair2.isFree() && pair1.getReg()+0x01==pair2.getReg()) {
+					if(pair2.isFree() && pair1.getReg()+0x01==pair2.getReg() && (null==usedRegsShot || !usedRegsShot.contains(pair2))) {
 						pair1.setFree(false);
 						pair2.setFree(false);
 						return new RegPair[]{pair1, pair2};
@@ -169,7 +181,7 @@ public class CGScope extends CGIContainer {
 	
 	@Override
 	public String toString() {
-		return getClass().getSimpleName() + ":" + name;
+		return getClass().getSimpleName() + (name.isEmpty() ? "" :  ":" + name);
 	}
 	
 	public void setBranch(CGBranch branch) {
@@ -177,6 +189,10 @@ public class CGScope extends CGIContainer {
 	}
 	public CGBranch getBranch() {
 		return branch;
+	}
+	
+	public Set<CGVarScope> getLiveVars() {
+		return liveVars;
 	}
 	
 	public void buildScopeTree(StringBuilder sb, String prefix, boolean parentDisabled) {
@@ -196,7 +212,9 @@ public class CGScope extends CGIContainer {
 		
 		StringBuilder sb = new StringBuilder();
 		sb.append(super.getSource());
-
+		if(null!=bottom && !bottom.items.isEmpty()) {
+			sb.append(bottom.getSource());
+		}
 		return sb.toString();
 	}
 }

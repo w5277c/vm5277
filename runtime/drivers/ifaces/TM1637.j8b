@@ -1,0 +1,129 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import rtos.RtosDispatcher;
+
+public class TM1637 implements RtosHalfDuplexIface {
+	private static final byte DELAY_US = 10;
+
+	private static final byte CMD_DATA_AUTO = 0x40; // Автоинкремент адреса
+	private static final byte CMD_ADDR_START = 0xC0; // Начальный адрес (левый разряд)
+	private static final byte CMD_DISPLAY_ON = 0x88; // Включение дисплея + маска яркости
+	private static final byte CMD_DISPLAY_OFF = 0x80; // Выключение дисплея
+
+	private byte dataPort;
+	private byte clkPort;
+
+	public TM1637(byte dataPort, byte clkPort) {
+		this.dataPort = dataPort;
+		this.clkPort = clkPort;
+
+		Gpio.setHigh(clkPort);
+		Gpio.setHigh(dataPort);
+		Gpio.modeOut(clkPort);
+		Gpio.modeOut(dataPort);
+	}
+
+	@Override public short comm(byte[] sendBuf, short sendLen, byte[] recvBuf, short recvLen, short timeout) {
+		if(null==sendBuf || 0==sendLen) return 0;
+
+		RtosDispatcher.lock();
+		//try {
+			start();
+			for(short i=0; i<sendLen; i++) {
+				writeByte(sendBuf[i]);
+			}
+			stop();
+
+/*			if(null!=recvBuf && 0!=recvLen) {
+				start();
+				for(short i=0; i<recvLen; i++) {
+					byte octet = 0;
+
+					modeIn();
+
+					for(byte bitPos=0; bitPos<8; bitPos++) {
+						Gpio.setLow(clkPort);
+						RtosCore.delayUs(DELAY_US/2);
+
+						Gpio.setHigh(clkPort);
+						octet >>= 1;
+						if(Gpio.get(dataPort)) {
+							octet |= 0x80;
+						}
+						RtosCore.delayUs(DELAY_US/2);
+					}
+
+					Gpio.setLow(clkPort);
+					RtosCore.delayUs(DELAY_US/2);
+					Gpio.setHigh(clkPort);
+					RtosCore.delayUs(DELAY_US/2);
+
+					Gpio.setLow(clkPort);
+					modeOut();
+					recvBuf[i] = octet;
+				}
+				stop();
+			}*/
+		//}
+		//finally {
+		RtosDispatcher.unlock();
+		//}
+		return null == recvBuf ? (short)0 : recvLen;
+	}
+
+	private void start() {
+		Gpio.setHigh(clkPort);
+		Gpio.setHigh(dataPort);
+		RtosCore.delayUs(DELAY_US/2);
+		Gpio.setLow(dataPort);
+	}
+
+	private void stop() {
+		Gpio.setLow(clkPort);
+		RtosCore.delayUs(DELAY_US/2);
+		Gpio.setLow(dataPort);
+		RtosCore.delayUs(DELAY_US/2);
+		Gpio.setHigh(clkPort);
+		RtosCore.delayUs(DELAY_US/2);
+		Gpio.setHigh(dataPort);
+	}
+
+	private void writeByte(byte octet) {
+		for(byte bitPos=0; bitPos<8; bitPos++) {
+			Gpio.setLow(clkPort);
+			Gpio.set(dataPort, (octet&0x01)!=0);
+			RtosCore.delayUs(DELAY_US/2);
+			Gpio.setHigh(clkPort);
+			RtosCore.delayUs(DELAY_US/2);
+			octet >>= 1;
+		}
+
+        Gpio.setLow(clkPort);
+		Gpio.modeIn(dataPort);
+        RtosCore.delayUs(DELAY_US);
+
+		//TODO после реализации finally:
+		//if(Gpio.get(dataPort)) {
+		//	DriverExpection.throw(DriverException.HARDWARE_FAIL);
+		//}
+
+		Gpio.setHigh(clkPort);
+        RtosCore.delayUs(DELAY_US/2);
+		Gpio.setLow(clkPort);
+		Gpio.modeOut(dataPort);
+	}
+}

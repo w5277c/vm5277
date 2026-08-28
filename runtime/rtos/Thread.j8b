@@ -18,10 +18,10 @@
 public interface Thread {
 	public native void start();
 	public native void stop();
-	public native bool isAlive();	// Если возвращаемый тип bool, то результат во флаге нуля (флаг Z для AVR)
-	public native bool isStopped();
+	public native boolean isAlive();	// Если возвращаемый тип boolean, то результат во флаге нуля (флаг Z для AVR)
+	public native boolean isStopped();
 
-	public void run();
+	@EntryPoint public void run();
 
 	public static native void sleep();
 	public static native void sleep(short milliseconds);

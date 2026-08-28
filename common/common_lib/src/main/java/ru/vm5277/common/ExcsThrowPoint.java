@@ -69,7 +69,7 @@ public class ExcsThrowPoint {
 		}
 	}
 	
-	public String toString(Path sourcePath) {
+	public String toString(PathPrefixTrimmer trimmer) {
 		if(null==sp || null==id || null==sp.getSourceFile()) return "";
 		
 		StringBuilder sb = new StringBuilder();
@@ -77,15 +77,7 @@ public class ExcsThrowPoint {
 		sb.append(" ");
 		
 		String filePathStr = sp.getSourceFile().getPath().toString();
-		String sourcePathStr = sourcePath.toString();
-		int pos = sourcePathStr.lastIndexOf(File.separator);
-		if(-1!=pos) {
-			sourcePathStr = sourcePathStr.substring(0, pos+1);
-			if(filePathStr.startsWith(sourcePathStr)) {
-				filePathStr = filePathStr.substring(sourcePathStr.length());
-			}
-		}
-		sb.append(filePathStr);
+		sb.append(trimmer.trim(filePathStr));
 		
 		sb.append(":");
 		sb.append(sp.getLine());

@@ -1,0 +1,134 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import rtos.RtosDispatcher;
+
+//TODO ввести две линии данных, сделать проверку если их порты совпадают,
+//получим полноценный универсальный SPI с поддержкой half duplex
+
+// SPISwHd - ведущий программный полудуплексный драйвер двухпроводной синхронной шины,
+// где data-двунаправленная линия данных, а clk-линия тактирования.
+public class SpiSwHd implements RtosHalfDuplexIface, RtosDriver {
+	private short clkOutReg;
+	private short dataOutReg;
+	private short dataInReg;
+	private short dataDirReg;
+	private byte dataPort;
+	private byte clkPort;
+	private	boolean fastMode;
+	private byte delay;
+	private	boolean cpol;
+	private boolean cpha;
+	private boolean lsbFirst;
+	private boolean busy;
+
+//	public SpiSwHd(byte dataPort, byte clkPort) { TODO
+//		this(dataPort, clkPort, false, 1, true, true);
+//	}
+
+	public SpiSwHd(byte dataPort, byte clkPort, boolean fastMode, byte delay, boolean cpol, boolean cpha, boolean lsbFirst) {
+		this.dataPort = dataPort;
+		this.clkPort = clkPort;
+		this.fastMode = fastMode;
+		this.delay = delay;
+		this.cpol = cpol;
+		this.cpha = cpha;
+		this.lsbFirst = lsbFirst;
+
+		Gpio.set(clkPort, cpol);
+		Gpio.modeOut(clkPort);
+
+		clkOutReg = RtosCore.getIORegOutput(clkPort);
+		dataOutReg = RtosCore.getIORegOutput(dataPort);
+		dataInReg = RtosCore.getIORegInput(dataPort);
+		dataDirReg = RtosCore.getIORegDirection(dataPort);
+	}
+
+	@Override
+	public short comm(byte[] sendBuf, short sendLen, byte[] recvBuf, short recvLen, short timeout) throws DriverException {
+		if(busy) DriverException.throw(DriverException.BUSY);
+		busy = true;
+
+		if(fastMode) RtosDispatcher.lock();
+
+		if(null!=sendBuf && 0!=sendLen) {
+			RtosCore.setIORegHigh(dataDirReg);
+			for(short bytePos=0; bytePos<sendLen; bytePos++) {
+				byte octet = sendBuf[bytePos];
+				for(byte bitPos=0; bitPos<8; bitPos++) {
+					if(!cpha) {
+						RtosCore.setIOReg(dataOutReg, 0!=(octet&(lsbFirst ? 0x01 : 0x80)));
+					}
+					RtosCore.setIOReg(clkOutReg, !cpol);
+					if(cpha) {
+						RtosCore.setIOReg(dataOutReg, 0!=(octet&(lsbFirst ? 0x01 : 0x80)));
+					}
+					if(0!=delay) {
+						if(fastMode) {RtosCore.delayUs(delay);}
+						else {Thread.sleep(delay);}
+					}
+					RtosCore.setIOReg(clkOutReg, cpol);
+
+					if(lsbFirst) {octet >>= 1;}
+					else {octet <<= 1;}
+					if(0!=delay) {
+						if(fastMode) {RtosCore.delayUs(delay);}
+						else {Thread.sleep(delay);}
+					}
+				}
+			}
+		}
+
+		if(null!=recvBuf && 0!=recvLen) {
+			RtosCore.setIORegLow(dataDirReg);
+			for(short bytePos=0; bytePos<recvLen; bytePos++) {
+				byte octet = 0;
+				for(byte bitPos=0; bitPos<8; bitPos++) {
+					if(lsbFirst) {octet >>= 1;}
+					else {octet <<= 1;}
+
+					if(!cpha) {
+						octet |= (RtosCore.getIOReg(dataInReg) ? (lsbFirst ? 0x80 : 0x01) : 0);
+					}
+					RtosCore.setIOReg(clkOutReg, !cpol);
+					if(0!=delay) {
+						if(fastMode) {RtosCore.delayUs(delay);}
+						else {Thread.sleep(delay);}
+					}
+					RtosCore.setIOReg(clkOutReg, cpol);
+
+					if(cpha) {
+						octet |= (RtosCore.getIOReg(dataInReg) ? (lsbFirst ? 0x80 : 0x01) : 0);
+					}
+
+					if(0!=delay) {
+						if(fastMode) {RtosCore.delayUs(delay);}
+						else {Thread.sleep(delay);}
+					}
+				}
+				recvBuf[bytePos] = octet;
+			}
+		}
+		else {
+			RtosCore.setIORegLow(dataDirReg);
+		}
+
+		if(fastMode) RtosDispatcher.unlock();
+
+		busy = false;
+		return null==recvBuf ? (short)0 : recvLen;
+	}
+}

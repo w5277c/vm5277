@@ -17,6 +17,7 @@ package ru.vm5277.compiler.nodes;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
@@ -31,8 +32,10 @@ import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 import ru.vm5277.common.lexer.Keyword;
+import ru.vm5277.common.lexer.tokens.TAnnotation;
 import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
+import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
 
 public class ClassBlockNode extends AstNode {
 	protected	List<AstNode>	children	= new ArrayList<>();
@@ -46,29 +49,30 @@ public class ClassBlockNode extends AstNode {
 		consumeToken(tb, Delimiter.LEFT_BRACE); // в случае ошибки, останавливаем парсинг файла
 
 		while (!tb.match(TokenType.EOF) && !tb.match(Delimiter.RIGHT_BRACE)) {		
+			Map<String, AnnotationParamNode> annotations = collectAnnotations(tb);
 			Set<Keyword> modifiers = collectModifiers(tb);
 
 			// Обработка классов с модификаторами
 			if (tb.match(TokenType.OOP, J8BKeyword.CLASS)) {
-				ClassNode cNode = new ClassNode(inst, tb, modifiers, true, classNode.getImported());
+				ClassNode cNode = new ClassNode(inst, tb, annotations, modifiers, true, classNode.getImported());
 				children.add(cNode);
 				continue;
 			}
 			// Обработка enum с модификаторами
 			if (tb.match(TokenType.OOP) && J8BKeyword.ENUM == tb.current().getValue()) {
-				EnumNode eNode = new EnumNode(inst, tb, modifiers);
+				EnumNode eNode = new EnumNode(inst, tb, annotations, modifiers, classNode);
 				children.add(eNode);
 				continue;
 			}
 			// Обработка интерфейсов с модификаторами
 			if (tb.match(TokenType.OOP, J8BKeyword.INTERFACE)) {
-				InterfaceNode iNode = new InterfaceNode(inst, tb, modifiers, null, classNode.getImported());
+				InterfaceNode iNode = new InterfaceNode(inst, tb, annotations, modifiers, null, true, classNode.getImported());
 				children.add(iNode);
 				continue;
 			}
 			// Обработка exception с модификаторами
 			if (tb.match(TokenType.OOP, J8BKeyword.EXCEPTION)) {
-				ExceptionNode eNode = new ExceptionNode(inst, tb, modifiers, null);
+				ExceptionNode eNode = new ExceptionNode(inst, tb, modifiers, new ArrayList<>());
 				children.add(eNode);
 				continue;
 			}
@@ -78,7 +82,9 @@ public class ClassBlockNode extends AstNode {
 			boolean isClassName = false;
 			if (null == type) {
 				isClassName = checkClassName(classNode.getName());
-				if(!isClassName) type = checkClassType();
+				if(!isClassName) {
+					type = checkClassType();
+				}
 			}
 			if(null != type) type = checkArrayType(type);
 			
@@ -94,16 +100,16 @@ public class ClassBlockNode extends AstNode {
 
 			if(tb.match(Delimiter.LEFT_PAREN)) { //'(' Это метод
 				if(isClassName) {
-					children.add(new MethodNode(inst, tb, modifiers, null, classNode.getName(), classNode));
+					children.add(new MethodNode(inst, tb, annotations, modifiers, null, classNode.getName(), classNode));
 				}
 				else {
-					children.add(new MethodNode(inst, tb, modifiers, type, name, classNode));
+					children.add(new MethodNode(inst, tb, annotations, modifiers, type, name, classNode));
 				}
 				continue;
 			}
 
-			if(null != type) {
-				children.add(new FieldNode(inst, tb, classNode, modifiers, type, name));
+			if(null!=type) {
+				children.add(new FieldNode(inst, tb, classNode, annotations, modifiers, type, name));
 				continue;
 			}
 
@@ -129,8 +135,40 @@ public class ClassBlockNode extends AstNode {
 	@Override
 	public boolean preAnalyze() {
 		boolean result = true;
+
+				
+		AnnotationParamNode sTimerAPN = classNode.getAnnotations().get(TAnnotation.REGISTER_SOFT_TIMER);
+		if(null!=sTimerAPN) {
+			for(Object sTimerIdFieldName : sTimerAPN.getValues()) {
+				boolean success = false;
+				for(AstNode node : children) {
+					if(node instanceof FieldNode) {
+						FieldNode fNode = (FieldNode)node;
+						if(fNode.getName().equals(sTimerIdFieldName)) {
+							if(null!=fNode.getInitializer()) {
+								markError(	"@" + sTimerAPN.getAnnotationName() + "." + (String)sTimerIdFieldName +
+											" cannot be used on a field with an initializer");
+							}
+							else if(VarType.BYTE!=fNode.getType()) {
+								markError("@" + sTimerAPN.getAnnotationName() + "." + (String)sTimerIdFieldName + " can only be applied to a byte field");
+							}
+							else {
+								fNode.setInitializer(new LiteralExpression(inst, null, inst.getAndIncSoftTimerCntr(), VarType.BYTE));
+								success = true;
+							}
+							break;
+						}
+					}
+				}
+				
+				if(!success) {
+					result=false;
+				}
+			}
+		}
+		
 		// Проверка всех объявлений в блоке
-		for (AstNode node : children) {
+		for(AstNode node : children) {
 			result&=node.preAnalyze();
 			
 			if(node instanceof FieldNode && ((FieldNode)node).isStatic() && classNode.isInner() && !classNode.isStatic()) {

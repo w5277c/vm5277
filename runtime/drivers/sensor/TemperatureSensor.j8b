@@ -15,5 +15,6 @@
  */
 
 public interface TemperatureSensor {
-	public fixed get();
+	public fixed getCelsius();
+	public void read();
 }

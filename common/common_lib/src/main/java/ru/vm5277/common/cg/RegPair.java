@@ -25,6 +25,11 @@ public class RegPair implements Comparable<RegPair> {
 		this.reg = reg;
 	}
 	
+	public RegPair(byte reg, boolean free) {
+		this.reg = reg;
+		this.free = free;
+	}
+
 	public byte getReg() {
 		return reg;
 	}
@@ -41,7 +46,21 @@ public class RegPair implements Comparable<RegPair> {
 	public String toString() {
 		return Byte.toString(reg) + (free ? "[FREE]" : "[USED]");
 	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		if(this==obj) return true;
+		if(null==obj || getClass()!=obj.getClass()) return false;
 
+		RegPair regPair = (RegPair) obj;
+		return this.getReg() == regPair.getReg();
+	}
+
+	@Override
+	public int hashCode() {
+		return java.util.Objects.hash(getReg());
+	}
+	
 	@Override
 	public int compareTo(RegPair pair) {
 		return Byte.compare(reg, pair.getReg());

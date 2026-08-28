@@ -17,19 +17,39 @@
 package ru.vm5277.compiler;
 
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
+import ru.vm5277.common.enums.OptimizationType;
+import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.compiler.nodes.ObjectTypeNode;
 
 public class Instance {
-	private	Path				toolkitPath;
-	private	Path				runtimePath;
-	private	MessageContainer	mc;
-	private	int					tabSize;
+	private			Path				toolkitPath;
+	private			Path				runtimePath;
+	private	final	List<String>		importedFiles	= new ArrayList<>();
+	private	final	List<Path>			includePaths	= new ArrayList<>();
+	private			MessageContainer	mc;
+	private			int					tabSize;
+	private			StrictLevel			strictLevel			= StrictLevel.LIGHT;
+	private			OptimizationType	optimizationType	= OptimizationType.SIZE;
+	private			int					softTimerCntr		= 0;	// Это поле должно быть в CodeGenerator'е, но его значением нужно заполнять FieldNode уже в preAnalyze
+	private			ObjectTypeNode		primaryObject;
 	
 	public Instance(Path toolkitPath, Path runtimePath, MessageContainer mc, int tabSize) {
 		this.toolkitPath = toolkitPath;
 		this.runtimePath = runtimePath;
 		this.mc = mc;
 		this.tabSize = tabSize;
+	}
+
+	public Instance(Path toolkitPath, Path runtimePath, MessageContainer mc, int tabSize, StrictLevel strictLevel, OptimizationType optimizationType) {
+		this.toolkitPath = toolkitPath;
+		this.runtimePath = runtimePath;
+		this.mc = mc;
+		this.tabSize = tabSize;
+		this.strictLevel = strictLevel;
+		this.optimizationType = optimizationType;
 	}
 	
 	public Instance(int tabSize) {
@@ -51,5 +71,38 @@ public class Instance {
 	
 	public int getTabSize() {
 		return tabSize;
+	}
+	
+	public StrictLevel getStrictLevel() {
+		return strictLevel;
+	}
+	
+	public OptimizationType getOptimizationType() {
+		return optimizationType;
+	}
+	public void setOptimizationType(OptimizationType optimizationType) {
+		this.optimizationType = optimizationType;
+	}
+	
+	public int getAndIncSoftTimerCntr() {
+		return softTimerCntr++;
+	}
+	public int getSoftTimerCntr() {
+		return softTimerCntr;
+	}
+	
+	public void setPrimaryObject(ObjectTypeNode primaryObject) {
+		this.primaryObject = primaryObject;
+	}
+	public ObjectTypeNode getPrimaryObject() {
+		return primaryObject;
+	}
+	
+	public List<String> getImportedFiles() {
+		return importedFiles;
+	}
+	
+	public List<Path> getIncludePaths() {
+		return includePaths;
 	}
 }

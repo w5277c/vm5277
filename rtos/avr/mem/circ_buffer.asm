@@ -15,10 +15,9 @@
  */
 
 .IFNDEF OS_CIRC_BUFFER_INIT_NR
-
+.include "mem/ram_clear16.asm"
 ;Байт со смещением 0x00-позиция для записи
 ;Байт со смещением 0x01-позиция для чтения
-
 ;-----------------------------------------------------------
 OS_CIRC_BUFFER_INIT_NR:
 ;-----------------------------------------------------------
@@ -27,16 +26,13 @@ OS_CIRC_BUFFER_INIT_NR:
 ;-----------------------------------------------------------
 	PUSH_Y
 	PUSH_T16
-	PUSH ACCUM_L
-	
+
 	ST Y+,C0x02												;Запись
 	ST Y+,C0x02												;Чтение
-	LDI ACCUM_L,0x00
 	LDI TEMP_H,0x00
 	SUBI TEMP_L,0x02
-	MCALL OS_RAM_FILL16_NR
+	MCALL OS_RAM_CLEAR16_NR
 
-	POP ACCUM_L
 	POP_T16
 	POP_Y
 	RET

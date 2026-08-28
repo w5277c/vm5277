@@ -18,7 +18,7 @@ package ru.vm5277.compiler.nodes.expressions.bin;
 
 import java.util.Arrays;
 import java.util.List;
-import ru.vm5277.common.enums.PlatformType;
+import java.util.Objects;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -31,7 +31,7 @@ import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.VarType;
-import ru.vm5277.common.messages.MessageContainer;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.CODEGEN;
 import ru.vm5277.compiler.Instance;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -54,7 +54,7 @@ public class ArithmeticExpression extends BinaryExpression {
 		cgScope = cg.enterExpression(parent, cgScope, toString());
 
 		// Анализ операндов
-		result&=leftExpr.postAnalyze(scope, cg, null);
+		result&=leftExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
 			// Резолвинг QualifiedPathExpression
 			ExpressionNode resolved = resolveQualifiedPathExpr(leftExpr);
@@ -63,7 +63,7 @@ public class ArithmeticExpression extends BinaryExpression {
 			}
 		}
 
-		result&=rightExpr.postAnalyze(scope, cg, null);
+		result&=rightExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
 			// Резолвинг QualifiedPathExpression
 			ExpressionNode resolved = resolveQualifiedPathExpr(rightExpr);
@@ -207,11 +207,15 @@ public class ArithmeticExpression extends BinaryExpression {
 	
 	//TODO Добавить явные случаи Array + VarField и VarField + Array
 	//TODO Проверить порядок операндов в Literal + VarField
-	//TODO главная проблема - порядок cgScope(в том числе и выражений) задается в postAnalyze. Мы не пожем просто поп порядку записывать в cgScope, нужно
+	//TODO главная проблема - порядок cgScope(в том числе и выражений) задается в postAnalyze. Мы не пожем просто по порядку записывать в cgScope, нужно
 	//учитывать порядок leftExpr.cgScope и rightExpr.cgScope (cм. //================ ArrayExpression ==== OTHER ================================
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean isInvert, boolean opOr, boolean toAccum, CGExcs excs) throws CompileException {
-		if(disabled) return null;
+		if(cgDone || disabled) return null;
+		cgDone = true;
+
+		debugAST(this, CODEGEN, true, getFullInfo());
+		
 		excs.setSourcePosition(sp);
 		
 		Object result = CodegenResult.RESULT_IN_ACCUM;
@@ -228,24 +232,29 @@ public class ArithmeticExpression extends BinaryExpression {
 		
 		// Оптимизация порядка для коммутативных операций
 		if(operator.isCommutative()) {
-			int leftTypeSize = (-1==leftExpr.getType().getSize() ? cg.getRefSize() : leftExpr.getType().getSize());
-			int rightTypeSize = (-1==rightExpr.getType().getSize() ? cg.getRefSize() : rightExpr.getType().getSize());
+			int leftTypeSize = (leftExpr.getType().isReferenceType() ? cg.getRefSize() : leftExpr.getType().getSize());
+			int rightTypeSize = (rightExpr.getType().isReferenceType() ? cg.getRefSize() : rightExpr.getType().getSize());
 
-			expr1 = (leftTypeSize>=rightTypeSize ? leftExpr : rightExpr);
-			expr2 = (leftTypeSize>=rightTypeSize ? rightExpr : leftExpr);
-
-			//AVR не умеет выполнять сложение с константой компактно
-			//TODO Тщательно проверить
-			if(	(leftExpr instanceof LiteralExpression && PlatformType.AVR!=cg.getDevice().getPlatform().getType()) ||
-				(!(rightExpr instanceof LiteralExpression) && leftExpr instanceof VarFieldExpression)) {
-
+/*			if(leftTypeSize<rightTypeSize) {
+				//AVR не умеет выполнять сложение с константой компактно
+				if(	(leftExpr instanceof LiteralExpression && PlatformType.AVR!=cg.getDevice().getPlatform().getType()) || - 
+					(!(rightExpr instanceof LiteralExpression) && leftExpr instanceof VarFieldExpression)) {
+				}
+				else {*/
+			// Для коммутативных операций VarFieldExpression лучше переносить в правую часть, так данные можно получить без использования аккумулятора,
+			// а значит снижается вероятность помещения одного из операндов в стек
+			// При этом нельзя допускать, чтобы размер левого операнда был меньше правого
+			//TODO добавить остальные типы выражений, данные которых можно также получить без аккумулятора
+			if(	(leftExpr instanceof VarFieldExpression && !(rightExpr instanceof VarFieldExpression) && leftTypeSize<=rightTypeSize) ||
+				(leftExpr instanceof LiteralExpression && leftTypeSize<=rightTypeSize) ||
+				(leftTypeSize<rightTypeSize)) {
+				
 				expr1 = rightExpr;
 				expr2 = leftExpr;
+				cgScope.swap(expr1.getCGScope(), expr2.getCGScope());
 			}
 		}
 
-		expr1.getCGScope().setParent(cgScope);
-		expr2.getCGScope().setParent(cgScope);
 /*		try { //Пытаемся оптимизировать, пока просто набросок
 			if(	null!=rightExpr.getSymbol() && null!=rightExpr.getSymbol().getCGScope() &&
 				rightExpr.getSymbol().getCGScope() instanceof CGCellsScope && null!=((CGCellsScope)rightExpr.getSymbol().getCGScope()).getCells() &&
@@ -385,7 +394,7 @@ public class ArithmeticExpression extends BinaryExpression {
 
 				// Определяем максмальный размер операнда
 				int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
-				cg.pushAccBE(leftExpr.getCGScope(), size);
+				cg.pushAccBE(leftExpr.getCGScope(), size, false);
 				if(CodegenResult.RESULT_IN_ACCUM != rightExpr.codeGen(cg, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + rightExpr);
 				}
@@ -397,17 +406,19 @@ public class ArithmeticExpression extends BinaryExpression {
 		}
 		//================ Other ================================
 		else {
-			if(CodegenResult.RESULT_IN_ACCUM!=leftExpr.codeGen(cg, true, excs)) {
-				throw new CompileException("Accum not used for operand:" + leftExpr);
+			//TODO проверить cgScope.swap(expr1.getCGScope(), expr2.getCGScope());
+
+			if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, true, excs)) {
+				throw new CompileException("Accum not used for operand:" + expr1);
 			}					
 
 			// Определяем максмальный размер операнда
 			int size = (leftType.getSize() > rightType.getSize() ? leftType.getSize() : rightType.getSize());
 			// Выполняем операцию, левый операнд - аккумулятор, правый операнд - значение на вершине стека
-			cg.pushAccBE(leftExpr.getCGScope(), size);
+			cg.pushAccBE(expr1.getCGScope(), size, false);
 			// Строим код для expr1(результат в аккумуляторе)
-			if(CodegenResult.RESULT_IN_ACCUM != rightExpr.codeGen(cg, true, excs)) {
-				throw new CompileException("Accum not used for operand:" + rightExpr);
+			if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, true, excs)) {
+				throw new CompileException("Accum not used for operand:" + expr2);
 			}
 
 			// Аккумулятор уже необходимого размера, но нужно проверить на Fixed
@@ -417,6 +428,7 @@ public class ArithmeticExpression extends BinaryExpression {
 			if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumUnlock();
 		}
 		
+		releaseVars(cg);
 		return result;
 	}
 
@@ -433,5 +445,14 @@ public class ArithmeticExpression extends BinaryExpression {
 	@Override
 	public String getFullInfo() {
 		return getClass().getSimpleName() + "  " + toString();
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		if(!(obj instanceof ArithmeticExpression)) return false;
+		ArithmeticExpression expr2 = (ArithmeticExpression)obj;
+		if(operator!=expr2.getOperator()) return false;
+		if(!Objects.equals(leftExpr, expr2.getLeft())) return false;
+		return Objects.equals(rightExpr, expr2.getRight());
 	}
 }

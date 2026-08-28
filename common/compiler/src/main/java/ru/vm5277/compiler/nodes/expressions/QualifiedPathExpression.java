@@ -18,6 +18,7 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.enums.Property;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
@@ -31,9 +32,7 @@ import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.enums.OptimizationType;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Instance;
-import ru.vm5277.compiler.Main;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.BlockNode;
@@ -71,6 +70,11 @@ public class QualifiedPathExpression extends ExpressionNode {
 		}
 
 		@Override
+		public boolean equals(Object seg2) {
+			return seg2 instanceof ThisSegment;
+		}
+
+		@Override
 		public String toString() {
 			return "this";
 		}
@@ -89,6 +93,12 @@ public class QualifiedPathExpression extends ExpressionNode {
 		}
 
 		@Override
+		public boolean equals(Object seg2) {
+			if(!(seg2 instanceof QualifiedSegment)) return false;
+			return name.equals(((QualifiedSegment)seg2).getName());
+		}
+		
+		@Override
 		public String toString() {
 			return name;
 		}
@@ -103,6 +113,13 @@ public class QualifiedPathExpression extends ExpressionNode {
 
 		public List<ExpressionNode> getArguments() {
 			return arguments;
+		}
+		
+		@Override
+		public boolean equals(Object seg2) {
+			if(!(seg2 instanceof MethodSegment)) return false;
+			MethodSegment ms = (MethodSegment)seg2;
+			return Objects.equals(arguments, ms.getArguments());
 		}
 		
 		@Override
@@ -122,6 +139,14 @@ public class QualifiedPathExpression extends ExpressionNode {
 			return indices;
 		}
 		
+		@Override
+		public boolean equals(Object seg2) {
+			if(!(seg2 instanceof ArraySegment)) return false;
+			ArraySegment as = (ArraySegment)seg2;
+			return Objects.equals(indices, as.getIndices());
+		}
+
+		
 		@Override  
 		public String toString() {
 			StringBuilder sb = new StringBuilder();
@@ -133,14 +158,16 @@ public class QualifiedPathExpression extends ExpressionNode {
 	}
 	
 	private	List<PathSegment>		segments			= new ArrayList<>();
+	private	boolean					isNewOperator		= false;
 //	private	List<ExpressionNode>	expressions			= new ArrayList<>();
 	private	ExpressionNode			resolvedExpr		= null;
 	private	boolean					reassigned			= false;
 	private	Integer					lastAccessedSn		= null;
 	private	boolean					postAnalyzed		= false;
 	
-	public QualifiedPathExpression(Instance inst, TokenBuffer tb) throws CompileException {
+	public QualifiedPathExpression(Instance inst, TokenBuffer tb, boolean isNewOperator) throws CompileException {
 		super(inst, tb);
+		this.isNewOperator = isNewOperator;
 	}
 	
 	public void addSegment(PathSegment segment) {
@@ -252,39 +279,36 @@ public class QualifiedPathExpression extends ExpressionNode {
 							catch(IllegalArgumentException ex) {
 							}
 
-							if(null!=resolvedExpr && (resolvedExpr instanceof EnumExpression || resolvedExpr.getType().isEnum())) {
+							if(	null!=resolvedExpr && null!=prop && ((resolvedExpr instanceof EnumExpression || resolvedExpr.getType().isEnum())) &&
+								isProperty(resolvedExpr, prop, (i<(segments.size()-1) && (segments.get(i+1) instanceof MethodSegment)))) {
+								
 								i++;
-								if(null!=prop) {
-									ExpressionNode expr = new PropertyExpression(inst, tb, sp, resolvedExpr, prop, ((MethodSegment)secondSegment).getArguments());
-									resolvedExpr = expr;
-									result&=expr.declare(scope);
-									if(result) {
-										result&=expr.postAnalyze(scope, cg, parent);
-										symbol = expr.getSymbol();
-									}
-								}
-								else {
-									markError("Unknown property: " + resolvedExpr.toString() + "." + propName);
+								ExpressionNode expr = new PropertyExpression(inst, tb, sp, resolvedExpr, prop, ((MethodSegment)secondSegment).getArguments());
+								resolvedExpr = expr;
+								result&=expr.declare(scope);
+								if(result) {
+									result&=expr.postAnalyze(scope, cg, parent);
+									symbol = expr.getSymbol();
 								}
 								continue;
 							}
-							else if(null!=pathExpr && pathExpr.getScope() instanceof EnumScope) {
-								if(null!=prop) {
-									ExpressionNode expr = new PropertyExpression(inst, tb, sp, pathExpr, prop, ((MethodSegment)secondSegment).getArguments());
-									resolvedExpr = expr;
-									result&=expr.declare(scope);
-									if(result) {
-										result&=expr.postAnalyze(scope, cg, parent);
-										symbol = expr.getSymbol();
-									}
-								}
-								else {
-									markError("Unknown property: " + resolvedExpr.toString() + "." + propName);
+							else if(null!=pathExpr && null!= prop && pathExpr.getScope() instanceof EnumScope &&
+									isProperty(pathExpr, prop, (i<(segments.size()-1) && (segments.get(i+1) instanceof MethodSegment)))) {
+								
+								ExpressionNode expr = new PropertyExpression(inst, tb, sp, pathExpr, prop, ((MethodSegment)secondSegment).getArguments());
+								resolvedExpr = expr;
+								result&=expr.declare(scope);
+								if(result) {
+									result&=expr.postAnalyze(scope, cg, parent);
+									symbol = expr.getSymbol();
 								}
 								i++;
 								continue;
 							}
-							else if(null!=prop && (Property.instanceId==prop || Property.typeId==prop || Property.code==prop)) {
+							else if(null!=prop && (Property.instanceId==prop || Property.typeId==prop || Property.code==prop)
+									&& isProperty(	null==resolvedExpr ? pathExpr : resolvedExpr, prop,
+													(i<(segments.size()-1) && (segments.get(i+1) instanceof MethodSegment)))) {
+									
 									ExpressionNode expr = new PropertyExpression(	inst, tb, sp, null==resolvedExpr ? pathExpr : resolvedExpr,
 																					prop, ((MethodSegment)secondSegment).getArguments());
 									resolvedExpr = expr;
@@ -297,15 +321,20 @@ public class QualifiedPathExpression extends ExpressionNode {
 									continue;
 							}
 							else {
-								ExpressionNode expr = new MethodCallExpression(	inst, tb, sp,
-																				null==resolvedExpr ? pathExpr : resolvedExpr,
-																				((QualifiedSegment)segment).getName(),
-																				((MethodSegment)secondSegment).getArguments());
+								ExpressionNode expr = null;
+								if(isNewOperator) {
+									expr = new NewExpression(	inst, tb, sp, ((QualifiedSegment)segment).getName(),
+																((MethodSegment)secondSegment).getArguments());
+								}
+								else {
+									expr = new MethodCallExpression(inst, tb, sp, null==resolvedExpr ? pathExpr : resolvedExpr,
+																	((QualifiedSegment)segment).getName(), ((MethodSegment)secondSegment).getArguments());
+								}
 								result&=expr.declare(scope);
 								if(result) {
 									result&=expr.postAnalyze(scope, cg, parent);
 									List<ExpressionNode> optimized = null;
-									if(result && OptimizationType.NONE!=Main.getOptimizationType()) {
+									if(result && expr instanceof MethodCallExpression && OptimizationType.NONE!=inst.getOptimizationType()) {
 										optimized = optimizeMethodCall((MethodCallExpression)expr);
 									}
 									if(null!=optimized) {
@@ -341,6 +370,49 @@ public class QualifiedPathExpression extends ExpressionNode {
 								}
 							}
 						}
+						else if(segment instanceof ThisSegment && secondSegment instanceof MethodSegment) {
+							ExpressionNode expr = new MethodCallExpression(	inst, tb, sp, null,
+																			scope.getThis().getName(),
+																			((MethodSegment)secondSegment).getArguments());
+							result&=expr.declare(scope);
+							if(result) {
+								result&=expr.postAnalyze(scope, cg, parent);
+								List<ExpressionNode> optimized = null;
+								if(result && OptimizationType.NONE!=inst.getOptimizationType()) {
+									optimized = optimizeMethodCall((MethodCallExpression)expr);
+								}
+								if(null!=optimized) {
+									symbol = null; //TODO ????
+									if(0x01==optimized.size()) {
+										ExpressionNode exprNode = optimized.get(0);
+										result&=exprNode.declare(scope);
+										if(result) {
+											result&=exprNode.postAnalyze(scope, cg, parent);
+											resolvedExpr = exprNode;
+											if(exprNode instanceof VarFieldExpression) {
+												symbol = exprNode.getSymbol();
+											}
+										}
+									}
+									else {
+										resolvedExpr = new ExpressionsContainer(inst, tb);
+										for(ExpressionNode exprNode : optimized) {
+											result&=exprNode.declare(scope);
+											if(result) {
+												result&=exprNode.postAnalyze(scope, cg, parent);
+												((ExpressionsContainer)resolvedExpr).add(exprNode);
+											}
+										}
+									}
+								}
+								else {
+									resolvedExpr = expr;
+									symbol = expr.getSymbol();
+								}
+								i++;
+								continue;
+							}
+						}
 					}
 
 					
@@ -361,7 +433,9 @@ public class QualifiedPathExpression extends ExpressionNode {
 						catch(IllegalArgumentException ex) {
 						}
 
-						if(null!=resolvedExpr && null!=prop) {
+						if(	null!=resolvedExpr && null!=prop &&
+							isProperty(resolvedExpr, prop, (i<(segments.size()-1) && (segments.get(i+1) instanceof MethodSegment)))) {
+							
 							ExpressionNode expr = new PropertyExpression(inst, tb, sp, resolvedExpr, prop, new ArrayList<>());
 							resolvedExpr = expr;
 							result&=expr.declare(scope);
@@ -401,7 +475,6 @@ public class QualifiedPathExpression extends ExpressionNode {
 								if(null!=symbol) {
 									ExpressionNode expr = new VarFieldExpression(inst, tb, sp, getSN(), null==resolvedExpr ?pathExpr :
 																															resolvedExpr, qSeg.getName());
-									resolvedExpr = expr;
 									result&=expr.declare(scope);
 									if(result) {
 										result&=expr.postAnalyze(scope, cg, parent);
@@ -410,6 +483,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 										}
 										expr.getSymbol().setAccessed(getSN());
 									}
+									resolvedExpr = expr;
 									continue;
 								}
 								else {
@@ -424,9 +498,6 @@ public class QualifiedPathExpression extends ExpressionNode {
 										resolvedExpr = pathExpr;
 										continue;
 									}
-									else {
-										int t=45454;
-									}
 								}
 							}
 						}
@@ -435,14 +506,33 @@ public class QualifiedPathExpression extends ExpressionNode {
 						result = false;
 					}
 					else if(segment instanceof ArraySegment) {
-						resolvedExpr = new ArrayExpression(inst, tb, sp, resolvedExpr, ((ArraySegment)segment).getIndices());
+						if(isNewOperator) {
+							type = resolvedExpr.getType();
+							List<ExpressionNode> arrDimensions = ((ArraySegment)segment).getIndices();
+							if(null!=arrDimensions) {
+								for(int f=0; f<arrDimensions.size(); f++) {
+									type = VarType.arrayOf(type);
+								}
+
+								ArrayInitExpression aie = null;
+								resolvedExpr = new NewArrayExpression(inst, tb, tb.getSP(), type, arrDimensions, aie);
+							}
+							else {
+								throw new CompileException("Invalid 'new' expression - expected array dimensions after primitive type");
+							}
+						}
+						else {
+							resolvedExpr = new ArrayExpression(inst, tb, sp, resolvedExpr, ((ArraySegment)segment).getIndices());
+						}
 						result&=resolvedExpr.declare(scope);
 						if(result) {
 							result&=resolvedExpr.postAnalyze(scope, cg, parent);
 							if(reassigned) {
 								resolvedExpr.getSymbol().setReassigned();
 							}
-							resolvedExpr.getSymbol().setAccessed(getSN());
+							if(null!=resolvedExpr.getSymbol()) {
+								resolvedExpr.getSymbol().setAccessed(getSN());
+							}
 						}
 					}
 					else {
@@ -541,7 +631,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 		//Проверка на getter
 		//INFO Очень редко не оптимально по размеру(8 bit, int или выход за пределы константного смещения lds инструкций(avr)
 		// Оставлю как есть, теряем 1 байт?, но есть выигрыш по времени
-		if(VarType.VOID!=mSymbol.getType() && mSymbol.getParameters().isEmpty() && 0x01==mSymbol.getNode().getChildren().size()) {
+		if(null!=mSymbol.getNode() && VarType.VOID!=mSymbol.getType() && mSymbol.getParameters().isEmpty() && 0x01==mSymbol.getNode().getChildren().size()) {
 			AstNode node = mSymbol.getNode().getChildren().get(0);
 			if(node instanceof BlockNode && 0x01==node.getChildren().size()) {
 				node = ((BlockNode)node).getChildren().get(0);
@@ -575,6 +665,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 			resolvedExpr.codeGen(cg, true, excs);
 		}
 		
+		releaseVars(cg);
 		return CodegenResult.RESULT_IN_ACCUM;
 	}
 	
@@ -600,6 +691,25 @@ public class QualifiedPathExpression extends ExpressionNode {
 		return null;
 	}
 	
+	private boolean isProperty(ExpressionNode resolvedExpr, Property prop, boolean asMethod) {
+//		return true;
+		// Дополнительная проверка свойств, пример: this.length - мы должны убедиться что resolvedExpr имеет тип массива
+		if(Property.length==prop && !asMethod && resolvedExpr.getType().isArray()) {
+			return true;
+		}
+		else if(asMethod && (Property.index==prop || Property.item==prop || Property.size==prop)) {
+			return true;
+		}
+		else if(asMethod && Property.instanceId==prop) {
+			return true;
+		}
+		else if(asMethod && (Property.typeId==prop || Property.code==prop)) {
+			return true;
+		}
+		return false;
+	}
+
+	
 	@Override
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
@@ -614,9 +724,30 @@ public class QualifiedPathExpression extends ExpressionNode {
 		}
 		sb.deleteCharAt(sb.length()-1);
 		return sb.toString();
-	}	
+	}
 
+	public boolean isNewOperator() {
+		return isNewOperator;
+	}
+	
+	@Override
 	public String getFullInfo() {
 		return getClass().getSimpleName() + " " + toString();
+	}
+	
+	public List<PathSegment> getSegments() {
+		return segments;
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		if(!(obj instanceof QualifiedPathExpression)) return false;
+		QualifiedPathExpression expr2 = (QualifiedPathExpression)obj;
+		if(isNewOperator!=expr2.isNewOperator()) return false;
+		if(segments.size()!=expr2.getSegments().size()) return false;
+		for(int i=0; i<segments.size(); i++) {
+			if(!segments.get(i).equals(expr2.getSegments().get(i))) return false;
+		}
+		return true;
 	}
 }

@@ -17,6 +17,7 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.VarType;
@@ -89,7 +90,8 @@ public class TernaryExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterExpression(parent, cgScope, toString());
+		cgScope = cg.enterCondBlock(parent, "if");		
+		//cgScope = cg.enterExpression(parent, cgScope, toString());
 		
 		// Проверяем условие и ветки
 		result&=condition.postAnalyze(scope, cg, cgScope);
@@ -126,7 +128,7 @@ public class TernaryExpression extends ExpressionNode {
 
 		// Проверяем тип условия
 		VarType condType = condition.getType();
-		if(VarType.BOOL!=condType) {
+		if(VarType.BOOLEAN!=condType) {
 			markError("Condition must be boolean, got: " + condType);
 			result = false;
 		}
@@ -140,7 +142,7 @@ public class TernaryExpression extends ExpressionNode {
 		if(result) {
 			if(condition instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)condition;
-				if(VarType.BOOL==le.getType()) {
+				if(VarType.BOOLEAN==le.getType()) {
 					if((boolean)le.getValue()) {
 						alwaysTrue = true;
 					}
@@ -160,7 +162,7 @@ public class TernaryExpression extends ExpressionNode {
 		condition.codeOptimization(scope, cg);
 		try {
 			ExpressionNode optimizedExpr = condition.optimizeWithScope(scope, cg);
-			if(null != optimizedExpr) {
+			if(null!=optimizedExpr) {
 				condition = optimizedExpr;
 			}
 		}
@@ -171,7 +173,7 @@ public class TernaryExpression extends ExpressionNode {
 		trueExpr.codeOptimization(scope, cg);
 		try {
 			ExpressionNode optimizedExpr = trueExpr.optimizeWithScope(scope, cg);
-			if(null != optimizedExpr) {
+			if(null!=optimizedExpr) {
 				trueExpr = optimizedExpr;
 			}
 		}
@@ -182,7 +184,7 @@ public class TernaryExpression extends ExpressionNode {
 		falseExpr.codeOptimization(scope, cg);
 		try {
 			ExpressionNode optimizedExpr = falseExpr.optimizeWithScope(scope, cg);
-			if(null != optimizedExpr) {
+			if(null!=optimizedExpr) {
 				falseExpr = optimizedExpr;
 			}
 		}
@@ -193,10 +195,9 @@ public class TernaryExpression extends ExpressionNode {
 
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
-		if(cgDone) return null;
+		if(cgDone || disabled) return null;
 		cgDone = true;
 
-		//CGScope cgs = (null==parent ? cgScope : parent);
 		cgScope.setBranch(branch);
 		
 		if(alwaysTrue) {
@@ -214,23 +215,24 @@ public class TernaryExpression extends ExpressionNode {
 			return falseExpr.codeGen(cg, toAccum, excs);
 		}
 		else if(obj==CodegenResult.RESULT_IN_ACCUM) {
-			cg.boolAccCond(cgScope, branch, true);
+			cg.boolAccCond(condition.getCGScope(), branch, true);
 		}
 		else if(obj==CodegenResult.RESULT_IN_FLAG) {
-			cg.boolFlagCond(cgScope, false, branch);
+			cg.boolFlagCond(condition.getCGScope(), false, branch);
 		}
 		else if(obj==CodegenResult.RESULT_IN_INV_FLAG) {
-			cg.boolFlagCond(cgScope, true, branch);
+			cg.boolFlagCond(condition.getCGScope(), true, branch);
 		}
 
 		CGLabelScope endScope = new CGLabelScope(null, CGScope.genId(), LabelNames.TERNARY_END, true);
 		
 		trueExpr.codeGen(cg, toAccum, excs);
-		cg.jump(cgScope, endScope);
-		cgScope.append(branch.getEnd());
+		cg.jump(trueExpr.getCGScope(), endScope);
+		trueExpr.getCGScope().append(branch.getEnd());
 		falseExpr.codeGen(cg, toAccum, excs);
 		cgScope.append(endScope);
 
+		releaseVars(cg);
 		return (toAccum ? CodegenResult.RESULT_IN_ACCUM : null);
 	}
 	
@@ -257,7 +259,17 @@ public class TernaryExpression extends ExpressionNode {
 		return condition + " ? " + trueExpr + " : " + falseExpr;
 	}
 	
+	@Override
 	public String getFullInfo() {
 		return getClass().getSimpleName() + " " + condition + " ? " + trueExpr + " : " + falseExpr;
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		if(!(obj instanceof TernaryExpression)) return false;
+		TernaryExpression expr2 = (TernaryExpression)obj;
+		if(!Objects.equals(condition, expr2.getCondition())) return false;
+		if(!Objects.equals(trueExpr, expr2.getTrueExpr())) return false;
+		return Objects.equals(falseExpr, expr2.getFalseExpr());
 	}
 }

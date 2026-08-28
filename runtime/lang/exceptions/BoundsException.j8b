@@ -1,0 +1,2 @@
+public exception BoundsException extends RuntimeException {
+}

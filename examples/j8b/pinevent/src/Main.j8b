@@ -1,0 +1,62 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+/* Пример работы с менеджером обработчиков событий смены состояния пина МК */
+
+import boards.ArduinoUno;
+import hal.PinEventManager;
+
+class Main implements RtosCallback {
+    private static byte regId;
+
+	public Main() {}
+
+    public static void main() {
+		System.setParam(RtosParam.SHOW_WELCOME, 1);
+		// Можно отключить код проверки существования пина
+		// System.setParam(RtosParam.GPIO_PIN_NOCHECK, 1);
+
+		Main inst = new Main();
+		try {
+			Gpio.modeIn(ArduinoUno.PIN_D2);
+			Gpio.setHigh(ArduinoUno.PIN_D2);
+
+			// Регистрируем обработчик (менеджер сам определит оптимальный механизм детектирования)
+			regId = PinEventManager.register(ArduinoUno.PIN_D2, inst, PinEventManager.TRIGGER_MODE_ANY);
+
+			// Спим минуту
+			Thread.sleep(60000);
+
+			// Отключаем обработчик
+			PinEventManager.unregister(regId);
+			System.out("done\n");
+		}
+		catch(DriverException ex) {
+			System.out("Исключение, стектрейс:");
+			System.out(ex);
+		}
+    }
+
+
+    @Override private void callback(byte resId) {
+    	System.out("Событие от GPIO, id:0x");
+    	System.outHex(resId);
+    	System.out("\n");
+    	if(resId==regId) {
+    		System.out("Пин сменил состояние\n");
+    	}
+    }
+}

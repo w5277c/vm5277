@@ -16,7 +16,7 @@
 
 class Main {
 	public static void main() {
-		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
+		System.setParam(RtosParam.SHOW_WELCOME, 0x01);
 
 		System.out("Hello world!\nПривет мир!\n");
 	}

@@ -15,18 +15,16 @@
  */
 
 class Main {
-    static final short DELAY = 100;
-
 	public static void main() {
-		GPIO.setPortMode(GPIO.PORTB, 0b00000111);
+		Gpio.setPortMode(Gpio.PORTB, 0b00000111);
 
 		while(true) {
 			switch(System.random() & 0x03) {
-				case 0x00: GPIO.invert(GPIO.PB0);
-				case 0x01: GPIO.invert(GPIO.PB1);
-				default: GPIO.invert(GPIO.PB2);
+				case 0x00: Gpio.invert(Gpio.PB0);
+				case 0x01: Gpio.invert(Gpio.PB1);
+				default: Gpio.invert(Gpio.PB2);
 			}
-			Thread.sleep(System.random());
+			Thread.sleep(System.random()/4);
 		}
 	}
 }

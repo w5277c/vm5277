@@ -13,27 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+.IFNDEF PIN_SET_LO
 .include "io/_port_offset.asm"
 .include "io/reg_bit_lo.asm"
-.IFNDEF PORT_SET_LO
-;--------------------------------------------------------
+;-----------------------------------------------------------
 PIN_SET_LO:
-;--------------------------------------------------------
+;-----------------------------------------------------------
 ;Устанвливаем пину низкий уровень
 ;IN: ACCUM_L-пин
-;--------------------------------------------------------
+;-----------------------------------------------------------
 	CPI ACCUM_L,0xff
-	BRNE PC+0x02
-	RET
-
-	PUSH_Z
-	PUSH ACCUM_L
-
+	BREQ _PIN_SET_LO__END
+	PUSH_A16
 	MCALL _PORT_OFFSET
-	ADIW ZL,0x02
-	MCALL REG_BIT_LO
-
-	POP ACCUM_L
-	POP_Z
+	ADD ACCUM_L,C0x02
+	MCALL REG_BIT_LO_NR
+	POP_A16
+_PIN_SET_LO__END:
 	RET
 .ENDIF

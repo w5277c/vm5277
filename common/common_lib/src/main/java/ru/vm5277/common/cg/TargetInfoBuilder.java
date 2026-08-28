@@ -25,14 +25,21 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import ru.vm5277.common.ExcsThrowPoint;
+import ru.vm5277.common.PathPrefixTrimmer;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.enums.RtosFeature;
 
 public class TargetInfoBuilder {
-
+	private Set<RtosFeature>			rtosFeatures;
 	private	Map<Integer, List<String>>	exceptionCodes		= new HashMap<>();
 	private	List<ExcsThrowPoint>		excsThrowPoints		= new ArrayList<>();
+
+	public TargetInfoBuilder(Set<RtosFeature> rtosFeatures) {
+		this.rtosFeatures = rtosFeatures;
+	}
 	
 	public ExcsThrowPoint addExcsThrowPoint(CodeGenerator cg, SourcePosition sp, String signature) {
 		int id = excsThrowPoints.size()+1;
@@ -55,11 +62,11 @@ public class TargetInfoBuilder {
 		return excsThrowPoints.size();
 	}
 	
-	public void write(Path sourcePath, FileWriter fw) throws IOException {
+	public void write(PathPrefixTrimmer trimmer, FileWriter fw) throws IOException {
 		fw.write("[BUILTIN_TYPES]\n");
 		fw.write("0 Object\n");
 		fw.write(VarType.VOID.getId() + " " + VarType.VOID.getName() + "\n");
-		fw.write(VarType.BOOL.getId() + " " + VarType.BOOL.getName() + "\n");
+		fw.write(VarType.BOOLEAN.getId() + " " + VarType.BOOLEAN.getName() + "\n");
 		fw.write(VarType.BYTE.getId() + " " + VarType.BYTE.getName() + "\n");
 		fw.write(VarType.CHAR.getId() + " " + VarType.CHAR.getName() + "\n");
 		fw.write(VarType.SHORT.getId() + " " + VarType.SHORT.getName() + "\n");
@@ -121,11 +128,23 @@ public class TargetInfoBuilder {
 		for(int i=0; i<excsThrowPoints.size(); i++) {
 			ExcsThrowPoint point = excsThrowPoints.get(i);
 			if(null!=point.getSp()) {
-				fw.write(point.toString(sourcePath));
+				fw.write(point.toString(trimmer));
 				fw.write("\n");
 			}
 		}
 		fw.write("\n");
+
+		fw.write("[RTOS_FEATURES]\n");
+		List<RtosFeature> sorted = new ArrayList<>(rtosFeatures);
+		Collections.sort(sorted);
+		for(RtosFeature feature : sorted) {
+			fw.write(Integer.toString(feature.ordinal()));
+			fw.write(" ");
+			fw.write(feature.toString());
+			fw.write("\n");
+		}
+		fw.write("\n");
+
 		fw.flush();
 		fw.close();
 	}

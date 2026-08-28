@@ -1,0 +1,37 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import drivers.display.HD44780;
+import drivers.ifaces.I2cMasterHw;
+
+class Main {
+	public static void main() {
+		System.setParam(RtosParam.SHOW_WELCOME, 1);
+
+		try {
+			TextDisplay td = new HD44780(new Pcf8574Layer(new I2cMasterHw(0x27, I2cMaster.I2cFreq.F400kHz)), 16, 02); //TODO должна быть ошибка так как Pcf8574 - вложенный класс
+			//TextDisplay td = new HD44780(new HD44780.Pcf8574Layer(new I2cMasterHw(0x27, I2cMaster.I2cFreq.F400kHz)), 16, 02); //TODO правильный синтаксис
+			while(true) {
+				td.setCursor(System.random()&0x0f,System.random()&0x01);
+				td.putChar(0x20+(System.random()&0x7f));
+				Thread.sleep(10);
+			}
+		}
+		catch(DriverException ex) {
+			System.out("Сбой HD44780, код:" + ex.code());
+		}
+	}
+}

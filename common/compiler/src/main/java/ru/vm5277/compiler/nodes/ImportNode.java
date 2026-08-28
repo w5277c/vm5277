@@ -24,7 +24,6 @@ import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.semantic.ImportableScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.lexer.tokens.Token;

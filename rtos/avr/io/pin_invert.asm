@@ -13,28 +13,23 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-.IFNDEF PORT_INVERT
+.IFNDEF PIN_INVERT
 .include "io/_port_offset.asm"
 .include "io/reg_bit_inv.asm"
-;--------------------------------------------------------
+;-----------------------------------------------------------
 PIN_INVERT:
-;--------------------------------------------------------
+;-----------------------------------------------------------
 ;Инвертирование состояния пина
 ;IN: ACCUM_L адрес регистра PORTx
 ;OUT: flag C-состояние бита(true = HI)
-;--------------------------------------------------------;
+;-----------------------------------------------------------
 	CPI ACCUM_L,0xff
-	BRNE PC+0x02
-	RET
-
-	PUSH_Z
-	PUSH ACCUM_L
-
+	BREQ _PIN_INVERT__END
+	PUSH_A16
 	MCALL _PORT_OFFSET
-	ADIW ZL,0x02
-	MCALL REG_BIT_INV
-
-	POP ACCUM_L
-	POP_Z
+	ADD ACCUM_L,C0x02
+	MCALL REG_BIT_INV_NR
+	POP_A16
+_PIN_INVERT__END:
 	RET
 .ENDIF

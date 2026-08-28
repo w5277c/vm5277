@@ -15,8 +15,7 @@
  */
 
 .IFNDEF J8BPROC_STDIN_READW
-
-	.INCLUDE "./core/wait.asm"
+.include "./core/wait.asm"
 ;-----------------------------------------------------------
 J8BPROC_STDIN_READW:
 ;-----------------------------------------------------------
@@ -27,11 +26,10 @@ J8BPROC_STDIN_READW:
 	PUSH_T16
 	PUSH FLAGS
 	
-	LDI FLAGS,0x00
-	OR FLAGS,ACCUM_L
+	MOV FLAGS,ACCUM_L
 	OR FLAGS,ACCUM_H
 
-	MOVW TEMP_L,ACCUM_L
+	MOVW TEMP_L,ACCUM_L										;Деление на 4, wait ждет 4 мс
 	LSR TEMP_H
 	ROR TEMP_L
 	LSR TEMP_H

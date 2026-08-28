@@ -16,9 +16,11 @@
 
 class Main {
 	public static void main() {
-		for(byte i=0; i!=255; i++) {
+		byte b=0;
+		do {
     		System.out(System.random());
 			System.out('\n');
-		}
+			b--;
+		} while(0!=b); // 256 итераций с счетчиком в 8 бит
 	}
 }

@@ -23,6 +23,7 @@ public enum TokenType {
 	COMMAND,	//Команды
 	MODIFIER,	//Модификаторы
 	OOP,		//Ключевые слова ООП
+	ANNOTATION,	//Аннотации
 	KEYWORD,	//Остальные ключевые слова
 	IDENTIFIER,
 	LABEL,

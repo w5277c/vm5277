@@ -1,0 +1,100 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+public class CH9329 {
+	private static final byte FRAME_OFFSET__HEADER		= 0x00;	//2B
+	private static final byte FRAME_OFFSET__ADDR		= 0x02;	//1B
+	private static final byte FRAME_OFFSET__CMD			= 0x03;	//1B
+	private static final byte FRAME_OFFSET__LEN			= 0x04;	//1B
+	private static final byte FRAME_OFFSET__DATA		= 0x05;	//0-64B
+//	private static final byte FRAME_OFFSET__SUM			= 0xXX;	//1B
+
+	public static final byte CMD_GET_INFO				= 0x01;
+	public static final byte CMD_SEND_KB_GENERAL_DATA	= 0x02;
+	public static final byte CMD_SEND_KB_MEDIA_DATA		= 0x03;
+	public static final byte CMD_SEND_MS_ABS_DATA		= 0x04;
+	public static final byte CMD_SEND_MS_REAL_DATA		= 0x05;
+	public static final byte CMD_SEND_MY_HID_DATA		= 0x06;
+	public static final byte CMD_READ_MY_HID_DATA		= 0x87;
+	public static final byte CMD_GET_PARAM_CFG			= 0x08;
+	public static final byte CMD_SET_PARAM_CFG			= 0x09;
+	public static final byte CMD_GET_USB_STRING			= 0x0a;
+	public static final byte CMD_SET_USB_STRING			= 0x0b;
+	public static final byte CMD_SET_DEFAULT_CFG		= 0x0c;
+	public static final byte CMD_RESET					= 0x0f;
+
+	public static final byte MOUSE_KEYBIT_LEFT			= 0x00;
+	public static final byte MOUSE_KEYBIT_RIGHT			= 0x01;
+	public static final byte MOUSE_KEYBIT_MIDDLE		= 0x02;
+
+ 	private UartHwFd iface;
+	private final byte[] buffer = new byte[16];
+
+ 	public CH9329(UartHwFd iface) {
+		this.iface = iface;
+
+		buffer[FRAME_OFFSET__HEADER+0] = 0x57;
+		buffer[FRAME_OFFSET__HEADER+1] = 0xAB;
+
+		iface.open();
+ 	}
+
+	public void mouseClick(byte buttons) {
+		buffer[FRAME_OFFSET__CMD] = CMD_SEND_MS_REAL_DATA;
+		buffer[FRAME_OFFSET__LEN] = 5;
+		buffer[FRAME_OFFSET__DATA+0] = 1; //Cont
+		buffer[FRAME_OFFSET__DATA+1] = buttons;
+		buffer[FRAME_OFFSET__DATA+2] = 0; //X
+		buffer[FRAME_OFFSET__DATA+3] = 0; //Y
+		buffer[FRAME_OFFSET__DATA+4] = 0; //Wheel
+		buffer[FRAME_OFFSET__DATA+5] = sum(buffer, 10);
+		iface.write(buffer, 0, 11);
+		iface.flush();
+
+    	Thread.sleep(20);
+
+		buffer[FRAME_OFFSET__DATA+1] = 0; //Buttons released
+		buffer[FRAME_OFFSET__DATA+5] = sum(buffer, 10);
+		iface.write(buffer, 0, 11);
+		iface.flush();
+	}
+
+	public void mouseMove(fixed xOffset, fixed yOffset) {
+		buffer[FRAME_OFFSET__CMD] = CMD_SEND_MS_REAL_DATA;
+		buffer[FRAME_OFFSET__LEN] = 5;
+		buffer[FRAME_OFFSET__DATA+0] = 1; //Cont
+		buffer[FRAME_OFFSET__DATA+1] = 0;
+		buffer[FRAME_OFFSET__DATA+2] = Primitive.b1(xOffset); //X
+		buffer[FRAME_OFFSET__DATA+3] = Primitive.b1(yOffset); //Y
+		buffer[FRAME_OFFSET__DATA+4] = 0; //Wheel
+		buffer[FRAME_OFFSET__DATA+5] = sum(buffer, 10);
+		iface.write(buffer, 0, 11);
+		iface.flush();
+	}
+
+	private byte sum(byte[] data, byte lastBytePos) {
+		byte result = 0;
+		for(byte i=0; i<lastBytePos; i++) {
+			result += data[i];
+		}
+		return result;
+	}
+
+	//TODO
+	//@Override private void finalize() {
+	//	if(null!=iface) iface.close();
+	//}
+}

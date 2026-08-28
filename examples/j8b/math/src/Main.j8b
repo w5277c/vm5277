@@ -23,7 +23,7 @@ class Main {
 		fixed f2;
 		f2 = 1.5;
 
-		System.out("\ns1=");	
+		System.out("\ns1=");
 		System.out(s1);
 		System.out("\nf1=");	
 		System.out(f1);
@@ -32,58 +32,61 @@ class Main {
 
 		System.out("\n");
 
-		System.out("\ns1+2=");
+		System.out("\ns1+2 [12]=");
 		System.out(s1 + 2);	//12
 
-		System.out("\ns1+1.5=");
+		System.out("\ns1+1.5 [11.50]=");
 		System.out(s1 + 1.5);//11.50
 
-		System.out("\nf1+1.5=");
+		System.out("\nf1+1.5 [7.50]=");
 		System.out(f1 + 1.5);//7.5
 
-		System.out("\ns1-2=");
+		System.out("\ns1-2 [8]=");
 		System.out(s1 - 2);//8
 
-		System.out("\ns1-1.5=");
+		System.out("\ns1-1.5 [8.50]=");
 		System.out(s1 - 1.5);//8.5
 
-		System.out("\nf1-1.5=");
+		System.out("\nf1-1.5 [4.50]=");
 		System.out(f1 - 1.5);//4.5
 
-		System.out("\ns1*8=");
+		System.out("\ns1*8 [80]=");
 		System.out(s1 * 8);//80
 
-		System.out("\ns1*1.5=");
+		System.out("\ns1*1.5 [15]=");
 		System.out(s1 * 1.5);//15
 
-		System.out("\nf1*1.5=");
+		System.out("\nf1*1.5 [9]=");
 		System.out(f1 * 1.5);//9
 
-		System.out("\ns1/8=");
-		System.out(s1 / 8);//1.25
+		System.out("\ns1/8 [1]=");
+		System.out(s1 / 8);//1
 
-		System.out("\ns1/1.5=");
+		System.out("\n((fixed)s1)/8 [1.25]=");
+		System.out(((fixed)s1) / 8);//1.25
+
+		System.out("\ns1/1.5 [6.66]=");
 		System.out(s1 / 1.5);//6.66
 
-		System.out("\nf1/1.5=");
+		System.out("\nf1/1.5 [4.00]=");
 		System.out(f1 / 1.5);//4.00
 
-		System.out("\ns1%2=");
+		System.out("\ns1%2 [0]=");
 		System.out(s1 % 2);//0
 
-		System.out("\nf1+f2=");
+		System.out("\nf1+f2 [7.50]=");
 		System.out(f1 + f2);//7.50
 
-		System.out("\nf1-f2=");
+		System.out("\nf1-f2 [4.50]=");
 		System.out(f1 - f2);//4.50
 
-		System.out("\nf1*f2=");
+		System.out("\nf1*f2 [9.00]=");
 		System.out(f1 * f2);//9.00
 
-		System.out("\nf1/f2=");
+		System.out("\nf1/f2 [4/00]=");
 		System.out(f1 / f2);//4.00
 
-		System.out("\ns1*1000000000=");
+		System.out("\ns1*1000000000 [Exc]=");
 		try {
 			System.out(s1 * 1000000000);
 		}

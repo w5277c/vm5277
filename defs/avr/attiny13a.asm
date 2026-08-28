@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+;TODO привести именования регистров IO и их бит в стандарт Atmega328 вязтый за базу
+
 .include "common.asm"
 
 ;---DESCRIPTION---------------------------------------------

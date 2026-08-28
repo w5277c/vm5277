@@ -51,8 +51,6 @@ import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.flash.InternalFlashTool;
 import ru.vm5277.common.messages.MessageContainer;
 
-//TODO добавить поддержку RST и TX0/RX0
-
 public class Main {
 	public	final	static	String					VERSION				= StrUtils.readVersion(Main.class);
 	public			static	boolean					isWindows;

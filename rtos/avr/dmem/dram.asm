@@ -94,13 +94,11 @@ OS_DRAM_FREE:												;
 	POP_Y
 	RET
 
-;TODO - проверить работу
 ;-----------------------------------------------------------;
 _OS_DRAM_FIND_FREE_CELLS:
 ;-----------------------------------------------------------;
 ;Поиск блока свободных ячеек
 ;IN: ACCUM_H/L-размер блока в ячейках,
-;ACCUM_EL-размер блока(байты) бит.маски,
 ;Y-адрес на бит.маску
 ;OUT: Z-адрес на выделенный блок, флаг C true=OutOfMemory
 ;-----------------------------------------------------------;
@@ -112,7 +110,7 @@ _OS_DRAM_FIND_FREE_CELLS:
 
 	LDI FLAGS,0x00											;Нулевой бит не найден
 	LDI_X 0x0000											;Начальное смещение в блоке памяти
-
+	LDI ACCUM_EL,0x08
 _OS_DRAM_FIND_FREE_CELLS__BYTELOOP:
 	LD RESULT,Y												;Получаем байт карты
 	CPI RESULT,0xff											;Пропускаем проверку бит, если все биты включены
@@ -234,10 +232,11 @@ _OS_DRAM_FILL_CELLS__BITOFFSET_LOOP_DONE:
 	MCALL _OS_DRAM_BYTE_UPDATE								;Обновляем первый байт
 
 	;Теперь смещение в битах всегда 0
-	MOV TEMP_H,ACCUM_L										;Сохраняю малдший байт для определения кол-ва бит в последнем байте
+	MOV TEMP_H,ACCUM_L										;Сохраняю младший байт для определения кол-ва бит в последнем байте
 	MCALL OS_DIV16P2_X8										;Получаю количество полностью заполненных байт
 	BREQ _OS_DRAM_FILL_CELLS__FILLBYTES_DONE
 _OS_DRAM_FILL_CELLS__FILLBYTES_LOOP:
+	LDI TEMP_L,0xff
 	MCALL _OS_DRAM_BYTE_UPDATE								;Обновляем последующий байт
 	DEC ACCUM_L												;Старший байт ожидается нулевым, не проверяем
 	BRNE _OS_DRAM_FILL_CELLS__FILLBYTES_LOOP

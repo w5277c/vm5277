@@ -21,6 +21,7 @@ import ru.vm5277.common.Toolkit;
 import ru.vm5277.common.enums.OptimizationType;
 import ru.vm5277.common.enums.PlatformType;
 import ru.vm5277.common.enums.StrictLevel;
+import ru.vm5277.common.enums.Verbosity;
 import ru.vm5277.common.flash.FlashTool;
 import ru.vm5277.common.flash.FlashToolParam;
 import ru.vm5277.common.flash.FlashToolProvider;
@@ -70,7 +71,9 @@ public class ExecuteSettingsEditor extends SettingsEditor<ExecuteConfiguration> 
 	private final ComboBox<String> strictLevelCombo = new ComboBox<>();
 	private final JBCheckBox softResetCheckbox = new JBCheckBox("Soft reset feature");
 	private final JBCheckBox bldrApiReuseCheckbox = new JBCheckBox("Bootloader API reuse");
-	private final JBCheckBox verboseOutputCheckbox = new JBCheckBox("Verbose output");
+	private final ComboBox<String> verbosityCombo = new ComboBox<>();
+    private final JBCheckBox addonsIncludeCheckbox = new JBCheckBox("Include addons");
+	private final JBCheckBox mvnQuietCheckbox = new JBCheckBox("Maven, quiet ");
 	private final JBCheckBox syncPomCheckbox = new JBCheckBox("Sync. POM ");
 
 	private ItemListener platformItemListener;
@@ -90,6 +93,10 @@ public class ExecuteSettingsEditor extends SettingsEditor<ExecuteConfiguration> 
 
 		for (StrictLevel strictLevel : StrictLevel.values()) {
 			strictLevelCombo.addItem(strictLevel.name().toLowerCase());
+		}
+
+		for (Verbosity verbosity : Verbosity.values()) {
+			verbosityCombo.addItem(verbosity.name().toLowerCase());
 		}
 	}
 
@@ -481,17 +488,28 @@ public class ExecuteSettingsEditor extends SettingsEditor<ExecuteConfiguration> 
 		bldrApiReuseRow.add(Box.createRigidArea(new Dimension(5, 0)));
 		bldrApiReuseRow.add(helpLabel);
 
-		JPanel verboseOutputRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-		helpLabel = ContextHelpLabel.create("Show detailed build and generates additional files useful for project debugging");
-		verboseOutputRow.add(verboseOutputCheckbox);
-		verboseOutputRow.add(Box.createRigidArea(new Dimension(5, 0)));
-		verboseOutputRow.add(helpLabel);
+		JPanel verbosityRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+		verbosityCombo.setPreferredSize(new Dimension(FIELD_WIDTH, verbosityCombo.getPreferredSize().height));
+		label = new JLabel("Verbosity:");
+		label.setPreferredSize(new Dimension(LABEL_WIDTH, label.getPreferredSize().height));
+		verbosityRow.add(label);
+		verbosityRow.add(verbosityCombo);
+
+		JPanel mvnQuietRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+		mvnQuietRow.add(mvnQuietCheckbox);
+		mvnQuietRow.add(Box.createRigidArea(new Dimension(5, 0)));
 
 		JPanel pomExportRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
 		helpLabel = ContextHelpLabel.create("Sync with Maven POM: pom → configuration on project open, configuration → pom on apply");
 		pomExportRow.add(syncPomCheckbox);
 		pomExportRow.add(Box.createRigidArea(new Dimension(5, 0)));
 		pomExportRow.add(helpLabel);
+
+        JPanel addonsIncludeRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+        helpLabel = ContextHelpLabel.create("Add addons libraries");
+        addonsIncludeRow.add(addonsIncludeCheckbox);
+        addonsIncludeRow.add(Box.createRigidArea(new Dimension(5, 0)));
+        addonsIncludeRow.add(helpLabel);
 
 		FormBuilder builder = FormBuilder.createFormBuilder()
 			.setVerticalGap(5)
@@ -506,10 +524,12 @@ public class ExecuteSettingsEditor extends SettingsEditor<ExecuteConfiguration> 
 			.addSeparator()
 			.addComponent(optimizationTypeRow)
 			.addComponent(strictLevelRow)
+			.addComponent(verbosityRow)
 			.addComponent(softResetRow)
 			.addComponent(bldrApiReuseRow)
-			.addComponent(verboseOutputRow)
-			.addComponent(pomExportRow);
+			.addComponent(addonsIncludeRow)
+			.addComponent(mvnQuietRow)
+            .addComponent(pomExportRow);
 		bodyPanel = builder.getPanel();
 
 		builder = FormBuilder.createFormBuilder();
@@ -583,7 +603,10 @@ public class ExecuteSettingsEditor extends SettingsEditor<ExecuteConfiguration> 
 
 		softResetCheckbox.setSelected(configuration.isSoftReset());
 		bldrApiReuseCheckbox.setSelected(configuration.isBldrApiReuse());
-		verboseOutputCheckbox.setSelected(configuration.isVerboseOutput());
+		verbosityCombo.setSelectedItem(configuration.getVerbosity().toLowerCase());
+        addonsIncludeCheckbox.setSelected(configuration.isAddonsInclude());
+		mvnQuietCheckbox.setSelected(configuration.isMvnQuiet());
+		syncPomCheckbox.setSelected(configuration.isSyncPom());
 	}
 
 	@Override
@@ -628,6 +651,7 @@ public class ExecuteSettingsEditor extends SettingsEditor<ExecuteConfiguration> 
 				}
 				sb.deleteCharAt(sb.length()-0x01);
 			}
+//            System.out.println("###" + sb.toString());
 			configuration.setFlashToolParams(sb.toString());
 		}
 
@@ -636,7 +660,9 @@ public class ExecuteSettingsEditor extends SettingsEditor<ExecuteConfiguration> 
 
 		configuration.setSoftReset(softResetCheckbox.isEnabled() && softResetCheckbox.isSelected());
 		configuration.setBldrApiReuse(bldrApiReuseCheckbox.isEnabled() && bldrApiReuseCheckbox.isSelected());
-		configuration.setVerboseOutput(verboseOutputCheckbox.isSelected());
+		configuration.setVerbosity(((String) verbosityCombo.getSelectedItem()).toLowerCase());
+        configuration.setAddonsInclude(addonsIncludeCheckbox.isSelected());
+		configuration.setMvnQuiet(mvnQuietCheckbox.isSelected());
 		configuration.setSyncPom(syncPomCheckbox.isSelected());
 	}
 

@@ -14,18 +14,23 @@
  * limitations under the License.
  */
 
- //TODO похоже в массивах путаница с LE/BE, в основном BE, а должно быть LE
-
+//TODO добавить блокировку диспетчера или убедиться что она есть уровнем выше
 .include "dmem/dram.asm"
 .include "math/mul16.asm"
+.include "j8b/arrview_arraddr.asm"
 
 .IFNDEF J8BPROC_ARR_REFCOUNT_INC
 ;-----------------------------------------------------------
 J8BPROC_ARR_REFCOUNT_INC:
 ;-----------------------------------------------------------
 ;Инкремент количества ссылок массива
-;IN: X-адрес заголовка массива
+;IN: X-адрес заголовка массива или VIEW
 ;-----------------------------------------------------------
+	CP XL,C0x00
+	CPC XH,C0x00
+	BRNE PC+0x02
+	RET
+	MCALL J8BPROC_ARRVIEW_ARRADDR
 	PUSH ACCUM_L
 	ADIW XL,0x01
 	LD ACCUM_L,X
@@ -40,8 +45,9 @@ J8BPROC_ARR_REFCOUNT_INC:
 J8BPROC_ARR_REFCOUNT_DEC_CONST:
 ;-----------------------------------------------------------
 ;Декремент количества ссылок массива
-;IN: X-адрес заголовка массива, ACCUM_L/H-размер
+;IN: X-адрес заголовка массива или VIEW, ACCUM_L/H-размер
 ;-----------------------------------------------------------
+	MCALL J8BPROC_ARRVIEW_ARRADDR
 	PUSH ACCUM_EL
 	ADIW XL,0x01
 	LD ACCUM_EL,X
@@ -65,8 +71,13 @@ J8BPROC_ARR_REFCOUNT_DEC_CONST:
 J8BPROC_ARR_REFCOUNT_DEC:
 ;-----------------------------------------------------------
 ;Декремент количества ссылок массива
-;IN: X-адрес заголовка массива
+;IN: X-адрес заголовка массива или VIEW
 ;-----------------------------------------------------------
+	CP XL,C0x00
+	CPC XH,C0x00
+	BRNE PC+0x02
+	RET
+	MCALL J8BPROC_ARRVIEW_ARRADDR
 	PUSH ACCUM_L
 	ADIW XL,0x01
 	LD ACCUM_L,X
@@ -80,14 +91,14 @@ J8BPROC_ARR_REFCOUNT_DEC:
 	MOVW ZL,XL
 	SBIW ZL,0x01
 	;Освобождение ресурса
-PUSH ACCUM_L
-PUSH RESULT
-PUSH FLAGS
+	PUSH ACCUM_L
+	PUSH RESULT
+	PUSH FLAGS
 	SBIW XL,0x01
 	LD RESULT,X												;Загружаю глубину массива
 	MOV FLAGS,RESULT										;Загружаю размер типа
 	ANDI RESULT,0x03
-PUSH RESULT
+	PUSH RESULT
 	SWAP FLAGS
 	ANDI FLAGS,0x03
 	ADIW XL,0x03
@@ -115,7 +126,7 @@ _J8BPROC_ARR_REFCOUNT__COMPTOTAL_LOOP:						;Умножаю на размер я
 	DEC FLAGS
 	BRNE _J8BPROC_ARR_REFCOUNT__COMPTOTAL_LOOP
 _J8BPROC_ARR_REFCOUNT__COMPTOTAL_END:
-POP RESULT												;Добавляем размер заголовка
+	POP RESULT												;Добавляем размер заголовка
 	LSL RESULT
 	SUBI RESULT,low(0x100-0x05)
 	ADD ACCUM_L,RESULT

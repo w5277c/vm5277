@@ -42,7 +42,7 @@ public class ComparisonExpression extends BinaryExpression {
         super(inst, tb, sp, left, operator, right);
 		
 		// Результат сравнения - всегда boolean
-		type = VarType.BOOL;
+		type = VarType.BOOLEAN;
     }
     
 	@Override
@@ -51,7 +51,7 @@ public class ComparisonExpression extends BinaryExpression {
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 		cgScope = cg.enterExpression(parent, cgScope, toString());
 
-		result&=rightExpr.postAnalyze(scope, cg, null);
+		result&=rightExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
 			// Резолвинг QualifiedPathExpression
 			ExpressionNode resolved = resolveQualifiedPathExpr(rightExpr);
@@ -61,7 +61,7 @@ public class ComparisonExpression extends BinaryExpression {
 		}
 
 		// Анализ операндов
-		result&=leftExpr.postAnalyze(scope, cg, null);
+		result&=leftExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
 			// Резолвинг QualifiedPathExpression
 			ExpressionNode resolved = resolveQualifiedPathExpr(leftExpr);
@@ -133,7 +133,9 @@ public class ComparisonExpression extends BinaryExpression {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean isInvert, boolean opOr, boolean toAccum, CGExcs excs) throws CompileException {
-		if(disabled) return null;
+		if(cgDone || disabled) return null;
+		cgDone = true;
+
 		excs.setSourcePosition(sp);
 		
 		//TODO операции сравнения не сохраняют результат в аккумулятор, это делают(к примеру) логические операции.
@@ -155,6 +157,7 @@ public class ComparisonExpression extends BinaryExpression {
 			if(leftExpr instanceof LiteralExpression || (!(rightExpr instanceof LiteralExpression) && leftExpr instanceof VarFieldExpression)) {
 				expr1 = rightExpr;
 				expr2 = leftExpr;
+				cgScope.swap(expr1.getCGScope(), expr2.getCGScope());
 			}
 		}
 
@@ -171,22 +174,18 @@ public class ComparisonExpression extends BinaryExpression {
 			null!=leftExpr.getSymbol() && null!=leftExpr.getSymbol().getCGScope() &&
 			leftExpr.getSymbol().getCGScope() instanceof CGCellsScope && null!=((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells()) {
 
-			expr1.getCGScope().setParent(cgScope);
-			expr2.getCGScope().setParent(cgScope);
-
 			rightExpr.codeGen(cg, false, excs);
 			leftExpr.codeGen(cg, false, excs);
 			cg.cellsCpCells(cgScope,
 							((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType,
 							((CGCellsScope)rightExpr.getSymbol().getCGScope()).getCells(), rightType,
 							operator, isInvert, opOr, (CGBranch)branch);
+			releaseVars(cg);
 			return result;
 		}
 		else if(null!=rightExpr.getSymbol() && null!=rightExpr.getSymbol().getCGScope() && rightExpr.getSymbol().getCGScope() instanceof CGCellsScope &&
 				null!=((CGCellsScope)rightExpr.getSymbol().getCGScope()).getCells()) {
 
-			expr1.getCGScope().setParent(cgScope);
-			expr2.getCGScope().setParent(cgScope);
 			// Определяем максмальный размер операнда
 			int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
 			rightExpr.codeGen(cg, false, excs);
@@ -198,6 +197,7 @@ public class ComparisonExpression extends BinaryExpression {
 								leftCells, leftType,
 								((CGCellsScope)rightExpr.getSymbol().getCGScope()).getCells(), rightType,
 								operator, isInvert, opOr, (CGBranch)branch);
+				releaseVars(cg);
 				return result;
 			}
 			if(CodegenResult.RESULT_IN_ACCUM==leftExpr.codeGen(cg, true, excs)) {
@@ -205,14 +205,12 @@ public class ComparisonExpression extends BinaryExpression {
 								new CGCells(CGCells.Type.ACC, size), leftType,
 								((CGCellsScope)rightExpr.getSymbol().getCGScope()).getCells(), rightType,
 								operator, isInvert, opOr, (CGBranch)branch);
+				releaseVars(cg);
 				return result;
 			}
 		}
 		else if(null!=leftExpr.getSymbol() && null!=leftExpr.getSymbol().getCGScope() && leftExpr.getSymbol().getCGScope() instanceof CGCellsScope &&
 				null!=((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells()) {
-
-			expr1.getCGScope().setParent(cgScope);
-			expr2.getCGScope().setParent(cgScope);
 
 			// Определяем максмальный размер операнда
 			int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
@@ -224,6 +222,7 @@ public class ComparisonExpression extends BinaryExpression {
 								((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType,
 								rightCells, rightType,
 								operator, isInvert, opOr, (CGBranch)branch);
+				releaseVars(cg);
 				return result;
 			}
 			if(CodegenResult.RESULT_IN_ACCUM==rightExpr.codeGen(cg, true, excs)) {
@@ -231,12 +230,11 @@ public class ComparisonExpression extends BinaryExpression {
 								((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType,
 								new CGCells(CGCells.Type.ACC, size), rightType,
 								operator, isInvert, opOr, (CGBranch)branch);
+				releaseVars(cg);
 				return result;
 			}
 		}
 		else if(leftExpr instanceof LiteralExpression) {
-			expr1.getCGScope().setParent(cgScope);
-			expr2.getCGScope().setParent(cgScope);
 			// Определяем максмальный размер операнда
 			int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
 
@@ -244,12 +242,11 @@ public class ComparisonExpression extends BinaryExpression {
 			leftCells.setConst(leftType.isFixedPoint() ? ((LiteralExpression)leftExpr).getFixedValue() : ((LiteralExpression)leftExpr).getNumValue());
 			if(CodegenResult.RESULT_IN_ACCUM==rightExpr.codeGen(cg, true, excs)) {
 				cg.cellsCpCells(cgScope, leftCells, null, new CGCells(CGCells.Type.ACC, size), rightType, operator, isInvert, opOr, (CGBranch)branch);
+				releaseVars(cg);
 				return result;
 			}
 		}
 		else if(rightExpr instanceof LiteralExpression) {
-			expr1.getCGScope().setParent(cgScope);
-			expr2.getCGScope().setParent(cgScope);
 			// Определяем максмальный размер операнда
 			int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
 
@@ -257,6 +254,7 @@ public class ComparisonExpression extends BinaryExpression {
 			rightCells.setConst(rightType.isFixedPoint() ? ((LiteralExpression)rightExpr).getFixedValue() : ((LiteralExpression)rightExpr).getNumValue());
 			if(CodegenResult.RESULT_IN_ACCUM==leftExpr.codeGen(cg, true, excs)) {
 				cg.cellsCpCells(cgScope, new CGCells(CGCells.Type.ACC, size), leftType, rightCells, null, operator, isInvert, opOr, (CGBranch)branch);
+				releaseVars(cg);
 				return result;
 			}
 		}

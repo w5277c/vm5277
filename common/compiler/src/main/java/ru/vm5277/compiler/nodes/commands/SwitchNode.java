@@ -34,7 +34,6 @@ import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.expressions.LiteralExpression;
@@ -200,7 +199,8 @@ public class SwitchNode extends CommandNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		boolean allCasesReturn = true;		
-		cgScope = cg.enterCommand(parent, "switch");
+		cgScope = cg.enterCondBlock(parent, "switch");
+		//cgScope = cg.enterCommand(parent, "switch");
 
 		// Проверка типа выражения switch
 		result&=expression.postAnalyze(scope, cg, cgScope);
@@ -285,7 +285,7 @@ public class SwitchNode extends CommandNode {
 
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
-		if(cgDone) return null;
+		if(cgDone || disabled) return null;
 		cgDone = true;
 
 		if(null==constantValue) {
@@ -391,6 +391,7 @@ public class SwitchNode extends CommandNode {
 			}
 		}
 
+		releaseVars(cg);
 		return null;
 	}
 	

@@ -17,12 +17,17 @@
 package ru.vm5277.compiler.semantic;
 
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class GlobalScope extends Scope implements ImportableScope {
-	protected	final	Map<String, CIScope>		imported		= new HashMap<>();
-	
+	protected	final	Map<String, CIScope>			imported					= new HashMap<>();
+	private		final	Map<VarType, Set<ClassScope>>	interfaceImplementations	= new HashMap<>();
+
 	public GlobalScope() {
 		super(null);
 	}
@@ -64,6 +69,20 @@ public class GlobalScope extends Scope implements ImportableScope {
 		return null;
 	}
 
+	public void addInterfaceImplementation(CIScope cis, List<VarType> implTypes) {
+		for(VarType interfaceType : implTypes) {
+			Set<ClassScope> implementations = interfaceImplementations.get(interfaceType);
+			if(null==implementations) {
+				implementations = new HashSet<>();
+				interfaceImplementations.put(interfaceType, implementations);
+			}
+			implementations.add((ClassScope)cis);
+		}
+	}
+	public Set<ClassScope> getInterfaceImplementations(VarType interfaceType) {
+		return interfaceImplementations.get(interfaceType);
+	}
+	
 	@Override
 	public void addImport(String importPath, String alias) throws CompileException {
 		throw new UnsupportedOperationException("Not supported yet."); // Generated from nbfs://nbhost/SystemFileSystem/Templates/Classes/Code/GeneratedMethodBody

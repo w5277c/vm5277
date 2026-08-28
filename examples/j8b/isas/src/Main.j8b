@@ -35,8 +35,8 @@ class Main {
 			return this;
 		}
 
-		public byte toByte() {return (byte)value;}
-		public short toShort() {
+		@Override public byte toByte() {return (byte)value;}
+		@Override public short toShort() {
 			System.out("\ntoShort() класса Short, возвращаем значение:" + value);
 			return value;
 		}
@@ -56,15 +56,15 @@ class Main {
 			return this;
 		}
 
-		public byte toByte() {return (byte)value;}
-		public short toShort() {
+		@Override public byte toByte() {return (byte)value;}
+		@Override public short toShort() {
 			System.out("\ntoShort() класса Integer, возвращаем значение:" + (short)value);
 			return (short)value;
 		}
 	}
 
 	public static void main() {
-		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
+		System.setParam(RtosParam.SHOW_WELCOME, 0x01);
 
 		System.out("\nСоздаем экземпляр класса Short");
 		Object num = new Short(0x0102);
@@ -72,15 +72,15 @@ class Main {
 		
 		//System.out(((Short)num).toShort()); не работает
 		
-		System.out("\nПроверка if(num is Short as s)");
-		if(num is Short as s) {
+		System.out("\nПроверка if(num instanceof Short as s)");
+		if(num instanceof Short as s) {
 			System.out("\nnum типа Object наследован от Short, вызываем s.toShort()");
 			short tmp = s.toShort();
 			System.out("\nvalue:");
 			System.out(tmp);
 			
-			System.out("\nПроверка if(s.getThis() is Short as s2)");
-			if(s.getThis() is Short as s2) {
+			System.out("\nПроверка if(s.getThis() instanceof Short as s2)");
+			if(s.getThis() instanceof Short as s2) {
 				System.out("\nthis типа Number класса s также наследован от Short, вызываем s2.toShort()");
 				short tmp2 = s2.toShort();				
 				System.out("\nvalue:" + tmp2);
@@ -93,9 +93,8 @@ class Main {
 			System.out("\nnum типа Object не наследован от Short");
 		}
 
-		System.out("\nПроверка if(num is Integer as s)");
-		//TODO if(num is Integer as s) { duplicate s
-		if(num is Integer as s3) {
+		System.out("\nПроверка if(num instanceof Integer as s)");
+		if(num instanceof Integer as s3) {
 			System.out("\nnum типа Object наследован от Integer - ошибка");
 		}
 		else {

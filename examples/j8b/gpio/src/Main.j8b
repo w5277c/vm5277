@@ -16,11 +16,11 @@
 
 class Main {
     public static void main() {
-		byte port = GPIO.PB5;
-		GPIO.modeOut(port);
+		byte port = Gpio.PB5;
+		Gpio.modeOut(port);
 		while(true) {
 			Thread.sleep(50);
-			GPIO.invert(port);
+			Gpio.invert(port);
 		}
     }
 }

@@ -1,0 +1,29 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+public class Array {
+	public static native void fill(byte[] arr, short offset, short len, byte fill) throws BoundsException;
+	public static native void fill(fixed[] arr, short offset, short len, fixed fill) throws BoundsException;
+	public static native void fill(short[] arr, short offset, short len, short fill) throws BoundsException;
+	public static native void fill(int[] arr, short offset, short len, int fill) throws BoundsException;
+	public static native void fill(Object[] arr, short offset, short len, Object fill) throws BoundsException;
+
+	public static native void copy(byte[] srcArr, short srcOffset, byte[] dstArr, short dstOffset, short len) throws BoundsException;
+	public static native void copy(fixed[] srcArr, short srcOffset, byte[] dstArr, short dstOffset, short len) throws BoundsException;
+	public static native void copy(short[] srcArr, short srcOffset, byte[] dstArr, short dstOffset, short len) throws BoundsException;
+	public static native void copy(int[] srcArr, short srcOffset, byte[] dstArr, short dstOffset, short len) throws BoundsException;
+	public static native void copy(Object[] srcArr, short srcOffset, byte[] dstArr, short dstOffset, short len) throws BoundsException;
+}

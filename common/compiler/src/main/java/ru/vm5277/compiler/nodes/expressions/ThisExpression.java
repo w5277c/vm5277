@@ -15,11 +15,11 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
+import java.util.Objects;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.ClassSymbol;
@@ -63,14 +63,25 @@ public class ThisExpression extends TypeReferenceExpression {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
+		if(cgDone || disabled) return null;
+		cgDone = true;
+
 		if(toAccum) {
 			cg.thisToAcc(cgScope);
+			
+			releaseVars(cg);
 			return CodegenResult.RESULT_IN_ACCUM;
 		}
 		
+		releaseVars(cg);
 		return null;
 	}
 	
+	@Override
+	public boolean equals(Object obj) {
+		return (obj instanceof ThisExpression);
+	}
+
 	@Override
 	public String toString() {
 		return "this";

@@ -32,7 +32,6 @@ import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.ExceptionScope;
@@ -49,11 +48,13 @@ public class ExceptionNode extends ObjectTypeNode {
 	private			int				id;
 	
 	public ExceptionNode(Instance inst, TokenBuffer tb, Set<Keyword> modifiers, List<ObjectTypeNode> imported) throws CompileException {
-		super(inst, tb, modifiers, null, imported);
+		super(inst, tb, null, modifiers, null, imported);
 		
 		if(null!=name) {
 			id = VarType.addException(this.name);
 		}
+		
+		inst.setPrimaryObject(this);
 		
 		try {
 			if(tb.match(TokenType.OOP, J8BKeyword.EXTENDS)) {
@@ -209,6 +210,19 @@ public class ExceptionNode extends ObjectTypeNode {
 	}
 	
 	@Override
+	public boolean isStatic() {
+		return true;
+	}
+	@Override
+	public boolean isFinal() {
+		return true;
+	}
+	@Override
+	public boolean isNative() {
+		return false;
+	}
+
+	@Override
 	public String toString() {
 		return modifiers + " " + name;
 	}
@@ -219,6 +233,8 @@ public class ExceptionNode extends ObjectTypeNode {
 
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
+		
+		releaseVars(cg);
 		return null;
 	}
 	

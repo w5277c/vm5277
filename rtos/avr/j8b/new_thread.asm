@@ -25,7 +25,7 @@ J8BPROC_NEW_THREAD:
 ;MOD: ACCUM_L/H
 ;OUT: Z-адрес на выделенный блок, флаг С-OUT OF RAM
 ;-----------------------------------------------------------
-	SET
+	SET //TODO перейти на OS_DISPATCHER_LOCK, но мешает использовние флагов, нужно чтобы OS_DISPATCHER_UNLOCK не влиял на флаги
 	MCALL OS_DRAM_ALLOC
 	BRCS _J8BPROC_NEW_THREAD__OVF
 	STD Z+0x00,ACCUM_L										;Длина

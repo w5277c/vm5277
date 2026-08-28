@@ -116,6 +116,34 @@ public class BlockScope extends Scope {
 	public boolean getInLoop() {
 		return inLoop;
 	}
+
+	public Set<VarSymbol> getVarsInRange(int minAstSn, int maxAstSn) {
+		Set<VarSymbol> result = new HashSet<>();
+		
+		// Если есть переменная с SN меньше minAstSn - диапазон полностью внутри текущего блока, подниматься к предкам не нужно (они объявлены раньше).
+		boolean outOfRange = false;
+		for(Symbol symbol : variables.values()) {
+			if(symbol instanceof VarSymbol) {
+				VarSymbol vSymbol = (VarSymbol)symbol;
+				if(vSymbol.getNode().getSN()<minAstSn) {
+					outOfRange = true;
+				}
+				else if(vSymbol.getNode().getSN()<=maxAstSn) {
+					result.add(vSymbol);
+				}
+			}
+		}
+		
+		if(!outOfRange) {
+			Scope scope = this;
+			while(null!=scope && scope.getParent() instanceof BlockScope) {
+				scope = scope.getParent();
+				result.addAll(((BlockScope)scope).getVarsInRange(minAstSn, maxAstSn));
+			}
+		}
+		
+		return result;
+	}
 	
 	@Override
 	public String toString() {

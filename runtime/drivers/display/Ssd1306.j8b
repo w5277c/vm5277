@@ -1,0 +1,234 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+ /* TODO: На слабых МК нет ресурсов создавать frame buffer, поэтому выполняем реализацию напрямую.
+    В будущем стоит ввести возможность использования полноценного frame buffer для более мощных МК.
+  */
+
+import rtos.RtosDispatcher;
+
+public class Ssd1306 implements GraphicsDisplay {
+	public static final byte I2C_ADDRESS = 0x3c;
+
+	private static final byte CMD_SET_LOW_COLUMN = 0x00; // 0x00-0x0f - set lower column start address for page addressing mode
+	private static final byte CMD_SET_HIGH_COLUMN = 0x10; // 0x10-0x1f - set higher column start address for page addressing mode
+	private static final byte CMD_SET_MEM_ADDR_MODE = 0x20;
+	private static final byte CMD_SET_COLUMN_ADDR = 0x21;
+	private static final byte CMD_SET_PAGE_ADDR = 0x22;
+	private static final byte CMD_SET_FADE_N_BLINK = 0x23;
+	private static final byte CMD_RIGHT_SCROLL = 0x26;
+	private static final byte CMD_LEFT_SCROLL = 0x27;
+	private static final byte CMD_VRIGHT_SCROLL = 0x29;
+	private static final byte CMD_VLEFT_SCROLL = 0x2a;
+	private static final byte CMD_DEACTIVATE_SCROLL = 0x2e;
+	private static final byte CMD_ACTIVATE_SCROLL = 0x2f;
+	private static final byte CMD_SET_DISPLAY_START_LINE = 0x40; // 0x40-0x7f
+	private static final byte CMD_SET_CONTRAST = 0x81;
+	private static final byte CMD_CHARGE_PUMP = 0x8D;
+	private static final byte CMD_SEG_REMAP_NORMAL = 0xa0;
+	private static final byte CMD_SEG_REMAP_MIRROR = 0xa1;
+	private static final byte CMD_SET_VSCROLL_AREA = 0xa3;
+	private static final byte CMD_DISPLAY_RAM = 0xa4;
+	private static final byte CMD_DISPLAY_ALL_ON = 0xa5;
+	private static final byte CMD_DISPLAY_NORMAL = 0xa6;
+	private static final byte CMD_DISPLAY_INVERSE = 0xa7;
+	private static final byte CMD_SET_MULTIPLEX = 0xa8;
+	private static final byte CMD_DISPLAY_OFF = 0xae;
+	private static final byte CMD_DISPLAY_ON = 0xaf;
+	private static final byte CMD_SET_PAGE_START = 0xb0; // 0xb0-0xb7 set page start address for page addressing mode
+	private static final byte CMD_COM_SCAN_NORMAL = 0xc0;
+    private static final byte CMD_COM_SCAN_MIRROR = 0xc8;
+	private static final byte CMD_SET_DISPLAY_OFFSET = 0xd3;
+	private static final byte CMD_SET_COM_PINS = 0xda;
+	private static final byte CMD_SET_DISPLAY_CLOCK = 0xd5;
+	private static final byte CMD_SET_ZOOM_IN = 0xd6;
+	private static final byte CMD_SET_PRECHARGE = 0xd9;
+	private static final byte CMD_SET_VCOM_DESELECT = 0xdb;
+	private static final byte CMD_NOP = 0xe3;
+
+	public interface Layer {
+		void sendCommand(byte byte0);
+		void sendCommand(byte byte0, byte byte1);
+		void sendCommand(byte byte0, byte byte1, byte byte2);
+		void sendData(byte byte0);
+	}
+
+	public static class I2cLayer implements Layer {
+		private I2cMaster i2c;
+		private final byte[] buffer = new byte[4];
+
+		public I2cLayer(I2cMaster i2c) {
+			this.i2c = i2c;
+        }
+
+		@Override
+		public void sendCommand(byte byte0) {
+			buffer[0] = 0x00;  // Control byte: command
+			buffer[1] = byte0;
+			i2c.comm(buffer, 2, null, 0, 100);
+		}
+
+		@Override
+		public void sendCommand(byte byte0, byte byte1) {
+			buffer[0] = 0x00;  // Control byte: command
+			buffer[1] = byte0;
+			buffer[2] = byte1;
+			i2c.comm(buffer, 3, null, 0, 100);
+        }
+
+		@Override
+		public void sendCommand(byte byte0, byte byte1, byte byte2) {
+			buffer[0] = 0x00;  // Control byte: command
+			buffer[1] = byte0;
+			buffer[2] = byte1;
+			buffer[3] = byte2;
+			i2c.comm(buffer, 4, null, 0, 100);
+        }
+
+        @Override
+        public void sendData(byte byte0) {
+			buffer[0] = 0x40;
+			buffer[1] = byte0;
+            i2c.comm(buffer, 2, null, 0, 100);
+        }
+	}
+
+	private byte width;
+	private byte height;
+	private Layer layer;
+	private short cursorX = 0;
+	private short cursorY = 0;
+	private byte inkColor = 1;
+	private byte paperColor = 0;
+	private	byte color = 0;
+	private byte transparentColor = 0xff;
+
+	public Ssd1306(Layer layer, byte width, byte height) {
+		this.layer = layer;
+		this.width = width;
+		this.height = height;
+
+		init();
+	}
+
+	@Override
+	public void init() {
+		RtosDispatcher.lock();
+
+		// Initialized state
+		layer.sendCommand(CMD_DISPLAY_OFF); // Display OFF
+
+		// Initial settings configuration
+		layer.sendCommand(CMD_SET_DISPLAY_CLOCK, 0x80); // Clock divider (RESET-middle ferq & power cons.)
+		layer.sendCommand(CMD_SET_MULTIPLEX, (height-1)); // Multiplex ratio
+		layer.sendCommand(CMD_SET_DISPLAY_OFFSET, 0x00); // Display offset 0
+		layer.sendCommand(CMD_SET_DISPLAY_START_LINE); // Display start line 0
+		layer.sendCommand(CMD_CHARGE_PUMP, 0x14); // Charge pump (enable)
+		layer.sendCommand(CMD_SET_MEM_ADDR_MODE, 0x00); // Memory addressing mode (horizontal)
+		layer.sendCommand(CMD_SEG_REMAP_MIRROR); // Segment remap (mirror)
+		layer.sendCommand(CMD_COM_SCAN_MIRROR); // COM output scan direction (mirror)
+		layer.sendCommand(CMD_SET_COM_PINS, 0x40==height ? 0x12 : 0x02); //COM pins
+		layer.sendCommand(CMD_SET_CONTRAST, 0x80); // Contrast
+		layer.sendCommand(CMD_SET_PRECHARGE, 0x22); // Pre-charge (RESET-middle bright & power cons.)
+		layer.sendCommand(CMD_SET_VCOM_DESELECT, 0x20); // VCOMH deselect level (RESET)
+		layer.sendCommand(CMD_DISPLAY_RAM); // Entire display
+		layer.sendCommand(CMD_DISPLAY_NORMAL); // Normal display (no inversion)
+
+		// Clear screen
+		clear(); // Clear
+
+		layer.sendCommand(CMD_DISPLAY_ON); // Display ON
+		RtosDispatcher.unlock();
+	}
+
+	//@Override public PixelFormat getPixelFormat() { return PixelFormat.MONO_1BIT_VERTICAL; }
+	@Override public short getWidth() { return width; }
+	@Override public short getHeight() { return height;	}
+
+	@Override
+	public void clear() {
+		layer.sendCommand(CMD_SET_COLUMN_ADDR, 0, this.width-1);
+		layer.sendCommand(CMD_SET_PAGE_ADDR, 0, (this.height>>3)-1);
+
+    	short totalBytes = this.width * (this.height>>3);
+		for(;0!=totalBytes; totalBytes--) {
+        	layer.sendData(0x00);
+    	}
+	}
+
+    @Override public void update() {}
+
+    @Override
+    public void setBacklight(boolean on) {
+        layer.sendCommand(on ? CMD_DISPLAY_ON : CMD_DISPLAY_OFF);
+    }
+
+    @Override
+    public void setBright(byte b) {
+    	byte vcomh=0x30;
+    	if(0==b) vcomh=0x00;
+    	else if(1==b) vcomh=0x20;
+    	layer.sendCommand(CMD_SET_VCOM_DESELECT, vcomh);
+    }
+
+	@Override
+	public void setContrast(byte b) {
+		layer.sendCommand(CMD_SET_CONTRAST, b);
+	}
+
+    @Override
+    public byte getMaxBright() {
+        return 0x02;
+    }
+
+	@Override
+	public byte getMaxContrast() {
+		return 0xff;
+	}
+
+	@Override
+	public void drawImage(byte[] data, short xPos, short yPos, short imgWidth, short imgHeight) {
+System.out('!');
+    	if(0!=(yPos&0x07) || 0!=(imgHeight&0x07)) DriverException.throw(DriverException.UNSUPPORTED);
+    	if(null==data || xPos>=this.width || yPos>=this.height || 0==imgWidth || 0==imgHeight) return;
+
+		short origImgWidth = imgWidth;
+
+		byte startPage = (byte)(yPos>>3);
+		byte endPage = (byte)(startPage + (imgHeight>>3)-1);
+		byte endX = (byte)(xPos + imgWidth-1);
+
+		if(7<endPage) endPage=7;
+		if(endX>=this.width) {
+			endX = this.width-1;
+			imgWidth = endX - xPos+1;
+		}
+
+		layer.sendCommand(CMD_SET_COLUMN_ADDR, (byte)xPos, endX);
+		layer.sendCommand(CMD_SET_PAGE_ADDR, startPage, endPage);
+
+		byte totalPages = endPage - startPage+1;
+		short index=0;
+		for(;0!=totalPages; totalPages--) {
+        	for(byte col=0; col<imgWidth; col++) {
+				byte octet = data[index];
+				layer.sendData(octet);
+				index++;
+            }
+        	if(origImgWidth!=imgWidth) index += origImgWidth-imgWidth;
+    	}
+    }
+}

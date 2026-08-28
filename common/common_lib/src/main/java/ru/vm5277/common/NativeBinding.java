@@ -15,7 +15,7 @@
  */
 package ru.vm5277.common;
 
-import ru.vm5277.common.enums.RTOSFeature;
+import ru.vm5277.common.enums.RtosFeature;
 import java.io.File;
 import java.text.ParseException;
 import java.util.Arrays;
@@ -28,7 +28,7 @@ public class NativeBinding {
 	private	String			rtosFilePath;
 	private	String			rtosFunction;
 	private	byte[][]		regs;
-	private	RTOSFeature[]	rtosFeatures;
+	private	RtosFeature[]	rtosFeatures;
 	
 	public NativeBinding(NativeBinding nb, VarType[] paramTypes) {
 		this.path = nb.getPath();
@@ -65,7 +65,7 @@ public class NativeBinding {
 				paramTypes = new VarType[paramsParts.length];
 				for(int i=0; i<paramsParts.length; i++) {
 					switch(paramsParts[i].trim().toLowerCase()) {
-						case "bool": paramTypes[i] = VarType.BOOL; break;
+						case "boolean": paramTypes[i] = VarType.BOOLEAN; break;
 						case "byte": paramTypes[i] = VarType.BYTE; break;
 						case "char": paramTypes[i] = VarType.CHAR; break;
 						case "short": paramTypes[i] = VarType.SHORT; break;
@@ -73,10 +73,15 @@ public class NativeBinding {
 						case "fixed": paramTypes[i] = VarType.FIXED; break;
 						case "cstr": paramTypes[i] = VarType.CSTR; break;
 						case "exception": paramTypes[i] = VarType.EXCEPTION; break;
-						case "array": paramTypes[i] = VarType.CLASS; break; // Похоже стоит уйти от CLASS в сторону REFERENCE
+						case "byte[]": paramTypes[i] = VarType.arrayOf(VarType.BYTE); break;
+						case "fixed[]": paramTypes[i] = VarType.arrayOf(VarType.FIXED); break;
+						case "short[]": paramTypes[i] = VarType.arrayOf(VarType.SHORT); break;
+						case "int[]": paramTypes[i] = VarType.arrayOf(VarType.INT); break;
+						case "object[]": paramTypes[i] = VarType.arrayOf(VarType.CLASS);
+						case "class": paramTypes[i] = VarType.CLASS; break;
 						case "this" : paramTypes[i] = VarType.VOID; break; // Используем VOID, чтобы не плодить лишние типы
 						default:
-							throw new ParseException("Invalid method parameter type " + paramsParts[i].trim() + "in: " + line, 0);
+							throw new ParseException("Invalid method parameter type '" + paramsParts[i].trim() + "' in: " + line, 0);
 					}
 				}
 			}
@@ -121,9 +126,9 @@ public class NativeBinding {
 
 			if(0x03 == parts.length) {
 				String[] features = parts[0x02].trim().split(",");
-				rtosFeatures = new RTOSFeature[features.length];
+				rtosFeatures = new RtosFeature[features.length];
 				for(int i=0; i<features.length; i++) {
-					RTOSFeature feature = RTOSFeature.valueOf(features[i].toUpperCase());
+					RtosFeature feature = RtosFeature.valueOf(features[i].toUpperCase());
 					if(null == feature) throw new ParseException("Unsupported RTOS feature: " + features[i] , 0);
 					rtosFeatures[i] = feature;
 				}
@@ -135,7 +140,12 @@ public class NativeBinding {
 			for(int i=0; i<paramTypes.length; i++) {
 				VarType argType = paramTypes[i];
 				if(VarType.VOID!=argType) { // Пропускаем аргумент VOID (он должен быть не видим в сигнатуре)
-					signature += argType.getName();
+					if(argType.isArray()) {
+						signature += argType.toString();
+					}
+					else {
+						signature += argType.getName();
+					}
 					if(i!=(paramTypes.length-1)) {
 						signature+=",";
 					}
@@ -186,7 +196,7 @@ public class NativeBinding {
 		return regs;
 	}
 	
-	public RTOSFeature[] getRTOSFeatures() {
+	public RtosFeature[] getRTOSFeatures() {
 		return rtosFeatures;
 	}
 	

@@ -23,9 +23,11 @@ import com.googlecode.lanterna.terminal.DefaultTerminalFactory;
 import jssc.SerialPort;
 import java.nio.charset.Charset;
 import com.googlecode.lanterna.terminal.Terminal;
+import ru.vm5277.common.enums.InteractiveMode;
 
 public class SerialTerminal extends Thread {
 	private	final			SerialPort				serialPort;
+	private					InteractiveMode			interactiveMode;
 	private					int						cSize;
 	private					int						rSize;
 	private					ServiceMessageHandler	handler;
@@ -33,9 +35,10 @@ public class SerialTerminal extends Thread {
 	private					boolean					enabled			= true;
 	private	static	final	Charset					MC_CHARSET		= Charset.forName("KOI8-R");
 	
-	public SerialTerminal(SerialPort serialPort, boolean singleWireMode, int cSize, int rSize, ServiceMessageHandler hanlder) {
+	public SerialTerminal(SerialPort serialPort, boolean singleWireMode, InteractiveMode interactiveMode, int cSize, int rSize, ServiceMessageHandler hanlder) {
 		this.serialPort = serialPort;
 		this.singleWireMode = singleWireMode;
+		this.interactiveMode = interactiveMode;
 		this.cSize = cSize;
 		this.rSize = rSize;
 		this.handler = hanlder;
@@ -44,52 +47,55 @@ public class SerialTerminal extends Thread {
 	@Override
 	public void run() {
 		try {
-			DefaultTerminalFactory terminalFactory = new DefaultTerminalFactory();
-			terminalFactory.setTerminalEmulatorTitle("vm5277 MC terminal");
-			terminalFactory.setInitialTerminalSize(new TerminalSize(cSize, rSize));
-//			AWTTerminalFontConfiguration fontConf = AWTTerminalFontConfiguration.getDefaultOfSize(6);
-//			terminalFactory.setTerminalEmulatorFontConfiguration(fontConf);
-			Terminal terminal = terminalFactory.createTerminal();
-			
-			while(enabled && !isTerminalClosed(terminal)) {
-				try{Thread.sleep(100);} catch(Exception ex) {}
-				KeyStroke ks = terminal.pollInput();
-				if(null!=ks) {
-					if(KeyType.Escape==ks.getKeyType()) {
-						enabled=false;
-						break;
-					}
-					if(KeyType.EOF==ks.getKeyType()) break;
-					Character ch = ks.getCharacter();
-//					System.out.println("ks:" + ks + ", ch:" + ch);
-					if(null==ch) {
-						switch(ks.getKeyType()) {
-							case ArrowDown:
-								ch = '2';
-								break;
-							case ArrowLeft:
-								ch = '4';
-								break;
-							case ArrowRight:
-								ch = '6';
-								break;
-							case ArrowUp:
-								ch = '8';
-								break;
-						}
-					}
-					if(null!=ch) {
-						String charStr = String.valueOf(ch);
-						byte[] koi8Bytes = charStr.getBytes(MC_CHARSET);
+			Terminal terminal = null;
+			if(InteractiveMode.FULL==interactiveMode) {
+				DefaultTerminalFactory terminalFactory = new DefaultTerminalFactory();
+				terminalFactory.setTerminalEmulatorTitle("vm5277 MC terminal");
+				terminalFactory.setInitialTerminalSize(new TerminalSize(cSize, rSize));
+				terminal = terminalFactory.createTerminal();
+			}
 
-						serialPort.writeByte(koi8Bytes[0x00]);
-						if(singleWireMode) {
-							serialPort.readBytes(0x01);
+			StringBuilder sb = null;			
+			while(enabled && (null==terminal || !isTerminalClosed(terminal))) {
+				try{Thread.sleep(1);} catch(Exception ex) {}
+				if(null!=terminal) {
+					KeyStroke ks = terminal.pollInput();
+					if(null!=ks) {
+						if(KeyType.Escape==ks.getKeyType()) {
+							enabled=false;
+							break;
+						}
+						if(KeyType.EOF==ks.getKeyType()) break;
+						Character ch = ks.getCharacter();
+	//					System.out.println("ks:" + ks + ", ch:" + ch);
+						if(null==ch) {
+							switch(ks.getKeyType()) {
+								case ArrowDown:
+									ch = '2';
+									break;
+								case ArrowLeft:
+									ch = '4';
+									break;
+								case ArrowRight:
+									ch = '6';
+									break;
+								case ArrowUp:
+									ch = '8';
+									break;
+							}
+						}
+						if(null!=ch) {
+							String charStr = String.valueOf(ch);
+							byte[] koi8Bytes = charStr.getBytes(MC_CHARSET);
+
+							serialPort.writeByte(koi8Bytes[0x00]);
+							if(singleWireMode) {
+								serialPort.readBytes(0x01);
+							}
 						}
 					}
 				}
 
-				StringBuilder sb = null;
 				while(enabled && 0<serialPort.getInputBufferBytesCount()) {
 					byte[] buffer = serialPort.readBytes(serialPort.getInputBufferBytesCount());
 					if(null!=buffer && 0<buffer.length) {
@@ -101,7 +107,25 @@ public class SerialTerminal extends Thread {
 								if(null!=sb) {
 									if('\n'==buffer[i]) {
 										String result = handler.handle(sb.toString());
-										terminal.putString(new String((null==result ? sb.toString() : result).getBytes(), MC_CHARSET));
+										if(null==result) {
+											if(null!=terminal) {
+												terminal.putString(new String(sb.toString().getBytes(), MC_CHARSET));
+											}
+											else {
+												System.out.print(new String(sb.toString().getBytes(), MC_CHARSET));
+											}
+										}
+										else {
+											if(null!=terminal) {
+												for(String part : result.split("\n")) {
+													terminal.putString(part);
+													terminal.putCharacter('\n');
+												}
+											}
+											else {
+												System.out.print(result);
+											}
+										}
 										sb = null;
 									}
 									else {
@@ -109,7 +133,12 @@ public class SerialTerminal extends Thread {
 									}
 								}
 								else {
-									terminal.putCharacter(new String(buffer, i, 0x01, MC_CHARSET).charAt(0));
+									if(null!=terminal) {
+										terminal.putCharacter(new String(buffer, i, 0x01, MC_CHARSET).charAt(0));
+									}
+									else {
+										System.out.print(new String(buffer, i, 0x01, MC_CHARSET).charAt(0));
+									}
 								}
 							}
 						}
@@ -121,7 +150,7 @@ public class SerialTerminal extends Thread {
 						else {
 							terminal.putString(new String(buffer, MC_CHARSET));
 						}*/
-						terminal.flush();
+						if(null!=terminal) terminal.flush();
 					}
 				}
 			}

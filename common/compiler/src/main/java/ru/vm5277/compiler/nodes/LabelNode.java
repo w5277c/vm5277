@@ -79,6 +79,9 @@ public class LabelNode extends AstNode {
 
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
+		if(cgDone || disabled) return null;
+		cgDone = true;
+
 		CodegenResult result = null;
 		
 		cgScope.append(labelScope);

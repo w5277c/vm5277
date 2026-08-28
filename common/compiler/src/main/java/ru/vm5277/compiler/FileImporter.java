@@ -19,46 +19,56 @@ import ru.vm5277.common.lexer.Lexer;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.List;
-import ru.vm5277.common.messages.ErrorMessage;
-import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.common.lexer.LexerType;
 import ru.vm5277.common.lexer.tokens.Token;
 
 public class FileImporter {
-	private	final	List<String>		importedFiles	= new ArrayList<>();
+	private	final	Instance			inst;
 	private	final	Path				runtimePath;
 	private	final	Path				basePath;
-	private	final	MessageContainer	mc;
-
-	public FileImporter(Path runtimePath, Path basePath, MessageContainer mc) {
+	
+	public FileImporter(Instance inst, Path runtimePath, Path basePath) {
+		this.inst = inst;
 		this.runtimePath = runtimePath;
 		this.basePath = basePath;
-		
-		this.mc = mc;
 	}
 
 	public List<Token> importFile(String importPath, int tabSize) throws IOException {
+		if(null==basePath) return null;
 		// Проверка циклических зависимостей
-		if (importedFiles.contains(importPath)) {
-			mc.add(new WarningMessage("Circular import detected: " + importPath, null));
-		}
-		else {
-			importedFiles.add(importPath);
+		if(!inst.getImportedFiles().contains(importPath)) {
+			inst.getImportedFiles().add(importPath);
 		}
 
-		File file = (null==runtimePath ? null : runtimePath.resolve(importPath).normalize().toFile());
-		if(null==file || !file.exists()) {
-			file = basePath.resolve(importPath).normalize().toFile();
-			if(!file.exists()) {
-				return null;
+		List<Token> result = null;
+		if(null!= runtimePath) {
+			result = getTokens(runtimePath, importPath, tabSize);
+			if(null!=result) return result;
+		}
+
+		if(null!=basePath) {
+			result = getTokens(basePath, importPath, tabSize);
+			if(null!=result) return result;
+		}
+		
+		for(Path includePath : inst.getIncludePaths()) {
+			result = getTokens(includePath, importPath, tabSize);
+			if(null!=result) return result;
+		}
+
+		return null;
+	}
+	
+	private List<Token> getTokens(Path dir, String filename, int tabSize) {
+		try {
+			File file = dir.resolve(filename).normalize().toFile();
+			if(null!=file && file.exists()) {
+				Lexer lexer = new Lexer(LexerType.J8B, file, null, tabSize, false);
+				return lexer.getTokens();
 			}
 		}
-		if(null != file) {
-			Lexer lexer = new Lexer(LexerType.J8B, file, null, tabSize, false);
-			return lexer.getTokens();
+		catch(IOException ignore)  {
 		}
 		return null;
 	}

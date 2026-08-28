@@ -1,0 +1,45 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+public interface P5277BusModule extends RtosBoard {
+	public static final byte PIN_CH1 = Gpio.PC4;	//ADC4,SDA
+	public static final byte CAP_CH1 = Gpio.PC1;	//100nF
+	public static final byte RES_CH1 = Gpio.PC3;	//1M/4K
+	public static final byte PIN_CH2 = Gpio.PC5;	//ADC5,SCL
+	public static final byte CAP_CH2 = Gpio.PD6;	//100nF
+	public static final byte RES_CH2 = Gpio.PC2;	//1M/4K
+	public static final byte PIN_CH3 = Gpio.PD2;	//INT0		=PIN_C1
+	public static final byte CAP_CH3 = Gpio.PB0;	//100nF
+	public static final byte RES_CH3 = Gpio.PB1;	//1M/4K
+
+	public static final byte PIN_L1 = Gpio.PB5;		//SCK
+	public static final byte PIN_L2 = Gpio.PB3;		//OC2A,MOSI
+	public static final byte PIN_L3 = Gpio.PB4;		//MISO
+	public static final byte PIN_R1 = Gpio.PD3;		//OC2B,INT1
+	public static final byte PIN_R2 = Gpio.PD7;		//AIN1
+	public static final byte PIN_C1 = Gpio.PD2; 	//INT0		=PIN_CH3
+	public static final byte PIN_C2 = Gpio.PC0;		//ADC0
+
+	public static final byte PIN_RS485_RX = Gpio.PD0;
+   	public static final byte PIN_RS485_TX = Gpio.PD1;
+   	public static final byte PIN_RS485_DR = Gpio.PD4;
+
+	public static final byte LED_ACT = Gpio.PB2;
+	public static final byte LED_BUS = Gpio.PD5;
+
+   	// UART'ы
+   	public static final byte UART0_SN	= 0x00;
+}

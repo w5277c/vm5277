@@ -16,11 +16,9 @@
 
 package ru.vm5277.compiler.stub_codegen;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import ru.vm5277.common.Device;
 import ru.vm5277.common.ExcsThrowPoint;
 import ru.vm5277.common.NativeBinding;
@@ -60,7 +58,7 @@ public class Generator extends CodeGenerator {
 	@Override public CGIContainer constToCells(CGScope scope, long value, CGCells cells, boolean isFixed) throws CompileException {return null;}
 	@Override public void cellsAction(CGScope scope, CGCells leftcells, Operator op, CGCells rightCells, boolean leftisFixed, boolean rightIsFixed, CGExcs excs) throws CompileException {}
 	@Override public void constAction(CGScope scope, CGCells cells, Operator op, long k, boolean isFixed, CGExcs excs) throws CompileException {}
-	@Override public CGIContainer pushAccBE(CGScope scope, int size) throws CompileException {return null;} 
+	@Override public CGIContainer pushAccBE(CGScope scope, int size, boolean strong) throws CompileException {return null;} 
 	@Override public CGIContainer pushAccLE(CGScope scope, int size) throws CompileException {return null;}
 	@Override public void popAccBE(CGScope scope, int size) throws CompileException {}
 	@Override public CGIContainer pushHeapReg(CGScope scope) {return null;}
@@ -70,14 +68,14 @@ public class Generator extends CodeGenerator {
 	@Override public void updateClassRefCount(CGScope scope, CGCells cells, boolean isInc) throws CompileException {}
 	@Override public void invokeInterfaceMethod(CGScope scope, String className, String methodName, VarType type, VarType[] types, VarType ifaceType, int methodSN) throws CompileException {}
 	@Override public void eInstanceof(CGScope scope, VarType type) throws CompileException {}
-	@Override public void eUnary(CGScope scope, Operator opt, CGCells cells, boolean toAccum, CGExcs excs) throws CompileException {}
+	@Override public void eUnary(CGScope scope, Operator opt, CGCells cells, boolean toAccum, boolean isFixed, CGExcs excs) throws CompileException {}
 	@Override public CGIContainer eNewInstance(CGScope scope, int fieldsSize, CGLabelScope iidLabel, VarType type, InstanceType instType, CGIContainer postfixCont, CGExcs excs) throws CompileException {return null;}
 	@Override public void eNewArray(CGScope scope, VarType type, int depth, int[] cDims, CGExcs excs) throws CompileException {};
 	@Override public void eNewArrView(CGScope scope, int depth, CGExcs excs) throws CompileException {};
 	@Override public void eTry(CGBlockScope blockScope, List<Case> cases, CGBlockScope defaultBlockScope) {}
 	@Override public void eCatch(CGScope scope) throws CompileException {};
 	@Override public CGIContainer eReturn(CGScope scope, VarType retType, CGLabelScope lScope) throws CompileException {return null;}
-	@Override public void eThrow(CGScope cgs, int exceptioId, boolean isMethodLeave, CGLabelScope lbScope, boolean withCode, ExcsThrowPoint point) throws CompileException {}
+	@Override public void eThrow(CGScope cgs, int exceptionId, boolean isMethodLeave, CGLabelScope lbScope, boolean withCode, ExcsThrowPoint point) throws CompileException {}
 	@Override public void throwCheck(CGScope scope, List<Pair<CGLabelScope, Set<Integer>>> exceptionHandlers, CGLabelScope methodEndLbScope, ExcsThrowPoint point) throws CompileException {}
 	@Override public void exTypeIdToAcc(CGScope scope) throws CompileException {}
 	@Override public void exCodeToAcc(CGScope scope) throws CompileException {}
@@ -86,7 +84,7 @@ public class Generator extends CodeGenerator {
 	@Override public HashMap<Byte, RegPair> buildRegsPool() {return null;}
 	@Override public CGIContainer pushConst(CGScope scope, int size, long value, boolean isFixed) {return null;}
 	@Override public CGIContainer pushCells(CGScope scope, int size, CGCells cells) throws CompileException {return null;}
-	@Override public void stackPrepare(CGIContainer scope, boolean firstBlock, int argsSize, int varsSize, CGExcs excs) throws CompileException {};
+	@Override public void stackPrepare(CGIContainer scope, boolean firstBlock, int argsSize, int varsSize, boolean asCallback, CGExcs excs) throws CompileException {};
 	@Override public CGIContainer blockFree(int size) {return null;}
 	@Override public String getVersion() {return VERSION;}
 	@Override public CGIContainer jump(CGScope scope, CGLabelScope lScope) throws CompileException {return null;}
@@ -95,33 +93,34 @@ public class Generator extends CodeGenerator {
 	@Override public void boolFlagCond(CGScope scope, boolean inverted, CGBranch branchScope) throws CompileException {}
 	@Override public CGIContainer call(CGScope scope, CGLabelScope lScope) throws CompileException {return null;}
 	@Override public int getCallStackSize() {return 0;}
-	@Override public boolean normalizeIRegConst(CGMethodScope mScope, char iReg, AtomicInteger lastOffset) {return false;}
+	@Override public void normalizeIRegConst(CGMethodScope mScope) {}
 	@Override public void computeArrCellAddr(CGScope scope, CGCells arrAddrCells, CGArrCells arrCells, CGExcs excs) throws CompileException {}
 	@Override public void arrToAcc(CGScope scope, CGArrCells arrCells, boolean isFixed) throws CompileException {}
 	@Override public void accToArr(CGScope scope, CGArrCells arrScope) throws CompileException {}
 	@Override public void flashDataToArr(CGScope scope, DataSymbol symbol, int offset) {}
-	@Override public void updateArrRefCount(CGScope cgScope, CGCells cells, boolean isInc, boolean isView) throws CompileException {}
+	@Override public void updateArrRefCount(CGScope cgScope, CGCells cells, boolean isInc) throws CompileException {}
 	@Override public void cellsToArrReg(CGScope cgScope, CGCells cells) throws CompileException {}
 	@Override public CGIContainer pushArrReg(CGScope scope) {return null;}
 	@Override public CGIContainer popArrReg(CGScope scope) {return null;}
-	@Override public void arrSizetoAcc(CGScope cgScope, boolean isView) {}
+	@Override public void arrSizetoAcc(CGScope cgScope, boolean exactlyArray) {}
 	@Override public void accToArrReg(CGScope scope) throws CompileException {}
 	@Override public void cellsToAcc(CGScope scope, CGCells cells, boolean isFixed) throws CompileException {}
 	@Override public void thisToAcc(CGScope scope) throws CompileException {}
-	@Override public NativeBinding nativeMethodInit(CGScope scope, String signature, boolean isConstants) throws CompileException {return null;}
+	@Override public NativeBinding nativeMethodInit(CGScope scope, String signature) throws CompileException {return null;}
 	@Override public void nativeMethodSetArg(CGScope scope, String signature, List<Byte> storedRegs, int index, boolean isFixed) throws CompileException {}
-	@Override public void nativeMethodInvoke(CGScope scope, String signature, List<Byte> storedRegs, VarType type) throws CompileException {}
-	@Override public void functApply(CGScope scope, String funct, long[] constants) throws CompileException {}
-	@Override public CGIContainer finMethod(VarType type, int argsSize, int varsSize, int lastStackOffset) throws CompileException {return null;}
+	@Override public void nativeMethodInvoke(CGScope scope, NativeBinding nb, String signature, List<Byte> storedRegs, VarType type, boolean sendThis) throws CompileException {}
+	@Override public boolean functApply(CGScope scope, String funct, long[] constants) throws CompileException {return true;}
+	@Override public CGIContainer finMethod(VarType type, int argsSize, int varsSize) throws CompileException {return null;}
 	@Override public void terminate(CGScope scope, boolean systemStop, boolean excsCheck) throws CompileException {}
 	@Override public void exCodeToAccH(CGScope scope, long numValue) throws CompileException {}
+	@Override public void classIdToAcc(CGScope scope, CGCells refCells) throws CompileException {}
+	@Override public void classTypeIdToAcc(CGScope scope, CGCells refCells) throws CompileException {}
 	@Override public void cellsToCells(CGScope scope, CGCells leftCells, VarType leftType, CGCells rightCells, VarType rigthType) throws CompileException {}
 	@Override public void computeArrViewCellsAddr(CGScope scope, CGCells arrAddrCells, CGArrCells arrCells, CGExcs excs) throws CompileException {}
 	@Override public CGIAsm pushReg(byte reg) throws CompileException {return null;}
 	@Override public CGIAsm popReg(byte reg) throws CompileException {return null;}
-	@Override public void methodInvoke(CGScope scope, CGLabelScope lbScope, String signature, VarType type) throws CompileException {}
+	@Override public void methodInvoke(CGScope scope, CGLabelScope lbScope, String signature, VarType type, boolean isStatic) throws CompileException {}
 	@Override public void invokeConstr(CGScope scope, CGLabelScope lScope) throws CompileException {}
-	@Override public void nativeMethodArrArgPrepare(CGScope cgScope, String signature, List<Byte> storedRegs, int index, boolean checkedByCompiler, CGLabelScope lbScope) throws CompileException {}
 	@Override public int getThreadHeaderSize() {return 0;}
 	@Override public int getTimerHeaderSize() {return 0;}
 	@Override public void cellsOpCells(CGScope scope, CGCells leftCells, VarType leftType, Operator op, CGCells rightCells, VarType rightType) throws CompileException {}

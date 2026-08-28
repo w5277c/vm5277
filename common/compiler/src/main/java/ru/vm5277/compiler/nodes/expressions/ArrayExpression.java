@@ -17,6 +17,7 @@
 package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.List;
+import java.util.Objects;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
@@ -30,7 +31,6 @@ import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Instance;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -218,10 +218,14 @@ public class ArrayExpression extends ExpressionNode {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
+		if(disabled) return null;
+// Приводит к генерации вычисления адреса массива только единожды во всем коде		if(cgDone || disabled) return null;
+		cgDone = true;
+
 		CodegenResult result = null;
 		excs.setSourcePosition(sp);
 		
-		targetExpr.codeGen(cg, false, excs);
+		if(CodegenResult.ACCUM_USED==targetExpr.codeGen(cg, false, excs)) result = CodegenResult.ACCUM_USED;
 
 		CGCellsScope cScope = (CGCellsScope)targetExpr.getSymbol().getCGScope(CGCellsScope.class);
 		
@@ -258,13 +262,18 @@ public class ArrayExpression extends ExpressionNode {
 				ExpressionNode indexExpr = indexExprs.get(i);
 				if(indexExpr instanceof LiteralExpression && ((LiteralExpression)indexExpr).type.isInteger()) {
 					int index = (int)((LiteralExpression)indexExpr).getNumValue();
-					cg.pushConst(indexExpr.getCGScope(), 0x02, index, false);
+					//cg.pushConst(indexExpr.getCGScope(), 0x02, index, false);
+					cg.pushConst(cgScope, 0x02, index, false);
 				}
 				else {
 					if(indexExpr instanceof ArrayExpression) {
-						indexExpr.codeGen(cg, false, excs);
-						cg.pushCells(indexExpr.getCGScope(), 0x02, new CGCells(CGCells.Type.ARRAY,
-															(-1==indexExpr.getType().getSize() ? cg.getRefSize() : indexExpr.getType().getSize())));
+						if(CodegenResult.ACCUM_USED==indexExpr.codeGen(cg, false, excs)) result = CodegenResult.ACCUM_USED;
+//						cg.pushCells(indexExpr.getCGScope(), 0x02, new CGCells(CGCells.Type.ARRAY,
+//															(indexExpr.getType().isReferenceType() ? cg.getRefSize() : indexExpr.getType().getSize())));
+						cg.pushCells(cgScope, 0x02, new CGCells(CGCells.Type.ARRAY,
+															(indexExpr.getType().isReferenceType() ? cg.getRefSize() : indexExpr.getType().getSize())));
+
+
 //						cgs.append(cg.accCast(null, VarType.SHORT));
 						//0x02 - количество байт под индекс массива
 //						cg.pushArrReg(cgs);
@@ -274,11 +283,14 @@ public class ArrayExpression extends ExpressionNode {
 						if(indexExpr instanceof VarFieldExpression) {
 							try {
 								VarFieldExpression ve = (VarFieldExpression)indexExpr;
-								cg.pushCells(ve.getCGScope(), 0x02, ((CGCellsScope)ve.getSymbol().getCGScope()).getCells());
+								if(CodegenResult.ACCUM_USED==indexExpr.codeGen(cg, false, excs)) result = CodegenResult.ACCUM_USED;
+								//cg.pushCells(ve.getCGScope(), 0x02, ((CGCellsScope)ve.getSymbol().getCGScope()).getCells());
+								cg.pushCells(cgScope, 0x02, ((CGCellsScope)ve.getSymbol().getCGScope()).getCells());
 								optimized = true;
 							}
 							catch(Exception ex) {
 								System.out.println("TODO:" + ex.getMessage());
+								ex.printStackTrace();
 							}
 						}
 						
@@ -286,11 +298,16 @@ public class ArrayExpression extends ExpressionNode {
 							cg.accumLock(VarType.SHORT);
 							if(CodegenResult.RESULT_IN_ACCUM == indexExpr.codeGen(cg, true, excs)) {
 								//0x02 - количество байт под размер массива
-								cg.pushAccLE(indexExpr.getCGScope(), 0x02);
+								//cg.pushAccLE(indexExpr.getCGScope(), 0x02);
+								cg.pushAccLE(cgScope, 0x02);
+								result = CodegenResult.ACCUM_USED;
 							}
 							else {
-								cg.pushCells(indexExpr.getCGScope(), 0x02, new CGCells(CGCells.Type.ARRAY,
-																	(-1==indexExpr.getType().getSize() ? cg.getRefSize() : indexExpr.getType().getSize())));
+								//cg.pushCells(indexExpr.getCGScope(), 0x02, new CGCells(CGCells.Type.ARRAY,
+								//									(indexExpr.getType().isReferenceType() ? cg.getRefSize() : indexExpr.getType().getSize())));
+								cg.pushCells(cgScope, 0x02, new CGCells(CGCells.Type.ARRAY,
+																	(indexExpr.getType().isReferenceType() ? cg.getRefSize() : indexExpr.getType().getSize())));
+
 							}
 							cg.accumUnlock();
 						}
@@ -326,6 +343,7 @@ public class ArrayExpression extends ExpressionNode {
 			//Похоже вообшще не нужно cg.popAccBE(cgs, accSize);
 		}
 
+		releaseVars(cg);
 		return result;
 	}
 	
@@ -386,7 +404,7 @@ public class ArrayExpression extends ExpressionNode {
 					if(indexExpr instanceof ArrayExpression) {
 						indexExpr.codeGen(cg, false, excs);
 						cg.pushCells(indexExpr.getCGScope(), 0x02, new CGCells(CGCells.Type.ARRAY,
-															(-1==indexExpr.getType().getSize() ? cg.getRefSize() : indexExpr.getType().getSize())));
+															(indexExpr.getType().isReferenceType() ? cg.getRefSize() : indexExpr.getType().getSize())));
 //						cgs.append(cg.accCast(null, VarType.SHORT));
 						//0x02 - количество байт под индекс массива
 //						cg.pushArrReg(cgs);
@@ -401,6 +419,7 @@ public class ArrayExpression extends ExpressionNode {
 							}
 							catch(Exception ex) {
 								System.out.println("TODO:" + ex.getMessage());
+								ex.printStackTrace();
 							}
 						}
 						
@@ -412,7 +431,7 @@ public class ArrayExpression extends ExpressionNode {
 							}
 							else {
 								cg.pushCells(indexExpr.getCGScope(), 0x02, new CGCells(CGCells.Type.ARRAY,
-																	(-1==indexExpr.getType().getSize() ? cg.getRefSize() : indexExpr.getType().getSize())));
+																	(indexExpr.getType().isReferenceType() ? cg.getRefSize() : indexExpr.getType().getSize())));
 							}
 							cg.accumUnlock();
 						}
@@ -446,6 +465,7 @@ public class ArrayExpression extends ExpressionNode {
 		}
 		cg.eNewArrView(cgScope, indexExprs.size()-1, excs);
 
+		releaseVars(cg);
 		return CodegenResult.RESULT_IN_ACCUM;
 	}
 
@@ -474,8 +494,20 @@ public class ArrayExpression extends ExpressionNode {
 		return targetExpr.toString() + sb.toString();
 	}
 	
+	@Override
 	public String getFullInfo() {
 		return getClass().getSimpleName() + " " + toString();
 	}
 
+	public ExpressionNode getTargetExpr() {
+		return targetExpr;
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		if(!(obj instanceof ArrayExpression)) return false;
+		ArrayExpression expr2 = (ArrayExpression)obj;
+		if(!Objects.equals(targetExpr, expr2.getTargetExpr())) return false;
+		return Objects.equals(indexExprs, expr2.getIndexesExpr());
+	}
 }

@@ -20,10 +20,13 @@ import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import ru.vm5277.common.Device;
 import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.Logger;
+import ru.vm5277.common.enums.InteractiveMode;
 
 public class InternalFlashTool implements FlashTool {
 	public	final	static	int				MIN_FLASH_SIZE_FOR_BOOTLOADER	= 2048; //2 KBytes
@@ -56,6 +59,11 @@ public class InternalFlashTool implements FlashTool {
 	@Override
 	public List<FlashToolParam> getParams() {
 		List<FlashToolParam> result = new ArrayList<>();
+		List<String> values = new ArrayList<>();
+		for(InteractiveMode im : InteractiveMode.values()) {
+			values.add(im.name().toLowerCase());
+		}
+		result.add(new FlashToolParam("Interactive mode", values, "auto", "I"));
 		return result;
 	}
 

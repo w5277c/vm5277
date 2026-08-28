@@ -132,7 +132,7 @@ public class DoWhileNode extends CommandNode {
 		
 		if(result) {
 			VarType condType = condition.getType();
-			if(null==condType || VarType.BOOL!=condType) {
+			if(null==condType || VarType.BOOLEAN!=condType) {
 				markError("Loop condition must be boolean, got: " + condType);
 				result = false;
 			}
@@ -169,7 +169,7 @@ public class DoWhileNode extends CommandNode {
 		
 		if(condition instanceof LiteralExpression) {
 			LiteralExpression le = (LiteralExpression)condition;
-			if(VarType.BOOL==le.getType()) {
+			if(VarType.BOOLEAN==le.getType()) {
 				if((boolean)le.getValue()) {
 					alwaysTrue = true;
 				}
@@ -182,11 +182,11 @@ public class DoWhileNode extends CommandNode {
 
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
-		if(cgDone) return null;
+		if(cgDone || disabled) return null;
 		cgDone = true;
 		
 		CodegenResult result = null;
-		cgScope.setBranch(branch);
+		condition.getCGScope().setBranch(branch);
 		
 		if(!alwaysFalse) {
 			blockNode.codeGen(cg, false, excs);
@@ -220,8 +220,8 @@ public class DoWhileNode extends CommandNode {
 		cgScope.append(((CGLoopBlockScope)cgScope).getEndLbScope());
 		
 		((CGBlockScope)cgScope).build(cg, false, excs);
-		((CGBlockScope)cgScope).releaseRegsPool();
 
+		releaseVars(cg);
 		return result;
 	}
 

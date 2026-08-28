@@ -35,18 +35,19 @@ J8BPROC_MFIN_SF:
 	LSR ZH
 	ROR ZL
 	ADIW ZL,0x04											;+Y(2B)+ADDR(2B)
-	ADD ZL,YL												;Нахожу адрес стека до вызова и записи аргументов
-	ADC ZH,YH												
 
+	ADIW YL,63
 	CLI														;Запрет прерываний из-за _SPL/_H и работы со стеком
+	STS SPL,YL												;Восстанавливаю стек
+	STS SPH,YH
+	SUB YL,ZL
+	SBC YH,ZH
 	LDD _SPH,Y+0x03											;Восстанавливаем адрес возврата
 	LDD _SPL,Y+0x04
 	LDD ATOM_L,Y+0x01										;Восстанавливаем Y
 	LDD YL,Y+0x02
 	MOV YH,ATOM_L
-	STS SPL,ZL												;Восстанавливаю стек
-	STS SPH,ZH
-	POP ZH													;Восстанавливаю Z
+	POP ZH													;Восстанавливаю Z (порядок как в аргументах)
 	POP ZL
 	PUSH _SPL												;Помещаю адрес возврата в стек
 	PUSH _SPH

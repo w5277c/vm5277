@@ -1,0 +1,226 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import drivers.ifaces.TM1637;
+
+public class HW069Display implements TextDisplay {
+	public static final char SYMBOL_A = 0b01110111; // 'A'
+	public static final char SYMBOL_B = 0b01111100; // 'b'
+	public static final char SYMBOL_C = 0b00111001; // 'C'
+	public static final char SYMBOL_D = 0b01011110; // 'd'
+	public static final char SYMBOL_E = 0b01111001; // 'E'
+	public static final char SYMBOL_F = 0b01110001; // 'F'
+	public static final char SYMBOL_G = 0b00111101; // 'G'
+	public static final char SYMBOL_H = 0b01110110; // 'H'
+	public static final char SYMBOL_I = 0b00000110; // 'I'
+	public static final char SYMBOL_J = 0b00011110; // 'J'
+	public static final char SYMBOL_L = 0b00111000; // 'L'
+	public static final char SYMBOL_N = 0b01010100; // 'n'
+	public static final char SYMBOL_O = 0b00111111; // 'O'
+	public static final char SYMBOL_P = 0b01110011; // 'P'
+	public static final char SYMBOL_R = 0b01010000; // 'r'
+	public static final char SYMBOL_S = 0b01101101; // 'S'
+	public static final char SYMBOL_T = 0b01111000; // 't'
+	public static final char SYMBOL_U = 0b00111110; // 'U'
+	public static final char SYMBOL_Y = 0b01101101; // 'Y'
+	public static final char SYMBOL_LL= 0b00110110; // 'LL'
+
+	public static final char DIGIT_0 = 0b00111111;
+	public static final char DIGIT_1 = 0b00000110;
+	public static final char DIGIT_2 = 0b01011011;
+	public static final char DIGIT_3 = 0b01001111;
+	public static final char DIGIT_4 = 0b01100110;
+	public static final char DIGIT_5 = 0b01101101;
+	public static final char DIGIT_6 = 0b01111101;
+	public static final char DIGIT_7 = 0b00000111;
+	public static final char DIGIT_8 = 0b01111111;
+	public static final char DIGIT_9 = 0b01101111;
+
+	public static final char SYMBOL_MINUS = 0b01000000; // '-' (сегмент G)
+	public static final char SYMBOL_UNDER = 0b00001000; // '_' (сегмент D)
+	public static final char SYMBOL_DEGREE= 0b01100011; // '°' (градус для температуры)
+	public static final char SYMBOL_BLANK = 0b00000000; // Пустой разряд (пробел)
+
+	private static final byte CMD_DATA_AUTO = 0x40; // Автоинкремент адреса
+	private static final byte CMD_ADDR_START = 0xC0; // Начальный адрес (левый разряд)
+	private static final byte CMD_DISPLAY_ON = 0x88; // Включение дисплея + маска яркости
+	private static final byte CMD_DISPLAY_OFF = 0x80; // Выключение дисплея
+
+	private static final byte[] FONT_DIGIT = new byte[] {
+		0b00111111, // 0
+		0b00000110, // 1
+		0b01011011, // 2
+		0b01001111, // 3
+		0b01100110, // 4
+		0b01101101, // 5
+		0b01111101, // 6
+		0b00000111, // 7
+		0b01111111, // 8
+		0b01101111  // 9
+	};
+
+	private static final byte[] FONT_ALPHA = new byte[] {
+		0b01110111, // A
+		0b01111100, // b
+		0b00111001, // C
+		0b01011110, // d
+		0b01111001, // E
+		0b01110001, // F
+		0b00111101, // G
+		0b01110110, // H
+		0b00000110, // I
+		0b00011110, // J
+		0b01110101, // K
+		0b00111000, // L
+		0b00110111, // M
+		0b01010100, // n
+		0b00111111, // O
+		0b01110011, // P
+		0b01100111, // Q
+		0b01010000, // r
+		0b01101101, // S
+		0b01111000, // t
+		0b00111110, // U
+		0b00011100, // V
+		0b00111110, // W
+		0b01110110, // X
+		0b01101110, // Y
+		0b01011011  // Z
+	};
+
+	private TM1637 iface;
+	private boolean autoShift;
+
+	private final byte[] buffer = new byte[0x05];
+	private byte xPos;
+	private byte bright = 4;
+	private boolean showColon;
+
+	public HW069Display(byte dataPort, byte clkPort) {
+		iface = new TM1637(dataPort, clkPort);
+	}
+
+	@Override public void init() {
+		buffer[0] = CMD_DATA_AUTO;
+		iface.comm(buffer, 1, null, 0, 10);
+
+		clear();
+		update();
+
+		setBacklight(true);
+	}
+
+	public void setAutoShift(boolean autoShift) {
+		this.autoShift = autoShift;
+	}
+	public boolean getAutoShift() {
+		return autoShift;
+	}
+
+	@Override public short getWidth() {return 4;}
+	@Override public short getHeight() {return 1;}
+
+	@Override public void clear() {
+		for(byte i=1; i<5; i++) {
+			buffer[i]=0x00;
+		}
+		xPos=0;
+	}
+
+	@Override public void update() {
+		byte oldDigit1 = buffer[2];
+		if(showColon) {
+			// ошибка кодогенерации buffer[2] |= 0x80;
+			buffer[2] = buffer[2] | 0x80;
+		}
+		buffer[0] = CMD_ADDR_START;
+		iface.comm(buffer, 5, null, 0, 10);
+		buffer[2] = oldDigit1;
+	}
+
+	@Override public void setBacklight(boolean on) {
+		buffer[0] = (on ? (CMD_DISPLAY_ON|bright) : CMD_DISPLAY_OFF);
+		iface.comm(buffer, 1, null, 0, 0);
+	}
+
+	@Override public void setCursor(short x, short y) {
+		if(x>=0 && x<4) {
+			this.xPos = (byte)x;
+		}
+	}
+
+	public void putSymbol(char c) {
+		if(!autoShift && xPos>=4) return;
+		putArr(c&0x7f);
+	}
+	@Override public void putChar(char c) {
+		if(!autoShift && xPos>=4) return;
+
+		if(c>='0' && c<='9') {
+			c = FONT_DIGIT[c-'0'];
+		}
+		else if(' '==c) {
+			c = SYMBOL_BLANK;
+		}
+		else if('-'==c) {
+			c = SYMBOL_MINUS;
+		}
+		else if(':'==c) {
+			showColon = true;
+			return;
+		}
+		else {
+			if(c>='a' && c<='z') {
+				c = FONT_ALPHA[c - 'a'];
+			}
+			else if(c>='A' && c<='Z') {
+				c = FONT_ALPHA[c - 'A'];
+			}
+			else {
+				c = SYMBOL_BLANK;
+			}
+		}
+		putArr(c);
+	}
+
+	private void putArr(byte c) {
+		if(xPos>=4) {
+			buffer[1] = buffer[2];
+    		buffer[2] = buffer[3];
+    		buffer[3] = buffer[4];
+    		buffer[4] = c;
+		}
+		else {
+			buffer[++xPos] = c;
+		}
+    }
+
+	public void setColon(boolean show) {
+		this.showColon = show;
+	}
+
+	@Override public void setInkColor(byte c) {}
+	@Override public void setPaperColor(byte c) {}
+
+	@Override public void setBright(byte b) {
+		bright = (b>7 ? 7 : b);
+		setBacklight(true);
+	}
+	@Override public byte getMaxBright() {return 7;}
+	@Override public void setContrast(byte b) {}
+	@Override public byte getMaxContrast() {return 0;}
+
+}

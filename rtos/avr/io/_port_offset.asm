@@ -17,30 +17,30 @@
 .IFNDEF _PORT_OFFSET
 ;-----------------------------------------------------------
 _PORT_OFFSET:
+REG_IN:														;Не требует дополнительных действий
 ;-----------------------------------------------------------
 ;Возвращаем смещение на первый адрес регистров порта
 ;IN: ACCUM_L-сдвоенный порт и пин (PA0, PC7 и т.п.)
-;OUT: Z-адрес регистра PINx, ACCUM_L-пин в виде числа
+;OUT: ACCUM_L-адрес регистра PINx, ACCUM_H-пин в виде
+;числа
 ;-----------------------------------------------------------
-	PUSH TEMP_L
+	PUSH_Z
 
-	MOV TEMP_L,ACCUM_L
+	PUSH ACCUM_L
 	ANDI ACCUM_L,0x0f
-
 	LDI_Z _BIT_TO_MASK_TABLE*2
+	ADD ZL,ACCUM_L
+	ADC ZH,C0x00
+	LPM ACCUM_H,Z
+
+	POP ACCUM_L
+	SWAP ACCUM_L
+	ANDI ACCUM_L,0x0f
+	LDI_Z PORTS_TABLE*2
 	ADD ZL,ACCUM_L
 	ADC ZH,C0x00
 	LPM ACCUM_L,Z
 
-	SWAP TEMP_L
-	ANDI TEMP_L,0x0f
-
-	LDI_Z PORTS_TABLE*2
-	ADD ZL,TEMP_L
-	ADC ZH,C0x00
-	LPM ZL,Z
-	LDI ZH,0x00
-
-	POP TEMP_L
+	POP_Z
 	RET
 .ENDIF

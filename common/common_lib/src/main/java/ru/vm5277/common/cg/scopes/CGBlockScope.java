@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.LabelNames;
-import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CGExcs;
@@ -44,16 +43,13 @@ import ru.vm5277.common.exceptions.CompileException;
 
 
 public class CGBlockScope extends CGScope {
+	private				CodeGenerator				cg;
 	private				CGLabelScope				lbEScope;
-	private		final	Map<Integer, CGVarScope>	locals			= new HashMap<>();
-	// Хранит размер блока в стеке, выделенный под локальные переменные
-	protected			int							stackOffset		= 0;				
-	// Все доступные регистры под переменные, хранят признак свободен(true)/занят для текущего уровня
-	private		final	HashMap<Byte,RegPair>		regsPool;
-	// Регистры, которые одолжили у родителя (в конце должны сообщить родителю весь список для освобождения)
-	private				Set<Byte>					parentUsedRegs	= new HashSet<>();	
-	// Регистры, которые были задействованы в коде блока и требуют сохранения оригинала в стек
-	private		final	Set<Byte>					localUsedRegs	= new HashSet<>();
+	private		final	Map<Integer, CGVarScope>	vars			= new HashMap<>();
+	protected			int							stackOffset		= 0; // Размер блока в стеке, выделенный под локальные переменные
+	private		final	HashMap<Byte,RegPair>		regsPool; // Все доступные регистры под переменные, хранят признак свободен(true)/занят для текущего уровня
+	private				Set<Byte>					parentUsedRegs	= new HashSet<>(); // Регистры, которые одолжили у родителя (в конце должны сообщить родителю весь список для освобождения)
+	private		final	Set<Byte>					localUsedRegs	= new HashSet<>(); // Регистры, которые были задействованы в коде блока и требуют сохранения оригинала в стек
 	private				CGMethodScope				mScope;
 	private				boolean						isFirstBlock;
 	private				Set<String>					labels			= new HashSet<>();
@@ -61,11 +57,8 @@ public class CGBlockScope extends CGScope {
 	public CGBlockScope(CodeGenerator cg, CGScope parent, int id, String comment) {
 		super(parent, id, comment);
 		
-/*		CGBlockScope bScope = parent.getBlockScope();
-		if(null != bScope) {
-			this.stackOffset = bScope.getStackBlockSize();
-		}
-*/		
+		this.cg = cg;
+		
 		regsPool = cg.buildRegsPool();
 
 		if(parent instanceof CGMethodScope) isFirstBlock = true;
@@ -74,14 +67,22 @@ public class CGBlockScope extends CGScope {
 		mScope.addBlockScope(this);
 
 		lbEScope = new CGLabelScope(null, null, LabelNames.BLOCK_END, false);
-//		cg.addLabel(lbEScope);
 	}
 	
 	public void build(CodeGenerator cg, boolean isLaunchPoint, CGExcs excs) throws CompileException {
 		CGIContainer cont = new CGIContainer();
 
+		InstanceType instType = InstanceType.CLASS;
+		if(isFirstBlock && mScope.getParent() instanceof CGClassScope) {
+			instType = ((CGClassScope)mScope.getParent()).getInstType();
+		}
+
+		boolean asCallback = (	isFirstBlock && !isLaunchPoint &&
+								(InstanceType.THREAD==instType  || InstanceType.TIMER==instType) && mScope.getSignature().equals("run()")) ||
+								(InstanceType.RTOS_CALLBACK==instType && mScope.getSignature().equals("callback(byte)"));
+
 		if(0!=mScope.getArgsStackSize() || 0!=stackOffset) {
-			cg.stackPrepare(cont, isFirstBlock, mScope.getArgsStackSize(), stackOffset, excs);
+			cg.stackPrepare(cont, isFirstBlock, mScope.getArgsStackSize(), stackOffset, asCallback, excs);
 		}
 
 		List<Byte> regs = new ArrayList<>(getMethodScope().getUsedRegs());
@@ -103,19 +104,6 @@ public class CGBlockScope extends CGScope {
 		if(VERBOSE_LO <= verbose) prepend(new CGIText(";build " + this.getClass().getSimpleName() + " '" + name + "'"));
 		
 		append(lbEScope);
-
-		if(!isLaunchPoint || !isFirstBlock) {
-			//Декрементируем счетчики ссылок
-			for(CGVarScope vScope : locals.values()) {
-				if(vScope.getType().isClassType() && !vScope.getType().isEnum()) {
-					cg.updateClassRefCount(this, vScope.getCells(), false);
-				}
-				else if(vScope.getType().isArray()) {
-					cg.updateArrRefCount(this, vScope.getCells(), false, vScope.isArrayView());
-				}
-			}
-		}
-		
 		if(!isLaunchPoint && isFirstBlock) {
 			if(!regs.isEmpty()) {
 				Collections.sort(regs, new Comparator<Byte>() {
@@ -148,14 +136,13 @@ public class CGBlockScope extends CGScope {
 			if(isLaunchPoint) {
 				cg.terminate(this, true, !excs.getProduced().isEmpty());
 			}
-			else {
-				CGClassScope cScope = (CGClassScope)mScope.getParent();
-				// Для нити отдельная процедура выхода - просто ret
-				if((InstanceType.THREAD==cScope.getInstType()  || InstanceType.TIMER==cScope.getInstType()) && mScope.getSignature().equals("run()")) {
+			else { // TODO класс не может реализовывать сразу thread, timer и rtos_callback, или может?
+				// Для нити, таймера и RtosCallback отдельная процедура выхода - просто ret
+				if(asCallback) {
 					append(cg.eReturn(null, VarType.VOID, null));
 				}
 				else {
-					append(cg.finMethod(mScope.getType(), mScope.getArgStackSize(), stackOffset, mScope.getLastStackOffset()));
+					append(cg.finMethod(mScope.getType(), mScope.getArgStackSize(), stackOffset));
 				}
 			}
 		}
@@ -199,10 +186,10 @@ public class CGBlockScope extends CGScope {
 	}
 	
 	public void addVar(CGVarScope vScope) {
-		locals.put(vScope.getResId(), vScope);
+		vars.put(vScope.getResId(), vScope);
 	}
 	public CGVarScope getVar(int resId) {
-		CGVarScope vScope = locals.get(resId);
+		CGVarScope vScope = vars.get(resId);
 		if(null!=vScope) return vScope;
 
 		if(null!=parent) {
@@ -214,33 +201,35 @@ public class CGBlockScope extends CGScope {
 		}
 		return null;
 	}
-
+	public Map<Integer, CGVarScope> getVars() {
+		return vars;
+	}
+	
+	
 	// Выделение ячеек для переменной в блоке(регистр или стек)
-	// Изначально ячейки могли содержать регистры и стек одновременно(если регистров не хватило)
-	// Но это очень сильно усложняет логику работы кодогенератора, а также сложно добиться оптимального генерируемого кода
-	public CGCells memAllocate(CGScope cgScope, int size) throws CompileException {
+	public CGCells memAllocate(CGScope cgScope, Set<RegPair> usedRegsShot, int size) throws CompileException {
 		// Пытаемся одолжить регистры у родителя (в этом случае не нужно сохранять их в стек на текущем уровне)
 		RegPair[] regPairs = null;
 		if(parent instanceof CGBlockScope) {
-			CGCells result = ((CGBlockScope)parent).memAllocate(cgScope, size);
+			CGCells result = ((CGBlockScope)parent).memAllocate(cgScope, usedRegsShot, size);
 			if(null!=result) {
-				for(int i=0; i<size; i++) {
-					byte regId = (byte)result.getId(i);
-					parentUsedRegs.add(regId); // Запоминаем, что одолжили у родителя чтобы в конце блока сообщить ему какие освобождать
-					regsPool.get(regId).setFree(false);
+				if(CGCells.Type.REG==result.getType()) {
+					for(int i=0; i<size; i++) {
+						byte regId = (byte)result.getId(i);
+						parentUsedRegs.add(regId); // Запоминаем, что одолжили у родителя чтобы в конце блока сообщить ему какие освобождать
+						regsPool.get(regId).setFree(false);
+					}
 				}
-				if(VERBOSE_LO <= verbose) cgScope.append(new CGIText(";allocated " + result + " from parent block (" + parent.getPath('.') + ") " + System.currentTimeMillis()));
 				return result;
 			}
 		}
 		else if(parent instanceof CGMethodScope) {
-			regPairs = mScope.borrowReg(size);
+			regPairs = mScope.borrowReg(usedRegsShot, size);
 			if(null!=regPairs) {
 				for(RegPair pair : regPairs) {
 					parentUsedRegs.add(pair.getReg()); // Запоминаем, что одолжили у родителя чтобы в конце блока сообщить ему какие освобождать
 					regsPool.get(pair.getReg()).setFree(false);
 				}
-				if(VERBOSE_LO <= verbose) cgScope.append(new CGIText(";allocated " + StrUtils.toString(regPairs) + " from method (" + parent.getPath('.') + ") " + System.currentTimeMillis()));
 				return new CGCells(regPairs);
 			}
 		}
@@ -251,19 +240,18 @@ public class CGBlockScope extends CGScope {
 		// Не смогли одолжить у родителя, занимаем на этом уровне
 		if(!regsPool.isEmpty()) {
 			if(0x02==size) {
-				RegPair[] pairs = findRegsPair(regsPool); // Регистры сразу помечаются занятыми (если не null))
+				RegPair[] pairs = findRegsPair(usedRegsShot, regsPool); // Регистры сразу помечаются занятыми (если не null))
 				if(null!=pairs) {
 					for(RegPair pair: pairs) {
 						localUsedRegs.add(pair.getReg());	// Помечаем, что регистр использовался на этом уровне
 					}
-					if(VERBOSE_LO <= verbose) cgScope.append(new CGIText(";allocated " + StrUtils.toString(pairs) + " locally (" + getPath('.') + ") " +  + System.currentTimeMillis()));
 					return new CGCells(pairs);
 				}
 			}
 			else if(0x04==size) {
-				RegPair[] pairs1 = findRegsPair(regsPool);
+				RegPair[] pairs1 = findRegsPair(usedRegsShot, regsPool);
 				if(null!=pairs1) {
-					RegPair[] pairs2 = findRegsPair(regsPool);
+					RegPair[] pairs2 = findRegsPair(usedRegsShot, regsPool);
 					if(null!=pairs2) {
 						for(RegPair pair: pairs1) {
 							localUsedRegs.add(pair.getReg());	// Помечаем, что регистр использовался на этом уровне
@@ -272,7 +260,6 @@ public class CGBlockScope extends CGScope {
 							localUsedRegs.add(pair.getReg());	// Помечаем, что регистр использовался на этом уровне
 						}
 						regPairs = new RegPair[]{pairs1[0x00], pairs1[0x01], pairs2[0x00], pairs2[0x01]};
-						if(VERBOSE_LO <= verbose) cgScope.append(new CGIText(";allocated " + StrUtils.toString(regPairs) + " locally (" + getPath('.') + ") " +  + System.currentTimeMillis()));
 						return new CGCells(regPairs);
 					}
 					else {
@@ -288,14 +275,13 @@ public class CGBlockScope extends CGScope {
 			Collections.sort(tmp);
 			int index = 0;
 			for(RegPair pair : tmp) {
-				if(pair.isFree()) {
+				if(pair.isFree() && (null==usedRegsShot || !usedRegsShot.contains(usedRegsShot))) {
 					result[index++] = pair;
 					if(index==size) {
 						for(RegPair rp : result) {
 							rp.setFree(false);
 							localUsedRegs.add(rp.getReg());	// Помечаем, что регистр использовался
 						}
-						if(VERBOSE_LO <= verbose) cgScope.append(new CGIText(";allocated " + StrUtils.toString(result) + " locally (" + getPath('.') + ") " + System.currentTimeMillis()));
 						return new CGCells(result);
 					}
 				}
@@ -309,7 +295,6 @@ public class CGBlockScope extends CGScope {
 		CGCells cells = new CGCells(CGCells.Type.STACK_FRAME, size, stackOffset);
 		cells.setObject(this);
 		stackOffset+=size;
-		if(VERBOSE_LO <= verbose) cgScope.append(new CGIText(";allocated x" + size + " from stack frame (" + getPath('.') + ")"));
 		return cells;
 	}
 
@@ -317,16 +302,7 @@ public class CGBlockScope extends CGScope {
 		return stackOffset;
 	}
 	
-	public void releaseRegsPool() throws CompileException {
-		for(RegPair pair : regsPool.values()) {
-			if(!pair.isFree()) {
-				releaseReg(this, pair.getReg());
-			}
-		}
-	}		
-	
 	protected void releaseReg(CGScope cgScope, Byte regId) throws CompileException {
-		if(VERBOSE_LO <= verbose) cgScope.append(new CGIText(";release REG[" + regId + "] (" + getPath('.') + ") " + System.currentTimeMillis()));
 		regsPool.get(regId).setFree(true);
 		if(parentUsedRegs.contains(regId)) {
 			if(parent instanceof CGMethodScope) {
@@ -343,7 +319,7 @@ public class CGBlockScope extends CGScope {
 		return isFirstBlock;
 	}
 	
-	public CGLabelScope getELabel() {
+	public CGLabelScope getEndLabel() {
 		return lbEScope;
 	}
 
@@ -355,5 +331,13 @@ public class CGBlockScope extends CGScope {
 	@Override
 	public String toString() {
 		return "block " + name;
+	}
+
+	public Set<RegPair> getUsedRegs() {
+		Set<RegPair> result = new HashSet<>();
+		for(RegPair pair : regsPool.values()) {
+			if(!pair.isFree()) result.add(pair);
+		}
+		return result;
 	}
 }

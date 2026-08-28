@@ -18,9 +18,9 @@ class Main {
     static final short DELAY = 50;
 
 	public static void main() {
-		GPIO.modeOut(GPIO.PB0);
-		GPIO.modeOut(GPIO.PB1);
-		GPIO.modeOut(GPIO.PB2);
+		Gpio.modeOut(Gpio.PB0);
+		Gpio.modeOut(Gpio.PB1);
+		Gpio.modeOut(Gpio.PB2);
 
 		while(true) {
 			for(byte i=0; i<3; i++) {
@@ -36,17 +36,17 @@ class Main {
 	}
 
 	public static void blinkRed() {
-	    GPIO.invert(GPIO.PB2);
+	    Gpio.invert(Gpio.PB2);
 	    Thread.sleep(DELAY);
 	}
 
 	public static void blinkGreen() {
-	    GPIO.invert(GPIO.PB1);
+	    Gpio.invert(Gpio.PB1);
 	    Thread.sleep(DELAY);
 	}
 
 	public static void blinkBlue() {
-	    GPIO.invert(GPIO.PB0);
+	    Gpio.invert(Gpio.PB0);
 	    Thread.sleep(DELAY);
 	}
 }

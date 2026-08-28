@@ -7,7 +7,7 @@ import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.openapi.options.SettingsEditor;
 import com.intellij.openapi.project.Project;
 import ru.vm5277.common.enums.PlatformType;
-import ru.vm5277.common.flash.FlashToolParam;
+import ru.vm5277.common.enums.Verbosity;
 
 import java.util.List;
 
@@ -64,12 +64,14 @@ public class ExecuteConfiguration extends RunConfigurationBase<ExecuteParameters
 	public boolean isSoftReset() {	return getOptions().isSoftReset();}
 	public void setBldrApiReuse(boolean bldrApiReuse) {getOptions().setBldrApiReuse(bldrApiReuse);}
 	public boolean isBldrApiReuse() {	return getOptions().isBldrApiReuse();}
-	public void setVerboseOutput(boolean verboseOutput) {getOptions().setVerboseOutput(verboseOutput);}
-	public boolean isVerboseOutput() {	return getOptions().isVerboseOutput();}
+	public void setVerbosity(String verbosity) {getOptions().setVerbosity(verbosity);}
+	public String getVerbosity() {	return getOptions().getVerbosity();}
 	public void setSyncPom(boolean syncPom) {getOptions().setSyncPom(syncPom);}
 	public boolean isSyncPom() { return getOptions().isSyncPom();}
+    public void setAddonsInclude(boolean addonsInclude) {getOptions().setAddonsInclude(addonsInclude);}
+    public boolean isAddonsInclude() { return getOptions().isAddonsInclude();}
+	public void setMvnQuiet(boolean mvnQuiet) {getOptions().setMvnQuiet(mvnQuiet);}
+	public boolean isMvnQuiet() { return getOptions().isMvnQuiet();}
 	public void setFlashToolParams(String flashToolParams) {getOptions().setFlashToolParams(flashToolParams);}
 	public String getFlashToolParams() { return getOptions().getFlashToolParams();}
-
-
 }

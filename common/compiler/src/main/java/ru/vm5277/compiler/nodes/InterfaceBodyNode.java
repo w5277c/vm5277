@@ -18,6 +18,7 @@ package ru.vm5277.compiler.nodes;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
@@ -27,12 +28,13 @@ import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.common.messages.WarningMessage;
-import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.lexer.Keyword;
 import ru.vm5277.compiler.Instance;
+import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
+import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
+import ru.vm5277.compiler.semantic.AstHolder;
+import ru.vm5277.compiler.semantic.InitNodeHolder;
 
 public class InterfaceBodyNode extends AstNode {
 	protected List<AstNode> children = new ArrayList<>();
@@ -43,31 +45,32 @@ public class InterfaceBodyNode extends AstNode {
 		consumeToken(tb, Delimiter.LEFT_BRACE);
 
 		while (!tb.match(TokenType.EOF) && !tb.match(Delimiter.RIGHT_BRACE)) {
+			Map<String, AnnotationParamNode> annotations = collectAnnotations(tb);
 			Set<Keyword> modifiers = collectModifiers(tb);
 
 			// Обработка вложенных интерфейсов
 			if (tb.match(TokenType.OOP, J8BKeyword.INTERFACE)) {
-				InterfaceNode iNode = new InterfaceNode(inst, tb, modifiers, null, null);
+				InterfaceNode iNode = new InterfaceNode(inst, tb, annotations, modifiers, null, true, new ArrayList<>());
 				children.add(iNode);
 				continue;
 			}
 			// Обработка exception с модификаторами
 			if (tb.match(TokenType.OOP, J8BKeyword.EXCEPTION)) {
-				ExceptionNode eNode = new ExceptionNode(inst, tb, modifiers, null);
+				ExceptionNode eNode = new ExceptionNode(inst, tb, modifiers, new ArrayList<>());
 				children.add(eNode);
 				continue;
 			}
 			// Обработка enum с модификаторами
 			if (tb.match(TokenType.OOP) && J8BKeyword.ENUM == tb.current().getValue()) {
 				//markError("Enums are not allowed in interfaces");
-    			EnumNode eNode = new EnumNode(inst, tb, modifiers);
+    			EnumNode eNode = new EnumNode(inst, tb, annotations, modifiers, ifaceNode);
 //				eNode.disable();
 				children.add(eNode);
 				continue;
 			}
 			// Обработка вложенных классов
 			if (tb.match(TokenType.OOP, J8BKeyword.CLASS)) {
-				ClassNode cNode = new ClassNode(inst, tb, modifiers, true, null);
+				ClassNode cNode = new ClassNode(inst, tb, annotations, modifiers, true, new ArrayList<>());
 				// Проверяем что класс статический
 				//TODO Продумать необходимость/возможность наличия статических классов в интерфейсе
 				if(!modifiers.contains(J8BKeyword.STATIC)) {
@@ -90,12 +93,12 @@ public class InterfaceBodyNode extends AstNode {
 			}
 
 			if (tb.match(Delimiter.LEFT_PAREN)) { // Это метод
-				children.add(new MethodNode(inst, tb, modifiers, type, name, ifaceNode));
+				children.add(new MethodNode(inst, tb, annotations, modifiers, type, name, ifaceNode));
 				continue;
 			}
 
 			if (null != type) { // Это поле
-				children.add(new FieldNode(inst, tb, ifaceNode, modifiers, type, name));
+				children.add(new FieldNode(inst, tb, ifaceNode, annotations, modifiers, type, name));
 				continue;
 			}
 
@@ -123,20 +126,9 @@ public class InterfaceBodyNode extends AstNode {
 				node.preAnalyze();
 			}
 			else if(node instanceof FieldNode) {
-				FieldNode fieldNode = (FieldNode)node;
-				if(!fieldNode.getModifiers().isEmpty()) {
-					//TODO не сохраняется позиция для конкретного modifier
-					addMessage(new WarningMessage("Modifiers not allowed for interface fields (already public static final)", fieldNode.getSP()));
-				}
 				node.preAnalyze();
 			}
 			else if(node instanceof MethodNode) {
-				MethodNode methoddNode = (MethodNode)node;
-				// В этой реализации языка похоже разрешены все модификаторы (так как нет наследования классов)
-/*				if(!methoddNode.getModifiers().isEmpty()) {
-					//TODO не сохраняется позиция для конкретного modifier
-					addMessage(new WarningMessage("Modifiers not allowed for interface methods (already public abstract)", methoddNode.getSP()));
-				}*/
 				node.preAnalyze();
 			}
 			else {
@@ -150,7 +142,7 @@ public class InterfaceBodyNode extends AstNode {
 
 	@Override
 	public boolean declare(Scope scope) {
-		for (AstNode node : children) {
+		for(AstNode node : children) {
 			node.declare(scope);
 		}
 		return true;
@@ -159,23 +151,36 @@ public class InterfaceBodyNode extends AstNode {
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
-		ClassScope classScope = (ClassScope)scope;
-
+		boolean result = true;
 		for (AstNode node : children) {
 			if (node instanceof InterfaceNode || node instanceof ClassNode) {
 				// Обработка вложенных интерфейсов и классов
-				node.postAnalyze(scope, cg, parent);
+				result &= node.postAnalyze(scope, cg, parent);
 			} 
 			else if (node instanceof FieldNode) {
 				FieldNode fieldNode = (FieldNode)node;
 
 				// Проверка инициализации поля
-				if (null == fieldNode.getInitializer()) {
+				if(null==fieldNode.getInitializer()) {
 					markError("Interface field '" + fieldNode.getName() + "' must be initialized");
-				} else {
-					fieldNode.getInitializer().postAnalyze(scope, cg, parent);
 				}
+				else {
+					result &= fieldNode.getInitializer().postAnalyze(scope, cg, parent);
+				}
+				if(result) {
+					// Резолвинг QualifiedPathExpression
+					ExpressionNode resolved = resolveQualifiedPathExpr(fieldNode.getInitializer());
+					if(null!=resolved) {
+						fieldNode.setInitializer(resolved);
+					}
 
+
+					if(fieldNode.getInitializer() instanceof VarFieldExpression) {
+						ExpressionNode en = ((InitNodeHolder)((AstHolder)((VarFieldExpression)fieldNode.getInitializer()).getSymbol()).getNode()).getInitNode();
+						fieldNode.setInitializer(en);
+					}
+				}
+				
 				// Проверка что поле static final
 				if (!fieldNode.isStatic()) {
 					markError("Interface field '" + fieldNode.getName() + "' must be static");
@@ -188,34 +193,36 @@ public class InterfaceBodyNode extends AstNode {
 				MethodNode methodNode = (MethodNode)node;
 
 				// Запрет конструкторов
-				if (methodNode.isConstructor()) {
+				if(methodNode.isConstructor()) {
 					markError("Interfaces cannot have constructors");
 					continue;
 				}
 
 				// Проверка методов
-				if (methodNode.isStatic()) {
+				if(methodNode.isStatic() && !methodNode.isNative()) {
 					// Для статических методов должно быть тело
-					if (null == methodNode.getBody()) {
+					if(null==methodNode.getBody()) {
 						markError("Static method '" + methodNode.getName() + "' must have a body");
-					} else {
-						methodNode.getBody().postAnalyze(scope, cg, parent);
 					}
-				} else {
+					else {
+						result &= methodNode.postAnalyze(scope, cg, parent);
+					}
+				}
+				else {
 					// Для нестатических методов не должно быть тела (абстрактные)
-					if (null != methodNode.getBody()) {
+					if(null!=methodNode.getBody()) {
 						markError("Non-static interface method '" + methodNode.getName() + "' cannot have a body");
 					}
 				}
 
 				// Проверка что метод public
-				if (!methodNode.isPublic()) {
+				if(!methodNode.isPublic()) {
 					markError("Interface method '" + methodNode.getName() + "' must be public");
 				}
 			}
 		}
 
-		return true;
+		return result;
 	}
 	
 	@Override

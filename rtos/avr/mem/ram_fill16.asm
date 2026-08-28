@@ -19,17 +19,12 @@
 OS_RAM_FILL16_NR:
 ;-----------------------------------------------------------
 ;Заполнение блока памяти значением							;NR-NO_RESTORE - не восстанавливает IN регистры.
-;IN: X-адрес, ACCUM_L/H-длина, ACCUM_EL-значение
-;MOD: XL/H,ACCUM_L/H/EL
+;IN: X-адрес, TEMP_L/H-длина, ACCUM_L-значение
+;MOD: X,TEMP_L/H
 ;-----------------------------------------------------------
-	CP ACCUM_L,C0x00
-	CPC ACCUM_H,C0x00
-	BREQ _OS_RAM_FILL16__RET
 _OS_RAM_FILL16__LOOP:
-	ST X+,ACCUM_EL
-	SUBI ACCUM_L,0x01
-	SBCI ACCUM_H,0x00
+	ST X+,ACCUM_L
+	SBIW TEMP_L,0x01
 	BRNE _OS_RAM_FILL16__LOOP
-_OS_RAM_FILL16__RET:
 	RET
 .ENDIF

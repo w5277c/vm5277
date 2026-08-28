@@ -10,51 +10,71 @@ import org.jetbrains.idea.maven.project.MavenProject;
 import org.jetbrains.idea.maven.project.MavenProjectsManager;
 import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.enums.PlatformType;
+import ru.vm5277.lsp.server.ASMLanguageServer;
 import ru.vm5277.plugin.EmptySyntaxHighlighter;
-
-import javax.swing.text.DefaultHighlighter;
+import com.intellij.openapi.diagnostic.Logger;
 import java.io.File;
-import java.util.Properties;
+import java.util.HashMap;
 
 public class AsmSyntaxHighlighterFactory extends SyntaxHighlighterFactory {
+	private final static Logger LOG = Logger.getInstance(AsmSyntaxHighlighterFactory.class);
+	private	static final HashMap<Project, ASMLanguageServer> lspServers = new HashMap<>();
 
-    @NotNull
+	@NotNull
     @Override
     public SyntaxHighlighter getSyntaxHighlighter(Project project, VirtualFile virtualFile) {
-		PlatformType platformType = null;
-		String mcu = "atmega328p";
+		ASMLanguageServer lspServer = lspServers.get(project);
+		if(null==lspServer) {
+			PlatformType platformType = null;
+			String mcu = "atmega328p";
 
-		MavenProjectsManager manager = MavenProjectsManager.getInstance(project);
-		if(manager!=null && !manager.getProjects().isEmpty()) {
-			for (MavenProject mavenProject : manager.getProjects()) {
-				if (null != platformType) break;
-
-				MavenId mavenId = mavenProject.getMavenId();
-				if (mavenId.getGroupId().equalsIgnoreCase("ru.vm5277.rtos")) {
-					platformType = PlatformType.fromName(mavenId.getArtifactId());
-					if (null != platformType) {
-						break;
+			MavenProjectsManager manager = MavenProjectsManager.getInstance(project);
+			if(null!=manager && !manager.getProjects().isEmpty()) {
+				for(MavenProject mavenProject : manager.getProjects()) {
+					MavenId mavenId = mavenProject.getMavenId();
+					if(mavenId.getGroupId().equalsIgnoreCase("ru.vm5277.rtos")) {
+						platformType = PlatformType.fromName(mavenId.getArtifactId());
+						if(null!=platformType) {
+							break;
+						}
 					}
 				}
 			}
-		}
-		if(null==platformType) {
-			String target = FSUtils.getTargetFromAsmPrebild(new File(virtualFile.getPath()));
-			if(null!=target) {
-				try {
-					int index = target.indexOf(":");
-					String platformName = target.substring(0x00, index).trim();
-					String mcuStr = target.substring(index+0x01).trim();
-					platformType = PlatformType.fromName(platformName);
-					mcu = mcuStr;
+			if(null==platformType) {
+				String target = FSUtils.getTargetFromAsmPrebild(new File(virtualFile.getPath()));
+				if(null!=target) {
+					try {
+						int index = target.indexOf(":");
+						String platformName = target.substring(0x00, index).trim();
+						String mcuStr = target.substring(index + 0x01).trim();
+						platformType = PlatformType.fromName(platformName);
+						mcu = mcuStr;
+					}
+					catch(Exception ex) {
+					}
 				}
-				catch (Exception ex) {}
+			}
+
+			if(null!=platformType) {
+				lspServer = new ASMLanguageServer(platformType, mcu);
+				lspServers.put(project, lspServer);
 			}
 		}
-
-		if(null!=platformType) {
-			return new AsmSyntaxHighlighter(project, virtualFile, platformType, mcu);
+		if(null!=lspServer) {
+			return new AsmSyntaxHighlighter(project, virtualFile);
 		}
 		return new EmptySyntaxHighlighter();
     }
+
+	public static ASMLanguageServer getLspSever(Project project) {
+		ASMLanguageServer result = lspServers.get(project);
+		if(null==result) {
+			LOG.warn("ASM LSP server not initiated");
+		}
+		return result;
+	}
+
+	public static void removeLspServer(@NotNull Project project) {
+		lspServers.remove(project);
+	}
 }

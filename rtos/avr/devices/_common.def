@@ -18,6 +18,13 @@
 	.include "devices/ftdepchck.asm"
 
 	.EQU	PLATFORM_ID								= 0x01	;AVR
+
+.IFNDEF OS_INT_RC_OSCIL
+    .SET    OS_INT_RC_OSCIL                         = 0x00  ;Использование внутреннего тактового генератора вместо внешнего кварца
+.ENDIF
+.IFNDEF OS_RESET_DISABLE
+    .SET    OS_RESET_DISABLE                        = 0x00  ;Отключение RESET - использование пина как GPIO
+.ENDIF
 .IFNDEF V_UID
 	.SET	V_UID									= 0x5277;Уникальный идентификатор чипа (vendor) дефолтное значение
 .ENDIF
@@ -42,11 +49,55 @@
 
 	.SET	OS_ETRACE_BUFFER_SIZE					= 0x08	;Размер буфера для трассировки исключений. Размер от 0x04 до 0xff.
 
-;---OS-RESULT-CODES-----------------------------------------; Универсальны коды ответов
+    .EQU    OS_J8B_1D_BYTE_ARRAY_HEADER_SIZE        = 0x05  ;Размер заголовка 1 уровневого байтного массива.
+
+	.EQU _OS_IRQ_RAM_ITEM_SIZE						= 0x05	;Размер - 5 байт
+	.SET _OS_IRQ_RAM_TABLE_SIZE 					= 0x00
+	.EQU _OS_IRQ_RAM_TABLE__OFFSET_HANDLER_ADDR		= 0x0000;2B-адрес обработчика (0x0000-не имеет обработчика)
+	.EQU _OS_IRQ_RAM_TABLE__OFFSET_HEAP_ADDR		= 0x0002;2B-aдрес HEAP или выделенного блока памяти
+	.EQU _OS_IRQ_RAM_TABLE__OFFSET_RES_ID		    = 0x0004;1B-идентификатор регистрации или ресурса
+
+    .EQU _OS_CLASS_HEAP_OFFSET__SIZE				= 0x0000;2B-HEAP SIZE
+    .EQU _OS_CLASS_HEAP_OFFSET__LINK_CNTR			= 0x0002;1B-Link counter
+    .EQU _OS_CLASS_HEAP_OFFSET__METADATA_ADDR		= 0x0003;2B-HEAP SIZE
+
+    .EQU _OS_CLASS_META_OFFSET__CLASS_ID            = 0x0000;1B-ИД типа класса
+    .EQU _OS_CLASS_META_OFFSET__PAIRS_QNT           = 0x0001;1B-Количество пар (ID интерфейса + количество методов)
+    .EQU _OS_CLASS_META_OFFSET__PAIRS_TABLE         = 0x0002;xB-таблица пар (ID интерфейса + количество методов)
+
+	.EQU _OS_STIMER_TABLE__OFFSET_HANDLER_ADDR		= 0x0000;2B-адрес обработчика (0x0000-не имеет обработчика)
+	.EQU _OS_STIMER_TABLE__OFFSET_HEAP_ADDR			= 0x0002;2B-aдрес HEAP или выделенного блока памяти
+	.EQU _OS_STIMER_TABLE__OFFSET_CNTR				= 0x0004;2B-счетчик порога срабатывания
+	.EQU _OS_STIMER_TABLE__OFFSET_PERIOD			= 0x0006;2B-значение для полного периода
+	.EQU _OS_STIMER_TABLE__OFFSET_RES_ID			= 0x0008;1B-значение заданное в коде верхнего уровня - когда в одном экземпляре несколько таймеров
+
+    .EQU _OS_PIN_TRIGGER_MODE_FALLING               = 0b00000001;
+    .EQU _OS_PIN_TRIGGER_MODE_RISING                = 0b00000010;
+    .EQU _OS_PIN_TRIGGER_MODE_ANY                   = 0b00000011;
+
+;---OS-RESULT-CODES-----------------------------------------;Универсальные коды ответов
 	.EQU	OSR_OK									= 0x00	;Успешно выполнено
 	.EQU	OSR_ALLOC_FAIL							= 0x01	;Ошибка выделения памяти
+    .EQU	OSR_TIMEOUT 							= 0x02	;Вышло время отведенное на опреацию
+    .EQU    OSR_BUSY                                = 0x03  ;Устройство/ресурс заняты
+    .EQU    OSR_INVALID_STATE                       = 0x04  ;Не валидное состояние
+    .EQU    OSR_INVALID_DATA                        = 0x05  ;Ошибка данных
+	.EQU    OSR_NO_RESPONSE                         = 0x06  ;Не отвечает
+	.EQU    OSR_HARDWARE_FAIL                       = 0x07  ;Аппаратный сбой
+	.EQU    OSR_INIT_FAILED                         = 0x08  ;Сбой инициализации
+	.EQU    OSR_CHECKSUM_ERROR                      = 0x09  ;Ошибка контрольной суммы
+	.EQU    OSR_OVERFLOW                            = 0x0a  ;Попытка переполнения буфера
+	.EQU    OSR_CANCELLED                           = 0x0b  ;Отменено программно
+	.EQU    OSR_UNSUPPORTED                         = 0x0c  ;Не поддерживается
+    .EQU    OSR_NO_AVAILABLE_MODEL                  = 0x0d  ;Не поддерживаемая модель
+    .EQU    OSR_INVALID_PARAM                       = 0x0e  ;Не корректный параметр
+    .EQU    OSR_UNSUPPORTED_PARAM                   = 0x0f  ;Не поддерживаемое значение параметра
+;---OS-NATIVE-EXCEPTION-CODES-------------------------------;Коды Native исключения
+    .EQU    OS_NATIVE_EXCEPTION_CODE__NOT_SUPPORTED = 0x00  ;Не поддерживается
+    .EQU    OS_NATIVE_EXCEPTION_CODE__OUT_OF_BOUNDS = 0x01  ;Вышли за границы
 
 	.EQU	STACK_GUARD_VALUE						= 0xdf	;'ъ'
+
 .IFNDEF OS_STAT_POOL_SIZE
 	.SET	OS_STAT_POOL_SIZE						= 0x0000;Размер статических данных(статические поля классов)
 .ENDIF
@@ -133,15 +184,6 @@
 	.EQU	ISC_FALLING_EDGE						= 0x02
 	.EQU	ISC_RISING_EDGE							= 0x03
 
-	.SET	INT0_PORT								= 0xff
-	.SET	INT1_PORT								= 0xff
-	.SET	INT2_PORT								= 0xff
-	.SET	INT3_PORT								= 0xff
-	.SET	INT4_PORT								= 0xff
-	.SET	INT5_PORT								= 0xff
-	.SET	INT6_PORT								= 0xff
-	.SET	INT7_PORT								= 0xff
-
 	;...
 	.DEF	ATOM_L									= r0	;r0-r3 используются для атомарных операций(разрешено использовать только в блоках CLI-SEI)
 	.DEF	ATOM_H									= r1
@@ -151,8 +193,8 @@
 	.DEF	C0x01									= r5	;Константа 0x01
 	.DEF	C0x02									= r6	;Константа 0x02
 	.DEF	C0xff									= r7	;Константа 0xff
-	.DEF	US_CNTR_H			    				= r8    ;Счетчик микросекунд - 1й байт, (0й байт обеспечивает аппаратный таймер)
-	.DEF	US_CNTR_EL			    				= r9    ;Счетчик микросекунд - 2й байт (используется на частотах выше 8МГц, если делитель TIMER2=8)
+	.DEF	DISPATCHER_CNTR		    				= r8    ;Счетчик блокировок диспетчера
+;	.DEF	_RESERVED			    				= r9
 	.DEF	PID_L									= r10	;ID_L текущей задачи
 	.DEF	PID_H									= r11	;ID_H текущей задачи
 	.DEF	_SPL									= r12	;Альтернативный SPL

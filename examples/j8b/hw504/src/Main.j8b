@@ -1,0 +1,54 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import boards.ArduinoUno;
+import hal.Adc;
+
+class Main {
+	public static void main() {
+		System.setParam(RtosParam.SHOW_WELCOME, 1);
+
+		Gpio.modeIn(ArduinoUno.PIN_A0);
+		Gpio.setLow(ArduinoUno.PIN_A0);
+		Gpio.modeIn(ArduinoUno.PIN_A1);
+		Gpio.setLow(ArduinoUno.PIN_A1);
+		Gpio.modeIn(ArduinoUno.PIN_D7);
+		Gpio.setHigh(ArduinoUno.PIN_D7);
+
+		short halfValue = 512;//(1<<Adc.getResolution()/2);
+
+		while(true) {
+			Adc.init();
+
+			boolean released = Gpio.get(ArduinoUno.PIN_D7);
+			Adc.setChannel(ArduinoUno.ADC_CHANNEL_A0);
+			short vrX = Adc.read();
+			Adc.setChannel(ArduinoUno.ADC_CHANNEL_A1);
+			short vrY = Adc.read();
+
+			Adc.shutdown();
+
+			System.out("x:");
+			if(vrX<halfValue) System.out("-" + (halfValue-vrX));
+			else System.out(vrX-halfValue);
+			System.out(", y:");
+			if(vrY<halfValue) System.out("-" + (halfValue-vrY));
+			else System.out(vrY-halfValue);
+			System.out(", pressed:" + !released + "\n");
+			Thread.sleep(500);
+		}
+	}
+}

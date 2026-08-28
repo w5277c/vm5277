@@ -27,7 +27,7 @@ J8BPROC_MFIN:
 	CLI
 	POP _SPH												;Восстанавливаем точку возврата
 	POP _SPL
-	POP ZH													;Восстанавливаем Z
+	POP ZH													;Восстанавливаем Z (порядок как в аргументах)
 	POP ZL
 	PUSH _SPL												;Помещаем адрес возврата
 	PUSH _SPH

@@ -38,12 +38,12 @@ public class ExceptionScope extends CIScope {
 		this.values = values;
 
 		MethodScope mScope = new MethodScope(null, this);
-		MethodSymbol ms = new MethodSymbol("throw", VarType.VOID, null, true, true, true, false, true, mScope, null);
+		MethodSymbol ms = new MethodSymbol("throw", VarType.VOID, null, true, true, true, false, true, mScope, null, false);
 		mScope.setSymbol(ms);
 		addMethod(ms);
 		
 		mScope = new MethodScope(null, this);
-		ms = new MethodSymbol("throw", VarType.VOID, Arrays.asList(new Symbol("code", VarType.BYTE)), true, true, true, false, true, mScope, null);
+		ms = new MethodSymbol("throw", VarType.VOID, Arrays.asList(new Symbol("code", VarType.BYTE)), true, true, true, false, true, mScope, null, false);
 		mScope.setSymbol(ms);
 		addMethod(ms);
 
@@ -138,7 +138,7 @@ public class ExceptionScope extends CIScope {
 			if(null!=extScope) {
 				return extScope.getValueIndex(value);
 			}
-			throw new CompileException("COMPILER ERROR: Excpetion value '" + value + "' not found in exception '" + name);
+			throw new CompileException("COMPILER ERROR: Exception value '" + value + "' not found in exception '" + name);
 		}
 		
 		return offset+index;

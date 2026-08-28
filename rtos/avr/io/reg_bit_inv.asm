@@ -13,25 +13,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-.IFNDEF REG_BIT_INV
-;--------------------------------------------------------
-REG_BIT_INV:
-;--------------------------------------------------------
+.IFNDEF REG_BIT_INV_NR
+;-----------------------------------------------------------
+REG_BIT_INV_NR:
+;-----------------------------------------------------------
 ;Инвертируем бит регистра и возвращаем его новое значение
-;IN: Z-адрес,ACCUM_L-число бита
+;IN: ACCUM_L-адрес,ACCUM_H-число бита
 ;OUT: flag C-состояние бита(true = HI)
-;--------------------------------------------------------
-	PUSH_T16
-
-	LDS TEMP_H,SREG
+;MOD: XH,ACCUM_L/EL
+;-----------------------------------------------------------
+	MOV XL,ACCUM_L
+	LDI XH,0x00
+	LDS ACCUM_EL,SREG
 	CLI
-	LD TEMP_L,Z
-	EOR TEMP_L,ACCUM_L
-	ST Z,TEMP_L
-	AND TEMP_L,ACCUM_L
-	STS SREG,TEMP_H
-	ADD TEMP_L,C0xff
-
-	POP_T16
+	LD ACCUM_L,X
+	EOR ACCUM_L,ACCUM_H
+	ST X,ACCUM_L
+	AND ACCUM_L,ACCUM_H
+	STS SREG,ACCUM_EL
+	ADD ACCUM_L,C0xff
 	RET
 .ENDIF

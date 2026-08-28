@@ -19,19 +19,18 @@ class Main {
 		byte b1; b1 = 54;
 		fixed[][] arr = new fixed[][]{{0.5,-1},{-2*2,(fixed)b1},{-4,100.99}};
 
-		System.out("Содержимое массива arr = new fixed[][]:\n");
+		System.out("Содержимое массива arr = new fixed[][],  [0.50 -1.00 -4.00 54.00 -4.00 100.99]\n");
 		for(byte i=0; i<arr.length; i++) {
 			for(byte j=0; j<arr[0].length; j++) {
 				System.out(arr[i][j]);
 				System.out(' ');
 			}
-			System.out('\n');
 		}
 
 		byte size=8;
 		short[] arr2 = new short[size];
 		arr2[1] = 25;
-		System.out("Содержимое массива arr2 = new short[8]:\n");
+		System.out("\nСодержимое массива arr2 = new short[8]  [0 25 0 0 0 0 0 0]\n");
 		for(byte i=0; i<arr2.length; i++) {
 			System.out(arr2[i]);
 			System.out(' ');
@@ -39,7 +38,7 @@ class Main {
 		System.out('\n');
 
 		short s; s=0x0101;
-		System.out("s=" + s + " > arr2[3]? ");
+		System.out("s=" + s + " > arr2[3] [true] = ");
 		if(s>arr2[3]) {
 			System.out(true + '\n');
 		}
@@ -47,7 +46,7 @@ class Main {
 			System.out(false + '\n');
 		}
 
-		System.out("Присваивание arr[0][0] = (fixed)arr2[1]; Результат:");
+		System.out("Присваивание arr[0][0] = (fixed)arr2[1]; Результат [25.00]: ");
 		arr[0][0] = (fixed)arr2[1];
 		System.out(arr[0][0]);
 		System.out('\n');		

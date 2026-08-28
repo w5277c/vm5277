@@ -9,7 +9,7 @@
 
 	<groupId>ru.vm5277</groupId>
 	<artifactId>j8b-plugin</artifactId>
-	<version>0.2.0</version>
+	<version>0.3.0</version>
 	<packaging>maven-plugin</packaging>
 
 	<dependencies>

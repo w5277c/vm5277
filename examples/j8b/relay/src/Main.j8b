@@ -1,0 +1,47 @@
+/*
+ * Copyright 2025 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import boards.ArduinoUno;
+
+class Main {
+    public static void main() {
+		Gpio.modeOut(ArduinoUno.PIN_D7);
+		Gpio.modeOut(ArduinoUno.PIN_D6);
+		Gpio.modeOut(ArduinoUno.PIN_D5);
+		Gpio.modeOut(ArduinoUno.PIN_D4);
+
+		System.out("Включаем реле на порту D7\n");
+		Gpio.setHigh(ArduinoUno.PIN_D7);
+		Thread.sleep(300);
+		System.out("Включаем реле на порту D6\n");
+		Gpio.setHigh(ArduinoUno.PIN_D6);
+		Thread.sleep(300);
+		System.out("Включаем реле на порту D5\n");
+		Gpio.setHigh(ArduinoUno.PIN_D5);
+		Thread.sleep(300);
+		System.out("Включаем реле на порту D4\n");
+		Gpio.setHigh(ArduinoUno.PIN_D4);
+
+		System.out("Ждем 3 секунды\n");
+		Thread.sleep(3000);
+
+		System.out("Выключаем все реле\n");
+		Gpio.setLow(ArduinoUno.PIN_D7);
+		Gpio.setLow(ArduinoUno.PIN_D6);
+		Gpio.setLow(ArduinoUno.PIN_D5);
+		Gpio.setLow(ArduinoUno.PIN_D4);
+    }
+}

@@ -16,7 +16,7 @@
 
 ;Выводим блок памяти на STDIO порт
 .IFNDEF OS_OUT_RAMBYTES_NR
-	.include "stdio/out_hex8.asm"
+.include "stdio/out_hex8.asm"
 ;-----------------------------------------------------------
 OS_OUT_RAMBYTES_NR:
 ;-----------------------------------------------------------

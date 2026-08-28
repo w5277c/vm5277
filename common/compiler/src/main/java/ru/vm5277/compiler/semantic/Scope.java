@@ -84,4 +84,12 @@ public abstract class Scope {
 		}
 		return false;
 	}
+	
+	public GlobalScope getGlobalScope() {
+		Scope tmp = this;
+		while(null!=tmp && !(tmp instanceof GlobalScope)) {
+			tmp = tmp.getParent();
+		}
+		return (GlobalScope)tmp;
+	}
 }

@@ -59,12 +59,12 @@ OS_STDIO_INIT_SET_PORT_NR:
 	.ENDIF
 	STS PCICR,TEMP_L
 	STS _OS_PCINT_PCICR,TEMP_L
-	;Вычислем 3-х байтную ячейку нашего прерывания(учитыаем отсутствие RESET IR) и записываем текущее состоянеи порта
+	;Вычислем 5-х байтную ячейку нашего прерывания(учитыаем отсутствие RESET IR) и записываем текущее состоянеи порта
 	.IFDEF STDIO_PORT_REGID
-		LDI_Y _OS_IR_VECTORS_TABLE+(C5_IR_PCINT0+STDIO_PORTNUM-1)*3-0x03
+		LDI_Y _OS_IRQ_RAM_TABLE+((OS_IRQ_PCINT0+STDIO_PORTNUM-1)*_OS_IRQ_RAM_ITEM_SIZE) ;TODO STDIO_PORTNUM-1
 		LDI_Z PORTS_TABLE*2+STDIO_PORTNUM						;PINx (учитываем отсутствие порта A, PCINT0=PORTB)
 	.ELSE
-		LDI_Y _OS_IR_VECTORS_TABLE+(C5_IR_PCINT0+STDIN_PORTNUM-1)*3-0x03
+		LDI_Y _OS_IRQ_RAM_TABLE+((OS_IRQ_PCINT0+STDIN_PORTNUM-1)*_OS_IRQ_RAM_ITEM_SIZE) ;TODO STDIO_PORTNUM-1
 		LDI_Z PORTS_TABLE*2+STDIN_PORTNUM
 	.ENDIF
 

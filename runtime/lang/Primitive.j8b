@@ -19,10 +19,12 @@
  * Предоставляет константы MIN, MAX, SIZE для каждого типа
  */
 
+import io.OutputStream;
+
 public class Primitive {
-	public static class Bool {
-		public static final bool MIN = false;
-		public static final bool MAX = true;
+	public static class Boolean {
+		public static final boolean MIN = false;
+		public static final boolean MAX = true;
 		public static final byte BITS = 1;
 		public static final byte MASK = 0x01;
 		public static final byte SIZE = 1;
@@ -63,6 +65,30 @@ public class Primitive {
 	}
 
 	public static native fixed rawToFixed(byte i, byte f);
-	public static native fixed rawToShort(byte b0, byte b1);
-	public static native fixed rawToInt(byte b0, byte b1, byte b2, byte b3);
+	public static native short rawToShort(byte b1, byte b0); //b0 младший
+	public static native int rawToInt(byte b3, byte b2, byte b1, byte b0); //b0 младший
+
+	public static native byte bcdToByte(byte bcd);
+	public static native byte byteToBcd(byte b);
+
+	public static native fixed hthToFixed(short hth); //Сотые в fixed
+
+	public static native byte b0(short v);
+	public static native byte b0(fixed v); // Часть после точки
+	public static native byte b0(int v);
+	public static native byte b1(short v);
+	public static native byte b1(fixed v); // Целая часть
+	public static native byte b1(int v);
+	public static native byte b2(int v);
+	public static native byte b3(int v);
+
+	public static void printByte(OutputStream os, byte val, byte minSize) {
+		byte v1 = val/100;
+		val -= v1*100;
+		if(minSize>2 || 0!=v1) os.write(0x30+v1);
+		byte v2 = val/10;
+		val -= v2*10;
+		if(minSize>1 || 0!=v1 || 0!=v2) os.write(0x30+v2);
+		os.write(0x30+val);
+	}
 }

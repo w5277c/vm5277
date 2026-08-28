@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
@@ -36,9 +37,9 @@ import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.common.messages.ErrorMessage;
-import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
@@ -51,23 +52,31 @@ import ru.vm5277.compiler.semantic.MethodSymbol;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.Symbol;
 import ru.vm5277.common.lexer.Keyword;
+import ru.vm5277.common.lexer.tokens.TAnnotation;
+import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.Instance;
+import ru.vm5277.compiler.nodes.expressions.MethodCallExpression;
+import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
 
 public class MethodNode extends AstNode {
-	private	final	Set<Keyword>			modifiers;
-	private	final	VarType					returnType;
-	private	final	String					name;
-	private	final	ObjectTypeNode			objTypeNode;
-	private			List<ParameterNode>		parameters;
-	private			BlockNode				blockNode;
-	private			MethodScope				methodScope; // Добавляем поле для хранения области видимости
-	private			boolean					canThrow	= false;
-	private			List<ExpressionNode>	throws_		= new ArrayList<>();
+	private			Map<String, AnnotationParamNode>	annotations;
+	private	final	Set<Keyword>						modifiers;
+	private	final	VarType								returnType;
+	private	final	String								name;
+	private	final	ObjectTypeNode						objTypeNode;
+	private			List<ParameterNode>					parameters;
+	private			BlockNode							blockNode;
+	private			BlockNode							nativeBlockNode;
+	private			MethodScope							methodScope; // Добавляем поле для хранения области видимости
+	private			boolean								canThrow		= false;
+	private			List<ExpressionNode>				throws_			= new ArrayList<>();
+	private			boolean								isEntryPoint	= false;
 	
-	public MethodNode(Instance inst, TokenBuffer tb, Set<Keyword> modifiers, VarType returnType, String name, ObjectTypeNode objectTypeNode)
-																																	throws CompileException {
+	public MethodNode(	Instance inst, TokenBuffer tb, Map<String, AnnotationParamNode> annotations, Set<Keyword> modifiers, VarType returnType, String name,
+						ObjectTypeNode objectTypeNode)																				throws CompileException {
 		super(inst, tb);
 		
+		this.annotations = annotations;
 		this.modifiers = modifiers;
 		this.returnType = returnType;
 		this.name = name;
@@ -83,10 +92,10 @@ public class MethodNode extends AstNode {
 			this.canThrow = true;
 			
 			if(tb.match(TokenType.IDENTIFIER)) {
-				throws_.add(parseFullQualifiedExpression(tb));
+				throws_.add(parseFullQualifiedExpression(tb, false));
 				while(tb.match(Delimiter.COMMA)) {
 					tb.consume();
-					throws_.add(parseFullQualifiedExpression(tb));
+					throws_.add(parseFullQualifiedExpression(tb, false));
 				}
 			}
 		}
@@ -104,6 +113,27 @@ public class MethodNode extends AstNode {
 			catch(CompileException e) {
 				markFirstError(e);
 			}
+		}
+		
+		if(isNative()) {
+			nativeBlockNode = new BlockNode("Block for native method");
+			
+			List<ExpressionNode> args = new ArrayList<>();
+			for(ParameterNode param : parameters) {
+/*				try {
+					blockNode.getScope().addVariable(new VarSymbol(name, param.getType(), false, false, blockNode.getScope(), blockNode));
+				}
+				catch(CompileException e) {
+					markError(e);
+				}
+*/
+				// Ссылка на параметр как на локальную переменную
+				VarFieldExpression paramRef = new VarFieldExpression(inst, tb, sp, getSN(), null, param.getName());
+				args.add(paramRef);
+			}
+			//TypeReferenceExpression tre = new TypeReferenceExpression(inst, tb, null, "this");
+			MethodCallExpression mce = new MethodCallExpression(inst, tb, sp, null, name, args, true);
+			nativeBlockNode.getChildren().add(mce);
 		}
 	}
 	
@@ -235,9 +265,39 @@ public class MethodNode extends AstNode {
 			}
 		}
 		
+		boolean hasOverrideAnnotation = false;
+		if(null!=annotations) {
+			for(String annotation : annotations.keySet()) {
+				if(annotation.equals(TAnnotation.OVERRIDE)) {
+					hasOverrideAnnotation = true;
+				}
+				else if(objTypeNode instanceof InterfaceNode && annotation.equals(TAnnotation.ENTRY_POINT)) {
+					isEntryPoint = true;
+				}
+				else {
+					if(StrictLevel.LIGHT==inst.getStrictLevel()) {
+						addMessage(new WarningMessage("Unsupported method annotation: @" + annotation, sp));
+					}
+					else if(StrictLevel.STRONG==inst.getStrictLevel()) {
+						addMessage(new ErrorMessage("Unsupported method annotation: @" + annotation, sp));
+					}
+				}
+			}
+		}
+
+		if(result) {
+			if(modifiers.contains(J8BKeyword.NATIVE) && blockNode!=null) {
+				markError("Native method cannot have a body");
+				result = false;
+			}
+		}
+		
 		if(result) {
 			if(null!=blockNode) {
 				result&=blockNode.preAnalyze();
+			}
+			else if(null!=nativeBlockNode) {
+				result&=nativeBlockNode.preAnalyze();
 			}
 		}
 		
@@ -266,8 +326,8 @@ public class MethodNode extends AstNode {
 		if(result) {
 		// Создаем MethodSymbol
 			try {
-				symbol = new MethodSymbol(	name, returnType, paramSymbols, modifiers.contains(J8BKeyword.FINAL),
-											modifiers.contains(J8BKeyword.STATIC),	modifiers.contains(J8BKeyword.NATIVE), canThrow, false, methodScope, this);
+				symbol = new MethodSymbol(	name, returnType, paramSymbols, modifiers.contains(J8BKeyword.FINAL), modifiers.contains(J8BKeyword.STATIC),
+											modifiers.contains(J8BKeyword.NATIVE), canThrow, false, methodScope, this, isEntryPoint);
 				// Устанавливаем обратную ссылку
 				methodScope.setSymbol((MethodSymbol)symbol);
 
@@ -314,11 +374,14 @@ public class MethodNode extends AstNode {
 			
 			if(result) {
 				if(null!=blockNode) {
-					if (!(scope instanceof ClassScope)) { //TODO ввести подержу статики
+					if(!isStatic() && !(scope instanceof ClassScope)) { //TODO ввести подержу статики
 						markError("Method '" + name + "' cannot have body in interface '" + ((InterfaceScope)scope).getName() + "'");
 						return false;
 					}
 					result&=blockNode.declare(methodScope);
+				}
+				else if(null!=nativeBlockNode) {
+					result&=nativeBlockNode.declare(methodScope);
 				}
 			}
 		}
@@ -417,11 +480,19 @@ public class MethodNode extends AstNode {
 				// Анализируем тело метода
 				result&=blockNode.postAnalyze(methodScope, cg, cgScope);
 			}
+			else if(null!=nativeBlockNode) {
+				if(((MethodSymbol)symbol).isInterfaceImpl()) {
+					result&=nativeBlockNode.postAnalyze(methodScope, cg, cgScope);
+					blockNode = nativeBlockNode;
+				}
+				else {
+					nativeBlockNode = null;
+				}
+			}
 		}
 
 		if(result) {
 			// Для не-void методов проверяем наличие return
-			// TODO переосмыслить после ConstantFolding
 			if(null!=returnType && !returnType.equals(VarType.VOID) && !isNative()) {
 				if(!BlockNode.hasReturnStatement(blockNode)) {
 					markError("Method '" + name + "' must return a value");
@@ -455,12 +526,12 @@ public class MethodNode extends AstNode {
 		}
 
 		if(result) {
-			if(!isNative()) {
+//			if(!isNative()) {
 				// Создаем CGScope для каждого параметра
 				int offset = 0;
 				for(Symbol pSymbol : ((MethodSymbol)symbol).getParameters()) {
 					try {
-						int size = (-1==pSymbol.getType().getSize() ? cg.getRefSize() : pSymbol.getType().getSize());
+						int size = (pSymbol.getType().isReferenceType() ? cg.getRefSize() : pSymbol.getType().getSize());
 						// Создаем CGScope для параметра
 						CGVarScope pScope = cg.enterLocal(cgScope, pSymbol.getType(), size, false, pSymbol.getName());
 						pScope.setCells(new CGCells(CGCells.Type.ARGS, size, offset));
@@ -472,6 +543,17 @@ public class MethodNode extends AstNode {
 						markError(ex);
 						result = false;
 					}
+				}
+//			}
+		}
+		
+		if(result) {
+			if(null!=annotations && annotations.containsKey(TAnnotation.OVERRIDE) && !((MethodSymbol)symbol).isInterfaceImpl()) {
+				if(StrictLevel.LIGHT==inst.getStrictLevel()) {
+					markWarning("'@Override' annotation is not allowed for method '" + ((MethodSymbol)symbol).getSignature() + "' - no supertype method found");
+				}
+				else if(StrictLevel.STRONG==inst.getStrictLevel()) {
+					markError("'@Override' annotation is not allowed for method '" + ((MethodSymbol)symbol).getSignature() + "' - no supertype method found");
 				}
 			}
 		}
@@ -494,6 +576,7 @@ public class MethodNode extends AstNode {
 	}
 
 	public void firstCodeGen(CodeGenerator cg, CGExcs excs) throws CompileException {
+		if(cgDone || disabled) return;
 		cgDone = true;
 
 // TODO забываю об инициализации staticInitContainer в CodeGenerator.build
@@ -502,9 +585,12 @@ public class MethodNode extends AstNode {
 //		cgScope.prepend(mainLabel);
 		
 		if(null!=blockNode) {
-			excs.setMethodEndLabel(blockNode.getCGScope().getELabel());
+			excs.setMethodEndLabel(blockNode.getCGScope().getEndLabel());
 			blockNode.firstCodeGen(cg, excs);
 		}
+//		else if(isNative() && ((MethodSymbol)symbol).isInterfaceImpl()) {
+//			wrapperCodeGen(cg, cgScope);
+//		}
 
 		objTypeNode.codeGen(cg, false, excs);		
 
@@ -520,11 +606,12 @@ public class MethodNode extends AstNode {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 
+		if(objTypeNode instanceof ClassNode) {
+			((ClassNode)objTypeNode).fieldsCodeGen(cg, excs);
+			((CGClassScope)cgScope.getParent()).addMethod((CGMethodScope)cgScope);
+		}
 		// Не статические методы в интерфейсе не имеют тела
 		if(objTypeNode instanceof InterfaceNode && !symbol.isStatic()) return null;
-		
-		((CGClassScope)cgScope.getParent()).addMethod((CGMethodScope)cgScope);
-
 		
 		//В данном месте runtimeChecks должен быть сформирован на базе throws а не на базе обернутых catch
 		if(null!=blockNode) {
@@ -534,7 +621,7 @@ public class MethodNode extends AstNode {
 //			exIds.add(VarType.getExceptionId("RuntimeException"));
 			//newExcs.getRuntimeChecks().put(VarType.getExceptionId("RuntimeException"), blockNode.getCGScope().getELabel());
 			for(ExceptionScope eScope : methodScope.getExceptionScopes()) {
-				newExcs.getRuntimeChecks().put(eScope.getId(), blockNode.getCGScope().getELabel());
+				newExcs.getRuntimeChecks().put(eScope.getId(), blockNode.getCGScope().getEndLabel());
 //				exIds.add(eScope.getId());
 			}
 
@@ -542,22 +629,59 @@ public class MethodNode extends AstNode {
 				newExcs.getRuntimeChecks().put(exId, blockNode.getCGScope().getELabel());
 			}
 */
-			newExcs.setMethodEndLabel(blockNode.getCGScope().getELabel());
+			newExcs.setMethodEndLabel(blockNode.getCGScope().getEndLabel());
 			blockNode.codeGen(cg, false, newExcs);
 			excs.getProduced().addAll(newExcs.getProduced());
 		}
-		
+//		else if(isNative() && ((MethodSymbol)symbol).isInterfaceImpl()) {
+//			wrapperCodeGen(cg, cgScope);
+//		}
+
 		objTypeNode.codeGen(cg, false, excs);
 
-		if(!(objTypeNode instanceof InterfaceNode)) {
+//		if(!(objTypeNode instanceof InterfaceNode)) {
 			((CGMethodScope)cgScope).build(cg, excs);
-		}
+//		}
 		return null;
 	}
 
+/*	Эта реализация не сохраняет старые значения регистров в которые восстанавливает данные и не смещает адрес массива на начало данных
+	private void wrapperCodeGen(CodeGenerator cg, CGScope cgScope) throws CompileException {
+		VarType[] varTypes = new VarType[parameters.size()];
+		for(int i=0; i<varTypes.length; i++) {
+			varTypes[i] = parameters.get(i).getType();
+		}
+		
+		List<Byte> storedRegs = new ArrayList<>();
+		
+		String signature = MethodCallExpression.buildSignature(methodScope.getThis(), name, (MethodSymbol)symbol, varTypes);
+		NativeBinding nb = cg.nativeMethodInit(cgScope, signature);
+		if(null==nb) {
+			throw new CompileException("Not found native method binding for wrapping method: " + signature);
+		}
+
+		for(int i=0; i<varTypes.length; i++) {
+			VarType type = varTypes[i];
+			byte[] paramRegs = nb.getRegs()[i];
+			for(byte reg : paramRegs) {
+				cgScope.append(cg.popReg(reg));
+			}
+		}
+		
+		cg.nativeMethodInvoke(cgScope, signature, storedRegs, returnType);
+	}*/
+	
 	@Override
 	public List<AstNode> getChildren() {
 		return Arrays.asList(blockNode);
+	}
+	
+	public Map<String, AnnotationParamNode> getAnnotations() {
+		return annotations;
+	}
+
+	public boolean isEntryPoint() {
+		return isEntryPoint;
 	}
 	
 	@Override

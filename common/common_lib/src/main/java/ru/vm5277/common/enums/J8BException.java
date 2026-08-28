@@ -19,5 +19,8 @@ public enum J8BException {
 	RuntimeException,
 	OutOfMemoryException,
 	MathOverflowException,
-	ArrayBoundsException;
+	BoundsException,
+	DriverException,
+	NativeException,
+	NullPointerException;
 }

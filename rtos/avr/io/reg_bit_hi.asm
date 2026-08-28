@@ -15,22 +15,21 @@
  */
 ;Включаем бит по в ячейке расположенной по адресу 0-255
 ;-----------------------------------------------------------------------------------------------------------------------
-.IFNDEF REG_BIT_HI
+.IFNDEF REG_BIT_HI_NR
 ;-----------------------------------------------------------
-REG_BIT_HI:
+REG_BIT_HI_NR:
 ;-----------------------------------------------------------
 ;Включаем бит регистра
-;IN: Z-адрес,ACCUM_L-число бита
+;IN: ACCUM_L-адрес,ACCUM_H-число бита
+;MOD: XH,ACCUM_L/EL
 ;-----------------------------------------------------------
-	PUSH_T16
-
-	LDS TEMP_H,SREG
+	MOV XL,ACCUM_L
+	LDI XH,0x00
+	LDS ACCUM_EL,SREG
 	CLI
-	LD TEMP_L,Z
-	OR TEMP_L,ACCUM_L
-	ST Z,TEMP_L
-	STS SREG,TEMP_H
-
-	POP_T16
+	LD ACCUM_L,X
+	OR ACCUM_L,ACCUM_H
+	ST X,ACCUM_L
+	STS SREG,ACCUM_EL
 	RET
 .ENDIF

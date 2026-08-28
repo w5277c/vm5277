@@ -20,7 +20,7 @@ class Main {
 	// для замены парных mov на единую инструкцию movw
 
     public static void main() {
-		bool b1 = false;
+		boolean b1 = false;
 		int i1 = 0x00;
 		byte t1 = 0x00;
 
@@ -28,8 +28,8 @@ class Main {
 		i1 = 0x04050607;
 		t1 = 0x08;
 
-		System.out('\n' + b1);
-		System.out('\n' + i1);
-		System.out('\n' + t1);
+		System.out("\nb1 [true]=" + b1);
+		System.out("\ni1 [67438087]=" + i1);
+		System.out("\nt1 [8]=" + t1);
 	}
 }

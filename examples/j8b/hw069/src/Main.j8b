@@ -1,0 +1,65 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+//TODO нужны статические импорты
+import boards.ArduinoUno;
+import drivers.display.HW069Display;
+
+class Main {
+	public static void main() {
+		System.setParam(RtosParam.SHOW_WELCOME, 1);
+
+		HW069Display disp = new HW069Display(ArduinoUno.PIN_D7, ArduinoUno.PIN_D6);
+		disp.init();
+		disp.putChar('H');
+		disp.putChar('E');
+		disp.putSymbol(HW069Display.SYMBOL_LL);
+		disp.putChar('O');
+		disp.update();
+		Thread.sleep(2000);
+
+		disp.setCursor(0,0);
+		disp.putChar('C');
+		disp.putChar('O');
+		disp.putChar('D');
+		disp.putChar('E');
+		disp.update();
+
+		Thread.sleep(1000);
+		disp.setColon(true);
+		disp.update();
+		Thread.sleep(1000);
+		disp.setCursor(0,0);
+		disp.putChar('B');
+		disp.putChar('A');
+		disp.putChar('B');
+		disp.putChar('E');
+		disp.update();
+
+		Thread.sleep(1000);
+		disp.setColon(false);
+		disp.update();
+		Thread.sleep(1000);
+
+		disp.clear();
+		while(true) for(byte i=0; i<6; i++) {
+			disp.setCursor(0,0);
+			disp.putSymbol(1<<i);
+			disp.update();
+			Thread.sleep(50);
+		}
+	}
+}

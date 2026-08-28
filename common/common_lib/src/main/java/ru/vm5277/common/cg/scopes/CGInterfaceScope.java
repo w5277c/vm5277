@@ -25,4 +25,10 @@ public class CGInterfaceScope extends CGScope {
 		
 		this.type = type;
 	}
+	
+	@Override
+	public String getLName() {
+		return "I" + name;
+	}
+
 }

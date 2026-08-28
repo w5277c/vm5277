@@ -22,7 +22,6 @@ import java.nio.file.Path;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import ru.vm5277.common.Device;
 import ru.vm5277.common.FSUtils;
-import ru.vm5277.common.Platform;
 import ru.vm5277.common.enums.PlatformType;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
@@ -32,7 +31,6 @@ import ru.vm5277.compiler.ASTParser;
 import ru.vm5277.common.lexer.Lexer;
 import ru.vm5277.compiler.SemanticAnalyzer;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.codegen.PlatformLoader;
 import ru.vm5277.common.lexer.LexerType;
 import ru.vm5277.compiler.Instance;
@@ -76,8 +74,9 @@ public class Test {
 		Lexer lexer = new Lexer(LexerType.J8B, "class Clazz{ void method() { byte b1 = -1; byte b2=0; byte b3=255; byte b4 = 256; byte B5=128; }}",
 								false, 0x04);
 		Instance inst = new Instance(0x04);
-		ASTParser parser = new ASTParser(inst, null, lexer.getTokens());
-		SemanticAnalyzer.analyze(parser.getClazz(), cg, new CGScope(), null);
+		ASTParser parser = new ASTParser(inst, null);
+		parser.parse(lexer.getTokens());
+		SemanticAnalyzer.analyze(inst, parser.getClazz(), cg, new CGScope(), null);
 		//TODO assertEquals(2, mc.getErrorCntr());
 		assertEquals(2, inst.getMessageContainer().getWarningCntr());
 	}

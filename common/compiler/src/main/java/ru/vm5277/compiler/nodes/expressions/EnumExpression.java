@@ -20,7 +20,6 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
@@ -101,11 +100,16 @@ public class EnumExpression extends ExpressionNode {
 
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
+		if(cgDone || disabled) return null;
+		cgDone = true;
+
 		if(toAccum) {
 			cg.constToAcc(cgScope, 0x01, index, false);
+			releaseVars(cg);
 			return CodegenResult.RESULT_IN_ACCUM;
 		}
 		
+		releaseVars(cg);
 		return null;
 	}
 	

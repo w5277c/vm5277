@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+import rtos.VT100;
+
 class Main {
 	static public class Th1 implements Thread {
 		private byte b;
@@ -21,21 +23,21 @@ class Main {
 			this.b = b;
 		}
 
-		public void run() {
+		@Override public void run() {
 			while(isAlive()) {
 			    System.out(b);
 			    Thread.sleep(100);
 			    b++;
-			    if(0==b) GPIO.invert(GPIO.PB5);
+			    if(0==b) Gpio.invert(Gpio.PB5);
 			}
 		}
 	}
 
 	public static void main() {
-		//System.setParam(RTOSParam.SHOW_WELCOME,0x01);
-		//System.setParam(RTOSParam.DIAG_MODE,0x01);
+		//System.setParam(RtosParam.SHOW_WELCOME,0x01);
+		//System.setParam(RtosParam.DIAG_MODE,0x01);
 
-		GPIO.modeOut(GPIO.PB5);
+		Gpio.modeOut(Gpio.PB5);
 
 //		for(byte b=0; b<3; b++) {
 //			Thread th = new Th1(b);
@@ -47,10 +49,10 @@ class Main {
 
 		while(true) {
 			Thread.sleep(1000);
-			ANSI.setCursor(0,0);
-			ANSI.setColor(2,0);
-			System.showDRAMMap();
-			ANSI.setColor(7,0);
+			VT100.setCursor(0,0);
+			VT100.setColor(2,0);
+			System.showDramUsage();
+			VT100.setColor(7,0);
 		}
 	}
 }

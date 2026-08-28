@@ -139,6 +139,8 @@ public class ParameterNode extends AstNode {
 
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
+		
+		releaseVars(cg);
 		return null;
 	}
 	

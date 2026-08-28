@@ -30,6 +30,6 @@ class Main {
 	}
 
 	public static void main() {
-		System.out(someMethod());
+		System.out("someMethod() [471868441]=" + someMethod() + '\n');
 	}
 }

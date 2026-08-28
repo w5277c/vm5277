@@ -27,6 +27,8 @@ import ru.vm5277.common.DefReader;
 import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.enums.PlatformType;
 import ru.vm5277.common.StrUtils;
+import ru.vm5277.common.enums.InteractiveMode;
+import ru.vm5277.common.enums.RtosFeature;
 import ru.vm5277.common.firmware.IntelHex.IntelHexParser;
 import ru.vm5277.common.firmware.Segment;
 
@@ -75,7 +77,7 @@ public class Main {
 		boolean isEncryptedFw = false;
 		boolean smartMode = false;
 		int	waitTime = 0;
-		boolean	interactiveMode = false;
+		InteractiveMode	interactiveMode = InteractiveMode.AUTO;
 
 		boolean doClearCache = false;
 		boolean doFlash = false;
@@ -182,8 +184,13 @@ public class Main {
 					else if(!detectMode && (arg.equals("-e") || arg.equals("--encrypted"))) {
 						isEncryptedFw = true;
 					}
-					else if(!detectMode && (arg.equals("-I") || arg.equals("--interactive"))) {
-						interactiveMode = true;
+					else if(args.length>i+1 && (arg.equals("-I") || arg.equals("--interactive"))) {
+						String interactiveModeStr = args[++i];
+						interactiveMode = interactiveMode.fromName(interactiveModeStr);
+						if(null==interactiveMode) {
+							showInvalidInteractiveMode(interactiveModeStr);
+							return 1;
+						}
 					}
 					else {
 						System.err.println("[ERROR] Invalid parameter: " + arg);
@@ -353,7 +360,7 @@ public class Main {
 			}
 
 			ServiceMessageHandler serviceMessageHandler = null;
-			if(interactiveMode) { // В инерактивном режиме может потребоваться обработка сервисных сообщений
+			if(InteractiveMode.NONE!=interactiveMode) { // В инерактивном режиме может потребоваться обработка сервисных сообщений
 				// В том числе трассировка исключений
 
 				final TargetInfoParser parser = new TargetInfoParser();
@@ -371,54 +378,98 @@ public class Main {
 					}
 				}
 
-				serviceMessageHandler = new ServiceMessageHandler() {
-					@Override
-					public String handle(String message) {
-						if(parser.isReady()) {
-							if(message.startsWith("ETRC:")) {
-								StringBuilder sb = new StringBuilder();
-								int pos = 0x05;
-								int endNumPos = getHexNumEndPos(message, pos);
-								int exId = Integer.parseInt(message.substring(pos, endNumPos), 0x10);
-								String exName = parser.getException(exId);
-								pos=endNumPos+1;
-								endNumPos = getHexNumEndPos(message, pos);
-								int code = Integer.parseInt(message.substring(pos, endNumPos), 0x10);
-								String codeName = parser.getExceptionCode(exId, code);
-								pos=endNumPos+1;
-								//sb.append(">").append(message).append("<");
-								sb.append("Stacktrace for ").append(exName).append(", code:").append(null==codeName ? code : codeName).append("\n");
+				if(InteractiveMode.AUTO==interactiveMode) {
+					if(!parser.isReady()) {
+						interactiveMode=InteractiveMode.NONE;
+						System.out.println(	"Interactive mode: " + InteractiveMode.AUTO.toString() + "->" + interactiveMode.toString() +
+											" (DBG file parsing fail)");
+					}
+					else {
+						if(parser.hasRtosFeature(RtosFeature.OS_FT_STDIN, RtosFeature.OS_FT_VT100)) {
+							interactiveMode = InteractiveMode.FULL;
+						}
+						else if(parser.hasRtosFeature(RtosFeature.OS_FT_DIAG, RtosFeature.OS_FT_ETRACE, RtosFeature.OS_FT_STDOUT, RtosFeature.OS_FT_WELCOME)) {
+							interactiveMode = InteractiveMode.OUTPUT;
+						}
+						else {
+							interactiveMode = InteractiveMode.NONE;
+						}
+					}
+				}
+				
+				if(InteractiveMode.NONE!=interactiveMode) {
+					serviceMessageHandler = new ServiceMessageHandler() {
+						@Override
+						public String handle(String message) {
+							if(parser.isReady()) {
+								if(message.startsWith("ETRC:")) {
+									StringBuilder sb = new StringBuilder();
+									int pos = 0x05;
+									int endNumPos = getHexNumEndPos(message, pos);
+									int exId = Integer.parseInt(message.substring(pos, endNumPos), 0x10);
+									String exName = parser.getException(exId);
+									pos=endNumPos+1;
+									endNumPos = getHexNumEndPos(message, pos);
+									int code = Integer.parseInt(message.substring(pos, endNumPos), 0x10);
+									String codeName = parser.getExceptionCode(exId, code);
+									pos=endNumPos+1;
+									//sb.append(">").append(message).append("<");
+									sb.append("Stacktrace for ").append(exName).append(", code:").append(null==codeName ? code : codeName).append("\n");
 
 
-								while(pos<message.length()) {
-									if(message.substring(pos).startsWith("..")) {
-										sb.append("...\n");
-										pos+=0x03;
+									while(pos<message.length()) {
+										if(message.substring(pos).startsWith("..")) {
+											sb.append("...\n");
+											pos+=0x03;
+										}
+										else {
+											endNumPos = getHexNumEndPos(message, pos);
+											sb.append(parser.getThrowPoint(Integer.parseInt(message.substring(pos, endNumPos), 0x10))).append("\n");
+											pos=endNumPos+1;
+										}
 									}
-									else {
-										endNumPos = getHexNumEndPos(message, pos);
-										sb.append(parser.getThrowPoint(Integer.parseInt(message.substring(pos, endNumPos), 0x10))).append("\n");
-										pos=endNumPos+1;
-									}
+									sb.append("End stacktrace\n");
+									return sb.toString();
 								}
-								sb.append("End stacktrace\n");
-								return sb.toString();
-							}	
-						}
-						return null;
-					}
-
-					public int getHexNumEndPos(String str, int startPos) {
-						for(int i=startPos; i<str.length(); i++) {
-							char ch = str.charAt(i);
-							if(!(Character.isDigit(ch) || ((ch|0x20)>='a' && (ch|0x20)<='f'))) {
-								return i;
+								else if(message.startsWith("DRAMSM:")) {
+									StringBuilder sb = new StringBuilder("DRAM:[");
+									int used = 0;
+									int total = 0;
+									
+									for(int pos=7; pos<(message.length()-1);pos+=2) {
+										int bitmapValue = Integer.parseInt(message.substring(pos, pos+2), 0x10);
+										used += Integer.bitCount(bitmapValue) * 8;
+										total+=64;
+										for(int nibbleNum=0; nibbleNum<2; nibbleNum++) {
+											byte nibble = (byte)((bitmapValue&0xf0)>>0x04);
+											if(nibble==15) sb.append('█');
+											else if(nibble>=12) sb.append('▓');
+											else if(nibble>=8) sb.append('▒');
+											else if(nibble>=4) sb.append('░');
+											else sb.append(' ');
+											bitmapValue <<= 0x04;
+										}
+									}
+									
+									int percent = (used * 100 + total / 2) / total;
+									sb.append("] ").append(percent).append("% used (").append(used).append("/").append(total).append(" bytes)\n");
+									return sb.toString();
+								}
 							}
+							return null;
 						}
-						return str.length();
-					}
-				};
 
+						public int getHexNumEndPos(String str, int startPos) {
+							for(int i=startPos; i<str.length(); i++) {
+								char ch = str.charAt(i);
+								if(!(Character.isDigit(ch) || ((ch|0x20)>='a' && (ch|0x20)<='f'))) {
+									return i;
+								}
+							}
+							return str.length();
+						}
+					};
+				}
 			}
 		
 			BootloaderIface bIface = new BootloaderIface(cpuFreqKHz, serialDeviceName, waitTime, retries);
@@ -535,11 +586,18 @@ public class Main {
 						}
 					}
 
-					if(result && interactiveMode) {
+					if(result && InteractiveMode.NONE!=interactiveMode) {
 						try {
-							System.out.println("\nEntering interactive mode. Press Esc to exit.");
-							SerialTerminal terminal = new SerialTerminal(	bIface.getSerialPort(), bIface.getDeviceInfo().isSingleWireMode(), tCSize, tRSize,
-																			serviceMessageHandler);
+							System.out.print("\nEntering interactive mode:" + interactiveMode.toString() + ".");
+							if(InteractiveMode.FULL==interactiveMode) {
+								System.out.println(" Press Esc for release connection and exit.");
+							}
+							else {
+								System.out.println(" Please terminate process (Ctrl-C or Stop IDE button) for release connection and exit.");
+							}
+							
+							SerialTerminal terminal = new SerialTerminal(	bIface.getSerialPort(), bIface.getDeviceInfo().isSingleWireMode(),
+																			interactiveMode, tCSize, tRSize, serviceMessageHandler);
 							terminal.start();
 							terminal.join();
 							result = true;
@@ -665,8 +723,13 @@ public class Main {
 		System.out.println("  -F,  --flash            Flash HEX file to device");
 		System.out.println("  -V,  --verify           Verify device against HEX file");
 		System.out.println("  -R,  --reboot           Reboot device");
-		System.out.println("  -I,  --interactive      Enter interactive mode after operations");
+		System.out.println("  -I,  --interactive <mode>");
+		System.out.println("                          Interactive mode after operations:");
 		System.out.println("                          (stdin/stdout redirected to serial port, Esc for exit)");
+		System.out.println("                          auto  - Auto-detect mode from DBG file (default)");
+		System.out.println("                          none  - disabled");
+		System.out.println("                          out   - STDOUT only (TX)");
+		System.out.println("                          full  - STDIN + STDOUT (RX+TX) with VT100 support");
 		System.out.println("  -f,  --fwversion <num>  Set firmware version 0-255 (default: 0, used with keys F,V)");
 		System.out.println("  -w,  --wait             Wait for device (10 seconds)");
 		System.out.println("  -r,  --retries <num>    Number of retries on failure (default: 3)");
@@ -713,5 +776,8 @@ public class Main {
 		System.err.println("1. Specify custom path with --path (-P) option");
 		System.err.println("2. Add toolkit directory(vm5277) to system environment variables");
 		System.err.println("3. Check project source or documentation at https://github.com/w5277c/vm5277");
+	}
+	private static void showInvalidInteractiveMode(String interactiveMode) {
+		System.err.println("[ERROR] TODO Invalid interactive mode (-I): '" + interactiveMode + "', expected auto|none|out|full");
 	}
 }

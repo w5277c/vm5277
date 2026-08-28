@@ -24,20 +24,12 @@ import ru.vm5277.common.exceptions.CompileException;
 public class ClassScope extends CIScope {
 	private	final	List<MethodSymbol>				constructors	= new ArrayList<>();
 	
-	public ClassScope(Scope parent, String name) throws CompileException {
+	public ClassScope(Scope parent, String name, boolean isInner) throws CompileException {
 		super(parent);
 		
 		addInternal(new InterfaceScope("Object", this, new ArrayList<>()));
-		MethodScope mScope = new MethodScope(null, this);
-		MethodSymbol mSymbol = new MethodSymbol("getClassId", VarType.SHORT, null, true, false, false, false, true, mScope, null);
-		mScope.setSymbol(mSymbol);
-		methods.add(mSymbol);
-		mScope = new MethodScope(null, this);
-		mSymbol = new MethodSymbol("getClassTypeId", VarType.SHORT, null, true, false, false, false, true, mScope, null);
-		mScope.setSymbol(mSymbol);
-		methods.add(mSymbol);
 		
-		if(null!=parent && !(parent instanceof GlobalScope) && !(parent instanceof ClassScope)) {
+		if(isInner && null!=parent && !(parent instanceof GlobalScope) && !(parent instanceof ClassScope)) {
 			throw new CompileException("Сlass " + name + " can only be declared within a class.");
 		}
 		if(name==null || name.isEmpty()) {

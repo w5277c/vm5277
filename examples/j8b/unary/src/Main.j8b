@@ -18,9 +18,9 @@
 
 class Main {
     public static void main() {
-		bool b1;
+		boolean b1;
 		b1 = false;
-		bool b2;
+		boolean b2;
 		b2 = false;
 
 		fixed f1;
@@ -57,9 +57,9 @@ class Main {
 
 		System.out(!b1 || b2);
 
-		System.out('\n' + s1);
-		System.out('\n' + s2);
-		System.out('\n' + f1);
-		System.out('\n' + b2);
+		System.out("\ns1 [???]=" + s1); //TODO проверить
+		System.out("\ns2 [65278]=" + s2);
+		System.out("\nf1 [1.00]=" + f1);
+		System.out("\nb2 [true]=" + b2);
 	}
 }

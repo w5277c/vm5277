@@ -18,8 +18,8 @@
 public interface Timer {
 	public native void start(short period);
 	public native void stop();
-	public native bool isRunning();
-	public native bool isStopped();
+	public native boolean isRunning();
+	public native boolean isStopped();
 
-	public void run();
+	@EntryPoint public void run();
 }

@@ -207,7 +207,6 @@ public class MnemNode extends Node {
 							if(be.getLeftExpr() instanceof IRegExpression) {
 								Instruction i = supported.get("ldd"+((IRegExpression)be.getLeftExpr()).getMnemPart());
 								if(null != i) {
-									// TODO HEX не корректный
 									parseQ(i, new Reg(scope, sp, expr1), new Const(mc, scope, sp, be.getRightExpr(), 0, 63, 6));
 									return true;
 								}

@@ -15,27 +15,22 @@
  */
 ;Выключаем бит по в ячейке расположенной по адресу 0-255
 ;-----------------------------------------------------------------------------------------------------------------------
-.IFNDEF REG_BIT_LO
+.IFNDEF REG_BIT_LO_NR
 ;--------------------------------------------------------
-REG_BIT_LO:
+REG_BIT_LO_NR:
 ;--------------------------------------------------------
 ;Выключаем бит регистра
-;IN: Z-адрес,ACCUM_L-число бита
+;IN: ACCUM_L-адрес,ACCUM_H-число бита
+;MOD: XH,ACCUM_L/H/EL
 ;--------------------------------------------------------
-	PUSH_T16
-	PUSH ACCUM_L
-
-	COM ACCUM_L
-	LDS TEMP_H,SREG
+	COM ACCUM_H
+	MOV XL,ACCUM_L
+	LDI XH,0x00
+	LDS ACCUM_EL,SREG
 	CLI
-
-	LD TEMP_L,Z
-	AND TEMP_L,ACCUM_L
-	ST Z,TEMP_L
-
-	STS SREG,TEMP_H
-
-	POP ACCUM_L
-	POP_T16
+	LD ACCUM_L,X
+	AND ACCUM_L,ACCUM_H
+	ST X,ACCUM_L
+	STS SREG,ACCUM_EL
 	RET
 .ENDIF

@@ -1,9 +1,45 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import drivers.CircBuffer;
+import rtos.RtosDispatcher;
+
 public interface OutputStream {
-    void write(byte b);
-    void write(char c);
-    void write(short s);
-    void write(int i);
-    void write(byte[] buf);
-    void write(byte[] buf, short off, short len);
-    void flush();
+    public static void write(CircBuffer cBuff, char b) {
+    	//TODO synchronized(RtosDispatcher.LOCK) {
+    		while(0==cBuff.getFree()) {} // Нельзя спать, иначе может образоваться пауза при передаче
+			cBuff.write(b);
+		//}
+    }
+	public static short write(CircBuffer cBuff, byte[] buff, short off, short len) {
+    	//TODO synchronized(RtosDispatcher.LOCK) {
+    		short index = 0;
+   			short free = cBuff.getFree();
+   			if(0!=free) {
+	   			for(; index<len && 0!=free; index++) {
+	   				cBuff.write(buff[off+index]);
+	   		 		free--;
+	   		 	}
+	   		}
+		//}
+   		return index;
+	}
+
+    public short getFree(); //Возвращает количество доступных байт
+    public void write(char c); //Передача байта
+    public void write(byte[] buff, short off, short len); //Передача блока данных
+    public void flush(); //Сброс буффера (незамедлительная передача)
 }

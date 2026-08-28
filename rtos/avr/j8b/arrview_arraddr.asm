@@ -19,14 +19,18 @@
 J8BPROC_ARRVIEW_ARRADDR:
 ;-----------------------------------------------------------
 ;Получаем адрес заголовка массива
-;IN: X-адрес заголовка VIEW
+;IN: X-адрес заголовка VIEW или массива
 ;OUT: X-адрес заголовка массива
 ;-----------------------------------------------------------
 	PUSH ACCUM_L
+	LD ACCUM_L,X											;Проверяем заголовк и выходим, если это массив
+	SBRS ACCUM_L,0x07										;включенный 7-й бит в заголовке означает что это VIEW, иначе массив
+	RJMP J8BPROC_ARRVIEW_ARRADDR__END
 	ADIW XL,0x01
 	LD ACCUM_L,X+											;LE
 	LD XH,X
 	MOV XL,ACCUM_L
+J8BPROC_ARRVIEW_ARRADDR__END:
 	POP ACCUM_L
 	RET
 .ENDIF

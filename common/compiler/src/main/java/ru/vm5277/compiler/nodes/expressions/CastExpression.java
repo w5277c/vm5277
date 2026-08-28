@@ -22,6 +22,7 @@ import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.cg.CodeGenerator;
 import java.util.List;
 import java.util.Arrays;
+import java.util.Objects;
 import ru.vm5277.common.cg.scopes.CGScope;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -30,6 +31,7 @@ import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.cg.CGExcs;
+import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 
@@ -115,6 +117,9 @@ public class CastExpression extends ExpressionNode {
 
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
+		if(cgDone || disabled) return null;
+		cgDone = true;
+
 		// Для констант мы можем задать размер аккумулятора изначально, это даст оптимальный код
 		// TODO точно? Проверить!
 		// Учет выражения (fixed)byte - ранее я убрал из этого условия VarFieldExpression, что-то оно ломало, нужно проверять
@@ -129,6 +134,8 @@ public class CastExpression extends ExpressionNode {
 //				cgScope.append(cg.accCast(sourceType, type));
 //			}
 			cg.accumUnlock();
+			
+			releaseVars(cg);
 			return result;
 /*		}
 		else {
@@ -156,10 +163,20 @@ public class CastExpression extends ExpressionNode {
 	}
 	
 	@Override
+	public boolean equals(Object obj) {
+		if(!(obj instanceof CastExpression)) return false;
+		CastExpression expr2 = (CastExpression)obj;
+		if(!Objects.equals(type, expr2.getType()) ) return false;
+		return Objects.equals(operand, getOperand());
+	}
+
+	
+	@Override
 	public String toString() {
 		return "(" + type + ")" + operand;
 	}
 	
+	@Override
 	public String getFullInfo() {
 		return getClass().getSimpleName() + " " + toString();
 	}

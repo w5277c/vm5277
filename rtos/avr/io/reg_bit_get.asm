@@ -14,21 +14,20 @@
  * limitations under the License.
  */
 
-;-----------------------------------------------------------------------------------------------------------------------
-.IFNDEF REG_BIT_GET
 ;-----------------------------------------------------------
-REG_BIT_GET:
+.IFNDEF REG_BIT_GET_NR
+;-----------------------------------------------------------
+REG_BIT_GET_NR:
 ;-----------------------------------------------------------
 ;Получаем бит регистра
-;IN: Z-адрес,ACCUM_L-число бита
+;IN: ACCUM_L-адрес,ACCUM_H-число бита
 ;OUT: Флаг C-состояние пина (C-true=HI)
+;MOD: XH,ACCUM_L
 ;-----------------------------------------------------------
-	PUSH TEMP_L
-
-	LD TEMP_L,Z
-	AND TEMP_L,ACCUM_L
-	ADD TEMP_L,C0xff
-
-	POP TEMP_L
+	MOV XL,ACCUM_L
+	LDI XH,0x00
+	LD ACCUM_L,X
+	AND ACCUM_L,ACCUM_H
+	ADD ACCUM_L,C0xff
 	RET
 .ENDIF

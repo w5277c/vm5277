@@ -1,0 +1,164 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import io.OutputStream;
+import drivers.ifaces.SpiSwHd;
+
+public class DS1302 implements TimeDateDevice, RtosDriver {
+	private static final byte CMD_BURST_READ = 0xbf;
+	private static final byte CMD_BURST_WRITE = 0xbe;
+	private static final byte CMD_READ_SECONDS = 0x81;
+	private static final byte CMD_WRITE_SECONDS = 0x80;
+	private static final byte CMD_WRITE_WP = 0x8e;
+
+	private SpiSwHd iface;
+	private byte cePort;
+	private final byte[] buffer = new byte[0x08];
+
+	public DS1302(byte clkPort, byte dataPort, byte cePort) {
+		this.cePort = cePort;
+
+		Gpio.setHigh(clkPort);
+		Gpio.modeOut(clkPort);
+		Gpio.setHigh(dataPort);
+		Gpio.modeOut(dataPort);
+		Gpio.setLow(cePort);
+		Gpio.modeOut(cePort);
+
+		iface = new SpiSwHd(dataPort, clkPort, true, 1, false, false, true);
+
+		read();
+	}
+
+	@Override public void read() {
+		buffer[0] = CMD_BURST_READ;
+
+		Gpio.setHigh(cePort);
+		RtosCore.delayUs(1);
+		iface.comm(buffer, 1, buffer, 7, 100);
+		RtosCore.delayUs(1);
+		Gpio.setLow(cePort);
+	}
+
+	public boolean isHalted() {
+		return 0x00!=(buffer[0] & 0x80);
+	}
+	public void setHalt(boolean on) {
+		Gpio.setHigh(cePort);
+		RtosCore.delayUs(1);
+
+		buffer[0] = CMD_READ_SECONDS;
+		iface.comm(buffer, 1, buffer, 1, 100);
+		byte oldSeconds = buffer[0];
+		buffer[0] = CMD_WRITE_SECONDS;
+		if(on) buffer[1] = oldSeconds | 0x80;
+		else buffer[1] = oldSeconds & 0x7f;
+		if(buffer[1]!=oldSeconds) {
+			iface.comm(buffer, 2, null, 0, 100);
+		}
+		Gpio.setLow(cePort);
+		RtosCore.delayUs(1);
+	}
+
+	private void setWP(boolean on) {
+		buffer[0] = CMD_WRITE_WP;
+		if(on) buffer[1] = 0x80;
+		else buffer[1] = 0x00;
+
+		Gpio.setHigh(cePort);
+		RtosCore.delayUs(1);
+		iface.comm(buffer, 2, null, 0, 100);
+		Gpio.setLow(cePort);
+		RtosCore.delayUs(1);
+	}
+
+	@Override public void set(byte dom, byte month, short year, byte dow, byte hour, byte minutes, byte seconds) {
+		buffer[0] = CMD_BURST_WRITE;
+		buffer[1] = Primitive.byteToBcd(seconds);
+		buffer[2] = Primitive.byteToBcd(minutes);
+		buffer[3] = Primitive.byteToBcd(hour); //24H
+		buffer[4] = Primitive.byteToBcd(dom);
+		buffer[5] = Primitive.byteToBcd(month);
+		buffer[6] = dow;
+		buffer[7] = Primitive.byteToBcd((byte)year);
+
+		Gpio.setHigh(cePort);
+		RtosCore.delayUs(1);
+		iface.comm(buffer, 8, null, 0, 100);
+		Gpio.setLow(cePort);
+		RtosCore.delayUs(1);
+	}
+
+	@Override public byte getSeconds() {
+		return Primitive.bcdToByte(buffer[0] & 0x7f);
+	}
+
+	@Override public byte getMinutes() {
+		return Primitive.bcdToByte(buffer[1] & 0x7f);
+	}
+
+	@Override public byte getHour() {
+		byte octet = buffer[2];
+		if(0==(octet&0x80)) { //24H
+			return Primitive.bcdToByte(octet & 0x3f);
+		}
+		byte hour = Primitive.bcdToByte(octet & 0x1f);
+		if(0!=(octet&0x20)) { //12H PM
+			return 12==hour ? 12 : hour+12;
+		}
+		return 12==hour ? 0 : hour; //12H AM
+	}
+
+	@Override public byte getDom() { //Day of month
+		return Primitive.bcdToByte(buffer[3] & 0x3f);
+	}
+
+	@Override public byte getMonth() {
+		return Primitive.bcdToByte(buffer[4] & 0x1f);
+	}
+
+	@Override public byte getDow() { //Day of week
+		return buffer[5] & 0x07;
+	}
+
+	@Override public short getYear() {
+		return Primitive.bcdToByte(buffer[6]);
+	}
+
+	public void printDate(OutputStream os) {
+		Primitive.printByte(os, getDom(), 2);
+		os.write('.');
+		Primitive.printByte(os, getMonth(), 2);
+		os.write('.');
+		os.write('2');
+		os.write('0');
+		Primitive.printByte(os, (byte)getYear(), 2);
+	}
+
+	public void printTime(OutputStream os) {
+		Primitive.printByte(os, getHour(), 2);
+		os.write(':');
+		Primitive.printByte(os, getMinutes(), 2);
+		os.write(':');
+		Primitive.printByte(os, getSeconds(), 2);
+	}
+
+	@Override public void print(OutputStream os) {
+		printDate(os);
+		os.write(' ');
+		printTime(os);
+	}
+}

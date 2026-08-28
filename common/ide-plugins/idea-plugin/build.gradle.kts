@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "ru.vm5277"
-version = "1.2"
+version = "1.4"
 
 repositories {
     mavenCentral()

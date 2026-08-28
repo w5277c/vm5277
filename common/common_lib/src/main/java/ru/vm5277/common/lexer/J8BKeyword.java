@@ -19,7 +19,7 @@ package ru.vm5277.common.lexer;
 public class J8BKeyword extends Keyword {
 	// Типы примитив
 	public	static	final	Keyword					VOID		= new Keyword("void", TokenType.TYPE, LexerType.J8B);
-	public	static	final	Keyword					BOOL		= new Keyword("bool", TokenType.TYPE, LexerType.J8B);
+	public	static	final	Keyword					BOOLEAN		= new Keyword("boolean", TokenType.TYPE, LexerType.J8B);
 	public	static	final	Keyword					BYTE		= new Keyword("byte", TokenType.TYPE, LexerType.J8B);
 	public	static	final	Keyword					CHAR		= new Keyword("char", TokenType.TYPE, LexerType.J8B);
 	public	static	final	Keyword					SHORT		= new Keyword("short", TokenType.TYPE, LexerType.J8B);

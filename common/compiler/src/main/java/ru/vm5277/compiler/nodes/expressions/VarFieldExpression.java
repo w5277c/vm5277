@@ -17,6 +17,7 @@
 package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.Objects;
+import ru.vm5277.common.VarType;
 import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.CGBranch;
@@ -24,7 +25,6 @@ import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.exceptions.CompileException;
-import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.VarSymbol;
@@ -34,8 +34,14 @@ import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CGExcs;
+import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.cg.scopes.CGCondBlockScope;
 import ru.vm5277.common.cg.scopes.CGFieldScope;
+import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
+import ru.vm5277.common.cg.scopes.CGVarScope;
+import static ru.vm5277.common.enums.SemanticAnalyzePhase.CODEGEN;
 import ru.vm5277.compiler.Instance;
+import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.semantic.AstHolder;
 import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.FieldSymbol;
@@ -104,10 +110,29 @@ public class VarFieldExpression extends ExpressionNode {
 					symbol = scope.resolveField(name, false);
 				}
 				targetScope = scope.getThis();
-				if(null!=symbol) type = symbol.getType();
+				if(null!=symbol) {
+					type = symbol.getType();
+				}
 			}
 			else {
 				result&=targetExpr.declare(scope);
+				if(result) {
+					if(targetExpr instanceof VarFieldExpression) {
+						VarType varType = ((VarFieldExpression)targetExpr).getSymbol().getType();
+						if(null!=varType) {
+							targetScope = scope.getThis().resolveCI(null, varType.getClassName(), false);
+							if(null!=targetScope) {
+								symbol = targetScope.resolveVar(name);
+								if(null==symbol) {
+									symbol = targetScope.resolveField(name, false);
+								}
+							}
+						}
+					}
+					if(null!=symbol) {
+						type = symbol.getType();
+					}
+				}
 			}
 		}
 		catch(CompileException ex) {
@@ -170,6 +195,41 @@ public class VarFieldExpression extends ExpressionNode {
 			}
 		}
 
+		if(result && symbol.getCGScope() instanceof CGVarScope) {
+			CGScope _scope = cgScope;
+			CGBlockScope declarationScope = null;
+			CGScope usageScope = null;
+			CGBlockScope upperControlScope = null; 
+			
+			while(null!=_scope) {
+				if(null!=_scope.getParent() && _scope.getParent() instanceof CGBlockScope) {
+					if(_scope.getParent() instanceof CGLoopBlockScope || _scope.getParent() instanceof CGCondBlockScope) { 
+						upperControlScope = (CGBlockScope)_scope.getParent();
+					}
+					
+					CGBlockScope bScope = ((CGBlockScope)_scope.getParent());
+					if(bScope.getVars().containsValue(symbol.getCGScope())) {
+						declarationScope = bScope;
+						usageScope = _scope;
+						break;
+					}
+				}
+				_scope = _scope.getParent();
+			}
+
+			if(null!=usageScope) {
+				CGVarScope vScope = (CGVarScope)symbol.getCGScope();
+				if(null==upperControlScope) {
+					vScope.setLastUsage(usageScope);
+					usageScope.getLiveVars().add((CGVarScope)symbol.getCGScope());
+				}
+				else {
+					vScope.setLastUsage(upperControlScope);
+					upperControlScope.getLiveVars().add((CGVarScope)symbol.getCGScope());
+				}
+			}
+		}
+		
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
 	}
@@ -184,6 +244,25 @@ public class VarFieldExpression extends ExpressionNode {
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(disabled) return null;
+		
+/*		if(symbol.getCGScope() instanceof CGVarScope) {
+			CGScope _scope = cgScope;
+			while(null!=_scope) {
+				if(_scope instanceof CGBlockScope) {
+					CGBlockScope bScope = ((CGBlockScope)_scope);
+					if(bScope.checkVarAndRelease((CGVarScope)symbol.getCGScope())) {
+						break;
+					}
+				}
+				_scope = _scope.getParent();
+			}
+		}
+*/
+		if(cgDone) return null;
+		cgDone = true;
+		
+		debugAST(this, CODEGEN, true, getFullInfo());
+		
 		// Актуализируем symbol
 		//getSymbol();
 		
@@ -211,17 +290,18 @@ public class VarFieldExpression extends ExpressionNode {
 					
 					if(null!=targetExpr) {
 						targetExpr.codeGen(cg, false, excs);
-					}
-					if(null!=targetExpr && targetExpr instanceof VarFieldExpression) { //Не смотрим на isInliningMode
-						cg.cellsToArrReg(cgScope, ((CGCellsScope)((VarFieldExpression)targetExpr).getSymbol().getCGScope()).getCells());
-					}
 
-					if(null!=targetExpr && isInliningMode) {
-						// Режим AST инлайнинга
-						CGFieldScope cgfs = (CGFieldScope)symbol.getCGScope();
-						if(!cgfs.isStatic()) {
-							CGCells cgcs = new CGCells(CGCells.Type.HEAP_ALT, cgfs.getCells().getIds());
-							cgfs.setCells(cgcs);
+						if(targetExpr instanceof VarFieldExpression) { //Не смотрим на isInliningMode
+							cg.cellsToArrReg(cgScope, ((CGCellsScope)((VarFieldExpression)targetExpr).getSymbol().getCGScope()).getCells());
+						}
+
+						if(isInliningMode) {
+							// Режим AST инлайнинга
+							CGFieldScope cgfs = (CGFieldScope)symbol.getCGScope();
+							if(!cgfs.isStatic()) {
+								CGCells cgcs = new CGCells(CGCells.Type.HEAP_ALT, cgfs.getCells().getIds());
+								cgfs.setCells(cgcs);
+							}
 						}
 					}
 					if(toAccum) {
@@ -233,6 +313,7 @@ public class VarFieldExpression extends ExpressionNode {
 //				}
 //		}
 
+		releaseVars(cg);		
 		return (toAccum ? CodegenResult.RESULT_IN_ACCUM : null);
 	}
 	
@@ -245,22 +326,11 @@ public class VarFieldExpression extends ExpressionNode {
 			CGCells rightCells = new CGCells(CGCells.Type.CONST);
 			rightCells.setConst(0);
 			cg.cellsCpCells(cgScope, cScope.getCells(), symbol.getType(), rightCells, null, Operator.NEQ, isInvert, opOr, brScope);
-
 		}
+		
+		releaseVars(cg);
 	}
 
-	public void postCodeGen(CodeGenerator cg) throws CompileException {
-		//TODO рудимент
-		if(!disabled) {
-
-			if(null!=targetExpr && targetExpr instanceof VarFieldExpression) { //Не смотрим на isInliningMode
-				if(!isInliningMode) {
-					cg.popHeapReg(cgScope);
-				}
-			}
-		}
-	}
-	
 	@Override
 	public String getQualifiedPath() {
 		return (null!=targetExpr ? targetExpr.getQualifiedPath() + ".": "" ) + name;
@@ -271,7 +341,21 @@ public class VarFieldExpression extends ExpressionNode {
 		return name;
 	}
 	
+	@Override
 	public String getFullInfo() {
 		return getClass().getSimpleName() + ": " + name;
+	}
+	
+	public boolean isInliningMode() {
+		return isInliningMode;
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		if(!(obj instanceof VarFieldExpression)) return false;
+		VarFieldExpression expr2 = (VarFieldExpression)obj;
+		if(isInliningMode!=expr2.isInliningMode()) return false;
+		if(!Objects.equals(targetExpr, expr2.getTargetExpr())) return false;
+		return Objects.equals(name, expr2.getName());
 	}
 }

@@ -17,14 +17,12 @@
 package ru.vm5277.compiler.avr_codegen;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import ru.vm5277.common.Device;
 import ru.vm5277.common.ExcsThrowPoint;
 import ru.vm5277.common.LabelNames;
@@ -34,14 +32,12 @@ import ru.vm5277.common.lexer.Operator;
 import static ru.vm5277.common.lexer.Operator.BIT_AND;
 import static ru.vm5277.common.lexer.Operator.BIT_OR;
 import static ru.vm5277.common.lexer.Operator.BIT_XOR;
-import static ru.vm5277.common.lexer.Operator.EQ;
-import static ru.vm5277.common.lexer.Operator.LT;
 import static ru.vm5277.common.lexer.Operator.MINUS;
 import static ru.vm5277.common.lexer.Operator.PLUS;
 import ru.vm5277.common.Pair;
 import ru.vm5277.common.compiler.Case;
 import ru.vm5277.common.cg.CodeGenerator;
-import ru.vm5277.common.enums.RTOSFeature;
+import ru.vm5277.common.enums.RtosFeature;
 import ru.vm5277.common.enums.RTOSHaltMode;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.enums.RTOSParam;
@@ -83,13 +79,23 @@ import static ru.vm5277.common.cg.CGCells.Type.ARGS;
 import static ru.vm5277.common.cg.CGCells.Type.CONST;
 import static ru.vm5277.common.cg.CGCells.Type.REG;
 import static ru.vm5277.common.cg.CGCells.Type.STACK;
+import static ru.vm5277.common.cg.CGCells.Type.STACK_FRAME;
 import ru.vm5277.common.enums.InstanceType;
 import ru.vm5277.common.enums.RTOSLibs;
+import static ru.vm5277.common.lexer.Operator.EQ;
+import static ru.vm5277.common.lexer.Operator.GT;
+import static ru.vm5277.common.lexer.Operator.GTE;
+import static ru.vm5277.common.lexer.Operator.LT;
+import static ru.vm5277.common.lexer.Operator.LTE;
+import static ru.vm5277.common.lexer.Operator.NEQ;
 import static ru.vm5277.common.lexer.Operator.ROL;
 
-//Для исключения путаницы - используем Little endian, т.е. 256 будет представлено в памяти как 0x00,0x01, и в регистрах r16=0x00, r17=0x01
-//Сравнение числел выполняется от большего к меньшему т.е. адрес и номер регистра должен уменьшаться
+// Для исключения путаницы - используем Little endian, т.е. 256 будет представлено в памяти как 0x00,0x01, и в регистрах r16=0x00, r17=0x01
+// Сравнение числел выполняется от большего к меньшему т.е. адрес и номер регистра должен уменьшаться
 //TODO похоже в коде есть ошибки - применение BE
+// !Все операции с переменными и параметрами в стеке выполняются через normalizeIRegConst(CGIAsmIReg) и используют LE
+// !Функция normalizeIRegConst сама поменяет порядок в итоговом коде.
+// !класть в стек нужно также в LE порядке
 
 // Блокировка диспетчера(механизм атомарности) в MULTITHREADING режиме осуществляется за счет инструкций SET и CLT, т.е. флаг T отведен конкретно под эту задачу
 // и более нигде использоваться не должен! Ну разве что для исключений, вполне могут разделять один флаг без конфликтов
@@ -103,8 +109,8 @@ import static ru.vm5277.common.lexer.Operator.ROL;
 public class Generator extends CodeGenerator {
 	private	final	static	String				VERSION				= StrUtils.readVersion(Generator.class);
 	private	final	static	byte[]				usableRegs			= new byte[]{20,21,22,23,24,25}; //Свободные регистры дял переменных
-	private			static	boolean				def_sph				= true;
-	private			static	boolean				def_jmp				= true;
+	private			static	boolean				defSph				= true;
+	private			static	boolean				defJmp				= true;
 	private	final	static	int					MIN_IREG_OFFSET		= 0;
 	private	final	static	int					MAX_IREG_OFFSET		= 63;
 	private	final	static	int					IREGS_SIZE			= 2;
@@ -115,6 +121,7 @@ public class Generator extends CodeGenerator {
 	static {
 		SUPPORTED_FUNCT.add("pin_hi");
 		SUPPORTED_FUNCT.add("pin_lo");
+		SUPPORTED_FUNCT.add("pin_set");
 		SUPPORTED_FUNCT.add("pin_invert");
 		SUPPORTED_FUNCT.add("port_set_state");
 		SUPPORTED_FUNCT.add("pin_in");
@@ -123,6 +130,7 @@ public class Generator extends CodeGenerator {
 		SUPPORTED_FUNCT.add("port_set_mode");
 		SUPPORTED_FUNCT.add("dispatcher_lock");
 		SUPPORTED_FUNCT.add("dispatcher_unlock");
+		SUPPORTED_FUNCT.add("uptime_b0");
 		
 		accRegs = new byte[]{16,17,18,19};
 		arrRegs = new byte[]{26,27};
@@ -138,26 +146,37 @@ public class Generator extends CodeGenerator {
 		codeExcsChecker = new ExcsChecker();
 		
 		Long num = device.getDefNum("JMP_SUPPORT");
-		def_jmp = (null!=num && 1==num);
+		defJmp = (null!=num && 1==num);
 		
 		num = device.getDefNum("SPH");
-		def_sph = (null!=num);
+		defSph = (null!=num);
 
-		CALL_INSTR = (def_jmp ? "call" : "rcall");
-		JUMP_INSTR = (def_jmp ? "jmp" : "rjmp");
+		CALL_INSTR = (defJmp ? "call" : "rcall");
+		JUMP_INSTR = (defJmp ? "jmp" : "rjmp");
 		
 		// Собираем RTOS
 	}
 	
 	@Override
-	public void stackPrepare(CGIContainer scope, boolean firstBlock, int argsSize, int varsSize, CGExcs excs) throws CompileException {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";stack prepare, size:" + varsSize));
+	public void stackPrepare(CGIContainer scope, boolean firstBlock, int argsSize, int varsSize, boolean asCallback, CGExcs excs) throws CompileException {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";stack prepare, args size:" + argsSize + ", size:" + varsSize));
 
+		//TODO проверять используются ли вообще параметры в методе, и игнорировать работу с Y если не используются и нет переменных
 		if(firstBlock && (0!=argsSize || 0!=varsSize)) {
-			scope.append(new CGIAsm("push", "r28")); //TODO проверить адрес ячейки
-			if(def_sph) scope.append(new CGIAsm("push", "r29")); // Если SPH отсутствует, то yh всегда должен быть равен 0
+			if(!asCallback) { // Метод как RtosCallback или run в Timer или Thread - Y уже сохранен (а выход быдет по ret)
+				scope.append(new CGIAsm("push", "r28")); //TODO проверить адрес ячейки
+				scope.append(new CGIAsm("push", "r29")); // Если SPH отсутствует, то yh всегда должен быть равен 0
+			}
 			scope.append(new CGIAsmLd("lds", "r28", "SPL")); //TODO проверить адрес ячейки
-			if(def_sph) scope.append(new CGIAsmLd("lds", "r29", "SPH"));
+			if(defSph)  {
+				scope.append(new CGIAsmLd("lds", "r29", "SPH"));
+			}
+			else {
+				scope.append(new CGIAsmLd("ldi", "r29", "0x00"));
+			}
+			//Позиционируем Y так, чтобы максимальное смещение указывало на самый первый(максимальный адрес) байт параметров
+			int localStackOffset = (asCallback ? 0x02 : 0x04);  //0x04 - в стеке адрес возврата+регистровая пара Y
+			scope.append(new CGIRAsm("sbiw", "r28", Integer.toString(MAX_IREG_OFFSET-(argsSize+localStackOffset))));
 		}
 
 		if(0!=varsSize) {
@@ -170,8 +189,8 @@ public class Generator extends CodeGenerator {
 			}
 			else {
 				// Осуществляем проверку переполнения стека, но не выполняем ее если размер <5
-				setFeature(RTOSFeature.OS_FT_ETRACE);
-				codeExcsChecker.stackOverflow(this, scope, excs, varsSize, def_sph ? new byte[]{29, 28} : new byte[]{29});
+				setFeature(RtosFeature.OS_FT_ETRACE);
+				codeExcsChecker.stackOverflow(this, scope, excs, varsSize, defSph ? new byte[]{29, 28} : new byte[]{29});
 				if(varsSize<0x100) {
 					scope.append(new CGIAsmLd("ldi", "r16", Integer.toString(varsSize)));
 					scope.append(new CGIAsm("push", "c0x00"));
@@ -195,35 +214,35 @@ public class Generator extends CodeGenerator {
 	public CGIContainer blockFree(int varsSize) throws CompileException {
 		CGIContainer cont = new CGIContainer();
 		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";block free, stack size:" + varsSize));
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("set"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("set"));
 		
 		if(0!=varsSize) {
-			if((def_sph && varsSize<9) || (!def_sph && varsSize<3)) {
+			if((defSph && varsSize<9) || (!defSph && varsSize<3)) {
 				for(int i=0; i<varsSize; i++) {
 					cont.append(new CGIAsm("pop", "j8b_atom"));
 				}
 			}
 			else {
-				if(def_sph) cont.append(new CGIAsm("cli"));
+				if(defSph) cont.append(new CGIAsm("cli"));
 				cont.append(new CGIAsm("lds", "_SPL,SPL"));
-				if(def_sph) cont.append(new CGIAsm("lds", "_SPH,SPH"));
+				if(defSph) cont.append(new CGIAsm("lds", "_SPH,SPH"));
 				cont.append(new CGIAsm("subi", "_SPL,low(-" + varsSize + ")")); // Оптимизатор по возможности приведет к интрукции adiw
-				if(def_sph) cont.append(new CGIAsm("sbci", "_SPH,high(-" + varsSize + ")"));
+				if(defSph) cont.append(new CGIAsm("sbci", "_SPH,high(-" + varsSize + ")"));
 				cont.append(new CGIAsm("sts", "SPL,_SPL"));
-				if(def_sph) cont.append(new CGIAsm("sts", "SPH,_SPH"));
-				if(def_sph) cont.append(new CGIAsm("sei")); // На верхнем уровне прерывания всегда резрешены, проверка(сохранение бита) не требуется
+				if(defSph) cont.append(new CGIAsm("sts", "SPH,_SPH"));
+				if(defSph) cont.append(new CGIAsm("sei")); // На верхнем уровне прерывания всегда резрешены, проверка(сохранение бита) не требуется
 			}
 		}
 		
-		if(def_sph) cont.append(new CGIAsm("pop", "r29"));
+		if(defSph) cont.append(new CGIAsm("pop", "r29"));
 		cont.append(new CGIAsm("pop", "r28"));
 		
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("clt"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("clt"));
 		return cont;
 	}
 	
 	@Override
-	public CGIContainer finMethod(VarType type, int argsSize, int varsSize, int lastStackOffset) throws CompileException {
+	public CGIContainer finMethod(VarType type, int argsSize, int varsSize) throws CompileException {
 		/* Структура данных в стеке
 		/  2Б	-регистровая пара Z
 		/  XБ	-аргументы
@@ -237,23 +256,10 @@ public class Generator extends CodeGenerator {
 		//Не требуется, более того, никто не сбрасывает флаг T
 		//if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("set"));
 		
-		// Есть переменные или аргументы, значит Y сохранен в стеке и его значение - адрес SP перед локальными переменными(с корректировкой lastStackOffset)
+		if(null==type) {
+			cont.append(new CGIAsmMv("movw", "r16", "r30")); // Конструктор, помещаем this в accum
+		}
 		if(0!=varsSize || 0!=argsSize) {
-			if(0!=lastStackOffset) {
-				int offset = lastStackOffset+0x02+0x02+argsSize; //Находимся после Z
-				if(64>offset) {
-					cont.append(new CGIAsm("sbiw", "r28," + offset));
-				}
-				else {
-					cont.append(new CGIAsm("subi", "r28,low(" + offset + ")"));
-					cont.append(new CGIAsm("subi", "r29,high(" + offset + ")"));
-				}
-			}
-			
-			if(null==type) {
-				cont.append(new CGIAsmIReg('z', true, null, 0)); // Восстановление изначального Z (this)
-				cont.append(new CGIAsmMv("movw", "r16", "r30")); // Помещаем this в accum			
-			}
 			// Передаю размер аргументов
 			if(128>argsSize) {
 				cont.append(new CGIAsmLd("ldi", "r30", Integer.toString(argsSize)));
@@ -271,11 +277,6 @@ public class Generator extends CodeGenerator {
 			cont.append(new CGIAsmJump(JUMP_INSTR, "j8bproc_mfin_sf", true));
 		}
 		else {
-			if(null==type) {
-				cont.append(new CGIAsmIReg('z', true, null, 0)); // Восстановление изначального Z (this)
-				cont.append(new CGIAsmMv("movw", "r16", "r30")); // Помещаем this в accum
-			}
-
 			RTOSLibs.METHOD_FIN.setRequired();
 			cont.append(new CGIAsmJump(JUMP_INSTR, "j8bproc_mfin", true));
 		}
@@ -303,19 +304,19 @@ public class Generator extends CodeGenerator {
 	@Override
 	public CGIContainer pushStackReg(CGScope scope) throws CompileException {
 		CGIContainer result = new CGIContainer();
-		if(VERBOSE_LO <= verbose) result.append(new CGIText(";push stack iReg"));
+		if(VERBOSE_LO<=verbose) result.append(new CGIText(";push stack iReg"));
 		result.append(new CGIAsm("push", "r28"));
 		result.append(new CGIAsm("push", "r29"));
-		if(null != scope) scope.append(result);
+		if(null!=scope) scope.append(result);
 		return result;
 	}
 	@Override
 	public CGIContainer popStackReg(CGScope scope) throws CompileException {
 		CGIContainer result = new CGIContainer();
-		if(VERBOSE_LO <= verbose) result.append(new CGIText(";pop stack iReg"));
+		if(VERBOSE_LO<=verbose) result.append(new CGIText(";pop stack iReg"));
 		result.append(new CGIAsm("pop", "r29"));
 		result.append(new CGIAsm("pop", "r28"));
-		if(null != scope) scope.append(result);
+		if(null!=scope) scope.append(result);
 		return result;
 	}
 	
@@ -430,45 +431,36 @@ public class Generator extends CodeGenerator {
 	public CGIContainer pushCells(CGScope scope, int size, CGCells cells) throws CompileException {
 		CGIContainer cont = new CGIContainer();
 		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";push cells: " + cells));
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("set")); //Можем свободно использовать j8b_atom
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("set")); //Можем свободно использовать j8b_atom
 		
-		// Сначала сохраняем старшие байты (так как LE + работа со стеком)
-		int offset = 0;
-		for(int i=cells.getSize(); i<size; i++) {
-			cont.append(new CGIAsm("push", "c0x00"));
-		}
-
-		size = (size - cells.getSize());
-		if(0!=size) {
+		//Не верно size = (size - cells.getSize());
+		if(0!=cells.getSize()) {
 			switch(cells.getType()) {
 				case ARRAY:
-					if(1<size) {
-						cont.append(new CGIAsm("adiw", "xl," + size));
-					}
-					for(int i=offset; i<cells.getSize(); i++) { // Порядок в цикле не имеет значения
-						cont.append(new CGIAsmLd("ld", "j8b_atom", "-x"));
+					for(int i=0; i<cells.getSize(); i++) { // Порядок в цикле не имеет значения
+						cont.append(new CGIAsmLd("ld", "j8b_atom", "x+"));
 						cont.append(new CGIAsm("push", "j8b_atom"));
 					}
 					break;
 				case REG:
-					for(int i=cells.getSize()-1; i>=0; i--) cont.append(new CGIAsm("push", "r" + cells.getId(i)));
+					for(int i=0; i<cells.getSize(); i++) cont.append(new CGIAsm("push", "r" + cells.getId(i)));
 					break;
 				case ARGS:
 				case STACK_FRAME:
-					for(int i=cells.getSize()-1; i>=0; i--) {
+					for(int i=0; i<cells.getSize(); i++) {
 						cont.append(new CGIAsmIReg(	'y', true, "j8b_atom", cells.getId(i), getCurBlockScope(scope), (CGBlockScope)cells.getObject(),
 													CGCells.Type.ARGS == cells.getType()));
 						cont.append(new CGIAsm("push", "j8b_atom"));
 					}
 					break;
 				case HEAP:
-					for(int i=cells.getSize()-1; i>=0; i--) {
+					for(int i=0; i<cells.getSize(); i++) {
 						cont.append(new CGIAsmIReg('z', true, "j8b_atom", cells.getId(i)));
 						cont.append(new CGIAsm("push", "j8b_atom"));
 					}
 					break;
 				case STAT:
-					for(int i=cells.getSize()-1; i>=0; i--) {
+					for(int i=0; i<cells.getSize(); i++) {
 						cont.append(new CGIAsmLd("lds", "j8b_atom", "_OS_STAT_POOL+" + cells.getId(i)));
 						cont.append(new CGIAsm("push", "j8b_atom"));
 					}
@@ -478,8 +470,12 @@ public class Generator extends CodeGenerator {
 			}
 		}
 		
-		
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("clt"));
+		// Сохраняем старшие байты (так как LE)
+		for(int i=cells.getSize(); i<size; i++) {
+			cont.append(new CGIAsm("push", "c0x00"));
+		}
+
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("clt"));
 		if(null!=scope) scope.append(cont);
 		return cont;
 	}
@@ -554,7 +550,7 @@ public class Generator extends CodeGenerator {
 	@Override
 	public void computeArrViewCellsAddr(CGScope scope, CGCells arrAddrCells, CGArrCells arrCells, CGExcs excs) throws CompileException { 
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";compute array addr " + arrAddrCells + "->X"));
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
 		
 		if(null!=arrAddrCells) {
 			switch(arrAddrCells.getType()) {
@@ -594,13 +590,13 @@ public class Generator extends CodeGenerator {
 		scope.append(new CGIAsm(CALL_INSTR, "j8bproc_arrview_celladdr")); //TODO портит аккумулятор - все 4 байта
 		codeExcsChecker.invalidIndex(this, scope, excs);
 		
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
 	}
 	
 	@Override //Диспетчер должен быть заблокирован заранее
 	public void computeArrCellAddr(CGScope scope, CGCells arrAddrCells, CGArrCells arrCells, CGExcs excs) throws CompileException { 
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";compute array addr " + arrAddrCells + "->X"));
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
 		
 		if(null!=arrAddrCells) {
 			switch(arrAddrCells.getType()) {
@@ -647,7 +643,7 @@ public class Generator extends CodeGenerator {
 			codeExcsChecker.invalidIndex(this, scope, excs);
 		}
 		
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
 	}
 
 	
@@ -674,14 +670,14 @@ public class Generator extends CodeGenerator {
 	public void accToArr(CGScope scope, CGArrCells arrCells) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";" + acc + "->arr'" + arrCells + "'"));
 		int size = arrCells.getSize();
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING) && 1!=size) scope.append(new CGIAsm("set"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING) && 1!=size) scope.append(new CGIAsm("set"));
 		
 		byte[] accRegs = getAccRegs(size);
 		//TODO почему был обратный цикл? Точно ошибка?
 		for(int i=0; i<size; i++) {
 			scope.append(new CGIAsm("st", "x+,r" + accRegs[i]));
 		}
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING) && 1!=size) scope.append(new CGIAsm("clt"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING) && 1!=size) scope.append(new CGIAsm("clt"));
 	}
 
 	@Override
@@ -693,12 +689,13 @@ public class Generator extends CodeGenerator {
 
 	@Override
 	public void cellsToCells(CGScope scope, CGCells leftCells, VarType leftType, CGCells rightCells, VarType rightType) throws CompileException {
+		//TODO Последние акутальные изменения  cellTocells STACK_FRAME[0,1][short]=STACK[x0][short]
 		CGIContainer cont = new CGIContainer();
 				
 		String info = leftCells + "[" + leftType + "]" + "=" + rightCells + "[" + rightType + "]";
 		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";cells " + info));
 
-		if(CGCells.Type.ACC==leftCells.getType())  {
+		if(CGCells.Type.ACC==leftCells.getType() && null==leftType)  {
 			leftType = accumStack.peek().getK();
 		}
 
@@ -709,7 +706,9 @@ public class Generator extends CodeGenerator {
 		boolean leftIsFixed = null!=leftType && leftType.isFixedPoint();
 		boolean rightIsFixed = null!=rightType && rightType.isFixedPoint();
 
-		
+		CGIContainer dispLockCont = new CGIContainer();
+		cont.append(dispLockCont);
+
 		if(leftSize<rightSize) {
 			if(CGCells.Type.ACC==leftCells.getType()) {
 				// Аккумулятор можно расширить
@@ -725,9 +724,12 @@ public class Generator extends CodeGenerator {
 				throw new CompileException("cellTocells " + info + " left operand size < right operand size");
 			}
 		}
+		if(CGCells.Type.ACC==leftCells.getType() && acc.getBytes()<leftSize) { //TODO костыль
+			acc.setBytes(leftSize);
+		}
 		
 		// Запись 1 байта в переменную или в аккумулятор потокобезопасна
-		boolean threadSafe = (1 == size || CGCells.Type.ACC == leftCells.getType());
+		boolean threadSafe = (1==size || CGCells.Type.ACC==leftCells.getType());
 		// Проверяем на аккумулятор левую часть если представлена в виде регистров
 		if(!threadSafe && CGCells.Type.REG == leftCells.getType()) {
 			boolean accRegOnly=true;
@@ -740,11 +742,16 @@ public class Generator extends CodeGenerator {
 			if(accRegOnly) threadSafe = true;
 		}
 		
-		// Необходимо блокировать диспетчер для атомарности (если значение больше одного байта)
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING) && !threadSafe) cont.append(new CGIAsm("set"));
+		byte[] accRegs = getAccRegs(0x04);
+		if(CGCells.Type.ACC==leftCells.getType() && null!=leftCells.getIds()) {
+			// Указаны конкретные регистры аккумулятора
+			byte[] newAcRegs = new byte[leftCells.getSize()];
+			for(int i=0; i<leftCells.getSize(); i++) {
+				newAcRegs[i] = accRegs[leftCells.getId(i)];
+			}
+			accRegs = newAcRegs;
+		}
 		
-		
-		byte[] accRegs = getAccRegs(size);
 		for(int index=0; index<size; index++) {
 			switch(rightCells.getType()) { //src
 				case ACC:
@@ -827,11 +834,40 @@ public class Generator extends CodeGenerator {
 
 							}
 							break;
+						case STAT:
+							if(leftIsFixed && !rightIsFixed) {
+								if(0==index) {
+									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",0"));
+								}
+								else {
+									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + "," + regsStr[index-1]));
+								}
+							}
+							else if(!leftIsFixed && rightIsFixed) {
+								if((index+1)<rightSize) {
+									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + "," + regsStr[index+1]));
+								}
+								else {
+									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",0"));
+								}
+							}
+							else {
+								if(index<rightSize) {
+									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + "," + regsStr[index]));
+								}
+								else {
+									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",0"));
+								}
+							}
+							break;
 						default:
 							throw new CompileException("cellTocells " + info + " unsupported yet");
 					}
 					break;
 				case ARGS:
+					//TODO проверить порядок - процедура вызова кладет в стек старший затем младший, т.е. процедура чтения должна поступать стандартно (LE)
+					//Но! Учитываем что normalizeIRegConst меняет порядок для инструкций работы со стеком
+					//Соответственно на этом уровне мы работаем со стеком как с обычной памятью, а процедура вызова должна клась в стек стандартно - сначала младший
 				case STACK_FRAME:
 					switch(leftCells.getType()) {
 						case ARRAY:
@@ -899,13 +935,18 @@ public class Generator extends CodeGenerator {
 							}
 							break;
 						case REG:
+							boolean sameRegs = (2<=size && 28==leftCells.getId(0) && 29==leftCells.getId(1)); // Определяет запись в эту же регистровую пару
+							
 							if(leftIsFixed && !rightIsFixed) {
 								if(0!=index && index<rightSize) {
 									cont.append(new CGIAsmIReg(	'y', true, "r"+leftCells.getId(index), rightCells.getId(index-1), getCurBlockScope(scope),
 																(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
+									if(sameRegs) {
+										cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(0), "0"));
+									}
 								}
 								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
+									if(!sameRegs) cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
 								}
 							}
 							else if(!leftIsFixed && rightIsFixed) {
@@ -918,12 +959,23 @@ public class Generator extends CodeGenerator {
 								}
 							}
 							else {
-								if(index<rightSize) {
-									cont.append(new CGIAsmIReg(	'y', true, "r"+leftCells.getId(index), rightCells.getId(index), getCurBlockScope(scope),
-																(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
+								if(!sameRegs) {
+									if(index<rightSize) {
+										cont.append(new CGIAsmIReg(	'y', true, "r"+leftCells.getId(index), rightCells.getId(index), getCurBlockScope(scope),
+																	(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
+									}
+									else {
+										cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
+									}
 								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
+								else if(0==index) {
+									threadSafe = false;
+									
+									cont.append(new CGIAsmIReg(	'y', true, "j8b_atom", rightCells.getId(0), getCurBlockScope(scope),
+																(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
+									cont.append(new CGIAsmIReg(	'y', true, "r"+leftCells.getId(1), rightCells.getId(1), getCurBlockScope(scope),
+																(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
+									cont.append(new CGIAsmMv("mov", "r"+leftCells.getId(0), "j8b_atom"));
 								}
 							}
 							break;
@@ -962,6 +1014,35 @@ public class Generator extends CodeGenerator {
 								}
 							}
 							break;
+						case HEAP:
+							if(leftIsFixed && !rightIsFixed) {
+								if(0!=index && index<rightSize) {
+									cont.append(new CGIAsmIReg('z', false, "x+", leftCells.getId(index)));
+								}
+								else {
+									cont.append(new CGIAsmIReg('z', false, "C0x00", leftCells.getId(index)));
+								}
+							}
+							else if(!leftIsFixed && rightIsFixed) {
+								if(0==index) {
+									cont.append(new CGIRAsm("adiw", "xl,1"));
+								}
+								if((index+1)<rightSize) {
+									cont.append(new CGIAsmIReg('z', false, "x+", leftCells.getId(index)));
+								}
+								else {
+									cont.append(new CGIAsmIReg('z', false, "C0x00", leftCells.getId(index)));
+								}
+							}
+							else {
+								if(index<rightSize) {
+									cont.append(new CGIAsmIReg('z', false, "x+", leftCells.getId(index)));
+								}
+								else {
+									cont.append(new CGIAsmIReg('z', false, "C0x00", leftCells.getId(index)));
+								}
+							}
+							break;
 						case REG:
 							if(leftIsFixed && !rightIsFixed) {
 								if(0!=index && index<rightSize) {
@@ -991,12 +1072,70 @@ public class Generator extends CodeGenerator {
 								}
 							}
 							break;
+						case ARGS:
+						case STACK_FRAME:
+							if(leftIsFixed && !rightIsFixed) {
+								if(0!=index && index<rightSize) {
+									cont.append(new CGIRAsm("ld", "r19", "x+"));
+								}
+								else {
+									cont.append(new CGIAsmLd("ldi", "r19", "0"));
+								}
+							}
+							else if(!leftIsFixed && rightIsFixed) {
+								if(0==index) {
+									cont.append(new CGIRAsm("adiw", "xl,1"));
+								}
+								if((index+1)<rightSize) {
+									cont.append(new CGIRAsm("ld", "r19", "x+"));
+								}
+								else {
+									cont.append(new CGIAsmLd("ldi", "r19", "0"));
+								}
+							}
+							else {
+								if(index<rightSize) {
+									cont.append(new CGIRAsm("ld", "r19", "x+"));
+								}
+								else {
+									cont.append(new CGIAsmLd("ldi", "r19", "0"));
+								}
+							}
+							cont.append(new CGIAsmIReg(	'y', false, "r19", leftCells.getId(index), getCurBlockScope(scope),
+														(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
+							break;
 						default:
 							throw new CompileException("cellTocells " + info + " unsupported yet");
 					}
 					break;
 				case CONST:
 					switch(leftCells.getType()) {
+						case ACC:
+							if(leftIsFixed && !rightIsFixed) {
+								if(0!=index && index<rightSize) {
+									cont.append(new CGIAsmMv("ldi", "r"+accRegs[index], ""+rightCells.getId(index-1)));
+								}
+								else {
+									cont.append(new CGIAsmLd("ldi", "r"+accRegs[index], "0"));
+								}
+							}
+							else if(!leftIsFixed && rightIsFixed) {
+								if((index+1)<rightSize) {
+									cont.append(new CGIAsmMv("ldi", "r"+accRegs[index], ""+rightCells.getId(index+1)));
+								}
+								else {
+									cont.append(new CGIAsmLd("ldi", "r"+accRegs[index], "0"));
+								}
+							}
+							else {
+								if(index<rightSize) {
+									cont.append(new CGIAsmMv("ldi", "r"+accRegs[index], ""+rightCells.getId(index)));
+								}
+								else {
+									cont.append(new CGIAsmLd("ldi", "r"+accRegs[index], "0"));
+								}
+							}
+							break;
 						case ARRAY:
 							if(leftIsFixed && !rightIsFixed) {
 								if(0!=index && index<=rightCells.getSize()) {
@@ -1181,6 +1320,30 @@ public class Generator extends CodeGenerator {
 							throw new CompileException("cellTocells " + info + " unsupported yet");
 					}
 					break;
+				case FLAG:
+					switch(leftCells.getType()) {
+						case REG:
+							cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
+							if((!leftIsFixed && 0==index) || (leftIsFixed && 1==index)) {
+								cont.append(new CGIAsm("adc", "r"+leftCells.getId(index) + ",c0x00"));
+							}
+							break;
+						default:
+							throw new CompileException("cellTocells " + info + " unsupported yet");
+					}
+					break;
+				case LABEL:
+					if(leftIsFixed || 0x02!=leftSize) throw new CompileException("COMPILER ERROR: Can't set label addr to not short var");
+					
+					switch(leftCells.getType()) {
+						case REG:
+							if(0==index) cont.append(new CGIAsmLdLabel("ldi", "r" + leftCells.getId(0), "low(" + (String)rightCells.getObject() + "*2)"));
+							if(1==index) cont.append(new CGIAsmLdLabel("ldi", "r" + leftCells.getId(1), "high(" + (String)rightCells.getObject() + "*2)"));
+							break;
+						default:
+							throw new CompileException("cellTocells " + info + " unsupported yet");
+					}
+					break;
 				case REG:
 					switch(leftCells.getType()) {
 						case ACC:
@@ -1265,6 +1428,32 @@ public class Generator extends CodeGenerator {
 								}
 							}
 							break;
+						case HEAP:
+							if(leftIsFixed && !rightIsFixed) {
+								if(0!=index && index<=rightCells.getSize()) {
+									cont.append(new CGIAsmIReg('z', false, "r"+rightCells.getId(index-1), leftCells.getId(index)));
+								}
+								else {
+									cont.append(new CGIAsmIReg('z', false, "c0x00", leftCells.getId(index)));
+								}
+							}
+							else if(!leftIsFixed && rightIsFixed) {
+								if((index+1)<rightCells.getSize()) {
+									cont.append(new CGIAsmIReg('z', false, "r"+rightCells.getId(index+1), leftCells.getId(index)));
+								}
+								else {
+									cont.append(new CGIAsmIReg('z', false, "c0x00", leftCells.getId(index)));
+								}
+							}
+							else {
+								if(index<rightCells.getSize()) {
+									cont.append(new CGIAsmIReg('z', false, "r"+rightCells.getId(index), leftCells.getId(index)));
+								}
+								else {
+									cont.append(new CGIAsmIReg('z', false, "c0x00", leftCells.getId(index)));
+								}
+							}
+							break;
 						case REG:
 							if(leftIsFixed && !rightIsFixed) {
 								if(0!=index && index<rightSize) {
@@ -1288,6 +1477,197 @@ public class Generator extends CodeGenerator {
 								}
 								else {
 									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
+								}
+							}
+							break;
+						default:
+							throw new CompileException("cellTocells " + info + " unsupported yet");
+					}
+					break;
+				case STACK:
+					switch(leftCells.getType()) {
+						case ARGS:
+						case STACK_FRAME:
+							if(leftIsFixed && !rightIsFixed) {
+								if(0!=index && index<rightSize) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));
+									cont.append(new CGIAsmIReg(	'y', false, "j8b_atom", leftCells.getId(index), getCurBlockScope(scope),
+																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
+									threadSafe=false;
+								}
+								else {
+									cont.append(new CGIAsmLd("ldi", "r"+rightCells.getId(index), "0"));
+								}
+							}
+							else if(!leftIsFixed && rightIsFixed) {
+								if(0==index) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));
+									threadSafe=false;
+								}
+								else if((index+1)<rightSize) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));
+									cont.append(new CGIAsmIReg(	'y', false, "j8b_atom", leftCells.getId(index), getCurBlockScope(scope),
+																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
+									threadSafe=false;
+								}
+								else {
+									cont.append(new CGIAsmIReg(	'y', false, "c0x00", leftCells.getId(index), getCurBlockScope(scope),
+																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
+								}
+							}
+							else {
+								if(index<rightSize) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));
+									cont.append(new CGIAsmIReg(	'y', false, "j8b_atom", leftCells.getId(index), getCurBlockScope(scope),
+																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
+									threadSafe=false;
+								}
+								else {
+									cont.append(new CGIAsmIReg(	'y', false, "c0x00", leftCells.getId(index), getCurBlockScope(scope),
+																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
+								}
+							}
+							break;
+						case ARRAY:
+							if(leftIsFixed && !rightIsFixed) {
+								if(0!=index && index<rightSize) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));
+									cont.append(new CGIRAsm("st", "x+", "j8b_atom"));
+									threadSafe=false;
+								}
+								else {
+									cont.append(new CGIRAsm("st", "x+,c0x00"));
+								}
+							}
+							else if(!leftIsFixed && rightIsFixed) {
+								if(0==index) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));									
+								}
+								else if((index+1)<rightSize) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));
+									cont.append(new CGIRAsm("st", "x+", "j8b_atom"));
+									threadSafe=false;
+								}
+								else {
+									cont.append(new CGIRAsm("st", "x+,c0x00"));
+								}
+							}
+							else {
+								if(index<rightSize) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));
+									cont.append(new CGIRAsm("st", "x+", "j8b_atom"));
+									threadSafe=false;
+								}
+								else {
+									cont.append(new CGIRAsm("st", "x+,c0x00"));
+								}
+							}
+							break;
+						case HEAP:
+							if(leftIsFixed && !rightIsFixed) {
+								if(0!=index && index<rightSize) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));
+									cont.append(new CGIAsmIReg('z', false, "j8b_atom", leftCells.getId(index)));
+									threadSafe=false;
+								}
+								else {
+									cont.append(new CGIAsmMv("mov", "j8b_atom", "C0x00"));
+									cont.append(new CGIAsmIReg('z', false, "j8b_atom", leftCells.getId(index)));
+								}
+							}
+							else if(!leftIsFixed && rightIsFixed) {
+								if(0==index) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));
+									threadSafe=false;
+								}
+								else if((index+1)<rightSize) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));
+									cont.append(new CGIAsmIReg('z', false, "j8b_atom", leftCells.getId(index)));
+									threadSafe=false;
+								}
+								else {
+									cont.append(new CGIAsmMv("mov", "j8b_atom", "C0x00"));
+									cont.append(new CGIAsmIReg('z', false, "j8b_atom", leftCells.getId(index)));
+									threadSafe=false;
+								}
+							}
+							else {
+								if(index<rightSize) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));
+									cont.append(new CGIAsmIReg('z', false, "j8b_atom", leftCells.getId(index)));
+									threadSafe=false;
+								}
+								else {
+									cont.append(new CGIAsmMv("mov", "j8b_atom", "C0x00"));
+									cont.append(new CGIAsmIReg('z', false, "j8b_atom", leftCells.getId(index)));
+									threadSafe=false;
+								}
+							}
+							break;
+						case REG:
+							if(leftIsFixed && !rightIsFixed) {
+								if(0!=index && index<rightSize) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));
+									cont.append(new CGIAsmMv("mov", "r"+leftCells.getId(index), "j8b_atom"));
+									threadSafe=false;
+								}
+								else {
+									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0x00"));
+								}
+							}
+							else if(!leftIsFixed && rightIsFixed) {
+								if(0==index) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));									
+								}
+								else if((index+1)<rightSize) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));
+									cont.append(new CGIAsmMv("mov", "r"+leftCells.getId(index), "j8b_atom"));
+									threadSafe=false;
+								}
+								else {
+									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0x00"));
+								}
+							}
+							else {
+								if(index<rightSize) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));
+									cont.append(new CGIAsmMv("mov", "r"+leftCells.getId(index), "j8b_atom"));
+									threadSafe=false;
+								}
+								else {
+									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0x00"));
+								}
+							}
+							break;
+						case STAT:
+							if(leftIsFixed && !rightIsFixed) {
+								if(0!=index && index<=rightCells.getSize()) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));
+									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",j8b_atom"));
+								}
+								else {
+									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",c0x00"));
+								}
+							}
+							else if(!leftIsFixed && rightIsFixed) {
+								if(0==index) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));
+								}
+								else if((index+1)<rightCells.getSize()) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));
+									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",j8b_atom"));
+								}
+								else {
+									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",c0x00"));
+								}
+							}
+							else {
+								if(index<rightCells.getSize()) {
+									cont.append(new CGIRAsm("pop", "j8b_atom"));
+									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",j8b_atom"));
+								}
+								else {
+									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",c0x00"));
 								}
 							}
 							break;
@@ -1371,6 +1751,60 @@ public class Generator extends CodeGenerator {
 					break;
 				case HEAP:
 					switch(leftCells.getType()) {
+						case ACC:
+							if(leftIsFixed && !rightIsFixed) {
+								if(0!=index && index<rightSize) {
+									cont.append(new CGIAsmIReg('z', true, "r"+accRegs[index], rightCells.getId(index-1)));
+								}
+								else {
+									cont.append(new CGIAsmLd("ldi", "r"+accRegs[index], "0"));
+								}
+							}
+							else if(!leftIsFixed && rightIsFixed) {
+								if((index+1)<rightSize) {
+									cont.append(new CGIAsmIReg('z', true, "r"+accRegs[index], rightCells.getId(index+1)));
+								}
+								else {
+									cont.append(new CGIAsmLd("ldi", "r"+accRegs[index], "0"));
+								}
+							}
+							else {
+								if(index<rightSize) {
+									cont.append(new CGIAsmIReg('z', true, "r"+accRegs[index], rightCells.getId(index)));
+								}
+								else {
+									cont.append(new CGIAsmLd("ldi", "r"+accRegs[index], "0"));
+								}
+							}
+							break;
+						case HEAP:
+							if(leftIsFixed && !rightIsFixed) {
+								if(0!=index && index<rightSize) {
+									cont.append(new CGIAsmIReg('z', true, "j8b_atom", rightCells.getId(index-1)));
+								}
+								else {
+									cont.append(new CGIAsmMv("mov", "j8b_atom", "C0x00"));
+								}
+							}
+							else if(!leftIsFixed && rightIsFixed) {
+								if((index+1)<rightSize) {
+									cont.append(new CGIAsmIReg('z', true, "j8b_atom", rightCells.getId(index+1)));
+								}
+								else {
+									cont.append(new CGIAsmMv("mov", "j8b_atom", "C0x00"));
+								}
+							}
+							else {
+								if(index<rightSize) {
+									cont.append(new CGIAsmIReg('z', true, "j8b_atom", rightCells.getId(index)));
+								}
+								else {
+									cont.append(new CGIAsmMv("mov", "j8b_atom", "C0x00"));
+								}
+							}
+							cont.append(new CGIAsmIReg('z', false, "j8b_atom", leftCells.getId(index)));
+							threadSafe=false;
+						break;
 						case REG:
 							if(leftIsFixed && !rightIsFixed) {
 								if(0!=index && index<rightSize) {
@@ -1397,6 +1831,7 @@ public class Generator extends CodeGenerator {
 								}
 							}
 							break;
+							
 						default:
 							throw new CompileException("cellTocells " + info + " unsupported yet");
 					}
@@ -1406,8 +1841,10 @@ public class Generator extends CodeGenerator {
 			}
 		}
 		
-		// Снимаем блокировку диспетчера
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING) && !threadSafe) cont.append(new CGIAsm("clt"));		
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING) && !threadSafe) {
+			dispLockCont.append(new CGIAsm("set"));
+			cont.append(new CGIAsm("clt"));
+		}
 		scope.append(cont);
 	}
 	
@@ -1487,16 +1924,17 @@ public class Generator extends CodeGenerator {
 	}
 	
 	@Override
-	public void arrSizetoAcc(CGScope cgScope, boolean isView) throws CompileException {
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) cgScope.append(new CGIAsm("set"));
+	public void arrSizetoAcc(CGScope cgScope, boolean exactlyArray) throws CompileException {
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) cgScope.append(new CGIAsm("set"));
 		
+		acc.setBytes(0x02);
 		RTOSLibs.ARR_SIZE.setRequired();
-		if(isView) {
+		if(!exactlyArray) {
 			RTOSLibs.ARRVIEW_ARRADDR.setRequired();
-			cgScope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_arrview_arraddr", true));
+			cgScope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_arrview_arraddr", true)); // В эту функцию заложена проверка на массив
 		}
 		cgScope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_arr_size", true));
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) cgScope.append(new CGIAsm("clt"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) cgScope.append(new CGIAsm("clt"));
 	}
 	
 	@Override
@@ -1598,6 +2036,21 @@ public class Generator extends CodeGenerator {
 			rightIndex++;
 			size=0x01;
 		}
+
+		CGIContainer dispLockCont = new CGIContainer();
+		scope.append(dispLockCont);
+
+		// Отдельная проверка на попытку записи Z из HEAP не нужна, так как индексные регистры 2 байта
+		boolean threadSafe = (1==size);
+		// Регистрам аккумулятора атомарность не нужна
+		boolean accRegsOnly = true;
+		for(byte reg : registers) {
+			if(!isAccumReg(reg)) {
+				accRegsOnly=false;
+				break;
+			}
+		}
+		if(accRegsOnly) threadSafe = true;
 		
 		switch(cells.getType()) {
 			case LABEL:
@@ -1639,7 +2092,18 @@ public class Generator extends CodeGenerator {
 				break;
 			case HEAP:
 				for(int i=0; i<size; i++) {
-					scope.append(new CGIAsmIReg('z', true, "r" + registers[rightIndex+i], cells.getId(leftIndex+i)));
+					if(heapRegs[0]==registers[0]) {
+						if(0==i) {
+							scope.append(new CGIAsmIReg('z', true, "j8b_atom", cells.getId(leftIndex+i)));
+						}
+						else {
+							scope.append(new CGIAsmIReg('z', true, "r" + registers[1], cells.getId(leftIndex+i)));
+							scope.append(new CGIRAsm("mov", "r" + registers[0], "j8b_atom"));
+						}
+					}
+					else {
+						scope.append(new CGIAsmIReg('z', true, "r" + registers[rightIndex+i], cells.getId(leftIndex+i)));
+					}
 				}
 				break;
 			case HEAP_ALT:
@@ -1663,13 +2127,18 @@ public class Generator extends CodeGenerator {
 		for(int i=size; i<registers.length-rightIndex; i++) {
 			scope.append(new CGIAsmLd("ldi", "r" + registers[i], "0x00"));
 		}
+		
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING) && !threadSafe) {
+			dispLockCont.append(new CGIAsm("set"));
+			scope.append(new CGIAsm("clt"));
+		}
 	}
 
 	@Override
 	public CGIContainer constToCells(CGScope scope, long value, CGCells cells, boolean isFixed) throws CompileException {
 		CGIContainer cont = new CGIContainer();
 		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";const '" + (isFixed ? value/256.0 : value) + "'->cells " + cells));
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("set"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("set"));
 
 		byte tmpReg=19;
 		if(0x04==acc.getBytes() && CGCells.Type.REG!=cells.getType()) {
@@ -1725,7 +2194,7 @@ public class Generator extends CodeGenerator {
 		}
 
 		if(19!=tmpReg) cont.append(new CGIAsmMv("mov", "r"+tmpReg, "j8b_atom"));
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("clt"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("clt"));
 		return cont;
 	}
 
@@ -1784,7 +2253,7 @@ public class Generator extends CodeGenerator {
 	 * @throws CompileException
 	 */
 	public void regsToVar(CGScope scope, byte[] regs, int usedRegsQnt, CGCells cells) throws CompileException {
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
 		
 		switch(cells.getType()) {
 			case REG:
@@ -1826,7 +2295,7 @@ public class Generator extends CodeGenerator {
 			scope.append(new CGIAsmLd("ldi", "r" + cells.getId(i), "0x00"));
 		}
 		
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
 	}
 
 	public int getRegPos(byte[] regs, int offset, byte reg) {
@@ -1844,7 +2313,7 @@ public class Generator extends CodeGenerator {
 	}
 
 	public void accToField(CGScope scope, int size, CGCells cells) throws CompileException {
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING) && 1!=size) scope.append(new CGIAsm("set"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING) && 1!=size) scope.append(new CGIAsm("set"));
 		
 		if(CGCells.Type.STAT==cells.getType()) {
 			scope.append(new CGIAsm("sts", "_OS_STAT_POOL+" + cells.getId(0) + ",r16"));
@@ -1862,18 +2331,42 @@ public class Generator extends CodeGenerator {
 			throw new CompileException("Unsupported cell type:" + cells.getType());
 		}
 		
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING) && 1!=size) scope.append(new CGIAsm("clt"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING) && 1!=size) scope.append(new CGIAsm("clt"));
 	}
 
 	@Override
-	public CGIContainer pushAccBE(CGScope scope, int size) throws CompileException {
+	public CGIContainer pushAccBE(CGScope scope, int size, boolean strong) throws CompileException {
 		CGIContainer result = new CGIContainer();
-		if(VERBOSE_LO <= verbose) result.append(new CGIText(";push accum(BE), size:" + size));
-		byte[] regs = getAccRegs(size);
+		if(VERBOSE_LO <= verbose) result.append(new CGIText(";push accum(BE), size:" + size + (strong ? "[strong]" : "")));
+
+		/* Вообще чушь. Пример генерации когда размер аккумулятора 4Б, а size 2Б
+			push c0x00
+			push c0x00
+			push r19
+			push r18
+			push r17
+			push r16
+
+		for(int i=size; i>acc.getBytes(); i--) {
+			result.append(new CGIAsm("push", "c0x00"));
+		}
+		
+		byte[] regs = getAccRegs(acc.getBytes());
 		for(int i=regs.length-1; i>=0; i--) {
 			result.append(new CGIAsm("push", "r" + regs[i]));
+		}*/
+		
+		byte[] regs = getAccRegs(size);
+		for(int i=(regs.length-1); i>=0; i--) {
+			if(!strong && i>(acc.getBytes()-0x01)) {
+				result.append(new CGIAsm("push", "C0x00"));
+			}
+			else {
+				result.append(new CGIAsm("push", "r" + regs[i]));
+			}
 		}
-		if(null != scope) scope.append(result);
+
+		if(null!=scope) scope.append(result);
 		return result;
 	}
 
@@ -1903,7 +2396,7 @@ public class Generator extends CodeGenerator {
 
 	//TODO актуализировать
 	@Override
-	public void eUnary(CGScope scope, Operator op, CGCells cells, boolean toAccum, CGExcs excs) throws CompileException {
+	public void eUnary(CGScope scope, Operator op, CGCells cells, boolean toAccum, boolean isFixed, CGExcs excs) throws CompileException {
 		//3 блока: 1 считывает значение, 2 выполняет опреацию, 3 записывает значение
 		//для регистров все просто, для аккумулятора не доступны POST* и PRE*
 		//POST и PRE влияют на аккумулятор, возвращая перед операцией значение или после операции.
@@ -1912,8 +2405,9 @@ public class Generator extends CodeGenerator {
 							(-1==accumStack.peek().getK().getSize() ? refSize : accumStack.peek().getK().getSize())*0x08 : 0x20);
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";eUnary " + op + " cells " + cells + (toAccum ? "->" + acc + "/" + accMaxBits : "")));
 
-		if(	CGCells.Type.REG != cells.getType() && CGCells.Type.ARGS != cells.getType() && CGCells.Type.STACK_FRAME != cells.getType() &&
-			CGCells.Type.HEAP != cells.getType() && CGCells.Type.ARRAY != cells.getType() && CGCells.Type.STAT != cells.getType()) {
+		if(	CGCells.Type.REG!=cells.getType() && CGCells.Type.ARGS!=cells.getType() && CGCells.Type.STACK_FRAME!=cells.getType() &&
+			CGCells.Type.HEAP!=cells.getType() && CGCells.Type.ARRAY!=cells.getType() && CGCells.Type.STAT!=cells.getType() &&
+			CGCells.Type.ACC!=cells.getType()) {
 			
 			throw new CompileException("Unsupported cell type:" + cells.getType());
 		}
@@ -1934,6 +2428,8 @@ public class Generator extends CodeGenerator {
 				}
 			}
 			switch(cells.getType()) {
+				case ACC:
+					break;
 				case ARRAY:
 					for(int i=0; i<cells.getSize(); i++) {
 						scope.append(new CGIAsmLd("ld", "r" + tmpReg, "x"));
@@ -2087,6 +2583,9 @@ public class Generator extends CodeGenerator {
 		if(Operator.MINUS==op) {
 			scope.append(new CGIAsm("add", "r" + accRegs[0] + ",C0x01"));
 			for(int i=1; i<cells.getSize(); i++) scope.append(new CGIAsm("adc", "r" + accRegs[i] + ",C0x00"));
+		}
+		if(isFixed) {
+			acc.setFixed();
 		}
 		if(19!=tmpReg) scope.append(new CGIAsm("pop", "r" + tmpReg));
 	}
@@ -2257,7 +2756,7 @@ public class Generator extends CodeGenerator {
 						if(null!=reg) {
 							return new CGIAsm((0 == sn ? "sub" : "sbc"), getRightOp(sn, null) + "," + reg);
 						}
-						return new CGIAsm("sbc", getRightOp(sn, null) + ",C0xFF");
+						return new CGIAsm("sbc", getRightOp(sn, null) + ",C0x00");
 					}
 				});
 				codeExcsChecker.mathOverflow(this, scope, excs, op, null, false, false);
@@ -2398,19 +2897,40 @@ public class Generator extends CodeGenerator {
 							}
 							break;
 						case STACK:
-							scope.append(new CGIAsm("pop", "r24"));
-							scope.append(new CGIAsm("pop", "r25"));
-							scope.append(new CGIAsm("pop", "r22"));
-							scope.append(new CGIAsm("pop", "r23"));//TODO проверить порядок
+							scope.append(new CGIAsm("push", "r28"));
+							scope.append(new CGIAsm("push", "r29"));
+							scope.append(new CGIAsmLd("lds", "r28", "SPL"));
+							if(defSph)  {
+								scope.append(new CGIAsmLd("lds", "r29", "SPH"));
+							}
+							else {
+								scope.append(new CGIAsmLd("ldi", "r29", "0x00"));
+							}
+
+							scope.append(new CGIAsmLd("ld", "r24", "y+0x06"));
+							scope.append(new CGIAsmLd("ld", "r25", "y+0x07"));
+							scope.append(new CGIAsmLd("ld", "r22", "y+0x08"));
+							scope.append(new CGIAsmLd("ld", "r23", "y+0x09"));
 							break;
 						default:
 							throw new CompileException("Unsupported cell type:" + rightCells.getType());
 					}
 					scope.append(new CGIAsmCall(CALL_INSTR, "os_mul32_nr", true));
-					scope.append(new CGIAsm("pop", "r23"));
-					scope.append(new CGIAsm("pop", "r22"));
-					scope.append(new CGIAsm("pop", "r25"));
-					scope.append(new CGIAsm("pop", "r24"));
+					if(CGCells.Type.STACK==rightCells.getType()) {
+						scope.append(new CGIAsm("adiw", "yl,0x0d")); //TODO проверить смещения
+						scope.append(new CGIAsm("cli"));
+						scope.append(new CGIAsm("sts", "SPL,r28"));
+						if(defSph)  {
+							scope.append(new CGIAsm("sts", "SPH,r29"));
+						}
+						scope.append(new CGIAsm("sei"));
+					}
+					else {
+						scope.append(new CGIAsm("pop", "r23"));
+						scope.append(new CGIAsm("pop", "r22"));
+						scope.append(new CGIAsm("pop", "r25"));
+						scope.append(new CGIAsm("pop", "r24"));
+					}
 					codeExcsChecker.mathOverflow(this, scope, excs, op, null, false, false);
 				}
 				break;
@@ -2456,32 +2976,57 @@ public class Generator extends CodeGenerator {
 					switch(rightCells.getType()) {
 						case REG:
 							scope.append(new CGIAsmMv("mov", "r18", "r"+rightCells.getId(0)));
-							scope.append(new CGIAsmMv("mov", "r19", "r"+rightCells.getId(1)));
+							if(rightCells.getSize()>1) {
+								scope.append(new CGIAsmMv("mov", "r19", "r"+rightCells.getId(1)));
+							}
+							else {
+								scope.append(new CGIAsmLd("ldi", "r19", "0x00"));
+							}
 							break;
 						case ARGS:
 						case STACK_FRAME:
 							scope.append(new CGIAsmIReg('y', true, "r18", rightCells.getId(0), getCurBlockScope(scope),
 														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							scope.append(new CGIAsmIReg('y', true, "r19", rightCells.getId(1), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
+							if(rightCells.getSize()>1) {
+								scope.append(new CGIAsmIReg('y', true, "r19", rightCells.getId(1), getCurBlockScope(scope),
+															(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
+							}
+							else {
+								scope.append(new CGIAsmLd("ldi", "r19", "0x00"));
+							}
 							break;
 						case HEAP:
 							scope.append(new CGIAsmIReg('z', true, "r18", rightCells.getId(0), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false));
-							scope.append(new CGIAsmIReg('z', true, "r19", rightCells.getId(1), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false));
+							if(rightCells.getSize()>1) {
+								scope.append(new CGIAsmIReg('z', true, "r19", rightCells.getId(1), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false));
+							}
+							else {
+								scope.append(new CGIAsmLd("ldi", "r19", "0x00"));
+							}
 							break;
 						case STACK:
 							scope.append(new CGIAsm("pop", "r18"));
-							scope.append(new CGIAsm("pop", "r19"));//TODO проверить порядок
+							if(rightCells.getSize()>1) {
+								scope.append(new CGIAsm("pop", "r19"));//TODO проверить порядок
+							}
+							else {
+								scope.append(new CGIAsmLd("ldi", "r19", "0x00"));
+							}
 							break;
 						default:
 							throw new CompileException("Unsupported cell type:" + rightCells.getType());
 					}
 					codeExcsChecker.divByZero(this, scope, excs, new byte[]{18, 19}, false);
-					scope.append(new CGIAsm("push", "r24"));
-					scope.append(new CGIAsm("push", "r25"));
-					scope.append(new CGIAsmCall(CALL_INSTR, (rightIsFixed ? "os_divq7n8" : "os_div16"), true));
-					scope.append(new CGIAsm("pop", "r25"));
-					scope.append(new CGIAsm("pop", "r24"));
+					if(rightIsFixed) {
+						scope.append(new CGIAsmCall(CALL_INSTR, "os_divq7n8", true));
+					}
+					else {
+						scope.append(new CGIAsm("push", "r24"));
+						scope.append(new CGIAsm("push", "r25"));
+						scope.append(new CGIAsmCall(CALL_INSTR, "os_div16", true));
+						scope.append(new CGIAsm("pop", "r25"));
+						scope.append(new CGIAsm("pop", "r24"));
+					}
 					scope.append(lbEndScope);
 				}
 				else {
@@ -2777,8 +3322,8 @@ public class Generator extends CodeGenerator {
 							if(null!=reg && 0==sn) {
 								CGIContainer cont = new CGIContainer();
 								if(0x01==acc.getBytes()) {
-									cont.append(new CGIAsmMv("mov", "r17", "r16")); //TODO костыль
-									cont.append(new CGIAsmMv("mov", "r16", reg));
+									//cont.append(new CGIAsmMv("mov", "r17", "r16")); //TODO костыль
+									cont.append(new CGIAsmMv("mov", "r17", reg));
 									RTOSLibs.MATH_SHL8.setRequired();
 									cont.append(new CGIAsmCall(CALL_INSTR, "os_shl8", true));
 								}
@@ -3015,24 +3560,26 @@ public class Generator extends CodeGenerator {
 					}
 					else if(0x02==acc.getBytes()) {
 						RTOSLibs.MATH_MUL16P2.setRequired();
-						scope.append(new CGIAsmLd("ldi", "r18", "0x00"));
+						//TODO пока не актуально, к томуже не сохраняю регистр scope.append(new CGIAsmLd("ldi", "r18", "0x00"));
 						scope.append(new CGIAsmCall(CALL_INSTR, "os_mul16p2_x" + (1<<k), true));
 					}
 					else {
 						RTOSLibs.MATH_MUL32P2.setRequired();
-						scope.append(new CGIAsmLd("ldi", "r20", "0x00")); //result
+						//TODO пока не актуально, к томуже не сохраняю регистр scope.append(new CGIAsmLd("ldi", "r20", "0x00")); //result
 						scope.append(new CGIAsmCall(CALL_INSTR, "os_mul32p2_x" + (1<<k), true));
 					}
 				}
 				break;
 			case SHR:
+
+/* Не верно, мы отбрасываем левую часть которая может после сдвигов попасть в используемую правую часть
 				if(!acc.getFixed()) {
 					int requiredBits = acc.getBits();
 					if(requiredBits>=0x18) requiredBits = 0x20;
 					acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
 					scope.append(accResize());
 				}
-
+*/
 				octetOffset = (int)k / 8;
 
 				if(0<octetOffset) {
@@ -3142,13 +3689,20 @@ public class Generator extends CodeGenerator {
 					else if(0x02==acc.getBytes()) {
 						if(rightIsFixed) RTOSLibs.MATH_DIVQ7N8.setRequired();
 						else RTOSLibs.MATH_DIV16.setRequired();
-						scope.append(new CGIAsm("push", "r24"));
-						scope.append(new CGIAsm("push", "r25"));
-						scope.append(new CGIAsmLd("ldi", "r18", Long.toString(k&0xff)));
-						scope.append(new CGIAsmLd("ldi", "r19", Long.toString((k>>8)&0xff)));
-						scope.append(new CGIAsmCall(CALL_INSTR, (rightIsFixed ? "os_divq7n8" : "os_div16"), true));
-						scope.append(new CGIAsm("pop", "r25"));
-						scope.append(new CGIAsm("pop", "r24"));
+						if(rightIsFixed) {
+							scope.append(new CGIAsmLd("ldi", "r18", Long.toString(k&0xff)));
+							scope.append(new CGIAsmLd("ldi", "r19", Long.toString((k>>8)&0xff)));
+							scope.append(new CGIAsmCall(CALL_INSTR, "os_divq7n8", true));
+						}
+						else {
+							scope.append(new CGIAsm("push", "r24"));
+							scope.append(new CGIAsm("push", "r25"));
+							scope.append(new CGIAsmLd("ldi", "r18", Long.toString(k&0xff)));
+							scope.append(new CGIAsmLd("ldi", "r19", Long.toString((k>>8)&0xff)));
+							scope.append(new CGIAsmCall(CALL_INSTR, "os_div16", true));
+							scope.append(new CGIAsm("pop", "r25"));
+							scope.append(new CGIAsm("pop", "r24"));
+						}
 					}
 					else {
 						RTOSLibs.MATH_DIV32.setRequired();
@@ -3404,7 +3958,7 @@ public class Generator extends CodeGenerator {
 		CGIContainer cont = new CGIContainer();
 				
 		String info =	leftCells + "[" + leftType + "] " + op + " " + rightCells + "[" + rightType + "]" +
-						" (isOr:" + isOr + ", isNot:" + isNot + ", branch:" + branchScope.getEnd() + ")";
+						" (isOr:" + isOr + ", isNot:" + isNot + ", branch:" + (null==branchScope ? "null" : branchScope.getEnd()) + ")";
 		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";cells cp " + info));
 
 		if(isNot) { // Инвертируем выражение заменя AND<->OR и инвертируем операторы сравнения
@@ -3485,21 +4039,26 @@ public class Generator extends CodeGenerator {
 					break;
 				case ARGS:
 				case STACK_FRAME:
-					if(!leftIsFixed && rightIsFixed) {
-						if(0==index) {
-							leftReg = "C0x00";
+					if(index>=leftSize) {
+						leftReg = "C0x00";
+					}
+					else {
+						if(!leftIsFixed && rightIsFixed) {
+							if(0==index) {
+								leftReg = "C0x00";
+							}
+							else {
+								if(leftReg.isEmpty()) leftReg = "zl";
+								cont.append(new CGIAsmIReg( 'y', true, leftReg, leftCells.getId(index-1), getCurBlockScope(scope),
+															(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS==leftCells.getType()));
+							}
+							leftIsFixed = true;
 						}
 						else {
 							if(leftReg.isEmpty()) leftReg = "zl";
-							cont.append(new CGIAsmIReg( 'y', true, leftReg, leftCells.getId(index-1), getCurBlockScope(scope),
+							cont.append(new CGIAsmIReg( 'y', true, leftReg, leftCells.getId(index), getCurBlockScope(scope),
 														(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS==leftCells.getType()));
 						}
-						leftIsFixed = true;
-					}
-					else {
-						if(leftReg.isEmpty()) leftReg = "zl";
-						cont.append(new CGIAsmIReg( 'y', true, leftReg, leftCells.getId(index), getCurBlockScope(scope),
-													(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS==leftCells.getType()));
 					}
 					if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, leftIsFixed, rightIsFixed)) {
 						throw new CompileException("cellCpcells " + info + " unsupported yet");
@@ -3627,7 +4186,7 @@ public class Generator extends CodeGenerator {
 		if(leftReg.equals("yl") || leftReg.equals("zl") || leftReg.equals("j8b_atom")) {
 			pushRegs.add(leftReg);
 		}
-		if(pushRegs.contains("j8b_atom") && RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) {
+		if(pushRegs.contains("j8b_atom") && rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) {
 			cont.prepend(new CGIAsm("set"));
 			cont.append(new CGIAsm("clt"));
 		}
@@ -3640,6 +4199,8 @@ public class Generator extends CodeGenerator {
 			cont.append(new CGIRAsm("pop" , reg));
 		}
 
+		CGLabelScope lbSkipInstrScope = new CGLabelScope(null, null, LabelNames.SKIP, false);
+		
 		// Выполняются все сравнения (в том числе и с fixed)
 		// далее реализация условных переходов с учетом знаковых операндов (fixed)
 		// TODO основной код сравнений готов, но требует тщательной проверки
@@ -3663,8 +4224,10 @@ public class Generator extends CodeGenerator {
 			case GT:
 				if(rightIsFixed) {
 					if(isOr) { // В связке с OR
-						cont.append(new CGIAsm("breq", "pc+0x02"));
+						cont.append(new CGIAsmCondJump("breq", lbSkipInstrScope));
 						cont.append(new CGIAsmCondJump("brge", branchScope.getEnd()));
+						lbSkipInstrScope.setUsed();
+						cont.append(lbSkipInstrScope);
 					}
 					else { // В связке с AND 
 						cont.append(new CGIAsmCondJump("brlt", branchScope.getEnd()));
@@ -3673,8 +4236,10 @@ public class Generator extends CodeGenerator {
 				}
 				else {
 					if(isOr) { // В связке с OR
-						cont.append(new CGIAsm("breq", "pc+0x02")); // Если =, пропустить brcc
+						cont.append(new CGIAsmCondJump("breq", lbSkipInstrScope)); // Если =, пропустить brcc
 						cont.append(new CGIAsmCondJump("brcc", branchScope.getEnd())); // Если >
+						lbSkipInstrScope.setUsed();
+						cont.append(lbSkipInstrScope);
 					}
 					else { // В связке с AND 
 						cont.append(new CGIAsmCondJump("brcs", branchScope.getEnd())); // Если <
@@ -3689,8 +4254,10 @@ public class Generator extends CodeGenerator {
 						cont.append(new CGIAsmCondJump("breq", branchScope.getEnd()));
 					}
 					else {
-						cont.append(new CGIAsm("breq", "pc+0x02"));
+						cont.append(new CGIAsmCondJump("breq", lbSkipInstrScope));
 						cont.append(new CGIAsmCondJump("brge", branchScope.getEnd()));
+						lbSkipInstrScope.setUsed();
+						cont.append(lbSkipInstrScope);
 					}
 				}
 				else {
@@ -3699,8 +4266,10 @@ public class Generator extends CodeGenerator {
 						cont.append(new CGIAsmCondJump("breq", branchScope.getEnd())); // Если =
 					}
 					else {
-						cont.append(new CGIAsm("breq", "pc+0x02")); // Если =, пропустить brcc
+						cont.append(new CGIAsmCondJump("breq", lbSkipInstrScope)); // Если =, пропустить brcc
 						cont.append(new CGIAsmCondJump("brcc", branchScope.getEnd())); // Если >
+						lbSkipInstrScope.setUsed();
+						cont.append(lbSkipInstrScope);
 					}
 				}
 				break;
@@ -4061,7 +4630,7 @@ public class Generator extends CodeGenerator {
 		
 		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";eNewInstance " + instType + (null!=type  ? "[" + type + "]" : "") + ", heap size:" + heapSize));
 		
-		setFeature(RTOSFeature.OS_FT_DRAM);
+		setFeature(RtosFeature.OS_FT_DRAM);
 		
 //TODO добавить расширенные заголовки для Thread и TimerTask
 /*
@@ -4122,7 +4691,7 @@ public class Generator extends CodeGenerator {
 			cont.append(new CGIAsmLdLabel("ldi", "r19", "high(" + metaLabel.getName()+ "*2)"));
 			cont.append(new CGIAsm("std", "z+0x04,r19"));
 		}
-		else if(InstanceType.CLASS==instType) {
+		else if(InstanceType.CLASS==instType || InstanceType.RTOS_CALLBACK==instType) {
 			RTOSLibs.NEW_CLASS.setRequired();
 			cont.append(new CGIAsmLd("ldi", "r16", "low(" + heapSize + ")"));
 			cont.append(new CGIAsmLd("ldi", "r17", "high(" + heapSize + ")"));
@@ -4216,11 +4785,11 @@ public class Generator extends CodeGenerator {
 	
 	@Override
 	public void eNewArray(CGScope scope, VarType type, int depth, int[] cDims, CGExcs excs) throws CompileException {
-		setFeature(RTOSFeature.OS_FT_DRAM);
+		setFeature(RtosFeature.OS_FT_DRAM);
 		RTOSLibs.NEW_ARRAY.setRequired();
 		
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";eNewArray " + type));
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
 		
 		VarType vt = type;
 		while(vt.isArray()) {
@@ -4239,9 +4808,9 @@ public class Generator extends CodeGenerator {
 			//1B flags&depth
 			//1B refCount
 			//1B type
-			//2B size d1 (h/l)
-			//0/2B size d2 (h/l)
-			//0/2B size d3 (h/l)
+			//2B size d1 (l/h)
+			//0/2B size d2 (l/h)
+			//0/2B size d3 (l/h)
 			//DATA
 
 			int dataSize = cDims[0] * (0!=cDims[1] ? cDims[1] : 0x01) * (0!=cDims[2] ? cDims[2] : 0x01) * typeSize;
@@ -4273,18 +4842,19 @@ public class Generator extends CodeGenerator {
 			}
 			
 			scope.append(new CGIAsmLd("lds", "r28", "SPL"));
-			if(def_sph) scope.append(new CGIAsmLd("lds", "r29", "SPH"));
+			if(defSph) scope.append(new CGIAsmLd("lds", "r29", "SPH"));
 			scope.append(new CGIAsm("adiw", "r28,0x01"));
 			// Вычисляем размер данных
 			if(1==depth) {
-				scope.append(new CGIAsmLd("ld", "r17", "y+"));
 				scope.append(new CGIAsmLd("ld", "r16", "y+"));
+				scope.append(new CGIAsmLd("ld", "r17", "y+"));
 			}
 			else {
 				RTOSLibs.MATH_MUL16.setRequired();
+				scope.append(new CGIAsmLd("ldi", "r16", Long.toString(depth)));
+				scope.append(new CGIAsmMv("mv", "j8b_atom", "r16"));
 				scope.append(new CGIAsmLd("ldi", "r16", "0x01"));
 				scope.append(new CGIAsmLd("ldi", "r17", "0x00"));
-				scope.append(new CGIAsmLd("ldi", "j8b_atom", Long.toString(depth)));
 				CGLabelScope lbScope = new CGLabelScope(null, null, LabelNames.LOOP, true);
 				scope.append(lbScope);
 				scope.append(new CGIAsmLd("ld", "r19", "y+"));
@@ -4326,13 +4896,13 @@ public class Generator extends CodeGenerator {
 		}
 
 		acc.setBytes(0x02);
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
 	}
 
 	@Override
 	public void eNewArrView(CGScope scope, int depth, CGExcs excs) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";eNewArrView depth: " + depth));
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
 
 		// Флаги: 0x07-isView, 0x06-расширенный тип данных(2байта), 0x05,0x04-размер ячейки-1, 0x02-0x00-глубина-1		
 		// Флаги и глубина(1 байт) + адрес массива + размеры(2/4 байта)
@@ -4344,8 +4914,8 @@ public class Generator extends CodeGenerator {
 		//0/2B index 1
 
 		
-		setFeature(RTOSFeature.OS_FT_DRAM);
-		setFeature(RTOSFeature.OS_FT_ARRVIEW);
+		setFeature(RtosFeature.OS_FT_DRAM);
+		setFeature(RtosFeature.OS_FT_ARRVIEW);
 		RTOSLibs.ARRVIEW_MAKE.setRequired();
 		
 		scope.append(new CGIRAsm("push", "r24"));
@@ -4354,7 +4924,7 @@ public class Generator extends CodeGenerator {
 		scope.append(new CGIRAsm("pop", "r24"));
 		codeExcsChecker.arrOutOfMemory(this, scope, excs, null);
 		acc.setBytes(0x02);
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
 	}
 
 	@Override
@@ -4377,21 +4947,23 @@ public class Generator extends CodeGenerator {
 	}
 	
 	@Override
-	public void methodInvoke(CGScope scope, CGLabelScope lbScope, String signature, VarType type) throws CompileException {
+	public void methodInvoke(CGScope scope, CGLabelScope lbScope, String signature, VarType type, boolean isStatic) throws CompileException {
 		if(VERBOSE_LO <= verbose) {
-			scope.append(new CGIText(";invoke " + signature));
+			scope.append(new CGIText(";invoke" + (isStatic ? "Static " : " ") + signature));
 		}
 
 		lbScope.setUsed();
 		scope.append(new CGIAsmCall(CALL_INSTR, lbScope.getName(), false));
-		acc.setSize(type);
+		if(null!=type) acc.setSize(type);
 	}
 
 	// Возвращаем имя функции кодогенератора, если не null, вместо вызова нативной функции
 	@Override
-	public NativeBinding nativeMethodInit(CGScope scope, String signature, boolean isConstants) throws CompileException {
+	public NativeBinding nativeMethodInit(CGScope scope, String signature) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";Native method " + signature));
 		NativeBinding nb = device.getPlatform().getNativeBinding(signature);
+		
+		Set<Byte> uniqueSet = new HashSet<>();
 		byte[][] regs = null;
 		if(null!=nb) {
 			regs = nb.getRegs();
@@ -4400,22 +4972,16 @@ public class Generator extends CodeGenerator {
 				StringBuilder sb = new StringBuilder();
 				for(int i=0; i<regs.length; i++) {
 					sb.append(StrUtils.printHexBinary(regs[i]));
+					for(int j=0; j<regs[i].length; j++) {
+						if(!uniqueSet.add(regs[i][j])) {
+							throw new CompileException("Duplicate register " + regs[i][j] + " in native binding '" + signature + "'");
+						}
+					}
 				}
 
 				scope.append(new CGIMeta("START_METHOD:" + sb.toString() + " " + signature));
 			}
-
 			//TODO добавить проверку после ввода виртуальных портов.
-			if(!isConstants || null==nb.getCgFunctName() || nb.getCgFunctName().isEmpty() || !isSupportedFunct(nb.getCgFunctName())) {
-				if(!"null".equals(nb.getRTOSFilePath())) {
-					includes.add(nb.getRTOSFilePath());
-				}
-				if(null != nb.getRTOSFeatures()) {
-					for(RTOSFeature feature : nb.getRTOSFeatures()) {
-						setFeature(feature);
-					}
-				}
-			}	
 		}
 		nativeMethodRegs.add(regs);
 		return nb;
@@ -4449,15 +5015,16 @@ public class Generator extends CodeGenerator {
 				if(26==dstReg || 27==dstReg || (acc.getBytes()>i && dstReg==accRegs[i])) continue;
 
 				boolean dstIsUsedAcc = false;
-				int accSize = (accumStack.isEmpty() ? acc.getBytes() : (-1==accumStack.peek().getK().getSize() ? refSize : accumStack.peek().getK().getSize()));
-				for(byte accReg : getAccRegs(accSize)) {
+				//int accSize = (accumStack.isEmpty() ? acc.getBytes() : (-1==accumStack.peek().getK().getSize() ? refSize : accumStack.peek().getK().getSize()));
+				// Не понятно ограничение, проверяем на все регистры акумулятора
+				for(byte accReg : getAccRegs(0x04)) {//accSize)) {
 					if(dstReg==accReg) {
 						dstIsUsedAcc = true;
 						break;
 					}
 				}
 				if(!dstIsUsedAcc && !storedRegs.contains(dstReg)) {
-					scope.append(new CGIRAsm("push", "r" + dstReg));
+					//scope.append(new CGIRAsm("push", "r" + dstReg));
 					storedRegs.add(dstReg);
 				}
 			}
@@ -4477,6 +5044,7 @@ public class Generator extends CodeGenerator {
 		}
 	}
 
+/*рудимент, нативный код сам знает где массив и сам выполняет проверки и смещения
 	@Override
 	public void nativeMethodArrArgPrepare(CGScope scope, String signature, List<Byte> storedRegs, int index, boolean checkedByCompiler, CGLabelScope lbScope) throws CompileException {
 		// Здесь оказываемся сразу после подготовленных регистров передающих адрес массива и длину обрабатываемых данных
@@ -4585,20 +5153,50 @@ public class Generator extends CodeGenerator {
 			}
 		}
 	}
-
+*/
 	@Override
-	public void nativeMethodInvoke(CGScope scope, String signature, List<Byte> storedRegs, VarType type) throws CompileException {
+	public void nativeMethodInvoke(CGScope scope, NativeBinding nb, String signature, List<Byte> storedRegs, VarType type, boolean sendThis)
+																																	throws CompileException {
 		if(VERBOSE_LO <= verbose) {
 			scope.append(new CGIText(";invokeNative " + signature));
 		}
 
 		nativeMethodRegs.pop();
 		
+		if(sendThis) {
+			byte[] regs = nb.getRegs()[0x00];
+			if(0x02!=regs.length) throw new CompileException("Invalid THIS native binding registers for" + signature);
+			byte reg = regs[0];
+			if(!isAccumReg(reg)) {
+				scope.append(new CGIRAsm("push", "r"+reg));
+			}
+			reg = regs[1];
+			if(!isAccumReg(reg)) {
+				scope.append(new CGIRAsm("push", "r"+reg));
+			}
+
+			scope.append(new CGIAsmMv("mov", "r"+regs[0], "r"+heapRegs[0]));
+			scope.append(new CGIAsmMv("mov", "r"+regs[1], "r"+heapRegs[1]));
+		}
+		
 		// signature может быть null, если вызываемого метода не существует, а задача метода сводится только к подготовке данных в конкретные регистры
 		if(null!=signature) {
-			scope.append(new CGIAsmCall(CALL_INSTR, device.getPlatform().getNativeBinding(signature).getRTOSFunction(), true));
+			scope.append(new CGIAsmCall(CALL_INSTR, nb.getRTOSFunction(), true));
 		}
-		for(int i = storedRegs.size()-1; i>=0; i--) {
+
+		if(sendThis) {
+			byte[] regs = nb.getRegs()[0x00];
+			byte reg = regs[1];
+			if(!isAccumReg(reg)) {
+				scope.append(new CGIRAsm("pop", "r"+reg));
+			}
+			reg = regs[0];
+			if(!isAccumReg(reg)) {
+				scope.append(new CGIRAsm("pop", "r"+reg));
+			}
+		}
+
+		for(int i=storedRegs.size()-1; i>=0; i--) {
 			scope.append(new CGIRAsm("pop", "r"+storedRegs.get(i)));
 		}
 
@@ -4607,7 +5205,10 @@ public class Generator extends CodeGenerator {
 	}
 	
 	@Override
-	public void functApply(CGScope scope, String funct, long[] constants) throws CompileException {
+	public boolean functApply(CGScope scope, String funct, long[] constants) throws CompileException {
+		 //Не все Мк могут переключать состояние пина инструкцией SBI PINx
+		if(funct.equalsIgnoreCase("pin_invert") && 0==device.getDefNum("SBI_TOGGLE_SUPPORT")) return false;
+
 		if(VERBOSE_LO <= verbose) {
 			scope.append(new CGIText(";functApply " + funct + ", const:" + StrUtils.toString(constants)));
 		}
@@ -4628,6 +5229,17 @@ public class Generator extends CodeGenerator {
 				param = "PORT" + (char)('A'+(constants[0x00]>>0x04));
 				scope.append(new CGIAsm("cbi", param + ", " + (constants[0x00]&0x0f)));
 				break;
+			case "pin_set":
+				if(0x02!=constants.length) throw new CompileException(toString() + " invalid parameters for funct:" + funct);
+				param = "PORT" + (char)('A'+(constants[0x00]>>0x04));
+				if(0x01==constants[0x01]) {
+					scope.append(new CGIAsm("sbi", param + ", " + (constants[0x00]&0x0f)));
+				}
+				else {
+					scope.append(new CGIAsm("cbi", param + ", " + (constants[0x00]&0x0f)));
+				}
+				break;
+
 			case "pin_invert":
 				if(0x01!=constants.length) throw new CompileException(toString() + " invalid parameters for funct:" + funct);
 				param = "PIN" + (char)('A'+(constants[0x00]>>0x04));
@@ -4658,9 +5270,9 @@ public class Generator extends CodeGenerator {
 			case "pin_get":
 				if(0x01!=constants.length) throw new CompileException(toString() + " invalid parameters for funct:" + funct);
 				param = "PIN" + (char)('A'+(constants[0x00]>>0x04));
-				scope.append(new CGIAsm("sez"));
+				scope.append(new CGIAsm("sec"));
 				scope.append(new CGIAsm("sbis", param + ", " + (constants[0x00]&0x0f)));
-				scope.append(new CGIAsm("clz"));
+				scope.append(new CGIAsm("clc"));
 				break;
 			case "pin_in":
 				if(0x01!=constants.length) throw new CompileException(toString() + " invalid parameters for funct:" + funct);
@@ -4685,14 +5297,18 @@ public class Generator extends CodeGenerator {
 				}
 				break;
 			case "dispatcher_lock":
-				if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
+				if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
 				break;
 			case "dispatcher_unlock":
-				if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
+				if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
+				break;
+			case "uptime_b0":
+				scope.append(new CGIRAsm("lds", "r16" ,"_OS_UPTIME+0x00"));
 				break;
 			default:
 				throw new CompileException(toString() + " unsupported funct:" + funct);
 		}
+		return true;
 	}
 	
 	@Override
@@ -4711,7 +5327,7 @@ public class Generator extends CodeGenerator {
 											CGCells.Type.ARGS==cells.getType()));
 				break;
 			case HEAP:
-				if(0x01 == getRefSize()) {
+				if(0x02==getRefSize()) {
 					scope.append(new CGIAsmIReg('z', true, "r16", cells.getId(0)));
 					scope.append(new CGIAsmIReg('z', true, "r17", cells.getId(1)));
 				}
@@ -4726,21 +5342,24 @@ public class Generator extends CodeGenerator {
 
 		RTOSLibs.CLASS_REFCOUNT.setRequired();
 		if(isInc) {
-			scope.append(new CGIAsmCall(CALL_INSTR, RTOSLibs.CLASS_REFCOUNT_PROCS.J8BPROC_CLASS_REFCOUNT_INC_NR.name(), true));
+			scope.append(new CGIAsmCall(CALL_INSTR, RTOSLibs.CLASS_REFCOUNT_PROCS.J8BPROC_CLASS_REFCOUNT_INC_NR.name().toLowerCase(), true));
 		}
 		else {
-			scope.append(new CGIAsmCall(CALL_INSTR, RTOSLibs.CLASS_REFCOUNT_PROCS.J8BPROC_CLASS_REFCOUNT_DEC_NR.name(), true));
+			scope.append(new CGIAsmCall(CALL_INSTR, RTOSLibs.CLASS_REFCOUNT_PROCS.J8BPROC_CLASS_REFCOUNT_DEC_NR.name().toLowerCase(), true));
 		}
 	}
 	
 	@Override
-	public void updateArrRefCount(CGScope scope, CGCells cells, boolean isInc, boolean isView) throws CompileException {
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";arr " + (isView ? "view " : "") + "refCount" + (isInc ? "++" : "--") + " for " + cells));
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
+	public void updateArrRefCount(CGScope scope, CGCells cells, boolean isInc) throws CompileException {
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(	";arr refCount" + (isInc ? "++" : "--") + " for " + cells));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
 
-		// Иначе адрес уже в X
 		if(null != cells) {
 			switch(cells.getType()) {
+				case ACC:
+					scope.append(new CGIAsmMv("mov", "r26", "r16"));
+					scope.append(new CGIAsmMv("mov", "r27", "r17"));
+					break;
 				case ARRAY:
 					// Адрес уже в X
 					break;
@@ -4786,6 +5405,10 @@ public class Generator extends CodeGenerator {
 						scope.append(new CGIAsmMv("mov", "r26", "j8b_atom"));
 					}
 					break;
+				case STACK:
+					scope.append(new CGIAsm("pop", "r26"));
+					scope.append(new CGIAsm("pop", "r27"));
+					break;
 				default:
 					throw new CompileException("Unsupported cell type:" + cells.getType());
 			}
@@ -4793,12 +5416,7 @@ public class Generator extends CodeGenerator {
 
 		//TODO Добавить статическую реализацию(кода размер известен на уровне компиляции)
 		RTOSLibs.ARR_REFCOUNT.setRequired();
-		if(isView) {
-			RTOSLibs.ARRVIEW_ARRADDR.setRequired();
-			scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_arrview_arraddr", true));
-			scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_arr_refcount_" + (isInc ? "inc" : "dec"), true));
-		}
-		else if(isInc || !(cells instanceof CGArrCells) || !((CGArrCells)cells).canComputeStatic()) {
+		if(isInc || !(cells instanceof CGArrCells) || !((CGArrCells)cells).canComputeStatic()) {
 			scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_arr_refcount_" + (isInc ? "inc" : "dec"), true));
 		}
 		else {
@@ -4808,13 +5426,13 @@ public class Generator extends CodeGenerator {
 			scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_arr_refcount_dec_const", true));
 		}
 
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
 	}
 
 	@Override
 	public void eInstanceof(CGScope scope, VarType type) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";eInstanceOf '" + type + "'"));
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
 		RTOSLibs.INCTANCEOF.setRequired();
 		
 		if(0x04==acc.getBytes()) scope.append(new CGIAsmMv("mov", "j8b_atom", "r19"));
@@ -4822,7 +5440,7 @@ public class Generator extends CodeGenerator {
 		scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_instanceof_nr", true));
 		if(0x04==acc.getBytes()) scope.append(new CGIAsmMv("mov", "r19", "j8b_atom"));
 		
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
 	}
 	
 	@Override
@@ -4871,7 +5489,7 @@ public class Generator extends CodeGenerator {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(	";eThrow exId:" + exceptionId + ", leave " + (isMethodLeave ? "method" : "try") +
 															(withCode ? " [with code]" : "")));
 		
-		setFeature(RTOSFeature.OS_FT_ETRACE);
+		setFeature(RtosFeature.OS_FT_ETRACE);
 		RTOSLibs.ETRACE_ADD.setRequired();
 		
 		scope.append(new CGIAsmLd("ldi", "r16", Integer.toString(exceptionId)));
@@ -4898,7 +5516,9 @@ public class Generator extends CodeGenerator {
 	public void throwCheck(	CGScope scope, List<Pair<CGLabelScope, Set<Integer>>> exceptionHandlers, CGLabelScope methodEndLbScope,
 							ExcsThrowPoint point)																					throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";throwsCheck"));
-
+		
+		setFeature(RtosFeature.OS_FT_ETRACE);
+		
 		CGLabelScope lbSkipThrow = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, true);
 		scope.append(new CGIAsmCondJump("brtc", lbSkipThrow));
 
@@ -4959,6 +5579,34 @@ public class Generator extends CodeGenerator {
 	}
 	
 	@Override
+	public void classIdToAcc(CGScope scope, CGCells refCells) throws CompileException {
+		acc.setBytes(refSize);
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";classIdToAcc, cells:" + refCells.toString()));
+		if(CGCells.Type.HEAP==refCells.getType()) {
+			scope.append(new CGIAsmIReg('z', true, "r16", refCells.getId(0)));
+			scope.append(new CGIAsmIReg('z', true, "r17", refCells.getId(1)));
+		}
+		else {
+			throw new CompileException("classIdToAcc - unsupported cells type:" + refCells.getType());
+		}
+	}
+	
+	@Override
+	public void classTypeIdToAcc(CGScope scope, CGCells refCells) throws CompileException {
+		acc.setBytes(refSize);
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";classTypeIdToAcc, cells:" + refCells.toString()));
+		if(CGCells.Type.HEAP==refCells.getType()) {
+			RTOSLibs.CLASS_TYPEID.setRequired();
+			scope.append(new CGIAsmIReg('z', true, "r16", refCells.getId(0)));
+			scope.append(new CGIAsmIReg('z', true, "r17", refCells.getId(1)));
+			scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_class_typeid", true));
+		}
+		else {
+			throw new CompileException("classTypeIdToAcc - unsupported cells type:" + refCells.getType());
+		}
+	}
+
+	@Override
 	public void terminate(CGScope scope, boolean systemStop, boolean excsCheck) throws CompileException {
 		Object obj = device.getParam(RTOSParam.HALT_OK_MODE);
 		RTOSHaltMode okMode = (null==obj ? RTOSHaltMode.HALT : RTOSHaltMode.values()[(Integer)obj]);
@@ -4979,7 +5627,7 @@ public class Generator extends CodeGenerator {
 		}
 
 		if(systemStop && !excsCheck) {
-			if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) {
+			if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) {
 				// При многопоточности мы должны завершить поток, если нет ошибок
 				//TODO Вероятно потом стоит добавить переход на процедуру останова в диспетчере, когда все нити будут завершены
 				scope.append(new CGIAsm("ret"));
@@ -5009,7 +5657,7 @@ public class Generator extends CodeGenerator {
 	
 	@Override
 	public int getCallSize() {
-		return def_jmp ? 0x02 : 0x01;
+		return defJmp ? 0x02 : 0x01;
 	}
 	@Override
 	public int getCallStackSize() {
@@ -5034,18 +5682,18 @@ public class Generator extends CodeGenerator {
 		switch(size) {
 			case 1: return new byte[]{16};
 			case 2: return new byte[]{16,17};
-			case 4: return new byte[]{16,17,18,19};
+			case 3: return new byte[]{16,17,18};
+			default: return new byte[]{16,17,18,19};
 		}
-		return null;
 	}
 
 	public byte[] getTempRegs(int size) {
 		switch(size) {
 			case 1: return new byte[]{30};
 			case 2: return new byte[]{30,31};
-			case 4: return new byte[]{30,31,28,29};
+			case 3: return new byte[]{16,17,18};
+			default: return new byte[]{30,31,28,29};
 		}
-		return null;
 	}
 
 	@Override
@@ -5054,31 +5702,41 @@ public class Generator extends CodeGenerator {
 	}
 
 	@Override
-	public boolean normalizeIRegConst(CGMethodScope mScope, char iReg, AtomicInteger lastOffset) throws CompileException {
-		boolean heapIRegModified = false;
-		
+	public void normalizeIRegConst(CGMethodScope mScope) throws CompileException {
 		List<CGItem> list = new ArrayList<>();
 		treeToList(mScope, list);
 
-		int yOffset = mScope.getArgsStackSize() + 0x04;
+		// Структура стека:
+		// 2B-индексный регистр Z хранящий адрес HEAP вызывающего
+		// xB-параметры												-_mScope.getArgsStackSize()
+		// 2B-адрес возврата из вызываемой процедуры                -\__0x04;
+		// 2B-индексный регистр Y хранящий адрес стека вызывающего  -/
+		// xB-переменные вызываемого метода (новый Y хранит этот адрес-TOOD проверить)
+		
+		int yOffset = mScope.getArgsStackSize() + 0x04; // Смещение указывает на начало параметров
 		int zOffset = 0;
 		
-		if('y'==iReg) {
-			for(CGItem item : list) {
-				if(item instanceof CGIAsmIReg) {
-					CGIAsmIReg instr = (CGIAsmIReg)item;
-					if(!instr.isArg() && 'y'==instr.getIreg()) {
+		for(CGItem item : list) {
+			if(item instanceof CGIAsmIReg) {
+				CGIAsmIReg instr = (CGIAsmIReg)item;
+				// Обрабатываем только переменные не трогая параметры
+				if('y'==instr.getIreg()) {
+					if(!instr.isArg()) {
 						int varsSize=mScope.getArgsStackSize() + 0x04;
+						// Для каждой инструкции перебираю все родительские блоки суммируя размер переменных в стеке
 						for(CGBlockScope bScope : mScope.getBlockScopes()) {
 							if(bScope == instr.getVarBlockScope()) break;
 							varsSize += bScope.getVarsStackSize();
 						}
-						instr.setOffset(varsSize + instr.getOffset());
+						instr.setOffset(varsSize + instr.getOffset()); // Т.е. считаем что Y содержит адрес начала параметров
 					}
 				}
 			}
 		}
-		for(CGItem item : list) {
+		
+		// Идея сырая - не учитываем условные переходы. Нечно подобное нужно сделать в оптимизаторе.
+		// А пока делаем примитивно adiw + instr + sbiw
+/*		for(CGItem item : list) {
 			if(item instanceof CGIAsmIReg) {
 				CGIAsmIReg instr = (CGIAsmIReg)item;
 				if('y'==iReg && 'y'==instr.getIreg()) {
@@ -5111,10 +5769,54 @@ public class Generator extends CodeGenerator {
 		}
 
 		lastOffset.set('y'==iReg ? yOffset : zOffset);
-	
-		return heapIRegModified;
+*/	
+
+		for(CGItem item : list) {
+			if(item instanceof CGIAsmIReg) {
+				CGIAsmIReg instr = (CGIAsmIReg)item;
+				if('y'==instr.getIreg()) {
+					int offset = MAX_IREG_OFFSET-instr.getOffset();
+					if(MIN_IREG_OFFSET>offset) {
+						instr.getPrefCont().append(new CGIRAsm("sbiw", "yl", "" + (offset*(-1))));
+						instr.setOffset(0);
+						instr.getPostCont().append(new CGIRAsm("adiw", "yl", "" + (offset*(-1))));
+					}
+					else if(MAX_IREG_OFFSET<offset) {
+						//TODO пригодится когда начну выделять свой фремй стека для каждого блока
+						instr.getPrefCont().append(new CGIRAsm("adiw", "yl", "" + offset));
+						instr.setOffset(0);
+						instr.getPostCont().append(new CGIRAsm("sbiw", "yl", "" + offset));
+					}
+					else {
+						instr.setOffset(offset);
+					}
+				}
+				//TODO сделать для Z
+			}
+		}
+
+/*
+
+		for(CGItem item : list) {
+			if(item instanceof CGIAsmIReg) {
+				CGIAsmIReg instr = (CGIAsmIReg)item;
+				int offset = (null==instr.getReg() ? 0 : instr.getOffset());
+				if(MIN_IREG_OFFSET>offset) {
+					instr.getPrefCont().append(new CGIRAsm("sbiw", iReg + "l", "" + (offset*(-1))));
+					instr.setOffset(0);
+					instr.getPrefCont().append(new CGIRAsm("adiw", iReg + "l", "" + (offset*(-1))));
+					heapIRegModified = true;
+				}
+				else if(MAX_IREG_OFFSET<offset) {
+					instr.getPrefCont().append(new CGIRAsm("adiw", iReg + "l", "" + offset));
+					instr.setOffset(0);
+					instr.getPrefCont().append(new CGIRAsm("sbiw", iReg + "l", "" + offset));
+					heapIRegModified = true;
+				}
+			}
+		}*/
 	}
-	private void moveIReg(CGIContainer cont, char iReg, int offset) throws CompileException {
+/*	private void moveIReg(CGIContainer cont, char iReg, int offset) throws CompileException {
 		if(0==offset) return;
 		if(0<offset && offset<=MAX_IREG_OFFSET) {
 			cont.append(new CGIRAsm("adiw", iReg + "l", "" + offset));
@@ -5126,11 +5828,11 @@ public class Generator extends CodeGenerator {
 			cont.append(new CGIRAsm("subi", iReg + "l", "low(" + offset*(-1) + ")"));
 			cont.append(new CGIRAsm("sbci", iReg + "h", "high(" + offset*(-1) + ")"));
 		}
-	}
+	}*/
 
 	@Override
 	public void flashDataToArr(CGScope scope, DataSymbol symbol, int offset) throws CompileException {
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
 		RTOSLibs.ROM_READ16.setRequired();
 		scope.append(new CGIAsm("push", "zl"));
 		scope.append(new CGIAsm("push", "zh"));
@@ -5141,7 +5843,7 @@ public class Generator extends CodeGenerator {
 		scope.append(new CGIAsmCall(CALL_INSTR, "os_rom_read16_nr", true));
 		scope.append(new CGIAsm("pop", "zh"));
 		scope.append(new CGIAsm("pop", "zl"));
-		if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
 	}
 
 	private String getConstReg(CGIContainer cont, byte reg, int index, long value) throws CompileException {

@@ -78,7 +78,7 @@ public class ForNode extends CommandNode {
 				if(null != type) {
 					String name = null;
 					try {name = consumeToken(tb, TokenType.IDENTIFIER).getStringValue();} catch(CompileException e) {markFirstError(e);}
-					this.init = new VarNode(inst, tb, new HashSet<>(), type, name);
+					this.init = new VarNode(inst, tb, null, new HashSet<>(), type, name);
 				}
 				else {
 					this.init = new ExpressionNode(inst, tb).parse();
@@ -302,7 +302,7 @@ public class ForNode extends CommandNode {
 			
 			if(result) {
 				VarType condType = condition.getType();
-				if(null==condType || VarType.BOOL!=condType) {
+				if(null==condType || VarType.BOOLEAN!=condType) {
 					markError("Loop condition must be boolean, got: " + condType);
 					result = false;
 				}
@@ -413,7 +413,7 @@ public class ForNode extends CommandNode {
 
 		if(null!=condition && condition instanceof LiteralExpression) {
 			LiteralExpression le = (LiteralExpression)condition;
-			if(VarType.BOOL==le.getType()) {
+			if(VarType.BOOLEAN==le.getType()) {
 				if((boolean)le.getValue()) {
 					alwaysTrue = true;
 				}
@@ -435,13 +435,15 @@ public class ForNode extends CommandNode {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
-		if(cgDone) return null;
+		if(cgDone || disabled) return null;
 		cgDone = true;
 		
 		CodegenResult result = null;
 		
 		if(!alwaysFalse) {
-			cgScope.setBranch(branch);
+			if(null!=condition) {
+				condition.getCGScope().setBranch(branch);
+			}
 
 			if(null!=init) {
 				init.codeGen(cg, false, excs);
@@ -483,8 +485,8 @@ public class ForNode extends CommandNode {
 		}
 		
 		((CGBlockScope)cgScope).build(cg, false, excs);
-		((CGBlockScope)cgScope).releaseRegsPool();
 
+		releaseVars(cg);
 		return result;
 	}
 }

@@ -15,11 +15,11 @@
  */
 
 class Main {
-    //TODO доделать функционал VIEW
+    //TODO доделать функционал VIEW, есть ошибки компиляции и кодогенерации
+
     public static void main() {
 		byte[][] b1 = new byte[4][5];
-		System.out("b1[][] длина:" + b1.length + '\n');
-
+		System.out("b1[][] длина [4]:" + b1.length + '\n');
 		byte cntr = 1;
 		for(byte i=0; i<4; i++) {
 			for(byte j=0; j<5; j++) {
@@ -27,7 +27,7 @@ class Main {
 			}
 		}
 
-		System.out("b1[][] дамп:\n");
+/*		System.out("b1[][] дамп [1-20]:\n");
 		for(byte i=0; i<4; i++) {
 			for(byte j=0; j<5; j++) {
 				System.out(b1[i][j]);
@@ -35,46 +35,33 @@ class Main {
 			}
 			System.out('\n');
 		}
-
-		System.out("Применение VIEW:");
+*/
 		byte[] b2 = b1[3];
-		System.out(b1[3][1]);
-		System.out(" vs ");
+//		System.out("Применение VIEW, оригинал b1[3][1], [17]: " + b1[3][1] + " vs вью b2[1] [17]: " + b2[1] + '\n'); //FAIL
 		System.out(b2[1]);
-		System.out('\n');
-
+/*
 		byte[] arr = new byte[10];
 		short s = arr.length;
-		System.out("arr[] длина:" + s + '\n');
+		System.out("arr[] длина, [10]: " + s + '\n');
 		for(byte i=0; i<s; i++) {
 			arr[i]=i+100;
 		}
 
 		byte[][] matrix = new byte[3][3];
 		matrix[0][1] = matrix[1][0];
-		System.out("Значение matrix[0][1]:" + matrix[0][1] + '\n');
+		System.out("Значение matrix[0][1], [0]: " + matrix[0][1] + '\n');
 
-		byte b;
-		System.out("Сумма ячеек arr[0]+arr[1]:");
-		b = arr[0] + arr[1];
-		System.out(b);
-		System.out('\n');
-		System.out("method1 для arr:");
-		System.out(method1(arr));
-		System.out('\n');
-
-		System.out("method2:");
-		//FAIL
-		System.out(method2(2)[1]);
-		System.out('\n');
+		System.out("Сумма ячеек arr[0]+arr[1], [201]: " + (arr[0] + arr[1]) + '\n');
+		System.out("method1 для arr, [101]: " + method1(arr) + '\n');
+		System.out("method2, [3]: " + method2(2)[1] + '\n'); //FAIL
 
 		arr[method3()] = 0;
-		b = arr[method3()];
+		byte b = arr[method3()];
 
 		arr[0]++;
 		--arr[0];
-
-		arr[arr[arr[0]]] = arr[method1(arr)] + method2(5)[0];
+*/
+		//TODO не работает arr[arr[arr[0]]] = arr[method1(arr)] + method2(5)[0]; //FAIL
 	}
 
 	public static byte method1(byte[] barr) {
@@ -82,7 +69,7 @@ class Main {
 	}
 
 	public static byte[] method2(byte b) {
-		byte[] arr = new byte[b];
+		byte[] arr = new byte[b]; //TODO нет автоматического приведения типа byte -> short
 		arr[1] = 3;
 		return arr;
 	}

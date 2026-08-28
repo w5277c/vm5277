@@ -35,7 +35,6 @@ import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.VarType;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Instance;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -175,7 +174,7 @@ public class BinaryExpression extends ExpressionNode {
 
 		if(result) {
 			if(operator.isLogical()) {
-				type = VarType.BOOL;
+				type = VarType.BOOLEAN;
 			}
 			else {
 				// Возвращаем более широкий тип
@@ -240,7 +239,9 @@ public class BinaryExpression extends ExpressionNode {
 		return codeGen(cg, false, false, toAccum, excs);
 	}
 	public Object codeGen(CodeGenerator cg, boolean isInvert, boolean opOr, boolean toAccum, CGExcs excs) throws CompileException {
-		if(disabled) return null;
+		if(cgDone || disabled) return null;
+		cgDone = true;
+
 		excs.setSourcePosition(sp);
 		
 		CodegenResult result = CodegenResult.RESULT_IN_ACCUM;
@@ -285,7 +286,7 @@ public class BinaryExpression extends ExpressionNode {
 					throw new CompileException("Accum not used for operand:" + expr1);
 				}
 				// Сохраняем результат левого операнда
-				cg.pushAccBE(cgScope, 1); // boolean занимает 1 байт
+				cg.pushAccBE(cgScope, 1, true); // boolean занимает 1 байт
 
 				// Генерируем код для правого операнда
 				if(CodegenResult.RESULT_IN_ACCUM != expr2.codeGen(cg, true, excs)) {
@@ -301,6 +302,7 @@ public class BinaryExpression extends ExpressionNode {
 					if(le.isBoolean()) {
 						boolean value = isInvert ? !(Boolean)le.getValue() : (Boolean)le.getValue();
 						if((Operator.OR == operator && value) || (Operator.AND == operator && !value)) {
+							releaseVars(cg);
 							return value ? CodegenResult.TRUE : CodegenResult.FALSE;
 						}
 					}
@@ -310,6 +312,7 @@ public class BinaryExpression extends ExpressionNode {
 					if(le.isBoolean()) {
 						boolean value = isInvert ? !(Boolean)le.getValue() : (Boolean)le.getValue();
 						if((Operator.OR == operator && value) || (Operator.AND == operator && !value)) {
+							releaseVars(cg);
 							return value ? CodegenResult.TRUE : CodegenResult.FALSE;
 						}
 					}
@@ -326,7 +329,6 @@ public class BinaryExpression extends ExpressionNode {
 				}
 				else if(expr1 instanceof VarFieldExpression) {
 					((VarFieldExpression)expr1).codeGen(cg, isInvert, Operator.OR == operator, branch, excs);
-					((VarFieldExpression)expr1).postCodeGen(cg);
 					result = null;
 				}
 				else if(expr1 instanceof UnaryExpression) {
@@ -351,7 +353,6 @@ public class BinaryExpression extends ExpressionNode {
 				}
 				else if(expr2 instanceof VarFieldExpression) {
 					((VarFieldExpression)expr2).codeGen(cg, isInvert, Operator.OR == operator, (CGBranch)branch, excs);
-					((VarFieldExpression)expr2).postCodeGen(cg);
 					result = null;
 				}
 				else if(expr2 instanceof UnaryExpression) {
@@ -389,7 +390,7 @@ public class BinaryExpression extends ExpressionNode {
 			int size = (leftType.getSize() > rightType.getSize() ? leftType.getSize() : rightType.getSize());
 			// Выполняем операцию, левый операнд - аккумулятор, правый операнд - значение на вершине стека
 			// Код отстроен и результат может быть только в аккумуляторе, сохраняем его
-			cg.pushAccBE(cgScope, size);
+			cg.pushAccBE(cgScope, size, false);
 			// Строим код для expr1(результат в аккумуляторе)
 			if(CodegenResult.RESULT_IN_ACCUM != expr1.codeGen(cg, true, excs)) {
 				throw new CompileException("Accum not used for operand:" + expr1);
@@ -404,6 +405,7 @@ public class BinaryExpression extends ExpressionNode {
 			if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumUnlock();
 		}
 
+		releaseVars(cg);
 		return result;
 	}
 

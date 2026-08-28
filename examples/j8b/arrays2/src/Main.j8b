@@ -18,23 +18,27 @@ class Main {
     public static void main() {
 		byte[] arr = new byte[4];
 		arr[1] = 8;
-		System.out(arr[1]);
+		System.out("arr[1], [8]: " + arr[1] + '\n');
 
 		int[] bArray1 = new int[2];
 		int[] bArray2 = new int[4];
 
-		System.out(bArray1[(short)bArray2[3]]);
+		System.out("bArray1[(short)bArray2[3]] [0]: " + bArray1[(short)bArray2[3]] + '\n');
 
 		bArray1[0]=bArray2[1];
-		System.out(' ');
+		System.out("Проверка ложного условия...");
 		if(bArray1[1]>2) {
-			System.out('!');
+			System.out("ошибка компиляции\n");
+		}
+		else {
+			System.out("ok\n");
 		}
 
 		byte bt;
 		bt=2;
 
-		bool bl = bArray1[0]>bt && bt==2;
-		System.out(bl);
+		boolean bl = bArray1[0]>bt && bt==2;
+		System.out("bArray1[0]>bt && bt==2 [false]: " + bl + "\n");
+		System.out("done");
 	}
 }

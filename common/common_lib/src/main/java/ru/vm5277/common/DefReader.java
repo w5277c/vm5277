@@ -19,8 +19,11 @@ package ru.vm5277.common;
 import ru.vm5277.common.lexer.SourceBuffer;
 import java.io.IOException;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
 import java.util.Set;
@@ -43,7 +46,7 @@ public class DefReader {
 		try(Scanner scan = new Scanner(defPath)) {
 			while(scan.hasNextLine()) {
 				String line = scan.nextLine();
-				int commentPos = line.indexOf(";"); ;//TODO добавить полноценную проверку на комментарий, в том числе много строчный
+				int commentPos = line.indexOf(";"); ;//TODO добавить полноценную проверку на комментарий, в том числе многострочный
 				if(-1!=commentPos) {
 					line = line.substring(0, commentPos);
 				}
@@ -115,5 +118,17 @@ public class DefReader {
 	
 	public Integer getRegister(String key) {
 		return defs.get(key.toLowerCase());
+	}
+	
+	public Set<String> getNumericRegisters() {
+		Set<String> result = new HashSet<>();
+		for(int reg : defs.values()) {
+			result.add("r"+reg);
+		}
+		return result;
+	}
+
+	public Collection<String> getRegisters() {
+		return defs.keySet();
 	}
 }

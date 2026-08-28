@@ -22,11 +22,14 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import ru.vm5277.common.Device;
 import ru.vm5277.common.FSUtils;
+import ru.vm5277.common.PathPrefixTrimmer;
 import ru.vm5277.common.enums.PlatformType;
 import ru.vm5277.common.enums.SemanticAnalyzePhase;
 import ru.vm5277.common.StrUtils;
@@ -92,7 +95,7 @@ public class Main {
 			}
 			return 0;
 		}
-		
+
 		PlatformType platformType = null;
 		String mcu = null;
 		Integer freq = null;
@@ -102,6 +105,7 @@ public class Main {
 		int maxErrors = 30;
 		boolean dumpIR = false;
 		int tabSize = 0x04;
+		List<Path> includePaths = new ArrayList<>();
 		Map<RTOSParam, Object> params = new HashMap<>();
 		
 		if(0x02 <= args.length) {
@@ -144,6 +148,12 @@ public class Main {
 						catch(Exception e) {
 							System.err.println("[ERROR] Invalid freq parameter:"  + value);
 							return 1;
+						}
+						continue;
+					}
+					else if(arg.equals("-I") || arg.equals("--include")) {
+						for(String dir : args[++i].split("[:;,]")) {
+							includePaths.add(FSUtils.resolveWithEnv(dir));
 						}
 						continue;
 					}
@@ -302,10 +312,13 @@ public class Main {
 
 		boolean result = false;
 		if(null!=lexer) {
-			Instance inst = new Instance(toolkitPath, runtimePath, mc, tabSize);
+			Instance inst = new Instance(toolkitPath, runtimePath, mc, tabSize, strictLevel, optimizationType);
+			inst.getIncludePaths().addAll(includePaths);
+			
 			ASTParser parser = null;
 			try {
-				parser = new ASTParser(inst, projectPath, lexer.getTokens(), true, isAsmView);
+				parser = new ASTParser(inst, projectPath);
+				parser.parse(lexer.getTokens(), true, isAsmView);
 			}
 			catch(Exception ex) {
 				ex.printStackTrace();
@@ -321,7 +334,7 @@ public class Main {
 			}
 			else {
 				if(!quiet && !isAsmView) System.out.println("Semantic...");
-				SemanticAnalyzer.analyze(clazz, cg, parentCGScope, parser.getAutoImported());
+				SemanticAnalyzer.analyze(inst, clazz, cg, parentCGScope, parser.getAutoImported());
 				time = (System.currentTimeMillis() - timestamp) / 1000f;
 				if(!quiet && !isAsmView) System.out.println("Semantic done, time:" + String.format(Locale.US, "%.3f", time) + " s");
 
@@ -369,13 +382,14 @@ public class Main {
 							}
 						}
 
-						if(null != launchNode) {
+						if(null!=launchNode) {
 							timestamp = System.currentTimeMillis();
 							if(!quiet && !isAsmView) System.out.println("Codegen...");
 
 							CGExcs excs = new CGExcs();
 							clazz.firstCodeGen(cg, launchNode, excs);
 							ReachableAnalyzer.analyze(mc, (ClassNode)parser.getClazz(), cg, excs);
+							cg.getDevice().setParam(RTOSParam.STIMER_QNT, inst.getSoftTimerCntr());
 							cg.build(VarType.fromClassName(clazz.getName()), 0);
 							//System.out.println("\n" + cg.getAsm());
 
@@ -390,12 +404,32 @@ public class Main {
 									cg.showScopeTree(parentCGScope);
 								}
 
+								class MyPathPrefixTrimmer implements PathPrefixTrimmer {
+									@Override
+									public String trim(String path) {
+										if(null==path || path.isEmpty()) return path;
+										
+										if(path.startsWith(projectPath.toString())) return "PROJECT" + path.substring(projectPath.toString().length()).replace('\\', '/');
+										if(path.startsWith(runtimePath.toString())) return "RUNTIME" + path.substring(runtimePath.toString().length()).replace('\\', '/');
+										
+										if(!inst.getIncludePaths().isEmpty()) {
+											for(Path includePath : inst.getIncludePaths()) {
+												if(path.startsWith(includePath.toString())) {
+													return includePath.getFileName().toString().toUpperCase() + path.substring(includePath.toString().length()).replace('\\', '/');
+												}
+											}
+										}
+										
+										return path;
+									}
+								}
+								
 								//TODO обозвать fwreport.txt - будет хранить все тех. описание сгенерированной прошивки (ресурсы, метки, типы, исключения,
 								//выделенные пулы памяти, вероятный размер испольуемых ресурсов, включенные фичи и т.п.
 								File dbgFile = outputPath.resolve(sourceName + ".dbg").normalize().toFile();
 								dbgFile.createNewFile();
 								fw = new FileWriter(dbgFile);
-								cg.getTargetInfoBuilder().write(sourcePath, fw);
+								cg.getTargetInfoBuilder().write(new MyPathPrefixTrimmer(), fw);
 							}
 							else {
 								System.out.println(cg.getAsm(parentCGScope, device.getDefsPath(), mc));
@@ -517,17 +551,6 @@ public class Main {
 		System.err.println("[ERROR] TODO Invalid optimization level:" + invalidParam + ", expected none|front|size|speed");
 	}
 
-	public static StrictLevel getStrictLevel() {
-		return strictLevel;
-	}
-	
-	public static OptimizationType getOptimizationType() {
-		return optimizationType;
-	}
-	public static void setOptimizationType(OptimizationType _optimizationType) {
-		optimizationType = _optimizationType;
-	}
-	
 	public static void debugAST(Object obj, SemanticAnalyzePhase phase, boolean isIn, String info) {
 		debugAST(obj, phase, isIn, false, info);
 	}

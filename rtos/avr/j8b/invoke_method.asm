@@ -23,6 +23,7 @@ J8BPROC_INVOKE_METHOD_NR:									;NR-NO_RESTORE - не восстанавлив
 ;номер метода в интерфейсе
 ;-----------------------------------------------------------
 	PUSH_Z
+	PUSH_Y
 
 	ADIW ZL,0x03
 	LD ACCUM_EH,Z+
@@ -38,7 +39,6 @@ J8BPROC_INVOKE_METHOD_NR:									;NR-NO_RESTORE - не восстанавлив
 	ADD YL,ZL
 	ADC YH,ZH
 
-	LDI TEMP_L,0x00											;Порядковый номер метода в классе
 _J8BPROC_INVOKE_METHOD_NR__IFACEIDS_LOOP:
 	LPM ACCUM_EL,Z+											;Получаем id интерфейса
 	CP ACCUM_EL,ACCUM_L
@@ -53,10 +53,12 @@ _J8BPROC_INVOKE_METHOD_NR__GOT_IFACE:
 	ADD YL,ACCUM_H
 	ADC YH,C0x00
 	MOVW ZL,YL
-	LPM YL,Z+												;Загружаем адрес метоа
-	LPM YH,Z
+	LPM ACCUM_L,Z+											;Загружаем адрес метода
+	LPM ACCUM_H,Z
+	POP_Y
 	POP_Z
-	PUSH_Y
+	PUSH ACCUM_L
+	PUSH ACCUM_H
 	RET
 .ENDIF
 

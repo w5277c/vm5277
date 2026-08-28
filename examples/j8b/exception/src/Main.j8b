@@ -33,7 +33,7 @@ class Main {
 		System.out("\nСложение с переполнением" + " вне обработчика искючения" + "(статика): " + (b1+0xffffffff));
 		System.out("\nСложение с переполнением" + " вне обработчика искючения" + "(runtime): " + (b2+0xffffffff));
 		try {
-			System.out("\nСложение с переполнением" + " в обработчике искючения" + "(статика): " + (b1+0xffffffff));
+			System.out("\nСложение с переполнением" + " в обработчике искючения" + "(статика): " + (b1+0xffffffff)); //TODO компилятор не отрабатывает
 		}
 		catch(MathOverflowException ex) {
 			System.out("MathOverflowException");

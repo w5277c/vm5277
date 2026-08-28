@@ -33,7 +33,7 @@ public enum Operator {
 	ASSIGN("="), PLUS_ASSIGN("+="), MINUS_ASSIGN("-="), MULT_ASSIGN("*="), DIV_ASSIGN("/="), MOD_ASSIGN("%="), BIT_AND_ASSIGN("&="), BIT_OR_ASSIGN("|="),
 	BIT_XOR_ASSIGN("^="), BIT_NOT_ASSIGN("~="), SHL_ASSIGN("<<="), SHR_ASSIGN(">>="), ROR(">>["), ROL("]<<"),
 	//Тернарный и instanceof
-	TERNARY("?"), IS("is");
+	TERNARY("?"), INSTANCEOF("instanceof");
 
 	
 	public static final Map<Operator, Integer> PRECEDENCE = new HashMap<>();
@@ -68,7 +68,7 @@ public enum Operator {
 	    // 7. Равенство
 		PRECEDENCE.put(Operator.EQ, 7);
 		PRECEDENCE.put(Operator.NEQ, 7);
-	    PRECEDENCE.put(Operator.IS, 7);
+	    PRECEDENCE.put(Operator.INSTANCEOF, 7);
 		// 8. Сравнение
 		PRECEDENCE.put(Operator.LT, 8);
 		PRECEDENCE.put(Operator.GT, 8);
@@ -127,7 +127,7 @@ public enum Operator {
 
 	// Проверяет, является ли оператор сравнением
 	public boolean isComparison() {
-		return this == EQ || this == NEQ || this == LT || this == GT || this == LTE || this == GTE || this == IS;
+		return this == EQ || this == NEQ || this == LT || this == GT || this == LTE || this == GTE || this == INSTANCEOF;
 	}
 
 	// Проверяет, является ли оператор логическим
@@ -201,6 +201,6 @@ public enum Operator {
 	}
 	
 	public boolean isAlpha() {
-		return Operator.IS == this;
+		return Operator.INSTANCEOF == this;
 	}
 }

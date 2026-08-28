@@ -32,7 +32,7 @@ public class LexerTests {
     @Test
     public void testBasicTypesAndKeywords() throws Exception {		
 		String source = "true false null " + 
-						"void bool byte char short int fixed cstr " +
+						"void boolean byte char short int fixed cstr " +
 						"if do while for return continue break switch " +
 						"static final private public native atomic " +
 						"class interface implements this " +
@@ -56,7 +56,7 @@ public class LexerTests {
 		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
 		assertEquals(J8BKeyword.VOID, tokens.get(pos++).getValue());
 		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
-		assertEquals(J8BKeyword.BOOL, tokens.get(pos++).getValue());
+		assertEquals(J8BKeyword.BOOLEAN, tokens.get(pos++).getValue());
 		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
 		assertEquals(J8BKeyword.BYTE, tokens.get(pos++).getValue());
 		assertEquals(TokenType.TYPE, tokens.get(pos).getType());
@@ -237,14 +237,14 @@ public class LexerTests {
 	
     @Test
     public void testNotes() throws Exception {
-        String source = "#p/8e5-e5-e5-c5-e5-/4g5-g4";
+        String source = "#p/8e5-e5-p-e5-c5-e5-/4g5-g4";
 		Lexer lexer = new Lexer(LexerType.J8B, source, false, 0x04);
         List<Token> tokens = lexer.getTokens();
         
         assertEquals(1, tokens.size() - 1); // -1 для EOF
         
 		assertEquals(TokenType.NOTE, tokens.get(0).getType());
-		assertEquals("0x884444444044844838", toStringValue(tokens.get(0).getValue()));
+		assertEquals("0x884444c8444044844737", toStringValue(tokens.get(0).getValue()));
     }
 	
     @Test

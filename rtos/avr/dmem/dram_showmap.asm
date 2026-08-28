@@ -23,7 +23,7 @@
 	.include "stdio/out_rambytes.asm"
 	
 _OS_DRAM_SHOWMAP__TEXT:
-	.db "~DRAMSM:",0x0a,0x00
+	.db "DRAMSM:",0x00
 
 ;-----------------------------------------------------------;
 OS_DRAM_SHOWMAP:
@@ -34,6 +34,8 @@ OS_DRAM_SHOWMAP:
 	PUSH_T16
 	PUSH_Z
 
+	LDI ACCUM_L,0x00
+	MCALL OS_OUT_CHAR
 	LDI ACCUM_H,high(_OS_DRAM_SHOWMAP__TEXT*2)
 	LDI ACCUM_L,low(_OS_DRAM_SHOWMAP__TEXT*2)
 	MCALL OS_OUT_CSTR

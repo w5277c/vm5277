@@ -1,0 +1,208 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import rtos.RtosDispatcher;
+
+public class HD44780 implements TextDisplay {
+	public interface Layer {
+		void init();
+		void setNibble(byte nibble, boolean isData);	// Отправка 4 бит
+		void pulse(); // Строб E
+		void setRS(boolean isData); // 0=cmd, 1=data
+		void setRW(boolean isRead); // 0=write, 1=read (опционально)
+		void setBacklight(boolean st);
+	}
+
+	public static class Pcf8574Layer implements Layer {
+		private I2cMaster i2c;
+		private final byte[] state = new byte[]{0x08};  // Backlight ON, остальные 0
+
+		public Pcf8574Layer(I2cMaster i2c) {
+            this.i2c = i2c;
+		}
+
+		@Override public void init() {
+            // Начальное состояние: EN=0, RW=0, RS=0, BL=1
+            i2c.comm(state, 1, null, 0, 100);
+		}
+		@Override public void setNibble(byte nibble, boolean isData) {
+			// Упаковка: BL(1) + D7 D6 D5 D4 + EN(0) + RW(0) + RS (RS=1 для данных)
+			state[0] = (0x08|((nibble&0x0f) << 4)|(isData ? 1 : 0));
+		}
+
+		@Override public void pulse() {
+			state[0] |= 0x04;  // EN=1
+            i2c.comm(state, 1, null, 0, 100);
+			RtosCore.delayUs(1);
+			state[0] &= 0xFB;  // EN=0
+            i2c.comm(state, 1, null, 0, 100);
+			RtosCore.delayUs(1);
+		}
+
+		@Override public void setRS(boolean isData) {
+			if(isData) state[0] |= 0x01;
+			else state[0] &= 0xFE;
+		}
+
+		@Override public void setRW(boolean isRead) {
+			// PCF8574 не поддерживает чтение с HD44780 без доп. логики
+		}
+
+		@Override public void setBacklight(boolean st) {
+            if (st) state[0] = state[0] |= 0x08;
+            else state[0] = state[0] &= ~0xF7;
+            i2c.comm(state, 1, null, 0, 100);
+        }
+	}
+
+/*	public static class GpioLayer implements Layer {
+        private byte rs;
+        private byte en;
+        private byte bl;
+        private byte d4;
+        private byte d5;
+        private byte d6;
+        private byte d7;
+        private boolean rsstate = false;
+
+        public GpioLayer(byte rs, byte en, byte bl, byte d4, byte d5, byte d6, byte d7) {
+            this.rs = rs;
+            this.en = en;
+            this.bl = bl;
+            this.d4 = d4;
+            this.d5 = d5;
+            this.d6 = d6;
+            this.d7 = d7;
+        }
+
+        @Override public void init() {
+            // Настройка пинов как OUTPUT
+        	GPIO.modeOut(rs);
+        	GPIO.modeOut(en);
+        	GPIO.modeOut(bl);
+        	GPIO.modeOut(d4);
+        	GPIO.modeOut(d5);
+        	GPIO.modeOut(d6);
+        	GPIO.modeOut(d7);
+        }
+
+        @Override public void setNibble(byte nibble, boolean isData) {
+            GPIO.set(rs, isData);
+			GPIO.set(d4, 0!=(nibble&0x01));
+			GPIO.set(d5, 0!=(nibble&0x02));
+			GPIO.set(d6, 0!=(nibble&0x04));
+			GPIO.set(d7, 0!=(nibble&0x08));
+        }
+
+        @Override public void pulse() {
+            GPIO.set(en, true);   // EN=1
+            RTOSCore.delayUs(1);
+            GPIO.set(en, false);   // EN=0
+            RTOSCore.delayUs(1);
+        }
+
+        @Override public void setRS(boolean isData) {
+            rsstate = isData;
+            GPIO.set(rs, isData);
+        }
+
+        @Override public void setRW(boolean isRead) {}
+
+		@Override public void setBacklight(boolean st) {
+			GPIO.set(bl, st);
+		}
+	}*/
+
+	private Layer layer;
+	private byte rows;
+	private byte cols;
+
+	public HD44780(Layer layer, byte cols, byte rows) {
+		this.layer = layer;
+		this.cols = cols;
+		this.rows = rows;
+
+		init();
+	}
+
+	public HD44780(Layer layer) {
+		this(layer, 16, 2);  // Стандартный 16x2
+	}
+
+	public HD44780(I2cMaster iface) {
+		this(new Pcf8574Layer(iface), 16, 2);  // Стандартный 16x2 с PCF8574
+	}
+
+	@Override private void init() {
+        // Специальная последовательность инициализации для 4-бит режима
+        Thread.sleep(50);  // Ждем 50 мс после включения питания
+        RtosDispatcher.lock();
+        // Три раза отправляем 0x03 (функция set 8-bit)
+        for (byte i=0; i<3; i++) {
+            layer.setNibble(0x03, false);
+            layer.pulse();
+            Thread.sleep(5);
+        }
+        // Переключение в 4-бит режим
+        layer.setNibble(0x02, false);
+        layer.pulse();
+        Thread.sleep(1);//RtosCore.delayUs(100);
+
+        sendCommand(0x28); // Настройка: 2 строки, 5x8 точек, 4-бит режим
+		sendCommand(0x0c); // Display ON, cursor OFF, blink OFF
+		sendCommand(0x01); // Clear display
+        Thread.sleep(2);
+        sendCommand(0x06); // Entry mode: increment, no shift
+        RtosDispatcher.unlock();
+    }
+
+    private void sendCommand(byte cmd) {
+        layer.setRS(false);  // Command mode
+        layer.setNibble((cmd>>4)&0x0F, false);
+        layer.pulse();
+        layer.setNibble(cmd&0x0F, false);
+        layer.pulse();
+        RtosCore.delayUs(50);
+    }
+
+    private void sendData(byte data) {
+        layer.setRS(true);   // Data mode
+        layer.setNibble((data>>4)&0x0F, true);
+        layer.pulse();
+        layer.setNibble(data&0x0F, true);
+        layer.pulse();
+        RtosCore.delayUs(50);
+    }
+
+	// === Реализация Display ===
+	@Override public short getWidth() {return cols;}
+	@Override public short getHeight() {return rows;}
+	@Override public void clear() {
+		sendCommand(0x01);
+		Thread.sleep(2);
+	}
+	@Override public void update() {}
+	@Override public void setBacklight(boolean st) {layer.setBacklight(st);}
+	// === Реализация TextDisplay ===
+	@Override void setInkColor(byte c) {}
+	@Override void setPaperColor(byte c) {}
+	@Override void setCursor(short x, short y) {sendCommand((byte)(0x80 + (y*0x40) + x));}
+	@Override public void putChar(char c) {sendData((byte)c);}
+	@Override public void setBright(byte b) {}
+	@Override public byte getMaxBright() {return 0;}
+	@Override public void setContrast(byte b) {}
+	@Override public byte getMaxContrast() {return 0;}
+}

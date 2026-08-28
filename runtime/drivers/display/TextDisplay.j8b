@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-import drivers.display.Display;
-
 public interface TextDisplay extends Display {
 	void setCursor(short x, short y);
 	void putChar(char c);

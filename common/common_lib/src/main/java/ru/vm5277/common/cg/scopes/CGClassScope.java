@@ -47,6 +47,9 @@ public class CGClassScope extends CGScope {
 	private			CGLabelScope				instInitlabel;
 	private			CGIContainer				instInitCont		= new CGIContainer();
 	private			CGIContainer				postfixCont			= new CGIContainer();
+	private			boolean						firstBuild			= true; // Выполняется множественный вход в build(не все поля сформированы при первом входе)
+																			// поэтому необходимо исключать повторную генерацию заголовка 
+	private			CGIContainer				newInstCont;
 	
 	public CGClassScope(CodeGenerator cg, CGScope parent, int id, VarType type, String name, List<ImplementInfo> impl, InstanceType instType) {
 		super(parent, id, name);
@@ -100,9 +103,12 @@ public class CGClassScope extends CGScope {
 		return cells;
 	}
 	
-	public void build(CodeGenerator cg, boolean isLaunchPoint, CGExcs excs) throws CompileException {
-		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";======== enter CLASS " + getPath('.') + "[" + instType + "] ========================"));
-		prepend(cont);
+	public void build(CodeGenerator cg, boolean isLaunchPoint, int heapExpandSize, CGExcs excs) throws CompileException {
+		if(firstBuild) {
+			if(VERBOSE_LO<=verbose) cont.append(new CGIText(";======== enter CLASS " + getPath('.') + "[" + instType + "], heap expand size:" +
+															heapExpandSize + " ========================"));
+			prepend(cont);
+		}
 		
 		//TODO Похоже здесь мы знаем о всех используемых полях и можем выделить память для heap
 		//Нужно перенести из CodeGenerator.buiid
@@ -122,7 +128,12 @@ public class CGClassScope extends CGScope {
 //				}
 			}
 			if(haveConstr) {
-				instInitCont.prepend(cg.eNewInstance(null, fieldsOffset, lbIIDSScope, type, instType, postfixCont, excs));
+				if(null!=newInstCont) {
+					instInitCont.remove(newInstCont);
+				}
+				postfixCont.clear(); // Возможен множественный вход в этот метод
+				newInstCont = cg.eNewInstance(null, fieldsOffset+heapExpandSize, lbIIDSScope, type, instType, postfixCont, excs);
+				instInitCont.prepend(newInstCont);
 			}
 		}
 		
@@ -135,7 +146,10 @@ public class CGClassScope extends CGScope {
 			}
 		}*/
 		
-		if(VERBOSE_LO<=verbose) append(new CGIText(";======== leave CLASS " + getPath('.') + " ========================"));
+		if(firstBuild) {
+			if(VERBOSE_LO<=verbose) append(new CGIText(";======== leave CLASS " + getPath('.') + " ========================"));
+			firstBuild = false;
+		}
 	}
 	
 	public int getHeapOffset() {

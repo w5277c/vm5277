@@ -28,9 +28,10 @@ public class MethodSymbol extends AstHolder {
 	private			AstNode			astNode;
 	private			boolean			isPredefined;
 	private			boolean			isInterfaceImpl;
+	private			boolean			isEntryPoint;
 	
 	public MethodSymbol(String name, VarType returnType, List<Symbol> parameters, boolean isFinal, boolean isStatic, boolean isNative, boolean canThrow,
-						boolean isPredefined, MethodScope scope, AstNode astNode) {
+						boolean isPredefined, MethodScope scope, AstNode astNode, boolean isEntryPoint) {
 		super(name, returnType, isFinal, isStatic, isNative);
 		
 		this.parameters = parameters;
@@ -38,6 +39,7 @@ public class MethodSymbol extends AstHolder {
 		this.scope = scope;
 		this.astNode = astNode;
 		this.isPredefined = isPredefined;
+		this.isEntryPoint = isEntryPoint;
 	}
 
 	public MethodScope getScope() {
@@ -70,12 +72,17 @@ public class MethodSymbol extends AstHolder {
 	}
 	
 	public synchronized String getSignature() {
-		if(null == signature) {
+		if(null==signature) {
 			StringBuilder sb = new StringBuilder();
 			sb.append(name).append("(");
-			if(null != parameters) {
+			if(null!=parameters) {
 				for (Symbol param : parameters) {
-					sb.append(param.getType().getName()).append(",");
+					if(param.getType().isArray()) {
+						sb.append(param.getType().toString()).append(",");
+					}
+					else {
+						sb.append(param.getType().getName()).append(",");
+					}
 				}
 				if (!parameters.isEmpty()) {
 					sb.setLength(sb.length() - 1); // Удаляем последнюю запятую
@@ -100,9 +107,13 @@ public class MethodSymbol extends AstHolder {
 		return isPredefined;
 	}
 	
+	public boolean isEntryPoint() {
+		return isEntryPoint;
+	}
+	
 	@Override
 	public String toString() {
 		return	(isNative ? "native " : "") + (isFinal ? "final " : "") + (isStatic ? "static " : "") + type + " " +
-				((ClassScope)scope.getParent()).getName() + "." + signature;
+				((ClassScope)scope.getParent()).getName() + "." + signature + (isEntryPoint ? "[entry point]" : "");
 	}
 }

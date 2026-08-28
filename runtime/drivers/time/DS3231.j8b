@@ -1,0 +1,281 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import io.OutputStream;
+import drivers.sensor.TemperatureSensor;
+
+public class DS3231 implements TimeDateDevice, TemperatureSensor, RtosDriver {
+    public final static byte I2C_ADDR = 0x68;
+    private final static byte CONTROL_REG = 0x0E;
+    private final static byte STATUS_REG = 0x0F;
+    private final static byte FIRST_REG_ADDR = 0x00;
+    private final static byte ALARM1_REG_ADDR = 0x07;
+    private final static byte ALARM2_REG_ADDR = 0x0b;
+    private final static byte TEMP_MSB_REG_ADDR = 0x11;
+    private final static byte TEMP_LSB_REG_ADDR = 0x12;
+
+    private final static byte CNTR_BIT_EOSC = 7;  // Enable Oscillator For Battery mode
+    private final static byte CNTR_BIT_BBSQW = 6;  // Battery-Backed Square Wave
+    private final static byte CNTR_BIT_CONV = 5;  // Convert Temperature
+    private final static byte CNTR_BIT_RS2 = 4;  // Rate Select 2
+    private final static byte CNTR_BIT_RS1 = 3;  // Rate Select 1
+    private final static byte CNTR_BIT_INTCN = 2;  // Interrupt Control
+    private final static byte CNTR_BIT_A2IE = 1;  // Alarm 2 Interrupt Enable
+    private final static byte CNTR_BIT_A1IE = 0;  // Alarm 1 Interrupt Enable
+
+    private static final byte STAT_BIT_OSF = 7;  // Oscillator Stop Flag
+    private static final byte STAT_BIT_EN32KHZ = 3; // Enable 32kHz Output
+    private static final byte STAT_BIT_BSY = 2;  // Busy (температурное преобразование)
+    private static final byte STAT_BIT_A2F = 1;  // Alarm 2 Flag (в некоторых версиях)
+    private static final byte STAT_BIT_A1F = 0;  // Alarm 1 Flag
+
+	public enum OutputMode {
+    	SQUARE_WAVE,     // Вывод меандра (INTCN=0)
+    	INTERRUPT        // Вывод прерываний от будильников (INTCN=1)
+	}
+
+	public enum SquareWaveFrequency {
+    	FREQ_1HZ,
+    	FREQ_1024HZ,
+    	FREQ_4096HZ,
+    	FREQ_8192HZ
+    }
+
+	private I2cMaster iface;
+
+	private final byte[] buffer = new byte[0x13];
+	private byte cntrReg;
+	private byte statReg;
+
+	public DS3231(I2cMaster iface) {
+		this.iface = iface;
+
+		read();
+	}
+
+	@Override public void read() {
+		buffer[0] = FIRST_REG_ADDR; // Адрес первого регистра
+		iface.comm(buffer, 1, buffer, 0x0d, 100);
+System.outHex(buffer);
+		cntrReg = buffer[CONTROL_REG];
+		statReg = buffer[STATUS_REG];
+	}
+
+	private void writeByte(byte addr, byte value) {
+		buffer[0] = addr;
+		buffer[1] = value;
+		iface.comm(buffer, 2, null, 0, 100);
+	}
+
+	public void setOscillEnabled(boolean enabled) {
+		cntrReg &= ~(1<<CNTR_BIT_EOSC);
+		if(enabled) cntrReg |= (1<<CNTR_BIT_EOSC);
+		writeByte(CONTROL_REG, cntrReg);
+	}
+
+	public void setOutputMode(OutputMode mode) {
+		cntrReg &= ~(1<<CNTR_BIT_INTCN);
+		if(OutputMode.INTERRUPT==mode) cntrReg |= (1<<CNTR_BIT_INTCN);
+		writeByte(CONTROL_REG, cntrReg);
+	}
+
+	public void setSquareWaveFrequency(SquareWaveFrequency freq) {
+		cntrReg &= ~((1<<CNTR_BIT_RS1)|(1<<CNTR_BIT_RS2));
+		if(SquareWaveFrequency.FREQ_1024HZ==freq) cntrReg |= ((1<<CNTR_BIT_RS1)|(0<<CNTR_BIT_RS2));
+		else if(SquareWaveFrequency.FREQ_4096HZ==freq) cntrReg |= ((0<<CNTR_BIT_RS1)|(1<<CNTR_BIT_RS2));
+		else if(SquareWaveFrequency.FREQ_8192HZ==freq) cntrReg |= ((1<<CNTR_BIT_RS1)|(1<<CNTR_BIT_RS2));
+		writeByte(CONTROL_REG, cntrReg);
+	}
+
+	public void setBatteryBackedSquareWave(boolean enabled) {
+		cntrReg &= ~(1<<CNTR_BIT_BBSQW);
+   		if(enabled) cntrReg |= (1<<CNTR_BIT_BBSQW);
+   		writeByte(CONTROL_REG, cntrReg);
+	}
+
+	public void setAlarmInterrupt(byte alarmNumber, boolean enabled) {
+    	if(1==alarmNumber) {
+    		cntrReg &= ~(1<<CNTR_BIT_A1IE);
+    		if(enabled) cntrReg |= (1<<CNTR_BIT_A1IE);
+        	writeByte(CONTROL_REG, cntrReg);
+    	}
+        else if(2==alarmNumber) {
+			cntrReg &= ~(1<<CNTR_BIT_A2IE);
+			if(enabled) cntrReg |= (1<<CNTR_BIT_A2IE);
+	        writeByte(CONTROL_REG, cntrReg);
+		}
+	}
+
+	public void clearAlarmFlag(byte alarmNumber) {
+    	if(1==alarmNumber) {
+            statReg &= ~(1<<STAT_BIT_A1F);
+        }
+        else if(2==alarmNumber) {
+            statReg &= ~(1<<STAT_BIT_A2F);
+        }
+        writeByte(STATUS_REG, statReg);
+    }
+
+	public void forceTemperatureConversion() {
+    	cntrReg |= (1<<CNTR_BIT_CONV);
+    	writeByte(CONTROL_REG, cntrReg);
+	}
+
+	// При использовании геттеров необходимо выполнить read()
+	@Override public fixed getCelsius() {
+    	return Primitive.rawToFixed(buffer[TEMP_MSB_REG_ADDR], buffer[TEMP_LSB_REG_ADDR]);
+	}
+
+	public boolean hasPowerLost() {
+    	return 0!=(statReg & (1<<STAT_BIT_OSF));
+	}
+
+	public boolean isTemperatureConversionBusy() {
+    	return 0!=(statReg & (1<<STAT_BIT_BSY));
+	}
+
+	public boolean isAlarmTriggered(byte alarmNumber) {
+        if(1==alarmNumber) {
+        	return 0!=(statReg & (1<<STAT_BIT_A1F));
+        }
+        else if(2==alarmNumber) {
+        	return 0!=(statReg & (1<<STAT_BIT_A2F));
+		}
+        return false;
+    }
+
+	public boolean isAlarmInterruptEnabled(byte alarmNumber) {
+        if(1==alarmNumber) {
+        	return 0!=(cntrReg & (1<<CNTR_BIT_A1IE));
+        }
+        else if(2==alarmNumber) {
+        	return 0!=(cntrReg & (1<<CNTR_BIT_A2IE));
+		}
+        return false;
+    }
+
+	public SquareWaveFrequency getSquareWaveFrequency() {
+    	if(0==(cntrReg & (1<<CNTR_BIT_RS2))) {
+    		if(0==(cntrReg & (1<<CNTR_BIT_RS1))) return SquareWaveFrequency.FREQ_1HZ;
+    		return SquareWaveFrequency.FREQ_1024HZ;
+    	}
+   		if(0==(cntrReg & (1<<CNTR_BIT_RS1))) return SquareWaveFrequency.FREQ_4096HZ;
+   		return SquareWaveFrequency.FREQ_8192HZ;
+    }
+
+	public OutputMode getOutputMode() {
+		if(0==(cntrReg & (1<<CNTR_BIT_INTCN))) return OutputMode.SQUARE_WAVE;
+		return OutputMode.INTERRUPT;
+	}
+
+	@Override public void set(byte dom, byte month, short year, byte dow, byte hour, byte minutes, byte seconds) {
+		buffer[0] = FIRST_REG_ADDR;
+		buffer[1] = Primitive.byteToBcd(seconds);
+		buffer[2] = Primitive.byteToBcd(minutes);
+		buffer[3] = Primitive.byteToBcd(hour); //24H
+		buffer[4] = dow;
+		buffer[5] = Primitive.byteToBcd(dom);
+		buffer[6] = Primitive.byteToBcd(month) | (year<2000 ? 0x00 : 0x80);
+		buffer[7] = Primitive.byteToBcd((byte)(year<2000 ? year : year-2000));
+		iface.comm(buffer, 8, null, 0, 0);
+	}
+
+	public void setAlarm1(byte day, boolean isDow, byte hour, byte minutes, byte seconds) {
+		buffer[0] = ALARM1_REG_ADDR;
+		buffer[1] = Primitive.byteToBcd(seconds);
+		buffer[2] = Primitive.byteToBcd(minutes);
+		buffer[3] = Primitive.byteToBcd(hour); //24H
+		buffer[4] = day; //TODO isDow
+		iface.comm(buffer, 5, null, 0, 0);
+	}
+
+	public void setAlarm2(byte day, boolean isDow, byte hour, byte minutes) {
+		buffer[0] = ALARM2_REG_ADDR;
+		buffer[1] = Primitive.byteToBcd(minutes);
+		buffer[2] = Primitive.byteToBcd(hour); //24H
+		buffer[3] = day; //TODO isDow
+		iface.comm(buffer, 4, null, 0, 0);
+	}
+
+	@Override public byte getSeconds() {
+		return Primitive.bcdToByte(buffer[0] & 0x7f);
+	}
+
+	@Override public byte getMinutes() {
+		return Primitive.bcdToByte(buffer[1] & 0x7f);
+	}
+
+	@Override public byte getHour() {
+		byte octet = buffer[2];
+		if(0==(octet&0x80)) { //24H
+			return Primitive.bcdToByte(octet & 0x3f);
+		}
+		byte hour = Primitive.bcdToByte(octet & 0x1f);
+		if(0!=(octet&0x20)) { //12H PM
+			return 12==hour ? 12 : hour+12;
+		}
+		return 12==hour ? 0 : hour; //12H AM
+	}
+
+	@Override public byte getDom() { //Day of month
+		return Primitive.bcdToByte(buffer[3] & 0x3f);
+	}
+
+	@Override public byte getMonth() {
+		return Primitive.bcdToByte(buffer[4] & 0x1f);
+	}
+
+	@Override public byte getDow() { //Day of week
+		return buffer[5] & 0x07;
+	}
+
+	@Override public short getYear() { //TODO Centurity
+		boolean century = 0!=(buffer[5] & 0x80);
+		return Primitive.bcdToByte(buffer[6]) + (century ? 2000 : (short)0);
+	}
+
+	public void printDate(OutputStream os) {
+		Primitive.printByte(os, getDom(), 2);
+		os.write('.');
+		Primitive.printByte(os, getMonth(), 2);
+		os.write('.');
+		short year = getYear();
+		if(2000<=year) {
+			os.write('2');
+			os.write('0');
+			Primitive.printByte(os, (byte)(year-2000), 2);
+		}
+		else {
+			os.write('1');
+			os.write('9');
+			Primitive.printByte(os, (byte)year, 2);
+		}
+	}
+
+	public void printTime(OutputStream os) {
+		Primitive.printByte(os, getHour(), 2);
+		os.write(':');
+		Primitive.printByte(os, getMinutes(), 2);
+		os.write(':');
+		Primitive.printByte(os, getSeconds(), 2);
+	}
+
+	@Override public void print(OutputStream os) {
+		printDate(os);
+		os.write(' ');
+		printTime(os);
+	}
+}

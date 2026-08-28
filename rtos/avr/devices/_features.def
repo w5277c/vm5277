@@ -15,6 +15,57 @@
  */
  
 ;---OS-FEATURES---------------------------------------------
+; Фичи разрешающие функционал обработки прерываний
+; Детальное разделение необходимо для выделения RAM толкьо под необходимые IRQ таблицы
+.IFNDEF OS_FT_IRQ_INT_BLOCK
+	.SET	OS_FT_IRQ_INT_BLOCK 					= 0x00
+.ENDIF
+.IFNDEF OS_FT_IRQ_PCINT_BLOCK
+	.SET	OS_FT_IRQ_PCINT_BLOCK 					= 0x00
+.ENDIF
+.IFNDEF OS_FT_IRQ_WD_BLOCK
+	.SET	OS_FT_IRQ_WD_BLOCK						= 0x00
+.ENDIF
+.IFNDEF OS_FT_IRQ_TIMER_CAPTURE_BLOCK
+	.SET	OS_FT_IRQ_TIMER_CAPTURE_BLOCK			= 0x00
+.ENDIF
+.IFNDEF OS_FT_IRQ_TIMER_BLOCK
+	.SET	OS_FT_IRQ_TIMER_BLOCK   			    = 0x00
+.ENDIF
+.IFNDEF OS_FT_IRQ_UART_START_BLOCK
+	.SET	OS_FT_IRQ_UART_START_BLOCK			    = 0x00
+.ENDIF
+.IFNDEF OS_FT_IRQ_UART_BLOCK
+	.SET	OS_FT_IRQ_UART_BLOCK	    		    = 0x00
+.ENDIF
+.IFNDEF OS_FT_IRQ_SPI_BLOCK
+	.SET	OS_FT_IRQ_SPI_BLOCK 					= 0x00
+.ENDIF
+.IFNDEF OS_FT_IRQ_ADC_BLOCK
+	.SET	OS_FT_IRQ_ADC_BLOCK						= 0x00
+.ENDIF
+.IFNDEF OS_FT_IRQ_EEPROM_BLOCK
+	.SET	OS_FT_IRQ_EEPROM_BLOCK					= 0x00
+.ENDIF
+.IFNDEF OS_FT_IRQ_ANALOG_CMP_BLOCK
+	.SET	OS_FT_IRQ_ANALOG_CMP_BLOCK				= 0x00
+.ENDIF
+.IFNDEF OS_FT_IRQ_TWI_BLOCK
+	.SET	OS_FT_IRQ_TWI_BLOCK 					= 0x00
+.ENDIF
+.IFNDEF OS_FT_IRQ_SPM_BLOCK
+	.SET	OS_FT_IRQ_SPM_BLOCK						= 0x00
+.ENDIF
+.IFNDEF OS_FT_IRQ_PTC_BLOCK
+	.SET    OS_FT_IRQ_PTC_BLOCK					    = 0x00
+.ENDIF
+.IFNDEF OS_FT_IRQ_USI_BLOCK
+	.SET	OS_FT_IRQ_USI_BLOCK					    = 0x00
+.ENDIF
+
+.IFNDEF OS_FT_STIMER
+    .SET    OS_FT_STIMER                             = 0x00  ;Реализация 5КГц программных таймеров на базе S_FT_TIMER
+.ENDIF
 .IFNDEF OS_FT_BOOTLOADER_ONLY
 	.SET	OS_FT_BOOTLOADER_ONLY					= 0x00	;Режим для сборки только бутлоадера
 .ENDIF
@@ -45,17 +96,11 @@
 .IFNDEF OS_FT_TIMER
 	.SET	OS_FT_TIMER								= 0x00	;Таймер системного тика
 .ENDIF
-.IFNDEF OS_FT_USTIMER
-	.SET	OS_FT_USTIMER							= 0x00	;Таймер отсчета микросекунд
-.ENDIF
 .IFNDEF OS_FT_DRAM
 	.SET	OS_FT_DRAM								= 0x00	;Функционал динамического выделения памяти
 .ENDIF
 .IFNDEF OS_FT_ETRACE
 	.SET	OS_FT_ETRACE							= 0x00	;Поддержка механизма трассировки исключений
-.ENDIF
-.IFNDEF OS_FT_PCINT
-	.SET	OS_FT_PCINT								= 0x00	;Поддержка внешних прерываний PIN Change interrupts
 .ENDIF
 .IFNDEF	OS_FT_TIMERTASK
 	.SET	OS_FT_TIMERTASK							= 0x00  ;Поддержка задачи-таймера (многозадачность)
@@ -69,3 +114,17 @@
 .IFNDEF OS_FT_PRND
 	.SET	OS_FT_PRND					            = 0x00	;Поддержка псевдослучайного числа
 .ENDIF
+.IFNDEF OS_FT_VT100
+    .SET    OS_FT_VT100                             = 0x00  ;Поддержка ESC последовательностей для терминала
+.ENDIF
+.IFNDEF OS_FT_GPIO_PIN_NOCHECK
+    .SET    OS_FT_GPIO_PIN_NOCHECK                  = 0x00  ;Отключение проверки наличия GPIO пина
+.ENDIF
+.IFNDEF OS_FT_ARRAY_INDEX_NOCHECK
+    .SET    OS_FT_ARRAY_INDEX_NOCHECK               = 0x00  ;Отключение проверки выхода за границы массива
+.ENDIF
+.IFNDEF OS_FT_MATH_OVF_NOCHECK
+    .SET    OS_FT_MATH_OVF_NOCHECK                  = 0x00  ;Отключение проверки переполнения переменной в математических операциях
+.ENDIF
+
+

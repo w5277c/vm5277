@@ -29,7 +29,7 @@
 .IF OS_FT_IR_TABLE == 0x01 || OS_FT_DIAG == 0x01 || OS_FT_STDIN == 0x01
 	.include "mem/ram_fill16.asm"
 .ENDIF
-.IF OS_FT_TIMER == 0x01 || OS_STAT_POOL_SIZE != 0x0000 || OS_FT_DRAM == 0x01
+.IF OS_FT_TIMER == 0x01 || OS_STAT_POOL_SIZE != 0x0000 || OS_FT_DRAM == 0x01 || OS_FT_IR_TABLE == 0x01
 	.include "mem/ram_clear16.asm"
 .ENDIF
 
@@ -47,7 +47,7 @@
 .IF OS_FT_ETRACE == 0x01
 	.include "j8b/etrace_clear.asm"
 .ENDIF
-.IF OS_FT_PCINT == 0x01
+.IF OS_FT_IRQ_PCINT_BLOCK == 0x01
 	.include "core/pcint.asm"
 .ENDIF
 
@@ -73,6 +73,15 @@ CSTR_MCUSR_PO:
 	.db	"PO ",0x00
 CSTR_MCUSR_RESET:
 	.db	"reset]",0x0d,0x0a,0x00,0x00
+.ENDIF
+
+.IF OS_FT_STIMER==0x01
+	.IFNDEF OS_STIMER_QNT
+		.ERROR "OS_STIMER_QNT is undefined"
+	.ENDIF
+ 	.IF OS_STIMER_QNT==0
+ 		.ERROR "OS_FT_STIMER enabled, but OS_STIMER_QNT is 0"
+ 	.ENDIF
 .ENDIF
 
 ;---RAM-OFFSETS---------------------------------------------
@@ -101,15 +110,19 @@ CSTR_MCUSR_RESET:
 	.EQU	_OS_STDIN_CBUFFER			= _OS_ROTO			;Кольцевой буффер для STDIN
 	.SET	_OS_ROTO					= _OS_STDIN_CBUFFER+OS_STDIN_CBUFFER_SIZE
 .ENDIF
-.IF OS_FT_PCINT
-	.EQU	_OS_PCINT_PCICR				= _OS_ROTO			;PCICR – Pin Change Interrupt Control Register
-	.SET	_OS_ROTO					= _OS_PCINT_PCICR+0x01
+.IF OS_FT_IRQ_PCINT_BLOCK==0x01
+	.EQU	_OS_PCINT_PCICR				= _OS_ROTO			;PCICR – (старший бит определяет выполнение кода в обработчике PCINT)
+	.EQU	_OS_PCINT_STATES			= _OS_PCINT_PCICR+1	;Послденее состояние портов
+	.SET	_OS_ROTO					= _OS_PCINT_STATES+OS_PCINT_PORTS_QNT
 .ENDIF
-.IF OS_FT_IR_TABLE == 0x01
-	.EQU	_OS_IR_VECTORS_TABLE		= _OS_ROTO			;Таблица прерываний (OS_IR_QNT*3 для каждого прерывания, исключая RESET)
-	.SET	_OS_ROTO					= _OS_IR_VECTORS_TABLE+OS_IR_QNT*3
+.IF _OS_IRQ_RAM_TABLE_SIZE > 0
+	.EQU	_OS_IRQ_RAM_TABLE			= _OS_ROTO			;RAM таблица прерываний
+	.SET	_OS_ROTO					= _OS_IRQ_RAM_TABLE+_OS_IRQ_RAM_TABLE_SIZE
 .ENDIF
-
+.IF OS_FT_STIMER==0x01
+	.EQU	_OS_STIMER_TABLE			= _OS_ROTO			;Таблица программных таймеров (OS_STIMER_QNT*9)
+	.SET	_OS_ROTO					= _OS_STIMER_TABLE+OS_STIMER_QNT*9
+.ENDIF
 .IF OS_STAT_POOL_SIZE != 0x0000
 	.EQU	_OS_STAT_POOL				= _OS_ROTO
 	.SET	_OS_ROTO					= _OS_STAT_POOL + OS_STAT_POOL_SIZE
@@ -137,9 +150,19 @@ CSTR_MCUSR_RESET:
 	.ELSE
 		.MESSAGE "Stack size:", OS_STACK_SIZE
 	.ENDIF
+
+	.IF _OS_IRQ_RAM_TABLE_SIZE > 0
+		.MESSAGE "IRQ RAM address:", _OS_IRQ_RAM_TABLE
+		.MESSAGE "IRQ RAM table size:", _OS_IRQ_RAM_TABLE_SIZE
+	.ENDIF
+
+	.IF OS_FT_IRQ_PCINT_BLOCK==0x01
+		.MESSAGE "PCINT states table size:", _OS_PCINT_STATES+OS_PCINT_PORTS_QNT
+	.ENDIF
 .ENDIF
 
-;TODO Нужен динамический размир для блоков динамической памяти
+
+
 .IF OS_FT_DRAM == 0x01
 	;Вычисляю доступную память
 	.IF -1==OS_STACK_SIZE
@@ -179,6 +202,9 @@ CSTR_MCUSR_RESET:
 
 .IF OS_FT_MULTITHREADING == 0x01
 	.include "core/dispatcher.asm"
+	.IF OS_FT_DIAG == 0x01
+		.MESSAGE "Multithreading activated"
+	.ENDIF
 .ENDIF
 
 	.SET	STACK_BORDER				= _OS_ROTO			;1B-байт изменение значения которого указывает на переполнение стека
@@ -194,6 +220,7 @@ _OS_INIT:
 	LDI TEMP_L,low(SRAM_START+SRAM_SIZE-1)
 	STS SPL,TEMP_L
 	EOR C0x00,C0x00
+	MOV DISPATCHER_CNTR,C0x00
 	LDI TEMP_L,0x01
 	MOV C0x01,TEMP_L
 	LDI TEMP_L,0xff
@@ -225,23 +252,30 @@ _OS_INIT:
 
 .IF OS_FT_DIAG == 0x01
 	;Заполнение всей памяти 0x52 значением (для диагностики)
-	LDI ACCUM_EL,0x52
+	LDI ACCUM_L,0x52
 	LDI_X SRAM_START
-	LDI ACCUM_L,low(SRAM_SIZE-0x0f)
-	LDI ACCUM_H,high(SRAM_SIZE-0x0f)
+	LDI TEMP_L,low(SRAM_SIZE-0x0f)
+	LDI TEMP_H,high(SRAM_SIZE-0x0f)
 	MCALL OS_RAM_FILL16_NR
 .ENDIF
 
-.IF OS_FT_IR_TABLE == 0x01
+.IF _OS_IRQ_RAM_TABLE_SIZE > 0
+	;Чистка RAM таблицы прерываний
+	LDI_X _OS_IRQ_RAM_TABLE
+	LDI TEMP_L,low(_OS_IRQ_RAM_TABLE_SIZE)
+	LDI TEMP_H,high(_OS_IRQ_RAM_TABLE_SIZE)
+	MCALL OS_RAM_CLEAR16_NR									;0x0000 в адрес обработчика = обработчик отсутствует
+.ENDIF
+
+.IF OS_FT_STIMER==0x01
 	;Чистка таблицы прерываний
-	LDI ACCUM_EL,0xff
-	LDI_X _OS_IR_VECTORS_TABLE
-	LDI ACCUM_L,low(OS_IR_QNT*3)
-	LDI ACCUM_H,high(OS_IR_QNT*3)
-	MCALL OS_RAM_FILL16_NR
+	LDI_X _OS_STIMER_TABLE
+	LDI TEMP_L,low(OS_STIMER_QNT*8)
+	LDI TEMP_H,high(OS_STIMER_QNT*8)
+	MCALL OS_RAM_CLEAR16_NR									;0x0000 в адрес обработчика = обработчик отсутствует
 .ENDIF
 
-.IF OS_FT_STDOUT == 0x01 || OS_FT_STDIN == 0x01
+.IF OS_FT_STDOUT==0x01 || OS_FT_STDIN==0x01
 	MCALL OS_STDIO_INIT_NR
 .ENDIF
 
@@ -284,7 +318,7 @@ _OS_INIT:
 
 .IF OS_STAT_POOL_SIZE != 0x0000
 	;Очистка статического блока верхнего уровня
-	LDI_Y _OS_STAT_POOL
+	LDI_X _OS_STAT_POOL
 	LDI TEMP_L,low(OS_STAT_POOL_SIZE)
 	LDI TEMP_H,high(OS_STAT_POOL_SIZE)
 	MCALL OS_RAM_CLEAR16_NR
@@ -310,7 +344,7 @@ _OS_INIT:
 	;Подготавливаем битовую таблицу для DRAM
 .IF OS_FT_DRAM == 0x01
 	.IF OS_DRAM_BMASK_SIZE > 0
-		LDI_Y OS_DRAM_BMASK_ADDR
+		LDI_X OS_DRAM_BMASK_ADDR
 		LDI TEMP_H,high(OS_DRAM_BMASK_SIZE)
 		LDI TEMP_L,low(OS_DRAM_BMASK_SIZE)
 		MCALL OS_RAM_CLEAR16_NR
@@ -323,7 +357,7 @@ _OS_INIT:
 
 .IF OS_FT_TIMER == 0x01
 	;Сброс счетчика времени
-	LDI_Y _OS_UPTIME
+	LDI_X _OS_UPTIME
 	LDI TEMP_L,0x05
 	LDI TEMP_H,0x00
 	MCALL OS_RAM_CLEAR16_NR
@@ -334,12 +368,6 @@ _OS_INIT:
 
 	;Запуск таймеров
 	_OS_TIMER_INIT_NR
-.ENDIF
-
-.IF OS_FT_USTIMER == 0x01
-	CLR US_CNTR_H
-	CLR US_CNTR_EL
-	_OS_USTIMER_INIT_NR
 .ENDIF
 
 	;Инициализируем начальное значение псевдослучайного числа
@@ -369,50 +397,155 @@ _OS_INIT:
 .ENDIF
 
 	;Разрешаем прерывания и переходим на основную программу
-.IF OS_FT_IR_TABLE == 0x01
+.IF _OS_IRQ_RAM_TABLE_SIZE > 0
 	SEI
 .ENDIF
 	JMP MAIN
 
 .IF OS_FT_IR_TABLE == 0x01
 ;-----------------------------------------------------------
-_OS_IR_HANDLER:
+_OS_IRQ_HANDLER:
 ;-----------------------------------------------------------
-;Обработчик всех прерываний
+;Общий обработчик прерываний
 ;-----------------------------------------------------------
-	;Прерывания и так запрещены CLI														;Запрещаем прерывания глобально
+
+;TODO нужно запретить прерывания INT но разрешить глобальные!
+;TODO похоже нужно делать разные обработчики прерываний, так как есть необходимость разрешать глобальные прерывания,
+;потому что многие из них будут обработаны на верхнем уровне.
+;Но при этом нужно блокировать повторное срабатывание - либо вводить дополнительне флаги, либо реализовать отдельные обработчики.
+;Похоже да, каждый тип блока должен иметь свой обработчик
+
 	;Получаем адрес по которому определяем тип прерывания
 	POP ATOM_L
 	POP ATOM_L
 
-	PUSH TEMP_L
-	LDS TEMP_L,SREG
-	PUSH TEMP_L
-
-	MOV TEMP_L,ATOM_L
-	SUBI TEMP_L,_MCALL_SIZE*0x02
-	LSR TEMP_L
+	LDS ATOM_H,SREG
+	PUSH ATOM_H
 .IF _MCALL_SIZE == 0x02
-	LSR TEMP_L												;Делим еще на 2, если переходы размерностью в 2 слова (JMP/CALL)
+	LSL ATOM_L												;Умножаем на 2, если переходы размерностью в 2 слова
 .ENDIF
 
-	;TODO
+	PUSH_Y
+	PUSH_Z
+	LDI ZH,0x00
+	MOV ZL,ATOM_L											;Загружаем следующий байт из Flash после команды перехода
+	LDI YH,0x00
+	LPM YL,Z+
+	RCALL _OS_IRQ_HANDLER__SUBROUTINE
 
-	POP TEMP_L
-	STS SREG,TEMP_L
-	POP TEMP_L
+	POP_Z
+	POP_Y
+	POP ATOM_H
+	STS SREG,ATOM_H
 	RETI
+
+_OS_IRQ_HANDLER__SUBROUTINE:
+	SUBI YL,low(-_OS_IRQ_RAM_TABLE)
+	SBCI YH,high(-_OS_IRQ_RAM_TABLE)
+	LDD ATOM_L,Y+_OS_IRQ_RAM_TABLE__OFFSET_HANDLER_ADDR+0x00
+	LDD ATOM_H,Y+_OS_IRQ_RAM_TABLE__OFFSET_HANDLER_ADDR+0x01
+	CP ATOM_L,C0x00
+	CPC ATOM_H,C0x00
+	BREQ _OS_IRQ_HANDLER__SKIP
+
+	LDD ZL,Y+_OS_IRQ_RAM_TABLE__OFFSET_RES_ID
+	PUSH ZL
+
+	LDI_Z _OS_IRQ_HANDLER__RETPOINT
+	PUSH ZL
+	PUSH ZH
+	PUSH ATOM_L
+	PUSH ATOM_H
+	LDD ZL,Y+_OS_IRQ_RAM_TABLE__OFFSET_HEAP_ADDR+0x00
+	LDD ZH,Y+_OS_IRQ_RAM_TABLE__OFFSET_HEAP_ADDR+0x01
+	RET
+_OS_IRQ_HANDLER__RETPOINT:
+	CLI														;Важно запрещать глобальные прерывания поскольку дальше в коде могут быть
+	POP ZL													;разрешены INT, PCINT и прочие - при этом существенно раньше, чем произойдет освобождение стека и RETI
+_OS_IRQ_HANDLER__SKIP:
+	RET
 .ENDIF
+
+
 
 .IF OS_FT_TIMER == 0x01
 ;-----------------------------------------------------------
-_OS_TIMER_HANDLER:
+_OS_SYSTIMER_HANDLER:
 ;-----------------------------------------------------------
 ;Обработчик прерывания основного таймера1
 ;-----------------------------------------------------------
 	PUSH TEMP_L
 	LDS TEMP_L,SREG
 	PUSH TEMP_L
+
+.IF OS_FT_STIMER==0x01										;Блок обработки программных таймеров
+	PUSH_Z
+	PUSH_Y
+	PUSH_A32
+
+	LDI_Y _OS_STIMER_TABLE
+	LDI ACCUM_EL,OS_STIMER_QNT								;Перебираем все записи таймеров
+_OS_SYSTIMER_HANDLER__STIMER_LOOP:
+	LDD ZL,Y+_OS_STIMER_TABLE__OFFSET_HEAP_ADDR+0x00		;Загружаем адрес кучи в Y
+	LDD ZH,Y+_OS_STIMER_TABLE__OFFSET_HEAP_ADDR+0x01
+	CP ZL,C0x00												;0x0000 - таймер выключен
+	CPC ZH,C0x00
+	BREQ _OS_SYSTIMER_HANDLER__STIMER_NEXT
+
+	LDD ACCUM_L,Y+_OS_STIMER_TABLE__OFFSET_CNTR+0x00
+	LDD ACCUM_H,Y+_OS_STIMER_TABLE__OFFSET_CNTR+0x01
+.IF	CORE_FREQ<=8000
+	SUBI ACCUM_L,0x02										;Выполняем декремент (для медленных CPU попадаем сюда в 2 раза реже, компенсируем)
+.ELSE
+	SUBI ACCUM_L,0x01
+.ENDIF
+	SBCI ACCUM_H,0x00
+	STD Y+_OS_STIMER_TABLE__OFFSET_CNTR+0x00,ACCUM_L
+	STD Y+_OS_STIMER_TABLE__OFFSET_CNTR+0x01,ACCUM_H
+	CP ACCUM_L,C0x00
+	CPC ACCUM_H,C0x00
+	BRCS PC+0x02											;Пропускаем переход если было переполнение (проверка для шага -2)
+	BRNE _OS_SYSTIMER_HANDLER__STIMER_NEXT						;Переходим к следующему если не 0
+
+	;Сработка таймера
+	STD Y+_OS_STIMER_TABLE__OFFSET_HEAP_ADDR+0x00,C0x00		;Блокируем таймер исключая повторное срабатывание
+	STD Y+_OS_STIMER_TABLE__OFFSET_HEAP_ADDR+0x01,C0x00
+	PUSH ACCUM_EL
+	PUSH_Y
+	PUSH_Z
+	LDD ACCUM_L,Y+_OS_STIMER_TABLE__OFFSET_RES_ID
+	PUSH ACCUM_L
+	LDI ACCUM_L,low(_OS_SYSTIMER_HANDLER__STIMER_RETPOINT)
+	PUSH ACCUM_L
+	LDI ACCUM_L,high(_OS_SYSTIMER_HANDLER__STIMER_RETPOINT)
+	PUSH ACCUM_L
+	LDD ACCUM_L,Y+_OS_STIMER_TABLE__OFFSET_HANDLER_ADDR+0x00	;Загружаем адрес обработчика
+	PUSH ACCUM_L
+	LDD ACCUM_L,Y+_OS_STIMER_TABLE__OFFSET_HANDLER_ADDR+0x01
+	PUSH ACCUM_L
+	RET														;Выполняем обработчик и запрещаем прерывания на случай если обработчик их разрешал
+_OS_SYSTIMER_HANDLER__STIMER_RETPOINT:
+	CLI
+	POP ACCUM_EL
+	POP_Z
+	POP_Y
+	POP ACCUM_EL
+	STD Y+_OS_STIMER_TABLE__OFFSET_HEAP_ADDR+0x00,ZL		;Восстанавливаем адрес HEAP
+	STD Y+_OS_STIMER_TABLE__OFFSET_HEAP_ADDR+0x01,ZH
+	LDD ACCUM_L,Y+_OS_STIMER_TABLE__OFFSET_PERIOD+0x00		;Инициализируем счетчик заново
+	STD Y+_OS_STIMER_TABLE__OFFSET_CNTR+0x00,ACCUM_L
+	LDD ACCUM_L,Y+_OS_STIMER_TABLE__OFFSET_PERIOD+0x01
+	STD Y+_OS_STIMER_TABLE__OFFSET_CNTR+0x01,ACCUM_L
+
+_OS_SYSTIMER_HANDLER__STIMER_NEXT:
+	ADIW YL,0x09
+	DEC ACCUM_EL
+	BRNE _OS_SYSTIMER_HANDLER__STIMER_LOOP
+
+	POP_A32
+	POP_Y
+	POP_Z
+.ENDIF
 
 	LDS TEMP_L,_OS_TIMER_CNTR								;Декремент внутреннего счетчика таймера для отсчета 1мс
 	DEC TEMP_L
@@ -421,8 +554,8 @@ _OS_TIMER_HANDLER:
 	LDI TEMP_L,_OS_TIMER_1MS_PERIOD
 	STS _OS_TIMER_CNTR,TEMP_L
 
-	PUSH_Z													;Инкремент uptime
-	LDI_Z _OS_UPTIME
+	PUSH_Z
+	LDI_Z _OS_UPTIME										;Инкремент uptime
 	LD TEMP_L,Z
 	ADD TEMP_L,C0x01
 	ST Z+,TEMP_L
@@ -489,28 +622,29 @@ _OS_TIMER1_HANDLER__RETI:
 	RETI
 .ENDIF
 
-.IF OS_FT_USTIMER == 0x01
 ;-----------------------------------------------------------
-_OS_USTIMER_HANDLER:
+OS_DISPATCHER_LOCK:
 ;-----------------------------------------------------------
-;Обработчик прерывания таймера для счета микросекунд
-;Нет учета частоты CPU (вход через каждые 2048 тактов)
+;Блокируем диспетчер
 ;-----------------------------------------------------------
-;-----------------------------------------------------------
-	PUSH TEMP_L
-	LDS TEMP_L,SREG
-
-.IF CORE_FREQ <= 8000										;На частотах не превышающих 8МГц достачточно 16бит
-	INC US_CNTR_H
-.ELSE
-	ADD US_CNTR_H,C0x01
-	ADC US_CNTR_EL,C0x00									;24 бита
+.IF OS_FT_MULTITHREADING==0x01
+	CP DISPATCHER_CNTR,C0xFF
+	BREQ PC+0x02
+	INC DISPATCHER_CNTR
 .ENDIF
+	RET
 
-	STS SREG,TEMP_L
-	POP TEMP_L
-	RETI
+;-----------------------------------------------------------
+OS_DISPATCHER_UNLOCK:
+;-----------------------------------------------------------
+;Разблокируем диспетчер
+;-----------------------------------------------------------
+.IF OS_FT_MULTITHREADING==0x01
+	CP DISPATCHER_CNTR,C0x00
+	BREQ PC+0x02
+	DEC DISPATCHER_CNTR
 .ENDIF
+	RET
 
 ;-----------------------------------------------------------
 _OS_COREFAULT_OUT_OF_MEMORY:
@@ -523,5 +657,4 @@ _OS_COREFAULT_OUT_OF_MEMORY:
 .ENDIF
 	CLI
 	RJMP PC
-
 .ENDIF

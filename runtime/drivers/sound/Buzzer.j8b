@@ -1,0 +1,55 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+@RegisterSoftTimer(timerId)
+public class Buzzer implements RtosCallback, RtosDriver {
+	private byte port;
+	private short ioReg;
+	private	short delay;
+	private final byte timerId;
+
+	public Buzzer(byte port, short delay) {
+		this.port = port;
+		this.ioReg = RtosCore.getIORegOutput(port);
+		this.delay = delay;
+	}
+
+	public void play(int data) {
+		boolean mute = true;
+		for(byte i=0; i<32; i++) {
+			boolean state = 0!=(Primitive.b3(data)&0x80);
+			if(!mute || state) {
+				mute = false;
+				if(state) {
+					Gpio.modeOut(port);
+					RtosCore.startSoftTimer(this, timerId, 0, 2); //2.5kHz
+				}
+				Thread.sleep(delay);
+				if(state) {
+					RtosCore.stopSoftTimer(timerId);
+					Gpio.modeIn(port);
+				}
+			}
+			data <<= 0x01;
+		}
+		Gpio.setLow(port);
+	}
+
+	@Override
+	private void callback(byte resId) {
+		RtosCore.invertIOReg(ioReg);
+	}
+}

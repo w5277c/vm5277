@@ -31,15 +31,18 @@
         <postStartupActivity implementation="ru.vm5277.plugin.executing.MavenStartup"/>
         <configurationType implementation="ru.vm5277.plugin.executing.ExecuteConfigurationType"/>
         <fileType name="J8B File" implementationClass="ru.vm5277.plugin.j8b.FileType" fieldName="INSTANCE" extensions="j8b" language="J8B"/>
-<!--    <annotator language="J8B" implementationClass="ru.vm5277.plugin.old.J8BAnnotator"/>
-        <lang.parserDefinition language="J8B" implementationClass="ru.vm5277.plugin.old.J8BParserDefinition"/>
-        <completion.contributor language="J8B" implementationClass="ru.vm5277.plugin.old.J8BCompletionContributor"/>-->
+<!--    <annotator language="J8B" implementationClass="ru.vm5277.plugin.old.J8BAnnotator"/>-->
+        <lang.parserDefinition language="J8B" implementationClass="ru.vm5277.plugin.j8b.J8BParserDefinition"/>
+        <completion.contributor language="J8B" implementationClass="ru.vm5277.plugin.j8b.J8BCompletionContributor"/>
+        <lang.parameterInfo language="J8B" implementationClass="ru.vm5277.plugin.j8b.J8BParameterInfoHandler"/>
         <lang.syntaxHighlighterFactory language="J8B" implementationClass="ru.vm5277.plugin.j8b.SyntaxHighlighterFactory"/>
         <additionalTextAttributes scheme="Default" file="colorSchemes/J8BColors.xml"/>
         <additionalTextAttributes scheme="Darcula" file="colorSchemes/J8BColorsDark.xml"/>
         <fileType name="ASM File" implementationClass="ru.vm5277.plugin.asm.FileType" fieldName="INSTANCE" extensions="asm" language="ASM"/>
         <lang.syntaxHighlighterFactory language="ASM" implementationClass="ru.vm5277.plugin.asm.AsmSyntaxHighlighterFactory"/>
         <lang.inspectionSuppressor language="ASM" implementationClass="ru.vm5277.plugin.asm.ASMInspectionSuppressor"/>
+        <lang.parserDefinition language="ASM" implementationClass="ru.vm5277.plugin.asm.AsmParserDefinition"/>
+        <completion.contributor language="ASM" implementationClass="ru.vm5277.plugin.asm.AsmCompletionContributor"/>
         <editorFactoryListener implementation="ru.vm5277.plugin.asm.EditorListener"/>
         <editorFactoryListener implementation="ru.vm5277.plugin.j8b.EditorListener"/>
     </extensions>

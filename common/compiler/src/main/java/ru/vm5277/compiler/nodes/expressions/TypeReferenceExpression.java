@@ -19,7 +19,6 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.Scope;
@@ -32,7 +31,9 @@ import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.semantic.CIScope;
 import ru.vm5277.compiler.semantic.EnumScope;
 import ru.vm5277.compiler.semantic.ExceptionScope;
+import ru.vm5277.compiler.semantic.FieldSymbol;
 import ru.vm5277.compiler.semantic.InterfaceScope;
+import ru.vm5277.compiler.semantic.Symbol;
 
 //Выражение описывающее доступ к типу которое может состоять из других типпов (по аналогии с FS: путь к файлу, без имени саммого файла, только директории)
 public class TypeReferenceExpression extends ExpressionNode {
@@ -164,6 +165,16 @@ public class TypeReferenceExpression extends ExpressionNode {
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		//cg.setAcc(new Operand(VarType.CLASS, OperandType.TYPE, varType.getId()));
+		
+		// Дополнительная проверка полей, необходима для корректной работы @Native аннотации
+		for(Symbol symbol : cis.getFields().values()) {
+			FieldSymbol fSymbol = (FieldSymbol)symbol;
+			if(!fSymbol.isFinal() && fSymbol.isStatic()) {
+				depCodeGen(cg, fSymbol, excs);
+			}
+		}
+		
+		releaseVars(cg);
 		return null;
 	}
 	
@@ -172,6 +183,7 @@ public class TypeReferenceExpression extends ExpressionNode {
 		return (null==parentExpr ? "" : parentExpr + ".") + lastId;
 	}
 	
+	@Override
 	public String getFullInfo() {
 		return getClass().getSimpleName() + " " + (null==parentExpr ? "" : parentExpr + ".") + lastId;
 	}

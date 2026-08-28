@@ -19,7 +19,7 @@ class Main {
 	// Переменные из разных блоков разделяют регистры
 
 	public static void main() {
-		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
+		System.setParam(RtosParam.SHOW_WELCOME, 0x01);
 
 		byte a;
 		a = 100;

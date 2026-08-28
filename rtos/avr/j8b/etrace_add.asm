@@ -14,9 +14,8 @@
  * limitations under the License.
  */
 
-.include "j8b/etrace_clear.asm"
-
 .IFNDEF J8BPROC_ETRACE_ADD
+.include "j8b/etrace_clear.asm"
 ;-----------------------------------------------------------
 J8BPROC_ETRACE_ADDFIRST:
 ;-----------------------------------------------------------
@@ -25,9 +24,7 @@ J8BPROC_ETRACE_ADDFIRST:
 ;строки в исходном коде (+ACCUM_EH в 15 бит режиме)
 ;-----------------------------------------------------------
 	MCALL J8BPROC_ETRACE_CLEAR
-	STS _OS_ETRACE_BUFFER+0x00,ACCUM_L						;В начале буфера записываем ид типа исключений
-	STS _OS_ETRACE_BUFFER+0x01,ACCUM_H						;И код
-	SET
+	RCALL _J8BPROC_ETRACE_ADDFIRST__SET
 ;-----------------------------------------------------------
 J8BPROC_ETRACE_ADD:
 ;-----------------------------------------------------------
@@ -78,4 +75,14 @@ _J8BPROC_ETRACE_ADD__LOOP:
 	POP TEMP_L
 	POP_X
     RET
+
+;-----------------------------------------------------------
+_J8BPROC_ETRACE_ADDFIRST__SET:
+;-----------------------------------------------------------
+;Фиксируем Ид первого исключения и код
+;-----------------------------------------------------------
+	STS _OS_ETRACE_BUFFER+0x00,ACCUM_L						;В начале буфера записываем ид типа исключений
+	STS _OS_ETRACE_BUFFER+0x01,ACCUM_H						;И код
+	SET
+	RET
 .ENDIF

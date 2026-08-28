@@ -21,12 +21,15 @@
 	.SET	_MCALL_SIZE								= 0x01	;Размер макроса MCALL/MJMP: 1(RCALL)-2(CALL)
 	.SET	JMP_SUPPORT								= 0x00	;Поддержка JMP,CALL
 	.SET	MUL_SUPPORT								= 0x00	;Поддержка MUL,MULS,MULSU
+	.SET    SBI_TOGGLE_SUPPORT                      = 0x01  ;Аппаратное переключение пина порта через инструкцию SBI
 	.SET	BLDRSEC_SUPPORT							= 0x00	;Аппаратная защита секции бутлоадера
 	.EQU	OS_IR_QNT								= 0x0a	;Количество перырваний
+    .EQU	OS_INT_PINS_QNT 						= 0x01	;Количество пинов поддерживающих внешние прерывания(INT)
 	.EQU	OS_PCINT_PORTS_QNT						= 0x01	;Количество портов поддерживающих внешние прерывания(PCINT)
 	.EQU	OS_RAM_BORDER_SIZE						= 0x01	;Минимальное допустимое расстояние между вершинами FREE_RAM и STACK
-	.SET	OS_TASKS_QNT							= 0x00	;По умолчанию многопоточность запрещена
-	
+    .EQU    OS_PORTS_LAST                           = 0x01  ;Номер последнего порта (A-0,B-1,C-2,D-3,E-4,...)
+	.EQU	OS_ADC_CHANNELS_QNT						= 0x04	;Количество каналов ADC
+
 .IFNDEF OS_STACK_SIZE
 	.SET	OS_STACK_SIZE							= -1	;Общий стек(-1 - вся свободная память)
 .ENDIF
@@ -44,44 +47,46 @@
 	.SET	INT0_PORT								= PB1
 
 	;---IR---
-	.EQU	C5_IR_INT0								= 0x01
-	.EQU	C5_IR_PCINT0							= 0x02
-	.EQU	C5_IR_TIMER0_OVF						= 0x03
-	.EQU	C5_IR_EE_READY							= 0x04
-	.EQU	C5_IR_ANALOG_COMP						= 0x05
-	.EQU	C5_IR_RESERVED_CORE_TIMER1				= 0x06
-	.EQU	C5_IR_RESERVED_CORE_TIMER2				= 0x07
-	.EQU	C5_IR_WDT								= 0x08
-	.EQU	C5_IR_ADC								= 0x09
+	.EQU	OS_IRQ_INT0								= 0x00
+	.EQU	OS_IRQ_PCINT0							= 0x05
+	.EQU	OS_IRQ_TIMER0_OVF						= 0x0a
+	.EQU	OS_IRQ_EE_READY							= 0x0f
+	.EQU	OS_IRQ_ANALOG_COMP						= 0x14
+	.EQU	OS_IRQ_RESERVED_CORE_TIMER				= 0x19
+	.EQU	OS_IRQ_TIMER0_COMPB						= 0x1e
+	.EQU	OS_IRQ_WDT								= 0x23
+	.EQU	OS_IRQ_ADC								= 0x28
 
+;TODO пока нет идей как реализовать диспетчерезацию прерываний не используя RAM
 .ORG 0x0000
 	RJMP	_OS_INIT										; Reset Handler
 .IF OS_FT_IR_TABLE == 0x01
-	RCALL	_OS_IR_HANDLER									; External Interrupt0 Handler
-_OS_PCINT_0_VECTOR:
-.IF OS_FT_PCINT
-	RCALL	_OS_PCINT_HANDLER								; Pin Change Interrupt Request 0
-.ELSE
-	RCALL	_OS_IR_HANDLER									; Pin Change Interrupt Request 0
-.ENDIF
-	RCALL	_OS_IR_HANDLER									; Timer/Counter0 Overflow
-	RCALL	_OS_IR_HANDLER									; EEPROM Ready
-	RCALL	_OS_IR_HANDLER									; Analog Comparator
+	RJMP	_OS_INIT	    								; External Interrupt0 Handler
+	RJMP	_OS_INIT    									; Pin Change Interrupt Request 0
+	RJMP	_OS_INIT		    							; Timer/Counter0 Overflow
+	RJMP	_OS_INIT			    						; EEPROM Ready
+	RJMP	_OS_INIT				    					; Analog Comparator
 .IF OS_FT_TIMER == 0x01										; Timer/Counter0 Compare Match A
-	RJMP	_OS_TIMER1_HANDLER
+	RJMP	_OS_SYSTIMER_HANDLER
 .ELSE
-	RCALL	_OS_IR_HANDLER
+	RJMP	_OS_INIT
 .ENDIF
-	RCALL	_OS_IR_HANDLER									; Timer/Counter0 Compare Match B
-	RCALL	_OS_IR_HANDLER									; Watchdog Time-out Interrupt
-	RCALL	_OS_IR_HANDLER									; ADC Conversion Complete
+	RJMP	_OS_INIT			    						; Timer/Counter0 Compare Match B
+	RJMP	_OS_INIT		    							; Watchdog Time-out Interrupt
+	RJMP	_OS_INIT	    								; ADC Conversion Complete
 .ENDIF
 PORTS_TABLE:												;Таблица из адресов IO PINx регистров (-,B)
 	.db	0x00,0x36
+PORTS_MASK:												    ;Таблица реальных портов(пинов)
+.IF OS_RESET_DISABLE==0
+    .db 0x00,0x1f
+.ELSE
+    .db 0x00,0x3f
+.ENDIF
 PCINT_TABLE:
 	.db	0x00,PCMSK0
 INT_TABLE:
-	.db	(1<<INT0),0x00
+	.db	INT0_PORT,0x00
 
 .MACRO MCALL
 	RCALL @0
@@ -122,4 +127,3 @@ INT_TABLE:
 	LDI ACCUM_L,(1<<OCIE0A)
 	STS TIMSK0,ACCUM_L
 .ENDMACRO
-

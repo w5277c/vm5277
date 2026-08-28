@@ -14,15 +14,17 @@
  * limitations under the License.
  */
 
+import boards.ArduinoUno;
+
 class Main {
 	static public class Blink implements Timer {
-		public void run() {
-			GPIO.invert(GPIO.PB5);
+		@Override public void run() {
+			Gpio.invert(Gpio.PB5);
 		}
 	}
 
 	public static void main() {
-		GPIO.modeOut(GPIO.PB5);
+		Gpio.modeOut(ArduinoUno.LED_BUILTIN);
 		Timer blink = new Blink();
 
 		while(true) {

@@ -14,27 +14,19 @@
  * limitations under the License.
  */
 
+.IFNDEF PIN_GET
 .include "io/_port_offset.asm"
 .include "io/reg_bit_get.asm"
-.IFNDEF PIN_GET
-;--------------------------------------------------------
+;-----------------------------------------------------------
 PIN_GET:
-;--------------------------------------------------------
+;-----------------------------------------------------------
 ;Считываем состояние пина
 ;IN: ACCUM_L-пин
 ;OUT: Флаг C-true=HI
-;--------------------------------------------------------
-	CPI ACCUM_L,0xff
-	BRNE PC+0x02
-	RET
-
-	PUSH_Z
-	PUSH ACCUM_L
-
+;-----------------------------------------------------------
+	PUSH_A16
 	MCALL _PORT_OFFSET
-	MCALL REG_BIT_GET
-
-	POP ACCUM_L
-	POP_Z
+	MCALL REG_BIT_GET_NR
+	POP_A16
 	RET
 .ENDIF

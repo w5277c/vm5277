@@ -18,7 +18,7 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.ArrayList;
 import java.util.List;
-import ru.vm5277.common.enums.RTOSFeature;
+import ru.vm5277.common.enums.RtosFeature;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
@@ -31,10 +31,8 @@ import ru.vm5277.common.VarType;
 import ru.vm5277.common.cg.CGAccum;
 import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.compiler.Instance;
-import ru.vm5277.compiler.Main;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
@@ -169,18 +167,18 @@ public class NewArrayExpression extends ExpressionNode {
 		bodyCgScope = new CGScope(cgScope, CGScope.genId(), "body");
 		
 		if(null==constDimensions) {
-			cg.setFeature(RTOSFeature.OS_ARRAY_3D);
+			cg.setFeature(RtosFeature.OS_ARRAY_3D);
 		}
 		else {
 			switch(depth) {
 				case 0x01:
-					cg.setFeature(RTOSFeature.OS_ARRAY_1D);
+					cg.setFeature(RtosFeature.OS_ARRAY_1D);
 					break;
 				case 0x02:
-					cg.setFeature(RTOSFeature.OS_ARRAY_2D);
+					cg.setFeature(RtosFeature.OS_ARRAY_2D);
 					break;
 				default:
-					cg.setFeature(RTOSFeature.OS_ARRAY_3D);
+					cg.setFeature(RtosFeature.OS_ARRAY_3D);
 			}
 		}
 
@@ -197,20 +195,22 @@ public class NewArrayExpression extends ExpressionNode {
 	@Override
 	public void codeOptimization(Scope scope, CodeGenerator cg) {
 		boolean optimized = false;
-		for(int i=0; i<depth; i++) {
-			ExpressionNode expr = arrDimensions.get(i);
-			if(null!=expr) {
-				expr.codeOptimization(scope, cg);
-				try {
-					ExpressionNode optimizedExpr = expr.optimizeWithScope(scope, cg);
-					if(null != optimizedExpr) {
-						expr = optimizedExpr;
-						arrDimensions.set(i, optimizedExpr);
-						optimized = true;
+		if(!arrDimensions.isEmpty()) {
+			for(int i=0; i<depth; i++) {
+				ExpressionNode expr = arrDimensions.get(i);
+				if(null!=expr) {
+					expr.codeOptimization(scope, cg);
+					try {
+						ExpressionNode optimizedExpr = expr.optimizeWithScope(scope, cg);
+						if(null != optimizedExpr) {
+							expr = optimizedExpr;
+							arrDimensions.set(i, optimizedExpr);
+							optimized = true;
+						}
 					}
-				}
-				catch(CompileException ex) {
-					markError(ex);
+					catch(CompileException ex) {
+						markError(ex);
+					}
 				}
 			}
 		}
@@ -268,11 +268,14 @@ public class NewArrayExpression extends ExpressionNode {
 
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
+		if(cgDone || disabled) return null;
+		cgDone = true;
+
 		CodegenResult result = null;
 		excs.setSourcePosition(sp);
 		
-		if(cg.getDevice().isLowRAM() && StrictLevel.NONE!=Main.getStrictLevel()) {
-			if(StrictLevel.STRONG==Main.getStrictLevel()) {
+		if(cg.getDevice().isLowRAM() && StrictLevel.NONE!=inst.getStrictLevel()) {
+			if(StrictLevel.STRONG==inst.getStrictLevel()) {
 				markError("HEAP usage on low memory device " + cg.getDevice().getUniqueName());
 			}
 			else {
@@ -293,7 +296,7 @@ public class NewArrayExpression extends ExpressionNode {
 				else {
 					expr.codeGen(cg, true, excs);
 					//TODO 0x02 - количество байт под размер массива
-					cg.pushAccLE(expr.getCGScope(), 0x02);
+					cg.pushAccBE(expr.getCGScope(), 0x02, true); //Для извлечения в стеке в порядке LE
 				}
 			}
 		}
@@ -305,12 +308,13 @@ public class NewArrayExpression extends ExpressionNode {
 		if(null!=arrayInitiExpr) {
 			// Генерация инициализационных данных не должна влиять на текущий размер аккумулятора (в том числе признак fixed)
 			CGAccum accum = cg._getAcc().clone();
-			cg.pushAccBE(bodyCgScope, 0x02);
+			cg.pushAccBE(bodyCgScope, 0x02, true);
 			arrayInitiExpr.codeGen(cg, false, excs);
 			cg._setAcc(accum);
 			cg.popAccBE(tailCgScope, 0x02);
 		}
 
+		releaseVars(cg);
 		return CodegenResult.RESULT_IN_ACCUM;
 	}
 

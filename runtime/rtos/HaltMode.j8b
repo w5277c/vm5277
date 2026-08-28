@@ -17,8 +17,8 @@
 // При изменение учитывать класс RTOSHaltMode в common библиотеке!
 
 public class HaltMode {
-	public	final	static	byte	HALT		= 0x00;	// Полный останов (запрет прерываний и бесконечный цикл)
-	public	final	static	byte	BLINK		= 0x01;	// Периодическое бесконечное мигание светодиодом ACTLED
-	public	final	static	byte	RESET		= 0x02;	// Перезапуск МК
+	public	final	static	byte	HALT			= 0x00;	// Полный останов (запрет прерываний и бесконечный цикл)
+	public	final	static	byte	BLINK			= 0x01;	// Периодическое бесконечное мигание светодиодом ACTLED
+	public	final	static	byte	RESET			= 0x02;	// Перезапуск МК
 	public	final	static	byte	BLINK_N_RESET	= 0x03;	// Мигание светодиодом ACTLED и перезапуск МК через некоторое время(15 сек?)
 }

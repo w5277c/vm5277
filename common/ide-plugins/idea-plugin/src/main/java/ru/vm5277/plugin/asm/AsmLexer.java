@@ -6,10 +6,6 @@ import com.intellij.openapi.project.Project;
 import com.intellij.psi.codeStyle.CodeStyleSettings;
 import com.intellij.psi.tree.IElementType;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.idea.maven.model.MavenId;
-import org.jetbrains.idea.maven.project.MavenProject;
-import org.jetbrains.idea.maven.project.MavenProjectsManager;
-import ru.vm5277.common.enums.PlatformType;
 import ru.vm5277.common.lexer.SourceBuffer;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.lexer.tokens.Token;
@@ -20,28 +16,26 @@ import ru.vm5277.plugin.j8b.FileType;
 import java.util.*;
 
 public class AsmLexer extends LexerBase {
-    private	Project     		project;
-    private	int					tabSize;
-	private ASMLanguageServer	server;
-	private Map<TokenType, IElementType> elementTypes	= new HashMap();
-	private	List<Token> 		tokens;
-    private	int         		currentIndex 	= 0;
-	private	int         		startOffset;
-	private	int         		endOffset;
-    private	CharSequence		buffer;
+    private	final int tabSize;
+	private final ASMLanguageServer	lspServer;
+	private final static Map<TokenType, IElementType> ELEMENT_TYPES = new HashMap<>();
+	private	List<Token> tokens;
+    private	int currentIndex 	= 0;
+	private	int startOffset;
+	private	int endOffset;
+    private	CharSequence buffer;
 
-    public AsmLexer(Project project, PlatformType platformType, String mcu) {
-		this.project = project;
+	static {
+		// Инициализируем все возможные типы токенов заранее
+		for (TokenType type : TokenType.values()) {
+			ELEMENT_TYPES.put(type, new IElementType(type.name(), ASMLanguage.INSTANCE));
+		}
+	}
+
+    public AsmLexer(Project project) {
 		CodeStyleSettings settings = CodeStyle.getSettings(project);
 		tabSize = settings.getTabSize(FileType.INSTANCE);
-
-
-
-		if(null!=platformType) {
-			//TODO необходимо загружать из бибилиотеки тулкита, иначе плагин будет привязан к конретной версии тулкита.
-			//Особенно чувствительно при изменениях в binding.cfg
-			server = new ASMLanguageServer(platformType, mcu);
-		}
+		lspServer = AsmSyntaxHighlighterFactory.getLspSever(project);
     }
 
 	@Override
@@ -51,7 +45,7 @@ public class AsmLexer extends LexerBase {
 		this.endOffset = endOffset;
 		this.currentIndex = 0;
 
-		if(null==server || buffer.isEmpty()) {
+		if(null==lspServer || buffer.isEmpty()) {
 			this.tokens = null;
 			return;
 		}
@@ -64,14 +58,13 @@ public class AsmLexer extends LexerBase {
 //		System.out.println("Text: '" + buffer.toString() + "'");
 
 		try (SourceBuffer sb = new SourceBuffer(text, tabSize)) {
-			this.tokens = server.tokenize(sb);
+			this.tokens = lspServer.tokenize(sb);
 //			for(Token token : tokens) {
 //				System.out.println("Token: " + token.toString());
 //			}
 
 			// Пропускаем токены до startOffset
-			while (	currentIndex < tokens.size() &&
-					tokens.get(currentIndex).getSP().getPos() +	tokens.get(currentIndex).getLength() <= startOffset) {
+			while(currentIndex<tokens.size() && tokens.get(currentIndex).getSP().getPos() +	tokens.get(currentIndex).getLength() <= startOffset) {
 
 				currentIndex++;
 			}
@@ -88,7 +81,7 @@ public class AsmLexer extends LexerBase {
 
 	@Override
 	public IElementType getTokenType() {
-		if (server == null || tokens == null || currentIndex >= tokens.size()) {
+		if(null==lspServer || null==tokens || currentIndex>=tokens.size()) {
 			return null;
 		}
 
@@ -97,31 +90,26 @@ public class AsmLexer extends LexerBase {
 		int tokenEnd = tokenStart + token.getLength();
 
 		// Токен полностью до начала - не показываем
-		if (tokenEnd <= startOffset) {
+		if(tokenEnd<=startOffset) {
 			return null;
 		}
 
 		// Токен начинается после конца - не показываем
-		if (tokenStart >= endOffset) {
+		if(tokenStart>=endOffset) {
 			return null;
 		}
 
-		IElementType ieet = elementTypes.get(token.getType());
-		if(null==ieet) {
-			ieet = new IElementType(token.getType().name(), ASMLanguage.INSTANCE);
-			elementTypes.put(token.getType(), ieet);
-		}
-		return ieet;
+		return ELEMENT_TYPES.get(token.getType());
 	}
 	
     @Override
     public int getTokenStart() {
-        return null==server ? 0 : tokens.get(currentIndex).getSP().getPos();
+        return null==lspServer ? 0 : tokens.get(currentIndex).getSP().getPos();
     }
 
     @Override
     public int getTokenEnd() {
-		if (server == null || tokens == null || currentIndex >= tokens.size()) {
+		if(null==lspServer || null==tokens || currentIndex>=tokens.size()) {
 			return endOffset;
 		}
 
@@ -134,22 +122,23 @@ public class AsmLexer extends LexerBase {
 
     @Override
 	public void advance() {
-		if (server != null && tokens != null) {
+		if(null!=lspServer && null!=tokens) {
 			currentIndex++;
 
 			// Если вышли за пределы списка токенов - всё ок
-			if (currentIndex >= tokens.size()) {
+			if(currentIndex>=tokens.size()) {
 				return;
 			}
 
 			// Пропускаем токены, которые заканчиваются до startOffset
-			while (currentIndex < tokens.size()) {
+			while(currentIndex<tokens.size()) {
 				Token token = tokens.get(currentIndex);
 				int tokenEnd = token.getSP().getPos() + token.getLength();
 
-				if (tokenEnd <= startOffset) {
+				if(tokenEnd<=startOffset) {
 					currentIndex++;
-				} else {
+				}
+				else{
 					break;
 				}
 			}
@@ -159,11 +148,15 @@ public class AsmLexer extends LexerBase {
     @NotNull
     @Override
     public CharSequence getBufferSequence() {
-        return null == server ? "" : buffer;
+        return null==lspServer ? "" : buffer;
     }
 
     @Override
     public int getBufferEnd() {
         return endOffset;
     }
+
+	public static IElementType getIElementType(TokenType tokenType) {
+		return ELEMENT_TYPES.get(tokenType);
+	}
 }

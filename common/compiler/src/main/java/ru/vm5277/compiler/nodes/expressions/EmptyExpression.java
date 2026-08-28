@@ -46,6 +46,8 @@ public class EmptyExpression extends ExpressionNode {
 
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
+		
+		releaseVars(cg);
 		return null;
 	}
 }

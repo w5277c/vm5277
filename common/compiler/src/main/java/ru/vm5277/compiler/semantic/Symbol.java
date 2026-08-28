@@ -18,7 +18,6 @@ package ru.vm5277.compiler.semantic;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.VarType;
 
-//TODO содердание типа как в type, так и в Operand
 public class Symbol {
 	protected			String				name;
 	protected			VarType				type;

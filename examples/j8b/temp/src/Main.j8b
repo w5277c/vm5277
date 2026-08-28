@@ -14,22 +14,21 @@
  * limitations under the License.
  */
 
-import drivers.sensor.DHT11;
+import drivers.sensor.Dht11;
 
 class Main {
 	public static void main() {
-		System.setParam(RTOSParam.SHOW_WELCOME,0x01);
+		System.setParam(RtosParam.SHOW_WELCOME,0x01);
 		// Опрашиваем датчик
-		THSensor ths = new DHT11(GPIO.PD7);
+		Dht11 ths = new Dht11(Gpio.PD7);
 		while(true) {
 			System.out("Inquiring: ");
 			try {
 				ths.read();
-				System.out("Temperature:" + ths.getTemperature());
-				System.out(", humidity:" + ths.getHumidity() + '\n');
+				System.out("Temperature:" + ths.getCelsius() + ", humidity:" + ths.getPercents() + '\n');
 			}
 			catch(DriverException ex) {
-				System.out("Сбой, код: " + ex.code() + '\n');
+				System.out(ex);
 			}
 			Thread.sleep(500);
 		}

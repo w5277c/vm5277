@@ -38,7 +38,7 @@ public class SemanticAnalyzer {
 	protected SemanticAnalyzer() {
 	}
 
-	public static void analyze(ObjectTypeNode clazz, CodeGenerator cg, CGScope parent, List<ObjectTypeNode> autoImported) {
+	public static void analyze(Instance inst, ObjectTypeNode clazz, CodeGenerator cg, CGScope parent, List<ObjectTypeNode> autoImported) {
 		GlobalScope gScope = new GlobalScope();
 
 		if(null!=autoImported) {
@@ -46,7 +46,7 @@ public class SemanticAnalyzer {
 				if(node.preAnalyze()) {
 					if(node.declare(gScope)) {
 						node.postAnalyze(gScope, cg, parent);
-						if(OptimizationType.NONE!=Main.getOptimizationType()) {
+						if(OptimizationType.NONE!=inst.getOptimizationType()) {
 							node.codeOptimization(gScope, cg);
 						}
 					}
@@ -59,7 +59,7 @@ public class SemanticAnalyzer {
 				// Выполняем если все declare отработали и никаких отложенных.
 				if(AstNode.getDeclarationPendingNodes().isEmpty()) {
 					if(clazz.postAnalyze(gScope, cg, parent)) {
-						if(OptimizationType.NONE!=Main.getOptimizationType()) {
+						if(OptimizationType.NONE!=inst.getOptimizationType()) {
 							clazz.codeOptimization(gScope, cg);
 						}
 					}
@@ -90,7 +90,7 @@ public class SemanticAnalyzer {
 				// Все отложенные выполнены и ошибок не было
 				if(result) {
 					if(clazz.postAnalyze(gScope, cg, parent)) {
-						if(OptimizationType.NONE!=Main.getOptimizationType()) {
+						if(OptimizationType.NONE!=inst.getOptimizationType()) {
 							clazz.codeOptimization(gScope, cg);
 						}
 					}

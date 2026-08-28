@@ -1,0 +1,143 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import drivers.CircBuffer;
+import io.InputStream;
+import io.OutputStream;
+import rtos.RtosDispatcher;
+import hal.PinEventManager;
+import hal.PinEventPolicy;
+
+// UART(UARTSwFull) - программный полнодуплексный драйвер двухпроводного UART-интерфейса,
+// где RX-линия приема данных, а TX-линия передачи данных.
+
+public class UartSwFd implements InputStream, OutputStream, UartCommon, Closeable, RtosCallback {
+	public enum Flags {
+		OPEN,
+		SENDING,
+	}
+
+	//WARNING! Любые изменения свойств должны быть учтены в драйвере RTOS
+	//Т.к. драйвер RTOS работает с кучей напрямую.
+	private CircBuffer sendBuff;
+	private CircBuffer recvBuff;
+	private RtosTimer timer;
+	private byte rxPort;
+	private short ioRegRx;
+	private short ioRegTx;
+	private int baudrate;
+	private	Parity parity;
+	private StopBits stopBits;
+	private PinEventPolicy pinPolicy;
+	private byte pinEventId;
+	private byte flags;
+	private byte errCode;
+
+	public UartSwFd(byte rxPort, byte txPort, int baudrate, Parity parity, StopBits stopBits, byte[] sendBuff, byte[] recvBuff, RtosTimer timer,
+	 				PinEventPolicy pinPolicy)																						throws DriverException {
+
+		this.sendBuff = new CircBuffer(sendBuff);
+		this.recvBuff = new CircBuffer(recvBuff);
+		this.timer = timer;
+		this.rxPort = rxPort;
+		this.ioRegRx = RtosCore.getIORegInput(rxPort);
+		this.ioRegTx = RtosCore.getIORegOutput(txPort);
+		this.baudrate = baudrate;
+		this.parity = parity;
+		this.stopBits = stopBits;
+		this.pinPolicy = pinPolicy;
+
+		Gpio.modeIn(rxPort); // RX - вход
+		Gpio.setHigh(rxPort); // Подтяжка к VCC на RX
+		Gpio.modeOut(txPort); // TX - выход
+		Gpio.setHigh(txPort); // Высокий уровень на TX
+
+		pinEventId = PinEventManager.register(rxPort, this, pinPolicy, PinEventManager.TRIGGER_MODE_FALLING);
+
+		init();
+	}
+
+
+	private native void init() throws DriverException;
+
+	public void open(
+
+	);
+
+	@Override
+	public void close() {}
+
+
+
+	@Override public int getBaudrate() {return baudrate;}
+	@Override public Parity getParity() {return parity;}
+	@Override public StopBits getStopBits() {return stopBits;}
+
+	private native void txEvent();
+	private void checkError() throws DriverException {
+		if(0!=errCode) {
+			close();
+        	DriverException.throw(errCode);
+    	}
+    	if(0==(flags&(1<<Flags.OPEN.index()))) {
+    		DriverException.throw(DriverException.CLOSED);
+    	}
+	}
+
+    @Override public short getAvailable() throws DriverException {
+    	checkError();
+    	return recvBuff.getAvailable();
+    }
+    @Override public short getFree() throws DriverException {
+    	checkError();
+    	return sendBuff.getFree();
+    }
+    @Override public byte read() throws DriverException {
+		checkError();
+    	return InputStream.read(recvBuff);
+    }
+    @Override public void read(byte[] buff, short off, short len) throws DriverException {
+		checkError();
+    	InputStream.read(recvBuff, buff, off, len);
+    }
+    @Override public void write(char b) throws DriverException {
+		checkError();
+    	OutputStream.write(sendBuff, b);
+    }
+    @Override public void write(byte[] buff, short off, short len) throws DriverException {
+		checkError();
+    	short index = 0;
+    	//TODO synchronized(RtosDispatcher.LOCK) { // Нельзя спать, иначе может образоваться пауза при передаче
+    	while(index<len) {
+			short sent = OutputStream.write(sendBuff, buff, off+index, len-index);
+			if(0!=sent) {
+				txEvent();
+				index+=sent;
+			}
+    	}
+    	//
+    }
+    @Override public void flush() {
+    	while(0!=(flags&(1<<Flags.OPEN.index())) && 0!=(flags&(1<<Flags.SENDING.index()))) {
+    		Thread.sleep(1);
+    	}
+    }
+
+    private void finalize() {
+		PinEventManager.unregister(pinEventId);
+		timer.stop();
+	}
+}

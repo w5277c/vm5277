@@ -23,9 +23,8 @@ J8BPROC_INSTANCEOF_NR:										;NR-NO_RESTORE - не восстанавлива
 ;OUT: flag C-true(реализует)
 ;-----------------------------------------------------------
 	PUSH TEMP_L
-	ADIW ZL,0x03
-	LD ACCUM_L,Z+
-	LD ZH,Z
+	LDD ACCUM_L,Z+_OS_CLASS_HEAP_OFFSET__METADATA_ADDR+0x00
+	LDD ZH,Z+_OS_CLASS_HEAP_OFFSET__METADATA_ADDR+0x01
 	MOV ZL,ACCUM_L
 	LPM ACCUM_L,Z+											;Проверяем на ид типа класса
 	CP ACCUM_L,ACCUM_EH
@@ -46,6 +45,4 @@ _J8BPROC_INSTANCEOF_NR__END_TRUE:
 _J8BPROC_INSTANCEOF_NR__END:
 	POP TEMP_L
 	RET
-
-	.ENDIF
-
+.ENDIF

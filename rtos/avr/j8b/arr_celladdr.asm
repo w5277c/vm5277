@@ -16,9 +16,8 @@
 
 //TODO при работе с массивами большая часть кода дублируется, нужно вынести в отдельную функцию
 
-.include "math/mul16.asm"
-
 .IFNDEF J8BPROC_ARR_CELLADDR
+.include "math/mul16.asm"
 ;-----------------------------------------------------------
 J8BPROC_ARR_CELLADDR:
 ;-----------------------------------------------------------
@@ -61,8 +60,8 @@ J8BPROC_ARR_CELLADDR:
 	;Вычисляем адрес ячейки с учетом глубины, размерностей и индексов
 	ADIW YL,0x04+0x02										;index0
 
-	LDD ACCUM_L,Y+0x00										;index0(внешний arr[!]/arr[!][]/arr[!][][])
-	LDD ACCUM_H,Y+0x01
+	LDD ACCUM_L,Y+0x01										;index0(внешний arr[!]/arr[!][]/arr[!][][])
+	LDD ACCUM_H,Y+0x00
 	CPI RESULT,0x00
 	BREQ _J8BPROC_ARR_CELLADDR__COMPINDEX_END
 
@@ -71,9 +70,9 @@ J8BPROC_ARR_CELLADDR:
 	RCALL OS_MUL16
 	CPI RESULT,0x01
 	BRNE _J8BPROC_ARR_CELLADDR__COMPINDEX_3D
-	LDD ACCUM_EL,Y+0x02										;index1(arr[][!]/arr[][!][])
+	LDD ACCUM_EL,Y+0x03										;index1(arr[][!]/arr[][!][])
 	ADD ACCUM_L,ACCUM_EL
-	LDD ACCUM_EH,Y+0x03
+	LDD ACCUM_EH,Y+0x02
 	ADC ACCUM_H,ACCUM_EH
 	RJMP _J8BPROC_ARR_CELLADDR__COMPINDEX_END
 _J8BPROC_ARR_CELLADDR__COMPINDEX_3D:
@@ -82,8 +81,8 @@ _J8BPROC_ARR_CELLADDR__COMPINDEX_3D:
 	RCALL OS_MUL16
 	PUSH ACCUM_H
 	PUSH ACCUM_L
-	LDD ACCUM_L,Y+0x02										;index1(arr[][!]/arr[][!][])
-	LDD ACCUM_H,Y+0x03
+	LDD ACCUM_L,Y+0x03										;index1(arr[][!]/arr[][!][])
+	LDD ACCUM_H,Y+0x02
 	LDD ACCUM_EL,Z+0x04										;dim2 - LE
 	LDD ACCUM_EH,Z+0x05
 	RCALL OS_MUL16
@@ -91,9 +90,9 @@ _J8BPROC_ARR_CELLADDR__COMPINDEX_3D:
 	ADD ACCUM_L,ACCUM_EL
 	POP ACCUM_EH
 	ADC ACCUM_H,ACCUM_EH
-	LDD ACCUM_EL,Y+0x04										;index2(внутренний arr[][][!])
+	LDD ACCUM_EL,Y+0x05										;index2(внутренний arr[][][!])
 	ADD ACCUM_L,ACCUM_EL
-	LDD ACCUM_EH,Y+0x05
+	LDD ACCUM_EH,Y+0x04
 	ADC ACCUM_H,ACCUM_EH
 _J8BPROC_ARR_CELLADDR__COMPINDEX_END:
 

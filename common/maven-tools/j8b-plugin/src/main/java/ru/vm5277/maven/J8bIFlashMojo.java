@@ -21,6 +21,8 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.Mojo;
 import java.nio.file.Path;
 import ru.vm5277.common.Toolkit;
+import ru.vm5277.common.enums.InteractiveMode;
+import ru.vm5277.common.enums.Verbosity;
 
 @Mojo(name = "iflash")
 public class J8bIFlashMojo extends J8bMojo {
@@ -41,10 +43,10 @@ public class J8bIFlashMojo extends J8bMojo {
 			outputSubDirectory.mkdirs();
 		}
 
-		if(!Toolkit.checkToolkit(verbose ? log : null, Path.of(toolkitPath), downloadUrl, true)) {
+		if(!Toolkit.checkToolkit(!Verbosity.MINIMAL.name().equalsIgnoreCase(verbosity) ? log : null, Path.of(toolkitPath), downloadUrl, true)) {
 			throw new MojoExecutionException("Toolkit not found, can't download toolkit from: " + downloadUrl + ", please try later.");
 		}
 
-		doFlash(outputSubDirectory, true);
+		doFlash(outputSubDirectory, InteractiveMode.AUTO);
 	}
 }

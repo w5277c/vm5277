@@ -28,6 +28,6 @@ public class Math {
 	public static native short mul(byte a, byte b);
 
 	public static native byte reflect(byte b);
-	public static native byte crc8(byte[] data, short len) throws ArrayBoundsException;
-	public static native byte crc8(byte[] data, short len, byte poly, byte init, byte reflect, byte xorOut) throws ArrayBoundsException;
+	public static native byte crc8(byte[] data, short offset, short len) throws BoundsException, NullPointerException;
+	public static native byte crc8(byte[] data, short offset, short len, byte poly, byte init, byte reflect, byte xorOut) throws BoundsException, NullPointerException;
 }

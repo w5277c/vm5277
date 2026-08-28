@@ -20,30 +20,24 @@
 OS_CRC8_NR:
 ;-----------------------------------------------------------
 ;Вычисление crc8 из блока данных
-;IN: X-адрес на данные, ACCUM_L-xorOut,ACCUM_H-poly
+;IN: X-адрес на данные, TEMP_EL-xorOut,TEMP_EH-poly
 ;ACCUM_EL-init,ACCUM_EH-bit0-refIn,bit1-refOut,
 ;TEMP_L/H-длина данных
 ;OUT: ACCUM_L-8b результат
+;MOD: X,ACCUM_EL,TEMP_L/H
 ;-----------------------------------------------------------
-	CPI TEMP_L,0x00
-	BRNE PC+0x03
-	CPI TEMP_H,0x00
-	BREQ OS_CRC8_NR__RET
-
-	PUSH ACCUM_L
-
 _OS_CRC8__LOOP_BYTES:
 	LD ACCUM_L,X+
 	SBRC ACCUM_EH,0x00
 	MCALL OS_REFLECT
 
-	EOR ACCUM_EL,ACCUM_L
+	EOR ACCUM_EL,TEMP_EL
 
 	LDI ACCUM_L,0x08
 _OS_CRC8__LOOP_BITS:
 	LSL ACCUM_EL
 	BRCC PC+0x02
-	EOR ACCUM_EL,ACCUM_H
+	EOR ACCUM_EL,TEMP_EH
 	DEC ACCUM_L
 	BRNE _OS_CRC8__LOOP_BITS
 	SBIW TEMP_L,0x01
@@ -53,8 +47,7 @@ _OS_CRC8__LOOP_BITS:
 	SBRC ACCUM_EH,0x01
 	MCALL OS_REFLECT
 
-	POP TEMP_L
-	EOR ACCUM_L,TEMP_L
+	EOR ACCUM_L,TEMP_EL
 OS_CRC8_NR__RET:
 	RET
 .ENDIF

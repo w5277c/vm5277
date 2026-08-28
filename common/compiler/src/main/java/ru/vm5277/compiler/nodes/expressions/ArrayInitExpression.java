@@ -31,10 +31,15 @@ import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.cg.CGArrCells;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGScope;
+import ru.vm5277.common.lexer.SourceBuffer;
+import ru.vm5277.common.lexer.tokens.TAnnotation;
+import ru.vm5277.common.lexer.tokens.TNote;
 import ru.vm5277.compiler.Instance;
+import ru.vm5277.compiler.nodes.AnnotationParamNode;
 import ru.vm5277.compiler.semantic.CIScope;
 
 public class ArrayInitExpression extends ExpressionNode {
+
 	public static class ConstRange {
 		private int			start;
 		private	int			end;
@@ -101,6 +106,27 @@ public class ArrayInitExpression extends ExpressionNode {
 		
 		this.type = type;
     }
+
+	
+	public ArrayInitExpression(Instance inst, byte[] data, SourcePosition sp, VarType type) throws CompileException {
+		super(inst, null, sp);
+		
+		this.basedType = type.getElementType();
+		while (basedType.isArray()) {
+			basedType = basedType.getElementType();
+		}
+
+		this.valueExprs = new ArrayList<>();
+		for(byte b : data) {
+			this.valueExprs.add(new LiteralExpression(inst, null, b&0xff, VarType.BYTE));
+		}
+
+		// Устанавливаем размеры
+		this.dimensions = new int[]{valueExprs.size(), 0, 0};
+
+		// Устанавливаем тип
+		this.type = type;
+	}
 
 	@Override
 	public boolean preAnalyze() {
@@ -193,7 +219,7 @@ public class ArrayInitExpression extends ExpressionNode {
 					}
 					else {
 						if(null!=consts) {
-							int size = (-1==basedType.getSize() ? cg.getRefSize() : basedType.getSize());
+							int size = (basedType.isReferenceType() ? cg.getRefSize() : basedType.getSize());
 							//TODO 0x02 константа зависящая от библиотеки кодогенератора(для AVR переносить во FLASH блоки <3 байт не выгодно)
 							if(0x02<consts.size()*size) {
 								constRanges.add(new ConstRange(pos, i-1, cg.defineData(	cg.genId(), consts.size()*size,
@@ -214,7 +240,7 @@ public class ArrayInitExpression extends ExpressionNode {
 			}
 		}
 		if(null!=consts) {
-			int size = (-1==basedType.getSize() ? cg.getRefSize() : basedType.getSize());
+			int size = (basedType.isReferenceType() ? cg.getRefSize() : basedType.getSize());
 			//TODO 0x02 константа зависящая от библиотеки кодогенератора(для AVR переносить во FLASH блоки <3 байт не выгодно)
 			//TODO переносоить копированием блоки мнее блока передачи параметров функции копирования(минимум 3 инструкции) тоже не выгодно
 			if(0x02<consts.size()*size) {
@@ -306,7 +332,10 @@ public class ArrayInitExpression extends ExpressionNode {
 
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
-		int size = (-1==basedType.getSize() ? cg.getRefSize() : basedType.getSize());
+		if(cgDone || disabled) return null;
+		cgDone = true;
+
+		int size = (basedType.isReferenceType() ? cg.getRefSize() : basedType.getSize());
 		int rangeId=0;
 		for(int i=0; i<linearValues.size(); i++) {
 			
@@ -325,7 +354,7 @@ public class ArrayInitExpression extends ExpressionNode {
 			//TODO проверить на VIEW(обяателне вызов runtime)
 			//CGArrCells arrCells = new CGArrCells(i*size, size);
 			CGArrCells arrCells = new CGArrCells(valueExprs.size());
-			arrCells.setSize(0x02);
+			arrCells.setSize(basedType.isReferenceType() ? cg.getRefSize() : basedType.getSize());
 			
 			if(expr instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)expr;
@@ -338,6 +367,7 @@ public class ArrayInitExpression extends ExpressionNode {
 			}
 		}
 
+		releaseVars(cg);
 		return null;
 	}
 	

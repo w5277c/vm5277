@@ -17,6 +17,7 @@ package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.CompileException;
@@ -141,7 +142,7 @@ public class UnaryExpression extends ExpressionNode {
 					}
 					break;
 				case NOT:
-					if(type != VarType.BOOL) {
+					if(type != VarType.BOOLEAN) {
 						markError("Logical ! requires boolean type");
 						result = false;
 					}
@@ -195,6 +196,9 @@ public class UnaryExpression extends ExpressionNode {
 		return codeGen(cg, false, false, accumStore, excs);
 	}
 	public Object codeGen(CodeGenerator cg, boolean isInvert, boolean opOr, boolean toAccum, CGExcs excs) throws CompileException {
+		if(cgDone || disabled) return null;
+		cgDone = true;
+
 		Object result = null;
 		excs.setSourcePosition(sp);
 		
@@ -226,7 +230,7 @@ public class UnaryExpression extends ExpressionNode {
 					if(CodegenResult.RESULT_IN_ACCUM!=((BinaryExpression)operand).codeGen(cg, isInvert, opOr, true, excs)) {
 						throw new CompileException("Accum not used for operand:" + operand);					
 					}
-					cg.eUnary(cgScope, operator, new CGCells(CGCells.Type.ACC), toAccum, excs);
+					cg.eUnary(cgScope, operator, new CGCells(CGCells.Type.ACC), toAccum, operand.getType().isFixedPoint(), excs);
 				}
 				else {
 					throw new CompileException("Unsupported operand '" + operand + " in unary expression");
@@ -242,7 +246,7 @@ public class UnaryExpression extends ExpressionNode {
 			else {
 				ve.codeGen(cg, false, excs);
 				CGCellsScope cScope = (CGCellsScope)operand.getSymbol().getCGScope(CGCellsScope.class);
-				cg.eUnary(cgScope, operator, cScope.getCells(), toAccum, excs);
+				cg.eUnary(cgScope, operator, cScope.getCells(), toAccum, operand.getType().isFixedPoint(), excs);
 				if(toAccum)	 {
 					result = CodegenResult.RESULT_IN_ACCUM;
 				}
@@ -252,7 +256,7 @@ public class UnaryExpression extends ExpressionNode {
 			ArrayExpression ae = (ArrayExpression)operand;
 			ae.codeGen(cg, false, excs);
 			CGCellsScope cScope = (CGCellsScope)operand.getSymbol().getCGScope(CGCellsScope.class);
-			cg.eUnary(cgScope, operator, cScope.getCells(), toAccum, excs);
+			cg.eUnary(cgScope, operator, cScope.getCells(), toAccum, operand.getType().isFixedPoint(), excs);
 			if(toAccum)	 {
 				result = CodegenResult.RESULT_IN_ACCUM;
 			}
@@ -269,7 +273,7 @@ public class UnaryExpression extends ExpressionNode {
 			MethodCallExpression mce = (MethodCallExpression)operand;
 			Object mceResult = mce.codeGen(cg, true, excs);
 			if(CodegenResult.RESULT_IN_ACCUM==mceResult) {
-				cg.eUnary(cgScope, operator, new CGCells(CGCells.Type.ACC), toAccum, excs);
+				cg.eUnary(cgScope, operator, new CGCells(CGCells.Type.ACC), toAccum, operand.getType().isFixedPoint(), excs);
 				if(toAccum)	 {
 					result = CodegenResult.RESULT_IN_ACCUM;
 				}
@@ -300,6 +304,8 @@ public class UnaryExpression extends ExpressionNode {
 		}
 		
 		cg.accumUnlock();
+		
+		releaseVars(cg);
 		return result;
 	}
 	
@@ -313,7 +319,16 @@ public class UnaryExpression extends ExpressionNode {
 		return operator.toString() +  "(" + operand + ")";
 	}
 	
+	@Override
 	public String getFullInfo() {
 		return getClass().getSimpleName() + " " + toString();
+	}
+	
+	@Override
+	public boolean equals(Object obj) {
+		if(!(obj instanceof UnaryExpression)) return false;
+		UnaryExpression expr2 = (UnaryExpression)obj;
+		if(operator!=expr2.getOperator()) return false;
+		return Objects.equals(operand, expr2.getOperand());
 	}
 }

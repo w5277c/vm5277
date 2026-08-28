@@ -22,6 +22,7 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
 import ru.vm5277.common.Toolkit;
+import ru.vm5277.common.enums.Verbosity;
 
 @Mojo(name = "assemble", threadSafe = true)
 public class J8bAssembleMojo extends J8bMojo {
@@ -45,7 +46,7 @@ public class J8bAssembleMojo extends J8bMojo {
 
 		doClean(log, outputSubDirectory);
 
-		if(!Toolkit.checkToolkit(verbose ? log : null, Path.of(toolkitPath), downloadUrl, true)) {
+		if(!Toolkit.checkToolkit(!Verbosity.MINIMAL.name().equalsIgnoreCase(verbosity) ? log : null, Path.of(toolkitPath), downloadUrl, true)) {
 			throw new MojoExecutionException("Toolkit not found, can't download toolkit from: " + downloadUrl + ", please try later.");
 		}
 

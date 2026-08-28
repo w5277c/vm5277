@@ -21,12 +21,15 @@
 	.SET	_MCALL_SIZE								= 0x01	;Размер макроса MCALL/MJMP: 1(RCALL)-2(CALL)
 	.SET	JMP_SUPPORT								= 0x00	;Поддержка JMP,CALL
 	.SET	MUL_SUPPORT								= 0x00	;Поддержка MUL,MULS,MULSU
+	.SET    SBI_TOGGLE_SUPPORT                      = 0x01  ;Аппаратное переключение пина порта через инструкцию SBI
 	.SET	BLDRSEC_SUPPORT							= 0x00	;Аппаратная защита секции бутлоадера
 	.EQU	OS_IR_QNT								= 0x15	;Количество перырваний
+    .EQU	OS_INT_PINS_QNT						    = 0x02	;Количество пинов поддерживающих внешние прерывания(INT)
 	.EQU	OS_PCINT_PORTS_QNT						= 0x03	;Количество портов поддерживающих внешние прерывания(PCINT)
 	.EQU	OS_RAM_BORDER_SIZE						= 0x01	;Минимальное допустимое расстояние между вершинами FREE_RAM и STACK
-	.SET	OS_TASKS_QNT							= 0x02	;По умолчанию одновременно разрешено только 2 задачи
-	
+    .EQU    OS_PORTS_LAST                           = 0x03  ;Номер последнего порта (A-0,B-1,C-2,D-3,E-4,...)
+	.EQU	OS_ADC_CHANNELS_QNT						= 0x00	;Количество каналов ADC
+
 .IFNDEF OS_STACK_SIZE
 	.SET	OS_STACK_SIZE							= -1	;Общий стек(-1 - вся свободная память)
 .ENDIF
@@ -49,26 +52,26 @@
 	.SET	INT1_PORT								= PD3
 
 	;---IR---
-	.EQU	C5_IR_INT0								= 0x01
-	.EQU	C5_IR_INT1								= 0x02
-	.EQU	C5_IR_TIMER1_CAPT						= 0x03
-	.EQU	C5_IR_TIMER1_COMPA						= 0x04
-	.EQU	C5_IR_TIMER1_OVF						= 0x05
-	.EQU	C5_IR_TIMER0_OVF						= 0x06
-	.EQU	C5_IR_UART_RX							= 0x07
-	.EQU	C5_IR_UART_UDRE							= 0x08
-	.EQU	C5_IR_UART_TX							= 0x09
-	.EQU	C5_IR_ANALOG_COMP						= 0x0a
-	.EQU	C5_IR_PCINT0							= 0x0b
-	.EQU	C5_IR_TIMER1_COMPB						= 0x0c
-	.EQU	C5_IR_RESERVED_CORE_TIMER1				= 0x0d
-	.EQU	C5_IR_RESERVED_CORE_TIMER2				= 0x0e
-	.EQU	C5_IR_USI_START							= 0x0f
-	.EQU	C5_IR_USI_OVF							= 0x10
-	.EQU	C5_IR_EE_READY							= 0x11
-	.EQU	C5_IR_WDT								= 0x12
-	.EQU	C5_IR_PCINT1							= 0x13
-	.EQU	C5_IR_PCINT2							= 0x14
+	.EQU	OS_IRQ_INT0								= 0x00
+	.EQU	OS_IRQ_INT1								= 0x05
+	.EQU	OS_IRQ_TIMER1_CAPT						= 0x0a
+	.EQU	OS_IRQ_TIMER1_COMPA						= 0x0f
+	.EQU	OS_IRQ_TIMER1_OVF						= 0x14
+	.EQU	OS_IRQ_TIMER0_OVF						= 0x19
+	.EQU	OS_IRQ_UART_RX							= 0x1e
+	.EQU	OS_IRQ_UART_UDRE						= 0x23
+	.EQU	OS_IRQ_UART_TX							= 0x28
+	.EQU	OS_IRQ_ANALOG_COMP						= 0x2d
+	.EQU	OS_IRQ_PCINT0							= 0x32
+	.EQU	OS_IRQ_TIMER1_COMPB						= 0x37
+	.EQU	OS_IRQ_RESERVED_CORE_TIMER				= 0x3c
+	.EQU	OS_IRQ_TIMER0_COMPB						= 0x41
+	.EQU	OS_IRQ_USI_START						= 0x46
+	.EQU	OS_IRQ_USI_OVF							= 0x4b
+	.EQU	OS_IRQ_EE_READY							= 0x50
+	.EQU	OS_IRQ_WDT								= 0x55
+	.EQU	OS_IRQ_PCINT1							= 0x5a
+	.EQU	OS_IRQ_PCINT2							= 0x5f
 
 .IF OS_FT_BOOTLOADER_ONLY==0x01								; Важно точно рассчитать _OS_INIT в прошивке
 	.EQU	_OS_INIT = OS_IR_QNT*_MCALL_SIZE+0x04+0x04+0x02
@@ -76,49 +79,251 @@
 .ORG 0x0000
 	RJMP	_OS_INIT										; Reset Handler
 .IF OS_FT_IR_TABLE == 0x01
-	RCALL	_OS_IR_HANDLER									; External Interrupt0 Handler
-	RCALL	_OS_IR_HANDLER									; External Interrupt1 Handler
-	RCALL	_OS_IR_HANDLER									; Timer/Counter1 Capture Event
-	RCALL	_OS_IR_HANDLER									; Timer/Counter1 Compare Match A
-	RCALL	_OS_IR_HANDLER									; Timer/Counter1 Overflow
-	RCALL	_OS_IR_HANDLER									; Timer/Counter0 Overflow
-	RCALL	_OS_IR_HANDLER									; USART Rx Complete
-	RCALL	_OS_IR_HANDLER									; USART, Data Register Empty
-	RCALL	_OS_IR_HANDLER									; USART, Tx Complete
-	RCALL	_OS_IR_HANDLER									; Analog Comparator
-;TODO _OS_PCINT_0_VECTOR: - здесь нельзя использовать нарешен порядок нужно учесть в драйверах для .DEVICE ATtiny2313a и ATtiny4313
-.IF OS_FT_PCINT
-	RCALL	_OS_PCINT_HANDLER								; Pin Change Interrupt Request 0
+;----INT----------------------------------------------------
+.IF OS_FT_IRQ_INT_BLOCK == 0x01
+	RCALL	_OS_IRQ_HANDLER									; External Interrupt0 Handler
+	RCALL	_OS_IRQ_HANDLER									; External Interrupt1 Handler
 .ELSE
-	RCALL	_OS_IR_HANDLER									; Pin Change Interrupt Request 0
+    JMP _OS_INIT
+    JMP _OS_INIT
 .ENDIF
-	RCALL	_OS_IR_HANDLER									; Timer/Counter1 Compare Match B
+;----TIMER CAPTURE------------------------------------------
+.IF OS_FT_IRQ_TIMER_CAPTURE_BLOCK==0x01
+	RCALL	_OS_IRQ_HANDLER									; Timer/Counter1 Capture Event
+.ELSE
+    JMP _OS_INIT
+.ENDIF
+;----TIMER--------------------------------------------------
+.IF OS_FT_IRQ_TIMER_BLOCK==0x01
+	RCALL	_OS_IRQ_HANDLER									; Timer/Counter1 Compare Match A
+	RCALL	_OS_IRQ_HANDLER									; Timer/Counter1 Overflow
+	RCALL	_OS_IRQ_HANDLER									; Timer/Counter0 Overflow
+.ELSE
+    JMP _OS_INIT
+    JMP _OS_INIT
+    JMP _OS_INIT
+.ENDIF
+;----UART---------------------------------------------------
+.IF OS_FT_IRQ_UART_BLOCK==0x01
+	RCALL	_OS_IRQ_HANDLER									; USART Rx Complete
+	RCALL	_OS_IRQ_HANDLER									; USART, Data Register Empty
+	RCALL	_OS_IRQ_HANDLER									; USART, Tx Complete
+.ELSE
+    JMP _OS_INIT
+    JMP _OS_INIT
+    JMP _OS_INIT
+.ENDIF
+;----ANALOG CMP---------------------------------------------
+.IF OS_FT_IRQ_ANALOG_CMP_BLOCK==0x01
+	RCALL	_OS_IRQ_HANDLER									; Analog Comparator
+.ELSE
+    JMP _OS_INIT
+.ENDIF
+;----PCINT--------------------------------------------------
+.IF OS_FT_IRQ_PCINT_BLOCK == 0x01
+	RCALL	_OS_IRQ_PCINT_HANDLER							; Pin Change Interrupt Request 0
+.ELSE
+    JMP _OS_INIT
+.ENDIF
+;----TIMER--------------------------------------------------
+.IF OS_FT_IRQ_TIMER_BLOCK==0x01
+	RCALL	_OS_IRQ_HANDLER									; Timer/Counter1 Compare Match B
 .IF OS_FT_TIMER == 0x01										; Timer/Counter0 Compare Match A
-	RJMP	_OS_TIMER1_HANDLER
+	RJMP	_OS_SYSTIMER_HANDLER
 .ELSE
-	RCALL	_OS_IR_HANDLER
+	RCALL	_OS_IRQ_HANDLER
 .ENDIF
-	RCALL	_OS_IR_HANDLER									; Timer/Counter0 Compare Match B
-	RCALL	_OS_IR_HANDLER									; USI Start Condition
-	RCALL	_OS_IR_HANDLER									; USI Overflow
-	RCALL	_OS_IR_HANDLER									; EEPROM Ready	
-	RCALL	_OS_IR_HANDLER									; Watchdog Time-out Interrupt
-.IF OS_FT_PCINT												;TODO учесть смещение!
-	RCALL	_OS_PCINT_HANDLER								; Pin Change Interrupt Request 1
-	RCALL	_OS_PCINT_HANDLER								; Pin Change Interrupt Request 2
+	RCALL	_OS_IRQ_HANDLER									; Timer/Counter0 Compare Match B
 .ELSE
-	RCALL	_OS_IR_HANDLER									; Pin Change Interrupt Request 1
-	RCALL	_OS_IR_HANDLER									; Pin Change Interrupt Request 2
+    JMP _OS_INIT
+    JMP _OS_INIT
+    JMP _OS_INIT
+.ENDIF
+;----USI----------------------------------------------------
+.IF OS_FT_IRQ_USI_BLOCK==0x01
+	RCALL	_OS_IRQ_HANDLER									; USI Start Condition
+	RCALL	_OS_IRQ_HANDLER									; USI Overflow
+.ELSE
+    JMP _OS_INIT
+    JMP _OS_INIT
+.ENDIF
+;----EEPROM-------------------------------------------------
+.IF OS_FT_IRQ_EEPROM_BLOCK==0x01
+	RCALL	_OS_IRQ_HANDLER									; EEPROM Ready
+.ELSE
+    JMP _OS_INIT
+.ENDIF
+;----WATCHDOG-----------------------------------------------
+.IF OS_FT_IRQ_WD_BLOCK==0x01
+	RCALL	_OS_IRQ_HANDLER									; Watchdog Time-out Interrupt
+.ELSE
+    JMP _OS_INIT
+.ENDIF
+;----PCINT--------------------------------------------------
+.IF OS_FT_IRQ_PCINT_BLOCK == 0x01
+	RCALL	_OS_IRQ_PCINT_HANDLER							; Pin Change Interrupt Request 1
+	RCALL	_OS_IRQ_PCINT_HANDLER							; Pin Change Interrupt Request 2
+.ELSE
+    JMP _OS_INIT
+    JMP _OS_INIT
 .ENDIF
 .ENDIF
 
 ;TODO можно оптимизировать - проверять на включенную фичу
 PORTS_TABLE:												;Таблица из адресов IO PINx регистров (A,B,-,D)
 	.db	0x39,0x36,0xff,0x30
+PORTS_MASK:												    ;Таблица реальных портов(пинов)
+.IF OS_INT_RC_OSCIL==0 && OS_RESET_DISABLE==0
+    .db 0x00,0xff,0x00,0x7f
+.ELIF OS_INT_RC_OSCIL==0 && OS_RESET_DISABLE==1
+    .db 0x04,0xff,0x00,0x7f
+.ELIF OS_INT_RC_OSCIL==1 && OS_RESET_DISABLE==0
+    .db 0x03,0xff,0x00,0x7f
+.ELIF OS_INT_RC_OSCIL==1 && OS_RESET_DISABLE==1
+    .db 0x07,0xff,0x00,0x7f
+.ENDIF
 PCINT_TABLE:
 	.db	PCMSK0, PCMSK1, 0x00, PCMSK2
 INT_TABLE:
-	.db	(1<<INT0),(1<<INT1)
+	.db	INT0_PORT,INT1_PORT
+
+_OS_IRQ_RAM_OFFSETS:
+;----INT----------------------------------------------------
+.IF _OS_FT_IRQ_INT_BLOCK==0x01
+    .SET OS_IRQ_INT0 = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B0 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
+    .SET OS_IRQ_INT1 = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B1 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
+.ELSE
+    .SET _OS_IRQ_RAM_OFFSETS_B0 = 0x00
+    .SET _OS_IRQ_RAM_OFFSETS_B1 = 0x00
+.ENDIF
+    .db _OS_IRQ_RAM_OFFSETS_B0,_OS_IRQ_RAM_OFFSETS_B1
+;----TIMER CAPTURE------------------------------------------
+.IF OS_FT_IRQ_TIMER_CAPTURE_BLOCK==0x01
+    .SET OS_IRQ_TIMER1_CAPTURE = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B0 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
+.ELSE
+    .SET _OS_IRQ_RAM_OFFSETS_B0 = 0x00
+.ENDIF
+;----TIMER--------------------------------------------------
+.IF OS_FT_IRQ_TIMER1_CMPA_BLOCK==0x01
+    .SET OS_IRQ_TIMER1_CMPA = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B1 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
+    .SET OS_IRQ_TIMER1_OVF = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B2 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
+    .SET OS_IRQ_TIMER0_OVF = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B3 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
+
+.ELSE
+    .SET _OS_IRQ_RAM_OFFSETS_B1 = 0x00
+    .SET _OS_IRQ_RAM_OFFSETS_B2 = 0x00
+    .SET _OS_IRQ_RAM_OFFSETS_B3 = 0x00
+.ENDIF
+    .db _OS_IRQ_RAM_OFFSETS_B0,_OS_IRQ_RAM_OFFSETS_B1,_OS_IRQ_RAM_OFFSETS_B2,_OS_IRQ_RAM_OFFSETS_B3
+;----UART---------------------------------------------------
+.IF _OS_FT_IRQ_UART_BLOCK==0x01
+    .SET OS_IRQ_UART0_RX = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B0 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
+    .SET OS_IRQ_UART0_UDRE = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B1 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
+    .SET OS_IRQ_UART0_TX = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B2 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
+.ELSE
+    .SET _OS_IRQ_RAM_OFFSETS_B0 = 0x00
+    .SET _OS_IRQ_RAM_OFFSETS_B1 = 0x00
+    .SET _OS_IRQ_RAM_OFFSETS_B2 = 0x00
+.ENDIF
+;----ANALOG CMP---------------------------------------------
+.IF OS_FT_IRQ_ANALOG_CMP_BLOCK==0x01
+    .SET OS_IRQ_ANALOG_CMP = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B3 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
+.ELSE
+    .SET _OS_IRQ_RAM_OFFSETS_B3 = 0x00
+.ENDIF
+    .db _OS_IRQ_RAM_OFFSETS_B0,_OS_IRQ_RAM_OFFSETS_B1,_OS_IRQ_RAM_OFFSETS_B2,_OS_IRQ_RAM_OFFSETS_B3
+;----PCINT--------------------------------------------------
+.IF _OS_FT_IRQ_PCINT_BLOCK==0x01
+    .SET OS_IRQ_PCINT0 = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B0 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
+.ELSE
+    .SET _OS_IRQ_RAM_OFFSETS_B0 = 0x00
+.ENDIF
+;----TIMER--------------------------------------------------
+.IF OS_FT_IRQ_TIMER_BLOCK==0x01
+    .SET OS_IRQ_TIMER1_CMPB = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B1 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B2 = 0x00
+.IF OS_FT_TIMER == 0x00
+    .SET OS_IRQ_TIMER0_CMPA = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B2 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
+.ENDIF
+    .SET OS_IRQ_TIMER0_CMPB = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B3 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
+.ELSE
+    .SET _OS_IRQ_RAM_OFFSETS_B1 = 0x00
+    .SET _OS_IRQ_RAM_OFFSETS_B2 = 0x00
+    .SET _OS_IRQ_RAM_OFFSETS_B3 = 0x00
+.ENDIF
+    .db _OS_IRQ_RAM_OFFSETS_B0,_OS_IRQ_RAM_OFFSETS_B1,_OS_IRQ_RAM_OFFSETS_B2,_OS_IRQ_RAM_OFFSETS_B3
+;----USI----------------------------------------------------
+.IF OS_FT_IRQ_USI_BLOCK==0x01
+    .SET OS_IRQ_USI_START = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B0 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
+    .SET OS_IRQ_USI_OVF = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B1 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
+.ELSE
+    .SET _OS_IRQ_RAM_OFFSETS_B0 = 0x00
+    .SET _OS_IRQ_RAM_OFFSETS_B1 = 0x00
+.ENDIF
+    .db _OS_IRQ_RAM_OFFSETS_B0,_OS_IRQ_RAM_OFFSETS_B1
+;----EEPROM-------------------------------------------------
+.IF OS_FT_IRQ_EEPROM_BLOCK==0x01
+    .SET OS_IRQ_EEPROM = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B0 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+2*_OS_IRQ_RAM_ITEM_SIZE
+.ELSE
+    .SET _OS_IRQ_RAM_OFFSETS_B0 = 0x00
+.ENDIF
+;----WATCHDOG-----------------------------------------------
+.IF OS_FT_IRQ_WD_BLOCK==0x01
+    .SET OS_IRQ_WD = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B1 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+2*_OS_IRQ_RAM_ITEM_SIZE
+.ELSE
+    .SET _OS_IRQ_RAM_OFFSETS_B1 = 0x00
+.ENDIF
+    .db _OS_IRQ_RAM_OFFSETS_B0,_OS_IRQ_RAM_OFFSETS_B1
+;----PCINT--------------------------------------------------
+.IF _OS_FT_IRQ_PCINT_BLOCK==0x01
+    .SET OS_IRQ_PCINT1 = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B0 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
+    .SET OS_IRQ_PCINT2 = _OS_IRQ_RAM_TABLE_SIZE
+    .SET _OS_IRQ_RAM_OFFSETS_B1 = _OS_IRQ_RAM_TABLE_SIZE
+    _OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
+.ELSE
+    .SET _OS_IRQ_RAM_OFFSETS_B0 = 0x00
+    .SET _OS_IRQ_RAM_OFFSETS_B1 = 0x00
+.ENDIF
+    .db _OS_IRQ_RAM_OFFSETS_B0,_OS_IRQ_RAM_OFFSETS_B1
+
 .ENDIF
 
 .MACRO MCALL
@@ -160,4 +365,3 @@ INT_TABLE:
 	LDI ACCUM_L,(1<<OCIE0A)
 	STS TIMSK0,ACCUM_L
 .ENDMACRO
-

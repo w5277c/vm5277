@@ -33,6 +33,18 @@ public class TOpearator extends Token {
 	public static TOpearator parse(SourceBuffer sb) {
 		SourcePosition sp = sb.snapSP();
 		
+		// Проверяем instanceof
+        if(sb.available(10)) {
+            Operator op = Operator.fromSymbol(sb.peekString(10));
+            if(null!=op) {
+				if(!op.isAlpha() || !Character.isLetterOrDigit(sb.peek(10))) {
+					sb.next(10);
+					TOpearator result = new TOpearator(sb, sp, op);
+					return result;
+				}
+			}
+        }
+
 		// Проверяем трехсимвольные операторы (если есть)
         if(sb.available(3)) {
             Operator op = Operator.fromSymbol(sb.peekString(3));

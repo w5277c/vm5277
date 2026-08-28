@@ -20,5 +20,6 @@ public enum InstanceType {
 	CLASS,
 	FIRST_THREAD,
 	THREAD,
-	TIMER;
+	TIMER,
+	RTOS_CALLBACK;
 }

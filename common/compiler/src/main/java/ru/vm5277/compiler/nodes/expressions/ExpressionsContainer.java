@@ -115,12 +115,17 @@ public class ExpressionsContainer extends ExpressionNode {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
+		if(cgDone || disabled) return null;
+		cgDone = true;
+
 		for(ExpressionNode expr : expressions) {
 			Object result = expr.codeGen(cg, toAccum, excs);
 			if(toAccum && CodegenResult.RESULT_IN_ACCUM!=result) {
 				throw new CompileException("Accum not used for operand:" + expr);
 			}
 		}
+		
+		releaseVars(cg);
 		return (toAccum ? CodegenResult.RESULT_IN_ACCUM : null);
 	}
 	
@@ -129,6 +134,7 @@ public class ExpressionsContainer extends ExpressionNode {
 		return "container";
 	}
 
+	@Override
 	public String getFullInfo() {
 		return getClass().getSimpleName() + " " + toString();
 	}

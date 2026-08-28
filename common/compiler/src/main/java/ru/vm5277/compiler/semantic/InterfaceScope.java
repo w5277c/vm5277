@@ -37,7 +37,7 @@ public class InterfaceScope extends CIScope {
 		}
 		
 		this.name = name;
-		this.implTypes = impl;
+		setImplTypes(impl);
 	}
 	
 	public String getRuntimePath() {

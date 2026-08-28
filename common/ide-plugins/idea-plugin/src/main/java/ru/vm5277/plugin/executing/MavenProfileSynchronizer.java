@@ -157,7 +157,6 @@ public class MavenProfileSynchronizer {
 			config.setTargetMode("specify");
 			config.setPlatformType(platformType);
 			config.setDeviceId(deviceId);
-			//TODO необходимо расширить параметры maven profile - для указания flash tool и его параметров
 			config.setFlashToolName("internal");
 		}
 
@@ -183,8 +182,8 @@ public class MavenProfileSynchronizer {
 			config.setBldrApiReuse(props.getProperty("j8b.bldrApiReuse", "true").equalsIgnoreCase("true"));
 		}
 
-		if(props.containsKey("verboseOutput")) {
-			config.setVerboseOutput(props.getProperty("verboseOutput", "false").equalsIgnoreCase("true"));
+		if(props.containsKey("verbosity")) {
+			config.setVerbosity(props.getProperty("verbosity"));
 		}
 	}
 
@@ -238,7 +237,7 @@ public class MavenProfileSynchronizer {
 			props.setProperty("j8b.strict", config.getStrictLevel());
 			props.setProperty("j8b.softReset", String.valueOf(config.isSoftReset()));
 			props.setProperty("j8b.bldrApiReuse", String.valueOf(config.isBldrApiReuse()));
-			props.setProperty("j8b.verbose", String.valueOf(config.isVerboseOutput()));
+			props.setProperty("j8b.verbosity", String.valueOf(config.getVerbosity()));
 
 			// Создаем backup оригинального файла
 			File backupFile = new File(pomFile.getAbsolutePath() + ".backup");

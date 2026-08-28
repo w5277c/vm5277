@@ -3,7 +3,10 @@ package ru.vm5277.plugin.executing;
 import com.intellij.execution.configurations.RunConfigurationOptions;
 import com.intellij.openapi.components.StoredProperty;
 import org.jetbrains.annotations.NotNull;
+import ru.vm5277.common.enums.OptimizationType;
 import ru.vm5277.common.enums.PlatformType;
+import ru.vm5277.common.enums.StrictLevel;
+import ru.vm5277.common.enums.Verbosity;
 import ru.vm5277.common.flash.FlashToolParam;
 import com.intellij.util.xmlb.annotations.XCollection;
 import com.intellij.util.xmlb.annotations.Property;
@@ -17,15 +20,17 @@ public class ExecuteParameters extends RunConfigurationOptions {
 	private final StoredProperty<Integer> cpuFreq = property(16000000).provideDelegate(this, "cpuFreq");
 	private final StoredProperty<String> stdioPort = string("").provideDelegate(this, "stdioPort");
 	private final StoredProperty<String> targetMode = string("onw_wire").provideDelegate(this, "targetMode");
-	private final StoredProperty<String> platformType = string("avr").provideDelegate(this, "platformType");
+	private final StoredProperty<String> platformType = string(PlatformType.AVR.name()).provideDelegate(this, "platformType");
 	private final StoredProperty<String> deviceId = string("atmega328").provideDelegate(this, "deviceId");
 	private final StoredProperty<String> flashToolName = string("avrdude").provideDelegate(this, "flashToolName");
-	private final StoredProperty<String> optimizationType = string("size").provideDelegate(this, "optimization");
-	private final StoredProperty<String> strictLevel = string("light").provideDelegate(this, "strict");
+	private final StoredProperty<String> optimizationType = string(OptimizationType.SIZE.name()).provideDelegate(this, "optimization");
+	private final StoredProperty<String> strictLevel = string(StrictLevel.LIGHT.name()).provideDelegate(this, "strict");
 	private final StoredProperty<Boolean> softReset = property(true).provideDelegate(this, "softReset");
 	private final StoredProperty<Boolean> bldrApiReuse = property(true).provideDelegate(this, "bldrApiReuse");
-	private final StoredProperty<Boolean> verboseOutput = property(false).provideDelegate(this, "verboseOutput");
+	private final StoredProperty<String> verbosity = string(Verbosity.NORMAL.name()).provideDelegate(this, "verbosity");
 	private final StoredProperty<Boolean> pomExport = property(false).provideDelegate(this, "pomExport");
+    private final StoredProperty<Boolean> addonsInclude = property(false).provideDelegate(this, "addonsInclude");
+	private final StoredProperty<Boolean> mvnQuiet = property(true).provideDelegate(this, "mvnQuiet");
 	private final StoredProperty<String> flashToolParams= string("").provideDelegate(this, "flashToolParams");
 
 	public void setMavenProfileId(String profileId) { this.mavenProfileId.setValue(this, profileId); }
@@ -67,13 +72,16 @@ public class ExecuteParameters extends RunConfigurationOptions {
 	public Boolean isBldrApiReuse() {
 		return bldrApiReuse.getValue(this);
 	}
-	public void setVerboseOutput(Boolean verboseOutput) {this.verboseOutput.setValue(this, verboseOutput);}
-	public Boolean isVerboseOutput() {
-		return verboseOutput.getValue(this);
+	public void setVerbosity(String verbosity) {this.verbosity.setValue(this, verbosity);}
+	public String getVerbosity() {
+		return verbosity.getValue(this);
 	}
 	public void setSyncPom(Boolean pomExport) {this.pomExport.setValue(this, pomExport);}
 	public Boolean isSyncPom() {return pomExport.getValue(this);}
+    public void setAddonsInclude(Boolean addonsInclude) {this.addonsInclude.setValue(this, addonsInclude);}
+    public Boolean isAddonsInclude() {return addonsInclude.getValue(this);}
+	public void setMvnQuiet(Boolean mvnQuiet) {this.mvnQuiet.setValue(this, mvnQuiet);}
+	public Boolean isMvnQuiet() {return mvnQuiet.getValue(this);}
 	public void setFlashToolParams(String flashToolParams) { this.flashToolParams.setValue(this, flashToolParams);}
 	public String getFlashToolParams() {return flashToolParams.getValue(this);}
-
 }

@@ -18,7 +18,7 @@ package ru.vm5277.compiler.avr_codegen;
 
 import ru.vm5277.common.ExcsThrowPoint;
 import ru.vm5277.common.LabelNames;
-import ru.vm5277.common.enums.RTOSFeature;
+import ru.vm5277.common.enums.RtosFeature;
 import ru.vm5277.common.enums.RTOSLibs;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.cg.CGExcs;
@@ -92,7 +92,7 @@ public class ExcsChecker extends CodeExcsChecker {
 		if(-1==id) return;
 		Integer throwableId = excs.getThrowable(id);
 		if(null!=throwableId) {
-			cg.setFeature(RTOSFeature.OS_FT_ETRACE);
+			cg.setFeature(RtosFeature.OS_FT_ETRACE);
 			excs.getProduced().add(id);
 			
 			CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, null==regIds);
@@ -145,7 +145,7 @@ public class ExcsChecker extends CodeExcsChecker {
 		if(-1==id) return;
 		Integer throwableId = excs.getThrowable(id);
 		if(null!=throwableId) {
-			cg.setFeature(RTOSFeature.OS_FT_ETRACE);
+			cg.setFeature(RtosFeature.OS_FT_ETRACE);
 			excs.getProduced().add(id);
 			
 			CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, false);
@@ -214,7 +214,7 @@ public class ExcsChecker extends CodeExcsChecker {
 		if(-1==id) return;
 		Integer throwableId = excs.getThrowable(id);
 		if(null!=throwableId) {
-			cg.setFeature(RTOSFeature.OS_FT_ETRACE);
+			cg.setFeature(RtosFeature.OS_FT_ETRACE);
 			excs.getProduced().add(id);
 			
 			CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, true);
@@ -248,7 +248,7 @@ public class ExcsChecker extends CodeExcsChecker {
 		if(-1==id) return;
 		Integer throwableId = excs.getThrowable(id);
 		if(null!=throwableId) {
-			cg.setFeature(RTOSFeature.OS_FT_ETRACE);
+			cg.setFeature(RtosFeature.OS_FT_ETRACE);
 			excs.getProduced().add(id);
 			
 			CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, true);
@@ -282,7 +282,7 @@ public class ExcsChecker extends CodeExcsChecker {
 		if(-1==id) return;
 		Integer throwableId = excs.getThrowable(id);
 		if(null!=throwableId) {
-			cg.setFeature(RTOSFeature.OS_FT_ETRACE);
+			cg.setFeature(RtosFeature.OS_FT_ETRACE);
 			excs.getProduced().add(id);
 			
 			CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, false);
@@ -308,7 +308,7 @@ public class ExcsChecker extends CodeExcsChecker {
 	
 	@Override
 	public void makeException(CodeGenerator cg, CGScope scope, CGExcs excs, int throwableId) throws CompileException {
-		cg.setFeature(RTOSFeature.OS_FT_ETRACE);
+		cg.setFeature(RtosFeature.OS_FT_ETRACE);
 		excs.getProduced().add(throwableId);
 		scope.append(new CGIAsmLd("ldi", "r16", Integer.toString(throwableId)));
 		scope.append(new CGIAsmLd("ldi", "r17", "0x00"));

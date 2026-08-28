@@ -109,8 +109,6 @@ public abstract class CommandNode extends AstNode {
 		}
 	}
 
-	protected	CGScope	cgScope;
-	
 	public CommandNode(Instance inst, TokenBuffer tb) {
 		super(inst, tb);
 	}
@@ -155,10 +153,10 @@ public abstract class CommandNode extends AstNode {
 				}
 				for(int i=num; i<=to; i++) {
 					if(!values.add(i)) {
-						if(StrictLevel.STRONG==Main.getStrictLevel()) {
+						if(StrictLevel.STRONG==inst.getStrictLevel()) {
 							throw new CompileException("Duplicate case value: " + i);
 						}
-						else if(StrictLevel.LIGHT==Main.getStrictLevel()) {
+						else if(StrictLevel.LIGHT==inst.getStrictLevel()) {
 							markWarning("Duplicate case value: " + i);
 						}
 					}
@@ -166,10 +164,10 @@ public abstract class CommandNode extends AstNode {
 			}
 			else {
 				if(!values.add(num)) {
-					if(StrictLevel.STRONG==Main.getStrictLevel()) {
+					if(StrictLevel.STRONG==inst.getStrictLevel()) {
 						throw new CompileException("Duplicate case value: " + num);
 					}
-					else if(StrictLevel.LIGHT==Main.getStrictLevel()) {
+					else if(StrictLevel.LIGHT==inst.getStrictLevel()) {
 						markWarning("Duplicate case value: " + num);
 					}
 				}

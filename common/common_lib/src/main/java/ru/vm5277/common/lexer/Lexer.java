@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.lexer.tokens.TAnnotation;
 import ru.vm5277.common.lexer.tokens.TDirective;
 import ru.vm5277.common.lexer.tokens.TKeyword;
 import static ru.vm5277.common.lexer.tokens.Token.skipToken;
@@ -152,12 +153,19 @@ public class Lexer {
 				throw new CompileException("Unexpected end of comment '*/' without start");
 			}
 
-			// Макро параметер
-			if((LexerType.ALL==type || LexerType.ASM==type) && '@'==sb.peek()) {
-				sb.next();
-				return  new Token(sb, sp, TokenType.MACRO_PARAM);
-			}
 
+			if('@'==sb.peek()) {
+				sb.next();
+				if(LexerType.J8B==type) {
+					// Аннотации				
+					return new TAnnotation(sb, sp);
+				}
+				else {
+					// Макро параметер
+					return  new Token(sb, sp, TokenType.MACRO_PARAM);
+				}
+			}
+			
 			// Символ
 			if ('\''==sb.peek()) {
 				return new TChar(sb);

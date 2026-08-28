@@ -16,14 +16,12 @@
 package ru.vm5277.common.cg.scopes;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.StrUtils;
 import ru.vm5277.common.cg.CGCells;
@@ -36,13 +34,6 @@ import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.enums.OptimizationType;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-
-/*TODO 
-	1.	В статических методах HeapIReg не задействован, можно использовать в пуле свободных регистров
-	2.	Похоже в методе без переменных и без аргументов также не задействован stackIReg(нужно убедиться), можно использовать в пуле свободных регистров
-		Но нужно убедтиться, что в блоках также нет локальных переменных.
-	3.	Критично! AST inlining использует IReg для массивов, похоже нужно пересмотреть его зону применения как общую, без константного смещения(X регистр в AVR)
-*/
 
 public class CGMethodScope extends CGCellsScope {
 	private			CodeGenerator				cg;
@@ -62,12 +53,9 @@ public class CGMethodScope extends CGCellsScope {
 
 	private			CGIContainer				initContainer		= new CGIContainer();
 	
-	private			boolean						heapIRegModified;
-	private			AtomicInteger				lastHeapOffset		= new AtomicInteger();
-	private			AtomicInteger				lastStackOffset		= new AtomicInteger();
 	private			Set<Integer>				exceptionIds		= new HashSet<>();
 	
-	public CGMethodScope(CodeGenerator cg, CGClassScope parent, int resId, VarType type, int size, String name) {
+	public CGMethodScope(CodeGenerator cg, CGScope parent, int resId, VarType type, int size, String name) {
 		super(parent, resId, type, size, name);
 		
 		this.cg = cg;
@@ -92,9 +80,13 @@ public class CGMethodScope extends CGCellsScope {
 		sb.append(name).append("(");
 		if(null != types) {
 			for (VarType _type : types) {
-				sb.append(_type.getName()).append(",");
-				int typeSize = _type.getSize();
-				argsStackSize += (-1 == typeSize ? cg.getRefSize() : typeSize);
+				if(_type.isArray()) {
+					sb.append(_type.toString()).append(",");
+				}
+				else {
+					sb.append(_type.getName()).append(",");
+				}
+				argsStackSize += (_type.isReferenceType() ? cg.getRefSize() : _type.getSize());
 			}
 			if (0!=types.length) {
 				sb.setLength(sb.length() - 1); // Удаляем последнюю запятую
@@ -125,11 +117,9 @@ public class CGMethodScope extends CGCellsScope {
 		cont.append(new CGIText(""));
 		cont.append(lbScope);
 
-		heapIRegModified = cg.normalizeIRegConst(this, 'z', lastHeapOffset);
-//FOR TEST heapIRegModified = true;
-		cg.normalizeIRegConst(this, 'y', lastStackOffset);
+		cg.normalizeIRegConst(this);
 		
-		CGClassScope cScope = (CGClassScope)parent;
+		//CGClassScope cScope = (CGClassScope)parent;
 		if(null==type) {
 			//cont.append(cg.eNewInstance(cScope.getHeapOffset(), cScope.getIIDLabel(), cScope.getType(), false, false));
 			cont.append(initContainer);
@@ -162,7 +152,6 @@ public class CGMethodScope extends CGCellsScope {
 	public CGCells argAllocate(CGScope cgScope, int size) throws CompileException {
 		CGCells cells = new CGCells(CGCells.Type.ARGS, size, stackOffset);
 		stackOffset+=size;
-		if(VERBOSE_LO <= verbose) cgScope.append(new CGIText(";allocated args data, x" + size + " from stack frame (" + getPath('.') + ")"));
 		return cells;
 	}
 	
@@ -200,14 +189,15 @@ public class CGMethodScope extends CGCellsScope {
 
 	/**
 	 * borrowReg занимаем регистры запрошенного количества, если регистров не достаточно возвращаем null
+	 * @param usedRegsShot слепок занятых регистров
 	 * @param size количество ячеек
 	 * @return массив выделенных регистров либо null
 	 */
-	public RegPair[] borrowReg(int size) throws CompileException {
+	public RegPair[] borrowReg(Set<RegPair> usedRegsShot, int size) throws CompileException {
 		if(regsPool.isEmpty()) return null;
 
 		if(0x02==size) {
-			RegPair[] pairs = findRegsPair(regsPool);
+			RegPair[] pairs = findRegsPair(usedRegsShot, regsPool);
 			if(null!=pairs) {
 				for(RegPair pair: pairs) {
 					usedRegs.add(pair.getReg());	// Помечаем, что регистр использовался для сохраненния оригинала в стек
@@ -216,9 +206,9 @@ public class CGMethodScope extends CGCellsScope {
 			}
 		}
 		else if(0x04==size) {
-			RegPair[] pairs1 = findRegsPair(regsPool);
+			RegPair[] pairs1 = findRegsPair(usedRegsShot, regsPool);
 			if(null!=pairs1) {
-				RegPair[] pairs2 = findRegsPair(regsPool);
+				RegPair[] pairs2 = findRegsPair(usedRegsShot, regsPool);
 				if(null!=pairs2) {
 					for(RegPair pair: pairs1) {
 						usedRegs.add(pair.getReg());	// Помечаем, что регистр использовался
@@ -240,7 +230,7 @@ public class CGMethodScope extends CGCellsScope {
 		Collections.sort(tmp);
 		int index = 0;
 		for(RegPair pair : tmp) {
-			if(pair.isFree()) {
+			if(pair.isFree() && (null==usedRegsShot || !usedRegsShot.contains(pair))) {
 				result[index++] = pair;
 				if(index==size) {
 					for(RegPair rp : result) {
@@ -258,7 +248,6 @@ public class CGMethodScope extends CGCellsScope {
 	}
 	
 	protected void releaseReg(CGScope cgScope, Byte regId) throws CompileException {
-		if(VERBOSE_LO <= verbose) cgScope.append(new CGIText(";release REG[" + regId + "] (" + getPath('.') + ") " + System.currentTimeMillis()));
 		regsPool.get(regId).setFree(true);	// Помечаем, что регистр освобожден
 	}
 
@@ -317,17 +306,5 @@ public class CGMethodScope extends CGCellsScope {
 	@Override
 	public CGCells getCells() {
 		return cells;
-	}
-	
-	public boolean isHeapIRegModified() {
-		return heapIRegModified;
-	}
-	
-	public int getLastHeapOffset() {
-		return lastHeapOffset.get();
-	}
-	
-	public int getLastStackOffset() {
-		return lastStackOffset.get();
 	}
 }

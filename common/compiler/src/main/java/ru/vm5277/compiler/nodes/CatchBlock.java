@@ -212,8 +212,8 @@ public class CatchBlock extends BlockNode {
 		}
 		
 		((CGBlockScope)cgScope).build(cg, false, excs);
-		((CGBlockScope)cgScope).releaseRegsPool();
-
+		
+		releaseVars(cg);
 		return null;
 	}
 }

@@ -1,0 +1,46 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import boards.ArduinoUno;
+import drivers.display.LedMatrixMax7219;
+import fonts.Ascii8x8;
+import fonts.Koi8r8x8;
+
+class Main {
+	public static void main() {
+		System.setParam(RtosParam.SHOW_WELCOME, 1);
+		int uptime = System.uptimeMs();
+		byte[] buffer = new byte[Koi8r8x8.CHAR_SIZE];
+		try {
+			GraphicsDisplay gd = new LedMatrixMax7219(ArduinoUno.PIN_D7, ArduinoUno.PIN_D6, ArduinoUno.PIN_D5, 8, 8);
+			for(short index=0x20; index<0x80; index++) {
+				FlashData.toBuffer(Ascii8x8.DATA, (index-0x20)*Ascii8x8.CHAR_SIZE, buffer);
+				gd.drawImage(buffer, 0, 0, 8, 8);
+				Thread.sleep(100);
+			}
+			for(short index=0x80; index<=0xff; index++) {
+				FlashData.toBuffer(Koi8r8x8.DATA, (index-0x80)*Koi8r8x8.CHAR_SIZE, buffer);
+				gd.drawImage(buffer, 0, 0, 8, 8);
+				Thread.sleep(100);
+			}
+			byte[] image = new byte[] {0x00,0x66,0xff,0xff,0x7e,0x3c,0x18,0x00};
+			gd.drawImage(image, 0, 0, 8, 8);
+		}
+		catch(NativeException ex) {
+			System.out(ex);
+		}
+	}
+}

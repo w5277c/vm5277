@@ -1,0 +1,100 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import rtos.RtosDispatcher;
+
+public class Dht11 implements HumiditySensor, TemperatureSensor {
+	private byte port;
+	private final byte[] buffer = new byte[4];
+
+	public Dht11(byte port) {
+		this.port = port;
+	}
+
+	@Override public void read() throws DriverException {
+ 		RtosDispatcher.lock();
+
+		Gpio.modeOut(port);
+		Gpio.setLow(port);
+// Квантование для переключения задач - 10мс, при большой нагрузке диспетчер может вернуть управление заметно позже,
+// поэтому диспетчер лучше заранее заблокировать
+		Thread.sleep(18);
+
+		Gpio.setHigh(port);
+
+		RtosCore.delayUs(40);
+        Gpio.modeIn(port);
+        Gpio.setLow(port);
+        if(Gpio.get(port)) {
+			RtosDispatcher.unlock();
+        	DriverException.throw(DriverException.NO_RESPONSE);
+        }
+
+		RtosCore.delayUs(80);
+        if(!Gpio.get(port)) {
+			RtosDispatcher.unlock();
+            DriverException.throw(DriverException.INIT_FAILED);
+        }
+
+		RtosCore.delayUs(80);
+		byte sum = 0;
+		for(byte i=0; i<4; i++) { // Читаем данные
+			byte b = readByte();
+			buffer[i] = b;
+			sum += b;
+		}
+		if(sum!=readByte()) { // Сверяем контрольную сумму
+            RtosDispatcher.unlock();
+            DriverException.throw(DriverException.CHECKSUM_ERROR);
+		}
+
+		RtosDispatcher.unlock();
+	}
+
+	private byte readByte() throws DriverException {
+		byte result = 0;
+
+		for(byte i=0; i<8; i++) {
+			byte uptime = RtosCore.getUptimeB0();
+			while(!Gpio.get(port)) { // Ждем высокий уровень или таймаут
+				if((RtosCore.getUptimeB0()-uptime)>2) {
+					RtosDispatcher.unlock();
+					DriverException.throw(DriverException.TIMEOUT);
+				}
+			}
+            RtosCore.delayUs(30);
+			// TODO пересмотреть токен
+			result ]<< Gpio.get(port); // if(Gpio.get(port)) {result |= (1<<(i-1));}
+
+			uptime = RtosCore.getUptimeB0();
+			while(Gpio.get(port)) { // Ждем низкий уровень или таймаут
+				if((RtosCore.getUptimeB0()-uptime)>2) {
+					RtosDispatcher.unlock();
+					DriverException.throw(DriverException.TIMEOUT);
+				}
+			}
+		}
+		return result;
+	}
+
+	@Override public fixed getCelsius() {
+		return Primitive.rawToFixed(buffer[2], buffer[3]*26);
+	}
+
+	@Override public fixed getPercents() {
+		return Primitive.rawToFixed(buffer[0], buffer[1]*26);
+	}
+}

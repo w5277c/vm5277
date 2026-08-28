@@ -27,12 +27,11 @@ class Main {
 		byte b1=1;
 		byte b2;b2=2;
 		
-		bool b;b=true;
-		System.out(b);
+		boolean b;b=true;
+		System.out("b [true]=" + b + '\n');
 		int i;i=123;
-		System.out(i);
+		System.out("i [123]=" + i + '\n');
 		
-		System.out('\n');
 		System.out("\nEnum EDirection, size:" + EDirection.size());
 		System.out("\nДлинная строка," + "cstr2");
 		System.out("\nДлинная строка," + 1);

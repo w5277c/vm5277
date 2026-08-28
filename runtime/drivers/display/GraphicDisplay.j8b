@@ -14,9 +14,25 @@
  * limitations under the License.
  */
 
-public interface GraphicsDisplay extends TextDisplay {
-	void setPixel(short x, short y, byte color);
-	void drawLine(short x1, short y1, short x2, short y2, byte color);
-	void drawRect(short x, short y, short w, short h, byte color);
-	void fillRect(short x, short y, short w, short h, byte color);
+public interface GraphicsDisplay extends Display {
+	public static enum PixelFormat {
+		MONO_1BIT_HORIZONTAL,   // 1 бит, 2 цвета (1 байт = 8 пикселей по горизонтали)
+		MONO_1BIT_VERTICAL,		// 1 бит, 2 цвета (1 байт = 8 пикселей по вертикали)
+		// Последующие - просто предлоложение, вероятно будут меняться по мере реализации дисплеев
+		CGA_2BIT_HORIZONTAL,	// 2 бита, 4 цвета
+		CGA_2BIT_VERTICAL,		// 2 бита, 4 цвета
+		EGA_4BIT_HORIZONTAL,	// 4 бита, 16 цветов
+		EGA_4BIT_VERTICAL,		// 4 бита, 16 цветов
+		VGA_8BIT,       		// 8 бит, 256 цветов
+		RGB332,         		// 8 бит, 256 цветов
+		RGB565,         		// 16 бит, 65536 цветов
+		RGB888,         		// 24 бита, 16.7M цветов
+		GRB888,					// 24 бита, 16.7M цветов
+		RGBA8888,       		// 32 бита, с альфа-каналом
+		ARGB8888;       		// 32 бита, с альфа-каналом
+	}
+
+    //PixelFormat getPixelFormat();
+
+	void drawImage(byte[] data, short xPos, short yPos, short imgWidth, short imgHeight);
 }

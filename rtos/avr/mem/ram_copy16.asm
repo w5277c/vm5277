@@ -14,23 +14,18 @@
  * limitations under the License.
  */
 
-.IFNDEF OS_RAM_COPY16
+.IFNDEF OS_RAM_COPY16_NR
 ;-----------------------------------------------------------
-OS_RAM_COPY16:
+OS_RAM_COPY16_NR:
 ;-----------------------------------------------------------
-;Заполнение блока памяти SRC->DST
-;IN: Y-SRC адрес, Z-DST адрес ACCUM_L/H-длина
-;MOD: YL/H,ZL/H,ACCUM_L/H/EL
+;Копирование блока памяти SRC->DST
+;IN: X-SRC адрес, Y-DST адрес TEMP_L/H-длина
+;MOD: Y,X,ACCUM_L,TEMP_L/H
 ;-----------------------------------------------------------
-	CP ACCUM_L,C0x00
-	CPC ACCUM_H,C0x00
-	BREQ _OS_RAM_COPY16__RET
 _OS_RAM_COPY16__LOOP:
-	LD ACCUM_EL,Y+
-	ST Z+,ACCUM_EL
-	SUBI ACCUM_L,0x01
-	SBCI ACCUM_H,0x00
+	LD ACCUM_L,X+
+	ST Y+,ACCUM_L
+	SBIW TEMP_L,0x01
 	BRNE _OS_RAM_COPY16__LOOP
-_OS_RAM_COPY16__RET:
 	RET
 .ENDIF

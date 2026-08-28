@@ -14,28 +14,22 @@
  * limitations under the License.
  */
 
-.include "io/_port_offset.asm"
-
 .IFNDEF PORT_SET
-;--------------------------------------------------------
+.include "io/_port_offset.asm"
+;-----------------------------------------------------------
 PORT_SET:
-;--------------------------------------------------------
+;-----------------------------------------------------------
 ;Устанвливаем состояние целиком на порт
-;IN: ACCUM_L-порт,ACCUM_H-состояние
-;--------------------------------------------------------
+;IN: ACCUM_L-порт,ACCUM_EL-состояние
+;-----------------------------------------------------------
 	CPI ACCUM_L,0xff
-	BRNE PC+0x02
-	RET
-
-	PUSH_Z
-	PUSH ACCUM_L
-
+	BREQ _PORT_SET__END
+	PUSH_A16
 	SWAP ACCUM_L
 	MCALL _PORT_OFFSET
-	ADIW ZL,0x02
-	STS Z,ACCUM_H
-
-	POP ACCUM_L
-	POP_Z
+	ADD ACCUM_L,C0x02
+	STS Z,ACCUM_EL
+	POP_A16
+_PORT_SET__END:
 	RET
 .ENDIF

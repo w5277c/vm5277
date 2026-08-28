@@ -1,0 +1,84 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import rtos.RtosDispatcher;
+
+// UartHwHalf - аппаратный полудуплексный(запрос-ответ) драйвер двухпроводного UART-интерфейса,
+// где RX-линия приема данных, а TX-линия передачи данных (с поддержкой пина направления).
+@ExpandHeap(10)
+public class UartHwHd implements RtosHalfDuplexIface, UartCommon {
+	public enum State {
+		READY,
+		SENDING,
+		BREAK,
+		WAIT_DATA,
+		RECEIVING,
+		FAIL,
+		OVERFLOW
+	}
+
+	public enum Feature {
+		BREAK,			// Формирование сигнала BREAK
+		MAGIC,			// Определение магического слова (2 байта) и вызов процедуры обработчика
+		U2X_OFF,		// Отключение удвоеной частоты выборки
+		DIR_CONTROL		// Управление дополнительным пином направления
+	}
+
+	//WARNING! Любые изменения свойств должны быть учтены в драйвере RTOS
+	//Т.к. драйвер RTOS работает с кучей напрямую.
+	private byte ifaceSn;
+	private int baudrate;
+	private	Parity parity;
+	private StopBits stopBits;
+	private short magic;
+	private RtosCallback magicCallback;
+	private	byte dirPin;
+	private byte features;
+	private byte state;
+
+	public UartHwHd(byte ifaceSn, int baudrate, Parity parity, StopBits stopBits) {
+		this.ifaceSn = ifaceSn;
+		this.baudrate = baudrate;
+		this.parity = parity;
+		this.stopBits = stopBits;
+
+	}
+
+	public void enableMagicDetection(short magic, RTOSCallback magicCallback) {
+		this.magic = magic;
+		this.magicCallback = magicCallback;
+		this.features |= (1<<Feature.MAGIC);
+	}
+	public void disableMagicDetection() {
+		this.features &= ~(1<<Feature.MAGIC);
+	}
+
+	public void setDirControl(byte dirPin) {
+		this.dirPin = dirPin;
+		this.features |= (1<<Feature.DIR_CONTROL);
+	}
+
+	private native void init() throws DriverException;
+	public void open() {
+		init();
+	}
+	public native void close();
+	@Override public int getBaudrate() {return baudrate;}
+	@Override public Parity getParity() {return parity;}
+	@Override public StopBits getStopBits() {return stopBits;}
+
+	@Override public native short comm(byte[] sendBuf, short sendLen, byte[] recvBuf, short recvLen, short timeout) throws DriverException;
+}

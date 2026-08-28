@@ -8,6 +8,8 @@ import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.project.ProjectManager;
+import com.intellij.openapi.project.ProjectManagerListener;
 import com.intellij.openapi.startup.ProjectActivity;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -20,6 +22,7 @@ import org.jetbrains.idea.maven.project.MavenProjectsManager;
 import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.Toolkit;
 import ru.vm5277.common.mvn.MavenUtils;
+import ru.vm5277.plugin.asm.AsmSyntaxHighlighterFactory;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -57,6 +60,15 @@ public class MavenStartup implements ProjectActivity {
 
 	@Override
 	public Object execute(@NotNull Project project, @NotNull Continuation<? super Unit> continuation) {
+		project.getMessageBus().connect().subscribe(
+			ProjectManager.TOPIC,
+			new ProjectManagerListener() {
+				@Override
+				public void projectClosed(@NotNull Project closedProject) {
+					AsmSyntaxHighlighterFactory.removeLspServer(project);
+				}
+			}
+		);
 		MavenProjectsManager mavenManager = MavenProjectsManager.getInstance(project);
 		if (mavenManager.isMavenizedProject()) {
 			mavenManager.forceUpdateAllProjectsOrFindAllAvailablePomFiles();

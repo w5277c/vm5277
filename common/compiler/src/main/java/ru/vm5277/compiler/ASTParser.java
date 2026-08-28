@@ -25,9 +25,9 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.ClassNode;
 import ru.vm5277.compiler.nodes.ExceptionNode;
@@ -41,31 +41,38 @@ import ru.vm5277.common.lexer.Lexer;
 import ru.vm5277.common.lexer.LexerType;
 import ru.vm5277.common.lexer.tokens.Token;
 import ru.vm5277.common.messages.ErrorMessage;
+import ru.vm5277.compiler.nodes.AnnotationParamNode;
+import ru.vm5277.compiler.nodes.EnumNode;
 
 public class ASTParser extends AstNode {
-	private	final	FileImporter			fileImporter;
-	private			List<AstNode>			imports			= new ArrayList<>();
+	private final	Path					basePath;
+	private			FileImporter			fileImporter;
+	private			List<ImportNode>		imports			= new ArrayList<>();
 	private			List<ObjectTypeNode>	autoImported	= new ArrayList<>();
 	private			List<ObjectTypeNode>	imported		= new ArrayList<>();
 	private			ObjectTypeNode			objTypeNode;
 	
-	public ASTParser(Instance inst, Path basePath, List<Token> tokens) throws IOException {
-		this(inst, basePath, tokens, false, false);
+	public ASTParser(Instance inst, Path basePath) {
+		this.inst = inst;
+		this.basePath = basePath;
 	}
-	public ASTParser(Instance inst, Path basePath, List<Token> tokens, boolean firsLaunch) throws IOException {
-		this(inst, basePath, tokens, firsLaunch, false);
+	
+	public void parse(List<Token> tokens) throws IOException {
+		parse(tokens, false, false);
 	}
-	public ASTParser(Instance inst, Path basePath, List<Token> tokens, boolean firsLaunch, boolean syntheticMode) throws IOException {
-		this.fileImporter = new FileImporter(inst.getRuntimePath(), basePath, inst.getMessageContainer());
-		
-		if(tokens.isEmpty()) return;
+	public void parse(List<Token> tokens, boolean firsLaunch) throws IOException {
+		parse(tokens, firsLaunch, false);
+	}
+	public void parse(List<Token> tokens, boolean firsLaunch, boolean syntheticMode) throws IOException {
+		this.fileImporter = new FileImporter(inst, inst.getRuntimePath(), basePath);
 		
         // Автоматический импорт из runtime/autoimport.cfg и загрузка не исключаемых методов для кодогенерации
         if(firsLaunch && null!=inst.getRuntimePath()) {
 			importAutoConfiguredClasses(inst, basePath);
-			loadPersistMethods(inst.getRuntimePath(), basePath);
 		}
 
+		if(null==tokens || tokens.isEmpty()) return;
+		
 		tb = new TokenBuffer(tokens.listIterator());
 
 		String classPath = null;
@@ -87,17 +94,27 @@ public class ASTParser extends AstNode {
 			}
 			else if(!importedTokens.isEmpty()) {
 				// Рекурсивный парсинг импортированного файла
-				ASTParser importedParser = new ASTParser(inst, basePath, importedTokens);
+				ASTParser importedParser = new ASTParser(inst, basePath);
+				importedParser.parse(importedTokens);
 				if(null!=importedParser.getClazz()) {
 					imported.add(importedParser.getClazz());
 				}
 			}
 		}
 		
+		Map<String, AnnotationParamNode> annotations = null;
+		try {
+			annotations = collectAnnotations(tb);
+		}
+		catch(CompileException e) {
+			markError(e);
+			return;
+		}
+		
 		Set<Keyword> modifiers = collectModifiers(tb);
 		if(tb.match(TokenType.OOP, J8BKeyword.INTERFACE)) {
 			try {
-				objTypeNode = new InterfaceNode(inst, tb, modifiers, classPath, imported);
+				objTypeNode = new InterfaceNode(inst, tb, annotations, modifiers, classPath, false, imported);
 			}
 			catch(CompileException e) {
 				markError(e);
@@ -117,7 +134,7 @@ public class ASTParser extends AstNode {
 		}
 		else if(tb.match(TokenType.OOP, J8BKeyword.CLASS)) {
 			try {
-				objTypeNode = new ClassNode(inst, tb, modifiers, false, imported); //TODO понадобится class path
+				objTypeNode = new ClassNode(inst, tb, annotations, modifiers, false, imported); //TODO понадобится class path
 			}
 			catch(CompileException e) {
 				markError(e);
@@ -125,6 +142,17 @@ public class ASTParser extends AstNode {
 				// Парсинг прерван (дальнейший парсинг файла бессмыслен)
 			}
 		}
+		else if(tb.match(TokenType.OOP, J8BKeyword.ENUM)) {
+			try {
+				objTypeNode = new EnumNode(inst, tb, annotations, modifiers, null);
+			}
+			catch(CompileException e) {
+				markError(e);
+				return;
+				// Парсинг прерван (дальнейший парсинг файла бессмыслен)
+			}
+		}
+
 		// Добавляем префикс и постфикс для synthericMode
 		if(syntheticMode && null==objTypeNode && !tb.match(TokenType.EOF)) {
 			try {
@@ -143,8 +171,9 @@ public class ASTParser extends AstNode {
 				filtered.add(new Token(TokenType.EOF));
 				
 				tb = new TokenBuffer(filtered.listIterator());
+				annotations = collectAnnotations(tb);
 				modifiers = collectModifiers(tb);
-				objTypeNode = new ClassNode(inst, tb, modifiers, false, imported);
+				objTypeNode = new ClassNode(inst, tb, annotations, modifiers, false, imported);
 			}
 			catch(CompileException e) {
 				markError(e);
@@ -152,10 +181,14 @@ public class ASTParser extends AstNode {
 		}
 	}
 	
-	public List<AstNode> getImports() {
+	public List<ImportNode> getImports() {
 		return imports;
 	}
 
+	public List<ObjectTypeNode> getImported() {
+		return imported;
+	}
+	
 	public List<ObjectTypeNode> getAutoImported() {
 		return autoImported;
 	}
@@ -209,7 +242,8 @@ public class ASTParser extends AstNode {
 					}
 					else {
 						if(!importedTokens.isEmpty()) {
-							ASTParser importedParser = new ASTParser(inst, basePath, importedTokens);
+							ASTParser importedParser = new ASTParser(inst, basePath);
+							importedParser.parse(importedTokens);
 							if(null!=importedParser.getClazz()) {
 								autoImported.add(importedParser.getClazz());
 							}
@@ -217,38 +251,6 @@ public class ASTParser extends AstNode {
 						else {
 							markWarning("Auto-import file not found or empty: " + fileRuntimePath);
 						}
-					}
-				}
-			}
-		}
-	}
-	
-	private void loadPersistMethods(Path runtimePath, Path basePath) throws IOException {
-		Path persistConfig = runtimePath.resolve("persist.cfg");
-
-		if(!persistConfig.toFile().exists()) {
-			markWarning("Persist configuration not found: " + persistConfig);
-			return;
-		}
-
-		try (BufferedReader br = new BufferedReader(new FileReader(persistConfig.toFile()))) {
-			while(true) {
-				String importPath = br.readLine();
-				if(null==importPath) break;
-				// Убираем комментарии и лишние пробелы
-				int pos = importPath.indexOf('#');
-				if(pos>=0) {
-					importPath = importPath.substring(0, pos);
-				}
-
-				importPath = importPath.trim();
-
-				if(!importPath.isEmpty()) {
-					if(importPath.replaceAll("^([a-zA-Z_][a-zA-Z0-9_]*\\.)+[a-zA-Z_][a-zA-Z0-9_]*\\(.*\\)$", "").isEmpty()) {
-						persists.add(importPath);
-					}
-					else {
-						markError("Illegal persist declaration: " + importPath + ", expected format: package.Class.method(args)");
 					}
 				}
 			}

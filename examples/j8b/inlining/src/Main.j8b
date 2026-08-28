@@ -38,13 +38,13 @@ class Main {
 	}
 
     public static void main() {
-		System.setParam(RTOSParam.SHOW_WELCOME, 0x01);
+		System.setParam(RtosParam.SHOW_WELCOME, 0x01);
 
 		set(14,15);
-		System.out(get());
+		System.out("get() [14]=" + get() + '\n');
 		
 		Clazz c = new Clazz();
 		c.set(16);
-		System.out(c.get());
+		System.out("c.get() [16]=" + c.get() + '\n');
 	}
 }

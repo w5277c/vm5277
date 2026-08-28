@@ -13,32 +13,47 @@
 
 	<modules>
 		<module>accclash</module>
-		<module>ansi</module>
 		<module>arrays1</module>
 		<module>arrays2</module>
 		<module>arrays3</module>
+		<module>beeper</module>
 		<module>bench_crc8</module>
+		<module>bmp580</module>
+		<module>buzzer</module>
 		<module>cast</module>
+		<module>collections</module>
 		<module>conditions</module>
 		<module>cstr</module>
+		<module>ds1302</module>
+		<module>ds3231</module>
 		<module>enum</module>
 		<module>exception</module>
+		<module>flash</module>
 		<module>for</module>
 		<module>gpio</module>
+		<module>hcsr04</module>
+		<module>hd44780</module>
 		<module>hello</module>
+		<module>hidm</module>
+		<module>hw069</module>
+		<module>hw504</module>
 		<module>if</module>
 		<module>inlining</module>
 		<module>isas</module>
 		<module>math</module>
+		<module>max7219</module>
 		<module>methodcall</module>
 		<module>newobj</module>
 		<module>pairalloc</module>
+		<module>pinevent</module>
 		<module>primitives</module>
 		<module>random</module>
 		<module>regreuse</module>
+		<module>relay</module>
 		<module>return</module>
 		<module>rgb</module>
 		<module>rgbrand</module>
+		<module>ssd1306</module>
 		<module>static</module>
 		<module>stdin</module>
 		<module>stdout</module>
@@ -47,8 +62,9 @@
 		<module>thread</module>
 		<module>timer1</module>
 		<module>unary</module>
-		<module>usdelay</module>
+		<module>vt100</module>
 		<module>while</module>
+		<module>ws2812b</module>
 	</modules>
 	
 	<properties>
@@ -58,6 +74,7 @@
 		<j8b.packaging.version>0.1.0</j8b.packaging.version>
 		<j8b.plugin.version>0.2.0</j8b.plugin.version>
 		<j8b.sourceDirectory>src</j8b.sourceDirectory>
+		<j8b.includePaths></j8b.includePaths>
 		<j8b.output.base>${project.build.directory}</j8b.output.base>
 	</properties>
 	
@@ -105,7 +122,25 @@
 				<j8b.softReset>false</j8b.softReset>
 			</properties>
 		</profile>
-	</profiles>
+		<profile>
+		<id>arduino-uno-pd2</id>
+			<properties>
+				<j8b.target>avr:atmega328p</j8b.target>
+				<j8b.targetFreq>16</j8b.targetFreq>
+				<j8b.targetStdio>PD2</j8b.targetStdio>
+				<j8b.softReset>false</j8b.softReset>
+			</properties>
+		</profile>
+		<profile>
+			<id>atmega16a</id>
+				<properties>
+					<j8b.target>avr:atmega16a</j8b.target>
+					<j8b.targetFreq>16</j8b.targetFreq>
+					<j8b.targetStdio>PD0/PD1</j8b.targetStdio>
+					<j8b.softReset>false</j8b.softReset>
+				</properties>
+			</profile>
+		</profiles>
 	<build>
 		<resources>
 			<resource>
@@ -143,7 +178,7 @@
 					<target>${j8b.target}</target>
 					<targetFreq>${j8b.targetFreq}</targetFreq>
 					<targetStdio>${j8b.targetStdio}</targetStdio>
-					<verbose>${j8b.verbose}</verbose>
+					<verbosity>${j8b.verbosity}</verbosity>
 				</configuration>
 			</plugin>
 		</plugins>

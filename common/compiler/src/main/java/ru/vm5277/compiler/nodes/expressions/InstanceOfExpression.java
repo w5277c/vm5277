@@ -55,7 +55,7 @@ public class InstanceOfExpression extends ExpressionNode {
 		this.leftExpr = leftExpr;
 		this.rightExpr = rightExpr;
 		this.varName = varName;
-		this.type = VarType.BOOL;
+		this.type = VarType.BOOLEAN;
 	}
 
 	public ExpressionNode getLeft() {
@@ -250,6 +250,9 @@ public class InstanceOfExpression extends ExpressionNode {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
+		if(cgDone || disabled) return null;
+		cgDone = true;
+
 		//Обходимся без рантайма, пока в левой части примитив или это константа
 		//Но нужно вызывать рантайм, если встречаем объект, так как только в рантайм данных есть информация о типе переменной
 		
@@ -273,6 +276,7 @@ public class InstanceOfExpression extends ExpressionNode {
 
 		if(heapSaved) cg.popHeapReg(cgScope);
 
+		releaseVars(cg);
 		return CodegenResult.RESULT_IN_FLAG;
 	}
 
@@ -286,6 +290,7 @@ public class InstanceOfExpression extends ExpressionNode {
 		return leftExpr + " is " + rightExpr + (null != varName ? " as " + varName : "");
 	}
     
+	@Override
 	public String getFullInfo() {
 		return getClass().getSimpleName() + " " + toString();
 	}

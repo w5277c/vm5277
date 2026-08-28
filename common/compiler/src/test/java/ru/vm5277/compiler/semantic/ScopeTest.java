@@ -16,7 +16,6 @@
 
 package ru.vm5277.compiler.semantic;
 
-import java.util.ArrayList;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -32,8 +31,8 @@ public class ScopeTest {
 
     @BeforeEach
     void setup() throws CompileException {
-        globalScope = new ClassScope(null, "Global");
-        childScope = new ClassScope(globalScope, "Child");
+        globalScope = new ClassScope(null, "Global", false);
+        childScope = new ClassScope(globalScope, "Child", false);
     }
 
     @Test

@@ -62,10 +62,6 @@
 
 	.EQU	_OS_DISPATCHER_PERIOD					= 10
 
-;---Смещения заголовка класса
-	.EQU	_OS_DISPATCHER__HEAP_SIZE_OFFSET		= 0x00
-	.EQU	_OS_DISPATCHER__HEAP_LINKCNTR_OFFSET	= 0x02
-	.EQU	_OS_DISPATCHER__HEAP_META_OFFSET		= 0x03
 ;---Смещения в заголовке heap'а
 	.EQU	_OS_DISPATCHER__TASK_STATEBITS_OFFSET	= 0x05
 	.EQU	_OS_DISPATCHER__TASK_NEXT_OFFSET		= 0x06
@@ -263,19 +259,18 @@ OS_TASK_START_NR:
 ;IN: ACCUM_L/H-адрес HEAP потока
 ;MOD:ACCUM_L/H/EL
 ;-----------------------------------------------------------
-	BLD ACCUM_EL,0x00										;Блокируем диспетчер
-	SET
-
+	MCALL OS_DISPATCHER_LOCK
 	PUSH_Z
+
 	MOVW ZL,ACCUM_L
 	LDD ACCUM_L,Z+_OS_DISPATCHER__TASK_STATEBITS_OFFSET		;Состояние потока
 	MOV ACCUM_H,ACCUM_L
 	ANDI ACCUM_H,0x0f
 	BRNE _OS_TASK_START__END								;Запуск уже выполнен
 
-	LDD ACCUM_H,Z+_OS_DISPATCHER__HEAP_LINKCNTR_OFFSET
+	LDD ACCUM_H,Z+_OS_CLASS_HEAP_OFFSET__LINK_CNTR
 	INC ACCUM_H												;Инсремент ref count
-	STD Z+_OS_DISPATCHER__HEAP_LINKCNTR_OFFSET,ACCUM_H
+	STD Z+_OS_CLASS_HEAP_OFFSET__LINK_CNTR,ACCUM_H
 
 	ORI ACCUM_L,(1<<_OS_DISPATCHER__TASK_READY)
 	STD Z+_OS_DISPATCHER__TASK_STATEBITS_OFFSET,ACCUM_L		;Состояние потока READY
@@ -286,7 +281,7 @@ OS_TASK_START_NR:
 
 _OS_TASK_START__END:
 	POP_Z
-	BST ACCUM_EL,0x00										;Снимаем блокировку диспетчера
+	MCALL OS_DISPATCHER_UNLOCK
 	RET
 
 ;-----------------------------------------------------------
@@ -297,9 +292,7 @@ OS_TIMER_START_NR:
 ;IN: ACCUM_L/H-адрес HEAP потока, ACCUM_EL/EH-период
 ;MOD:ACCUM_L/H
 ;-----------------------------------------------------------
-	PUSH TEMP_L
-	BLD TEMP_L,0x00											;Блокируем диспетчер
-	SET
+	MCALL OS_DISPATCHER_LOCK
 
 	PUSH_Z
 	MOVW ZL,ACCUM_L
@@ -312,9 +305,9 @@ OS_TIMER_START_NR:
 	LDD ACCUM_L,Z+_OS_DISPATCHER__TASK_STATEBITS_OFFSET		;Состояние потока
 	SBRC ACCUM_L,_OS_DISPATCHER__TASK_RUNNING
 	RJMP _OS_TIMER_START__END								;Нить выполняется
-	LDD ACCUM_H,Z+_OS_DISPATCHER__HEAP_LINKCNTR_OFFSET
+	LDD ACCUM_H,Z+_OS_CLASS_HEAP_OFFSET__LINK_CNTR
 	INC ACCUM_H												;Инсремент ref count
-	STD Z+_OS_DISPATCHER__HEAP_LINKCNTR_OFFSET,ACCUM_H
+	STD Z+_OS_CLASS_HEAP_OFFSET__LINK_CNTR,ACCUM_H
 
 	LDI ACCUM_L,(1<<_OS_DISPATCHER__TASK_READY)|(1<<_OS_DISPATCHER__TASK_TIMER)
 	STD Z+_OS_DISPATCHER__TASK_STATEBITS_OFFSET,ACCUM_L		;Состояние потока READY
@@ -325,8 +318,7 @@ OS_TIMER_START_NR:
 
 _OS_TIMER_START__END:
 	POP_Z
-	BST TEMP_L,0x00											;Снимаем блокировку диспетчера
-	POP TEMP_L
+	MCALL OS_DISPATCHER_UNLOCK
 	RET
 
 ;-----------------------------------------------------------
@@ -337,17 +329,16 @@ OS_TASK_STOP_NR:
 ;IN: ACCUM_L/H-адрес HEAP потока
 ;MOD: ACCUM_L/H/EL
 ;-----------------------------------------------------------
-	BLD ACCUM_EL,0x00										;Блокируем диспетчер
-	SET
-
+	MCALL OS_DISPATCHER_LOCK
 	PUSH_Z
+
 	MOVW ZL,ACCUM_L
 	LDD ACCUM_L,Z+_OS_DISPATCHER__TASK_STATEBITS_OFFSET		;Состояние потока
 	ORI ACCUM_L,(1<<_OS_DISPATCHER__TASK_STOP_REQUEST)
 	STD Z+_OS_DISPATCHER__TASK_STATEBITS_OFFSET,ACCUM_L		;Состояние потока STOP_REQUEST
 
 	POP_Z
-	BST ACCUM_EL,0x00										;Снимаем блокировку диспетчера
+	MCALL OS_DISPATCHER_UNLOCK
 	RET
 
 ;-----------------------------------------------------------

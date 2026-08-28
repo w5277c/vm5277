@@ -2,12 +2,39 @@ package ru.vm5277.plugin.j8b;
 
 import com.intellij.openapi.editor.DefaultLanguageHighlighterColors;
 import com.intellij.openapi.editor.colors.TextAttributesKey;
+import com.intellij.openapi.editor.markup.TextAttributes;
 import com.intellij.openapi.fileTypes.SyntaxHighlighterBase;
 import com.intellij.psi.tree.IElementType;
 import org.jetbrains.annotations.NotNull;
+
+import java.awt.*;
+
 import static com.intellij.openapi.editor.colors.TextAttributesKey.createTextAttributesKey;
 
 public class SyntaxHighlighter extends SyntaxHighlighterBase {
+	private static class LazyHolder {
+		public static final TextAttributesKey COLOR_MODIFIER = createTextAttributesKey(
+			"DARKRED_MACRO",
+			new TextAttributes(
+				new Color(255, 92, 54),
+				null,
+				null,
+				null,
+				Font.PLAIN
+			)
+		);
+		public static final TextAttributesKey COLOR_OOP = createTextAttributesKey(
+			"GOLD_REGS",
+			new TextAttributes(
+				new Color(184, 132, 11),
+				null,
+				null,
+				null,
+				Font.PLAIN
+			)
+		);
+	}
+
     public static final TextAttributesKey PRIMITIVE_TYPE =
             createTextAttributesKey("J8B_PRIMITIVE_TYPE", DefaultLanguageHighlighterColors.CLASS_NAME);
 
@@ -28,11 +55,11 @@ public class SyntaxHighlighter extends SyntaxHighlighterBase {
     public static TextAttributesKey getColorForTokenType(String type) {
         return switch (type) {
             // Ключевые слова
-            case "LITERAL" -> DefaultLanguageHighlighterColors.KEYWORD;
+            case "LITERAL" -> DefaultLanguageHighlighterColors.NUMBER;
             case "TYPE" -> PRIMITIVE_TYPE;
             case "COMMAND" -> DefaultLanguageHighlighterColors.KEYWORD;
-            case "MODIFIER" -> DefaultLanguageHighlighterColors.KEYWORD;
-            case "OOP" -> DefaultLanguageHighlighterColors.KEYWORD;
+            case "MODIFIER" -> LazyHolder.COLOR_MODIFIER;
+            case "OOP" -> LazyHolder.COLOR_OOP;
             case "KEYWORD" -> DefaultLanguageHighlighterColors.KEYWORD;
 
             // Идентификаторы и метки

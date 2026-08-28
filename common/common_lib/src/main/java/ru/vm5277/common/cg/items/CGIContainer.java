@@ -54,14 +54,14 @@ public class CGIContainer extends CGItem {
 		items.add(pos++, item);
 	}
 	
-	public void replace(CGItem item, CGScope oldScope) {
+	public void replace(CGScope oldScope, CGScope newScope) {
 		int index = items.indexOf(oldScope);
 		if(-1==index) {
-			items.add(item);
+			items.add(newScope);
 			pos = items.size()-1;
 		}
 		else {
-			items.set(index, item);
+			items.set(index, newScope);
 		}
 	}
 

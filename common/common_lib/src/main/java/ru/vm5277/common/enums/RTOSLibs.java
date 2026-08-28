@@ -63,7 +63,9 @@ public enum RTOSLibs {
 	METHOD_FIN_SF("j8b/mfin_sf.asm"), //С STACKFRAME IReg в стеке
 	MEM_RAMCLEAR("mem/ram_clear.asm"),
 	NEW_THREAD("j8b/new_thread.asm"),
-	NEW_CLASS("j8b/new_class.asm");
+	NEW_CLASS("j8b/new_class.asm"),
+	SOFT_TIMER("core/soft_timer.asm"),
+	CLASS_TYPEID("j8b/class_typeid.asm");
 	
 	public static enum CLASS_REFCOUNT_PROCS {
 		J8BPROC_CLASS_REFCOUNT_INC_NR,

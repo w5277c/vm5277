@@ -35,7 +35,7 @@ class Main {
 
         byte result = 0;
         for(short i=0; i<ITERATIONS; i++) {
-        	result = Math.crc8(TEST_DATA, BUFFER_SIZE);
+        	result = Math.crc8(TEST_DATA, 0, BUFFER_SIZE);
         }
 
         int elapsedMs = System.uptimeMs() - startTime;

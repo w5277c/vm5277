@@ -1,0 +1,66 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+public class TextUtil {
+	public static void write(byte v, OutputStream os) {
+		boolean zero=true;
+		for(byte i=0;i<3;i++) {
+			char c = firstDecimal(v);
+			if('0'!=c) zero = false;
+			if(!zero || i==2) os.write(c);
+			v = shiftDecimal(v);
+		}
+	}
+
+	public static void write(short v, OutputStream os) {
+		boolean zero=true;
+		for(byte i=0;i<5;i++) {
+			char c = firstDecimal(v);
+			if('0'!=c) zero = false;
+			if(!zero || i==4) os.write(c);
+			v = shiftDecimal(v);
+		}
+	}
+	public static void write(fixed v, OutputStream os) {
+        if(0>v) os.write('-');
+        write(Primitive.b1(v), os);
+		byte b0=Primitive.b0(v);
+		if(0!=b0) {
+		    os.write('.');
+            os.write((char)('0' + ((b0*10)>>8)));
+            b0 = (byte)((b0 * 10)&0xff);
+            if(b0!=0) {
+                os.write((char)('0' + ((b0 * 10) >> 8)));
+            }
+		}
+	}
+	public static void write(int v, OutputStream os) {
+		boolean zero=true;
+		for(byte i=0;i<10;i++) {
+			char c = firstDecimal(v);
+			if('0'!=c) zero = false;
+			if(!zero || i==9) os.write(c);
+			v = shiftDecimal(v);
+		}
+	}
+
+	public static native char firstDecimal(byte v);
+	public static native char firstDecimal(short v);
+	public static native char firstDecimal(int v);
+	public static native char shiftDecimal(byte v);
+	public static native char shiftDecimal(short v);
+	public static native char shiftDecimal(int v);
+}

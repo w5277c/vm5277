@@ -1,0 +1,292 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+.include "stdio/out_hex8.asm"
+.include "stdio/out_char.asm"
+
+.include "drivers/i2c/common.asm"
+.include "core/irq_set.asm"
+.include "sys/proc_await.asm"
+
+.IFNDEF OS_DRV_I2C_MASTER_HW__INIT
+
+;Константы смещений в HEAP
+.EQU _OS_DRV_I2C_MASTER_HW__HEAP_FIELD_ADDR			= 0x05	;1B-I2C device address
+.EQU _OS_DRV_I2C_MASTER_HW__HEAP_FIELD_FREQ_ID		= 0x06	;1B-I2C frequence id
+.EQU _OS_DRV_I2C_MASTER_HW__HEAP_DRV_SRC_BUFF_ADDR	= 0x07	;2B-src buffer addr
+.EQU _OS_DRV_I2C_MASTER_HW__HEAP_DRV_SRC_BUFF_LEN	= 0x09	;2B-src buffer length
+.EQU _OS_DRV_I2C_MASTER_HW__HEAP_DRV_DST_BUFF_ADDR	= 0x0b	;2B-dst buffer addr
+.EQU _OS_DRV_I2C_MASTER_HW__HEAP_DRV_DST_BUFF_LEN	= 0x0d	;2B-dst buffer length
+.EQU _OS_DRV_I2C_MASTER_HW__HEAP_DRV_TIMEOUT		= 0x0f	;2B-timeout
+.EQU _OS_DRV_I2C_MASTER_HW__HEAP_ERRCODE			= 0x11	;1B-err code
+;---свободный блок данных в HEAP для этой реализации
+.EQU _OS_DRV_I2C_MASTER_HW__HEAP_DRV_SRC_BUFF_POS	= 0x12	;2B-src buffer position
+.EQU _OS_DRV_I2C_MASTER_HW__HEAP_DRV_DST_BUFF_POS	= 0x14	;2B-dst buffer position
+
+;-----------------------------------------------------------
+OS_DRV_I2C_MASTER_HW__INIT_NR:
+;-----------------------------------------------------------
+;Инициализация аппаратоного I2C в режиме ведущего
+;IN:Y-адрес HEAP
+;MOD: ACCUM_L/EL/EH
+;-----------------------------------------------------------
+	PUSH_Z
+
+	_OS_POWER_ON PRTWI										;Подаем питание на TWI
+
+	STS TWAR,C0x00											;В регистр адреса пишем 0
+
+	LDD ACCUM_L,Y+_OS_DRV_I2C_MASTER_HW__HEAP_FIELD_FREQ_ID	;Устанавливаем скорость передачи данных
+	LDI_Z _OS_DRV_I2C_FREQ*0x02								;Получаем из таблицы значение для TWBR
+	LSL ACCUM_L
+	ADD ZL,ACCUM_L
+	ADC ZH,C0X00
+	LPM ACCUM_L,Z+
+	STS TWBR,ACCUM_L
+	LPM ACCUM_L,Z
+	STS TWSR,ACCUM_L
+
+	LDI ACCUM_L,OS_IRQ_TWI0									;Устанавливаем обработчик для прерывания I2C
+	LDI ACCUM_EL,low(_OS_DRV_I2C_MASTER_HW__IRQ_HANDLER)
+	LDI ACCUM_EH,high(_OS_DRV_I2C_MASTER_HW__IRQ_HANDLER)
+	MCALL OS_IRQ_SET
+
+	POP_Z
+	RET														;Готов к работе
+
+;-----------------------------------------------------------
+OS_DRV_I2C_MASTER_HW__COMM_NR:
+;-----------------------------------------------------------
+;Прием/передача данных
+;IN:Y-адрес HEAP
+;MOD: ACCUM_L/H,X
+;-----------------------------------------------------------
+	PUSH_Z
+	PUSH TEMP_EL
+	PUSH TEMP_EH
+
+	STD Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_SRC_BUFF_POS+0,C0x00
+	STD Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_SRC_BUFF_POS+1,C0x00
+	STD Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_DST_BUFF_POS+0,C0x00
+	STD Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_DST_BUFF_POS+1,C0x00
+
+	LDI ACCUM_L,OSR_BUSY
+	STD Y+_OS_DRV_I2C_MASTER_HW__HEAP_ERRCODE,ACCUM_L
+
+	LDI ACCUM_L,(1<<TWINT)|(1<<TWSTA)|(1<<TWEN)|(1<<TWIE)
+	STS TWCR,ACCUM_L
+	MCALL OS_PROC_AWAIT__INIT
+	LDD TEMP_EL,Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_TIMEOUT+0
+	LDD TEMP_EH,Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_TIMEOUT+1
+	LDI_Z _OS_DRV_I2C_MASTER_HW__IRQ_HANDLER__COMM_COND		;Ожидание окончания
+	MCALL OS_PROC_AWAIT__CHECK
+	BRNE _OS_DRV_I2C_MASTER_HW__COMM_TIMEOUT
+	RJMP _OS_DRV_I2C_MASTER_HW__COMM_END
+
+_OS_DRV_I2C_MASTER_HW__COMM_TIMEOUT:
+	LDI ACCUM_L,OSR_TIMEOUT
+	STD Y+_OS_DRV_I2C_MASTER_HW__HEAP_ERRCODE,ACCUM_L
+	LDI ACCUM_L,(1<<TWSTO)|(1<<TWEN)|(1<<TWINT)
+	STS TWCR,ACCUM_L
+_OS_DRV_I2C_MASTER_HW__COMM_END:
+	LDI_Z _OS_DRV_I2C_MASTER_HW__IRQ_HANDLER__STOP_COND		;Ждем завершения передачи STOP
+	LDI TEMP_EL,0x0a										;TIMEOUT в 10 мс
+	LDI TEMP_EH,0x00
+	MCALL OS_PROC_AWAIT
+	LDI ACCUM_L,(0<<TWEN)									;Останавливаем TWI
+	STS TWCR,ACCUM_L
+
+	POP TEMP_EH
+	POP TEMP_EL
+	POP_Z
+	RET
+
+_OS_DRV_I2C_MASTER_HW__IRQ_HANDLER__COMM_COND:
+	LDD ACCUM_L,Y+_OS_DRV_I2C_MASTER_HW__HEAP_ERRCODE		;Ожидание окончания передачи
+	CPI ACCUM_L,OSR_BUSY
+	BREQ PC+0x03
+	SEZ
+	RET
+	CLZ
+	RET
+
+_OS_DRV_I2C_MASTER_HW__IRQ_HANDLER__STOP_COND:
+	SEZ														;Ожидание завершения передачи STOP
+	LDS ACCUM_L,TWCR
+	SBRC ACCUM_L,TWSTO										;Если TWSTO=0(STOP уже ушел)
+	CLZ
+	RET
+
+;-----------------------------------------------------------
+_OS_DRV_I2C_MASTER_HW__IRQ_HANDLER:
+;-----------------------------------------------------------
+;Событие от шины
+;IN:Y-адрес HEAP
+;-----------------------------------------------------------
+	PUSH_A16
+	PUSH_T16
+	PUSH_X
+
+	LDS ACCUM_L,TWSR										;Читаем статус TWI
+	ANDI ACCUM_L,0xF8
+
+;MCALL OS_OUT_HEX8
+;PUSH ACCUM_L
+;LDI ACCUM_L,','
+;MCALL OS_OUT_CHAR
+;POP ACCUM_L
+
+	CPI ACCUM_L,0x08										;START отправлен
+	BREQ _OS_DRV_I2C_MASTER_HW__IRQ_TR_START
+	CPI ACCUM_L,0x18       									;SLA+W отправлен, ACK получен
+	BREQ _OS_DRV_I2C_MASTER_HW__IRQ_TR_CONT
+	CPI ACCUM_L,0x20										;SLA+W отправлен, NACK получен
+	BREQ _OS_DRV_I2C_MASTER_HW__IRQ_NO_RESPONSE
+	CPI ACCUM_L,0x28										;Байт отправлен, ACK получен
+	BREQ _OS_DRV_I2C_MASTER_HW__IRQ_TR_CONT
+	CPI ACCUM_L,0x30										;Байт отправлен, NACK получен
+	BREQ _OS_DRV_I2C_MASTER_HW__IRQ_NO_RESPONSE
+
+	CPI ACCUM_L,0x10       									;REPEATED START отправлен
+	BRNE PC+0x02
+	RJMP _OS_DRV_I2C_MASTER_HW__IRQ_RC_START
+	CPI ACCUM_L,0x40										;SLA+R отправлен, ACK получен
+	BRNE PC+0x02
+	RJMP _OS_DRV_I2C_MASTER_HW__IRQ_RC_START_OK
+	CPI ACCUM_L,0x48										;SLA+R отправлен, NACK получен
+	BREQ _OS_DRV_I2C_MASTER_HW__IRQ_NO_RESPONSE
+	CPI ACCUM_L,0x50										;Байт принят, ACK отправлен
+	BRNE PC+0x02
+	RJMP _OS_DRV_I2C_MASTER_HW__IRQ_RC_NEXT
+	CPI ACCUM_L,0x58										;Байт принят, NACK отправлен (последний)
+	BRNE PC+0x02
+	RJMP _OS_DRV_I2C_MASTER_HW__IRQ_RC_LAST
+
+	LDI ACCUM_L,OSR_HARDWARE_FAIL
+	RJMP _OS_DRV_I2C_MASTER_HW__IRQ_HANDLER_DONE_WITH_STATE
+
+_OS_DRV_I2C_MASTER_HW__IRQ_NO_RESPONSE:
+	LDI ACCUM_L,OSR_NO_RESPONSE
+_OS_DRV_I2C_MASTER_HW__IRQ_HANDLER_DONE_WITH_STATE:
+	STD Y+_OS_DRV_I2C_MASTER_HW__HEAP_ERRCODE,ACCUM_L
+	LDI ACCUM_L,(1<<TWINT)|(1<<TWSTO)|(1<<TWEN)
+	STS TWCR,ACCUM_L
+_OS_DRV_I2C_MASTER_HW__IRQ_HANDLER_DONE:
+
+	POP_X
+	POP_T16
+	POP_A16
+	RET
+
+;---TR------------------------------------------------------
+_OS_DRV_I2C_MASTER_HW__IRQ_TR_START:
+	LDD ACCUM_L,Y+_OS_DRV_I2C_MASTER_HW__HEAP_FIELD_ADDR
+	LSL ACCUM_L
+	STS TWDR,ACCUM_L
+	LDI ACCUM_L,(1<<TWINT)|(1<<TWEN)|(1<<TWIE)
+	STS TWCR,ACCUM_L
+	RJMP _OS_DRV_I2C_MASTER_HW__IRQ_HANDLER_DONE
+_OS_DRV_I2C_MASTER_HW__IRQ_TR_CONT:
+	LDD ACCUM_EL,Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_SRC_BUFF_POS+0	;Загрузаем текущий OFFSET
+	LDD ACCUM_EH,Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_SRC_BUFF_POS+1
+	LDD ACCUM_L,Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_SRC_BUFF_LEN+0	;Загружаем длину
+	LDD ACCUM_H,Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_SRC_BUFF_LEN+1
+	CP ACCUM_L,ACCUM_EL										;Проверяем, всё ли отправили
+	CPC ACCUM_H,ACCUM_EH
+	BREQ _OS_DRV_I2C_MASTER_HW__IRQ_TR_DONE
+
+	LDD XL,Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_SRC_BUFF_ADDR+0;Загружаем байт из буфера
+	LDD XH,Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_SRC_BUFF_ADDR+1
+	ADIW XL,0x05
+	ADD XL,ACCUM_EL
+	ADC XH,ACCUM_EH
+
+	LD ACCUM_L,X
+	STS TWDR,ACCUM_L
+
+	ADD ACCUM_EL,C0x01
+	ADC ACCUM_EH,C0x00
+	STD Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_SRC_BUFF_POS+0,ACCUM_EL
+	STD Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_SRC_BUFF_POS+1,ACCUM_EH
+
+	LDI ACCUM_L,(1<<TWINT)|(1<<TWEN)|(1<<TWIE)				;Следующий байт
+	STS TWCR,ACCUM_L
+	RJMP _OS_DRV_I2C_MASTER_HW__IRQ_HANDLER_DONE
+_OS_DRV_I2C_MASTER_HW__IRQ_TR_DONE:
+	LDD ACCUM_L,Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_DST_BUFF_LEN+0	;Загружаем длину
+	LDD ACCUM_H,Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_DST_BUFF_LEN+1
+	CP ACCUM_L,C0x00
+	CPC ACCUM_H,C0x00
+	LDI ACCUM_L,OSR_OK
+	BREQ _OS_DRV_I2C_MASTER_HW__IRQ_HANDLER_DONE_WITH_STATE	;Завершаем работу
+	LDI ACCUM_L,(1<<TWINT)|(1<<TWSTA)|(1<<TWEN)|(1<<TWIE)	;REPEATED START
+	STS TWCR,ACCUM_L
+	RJMP _OS_DRV_I2C_MASTER_HW__IRQ_HANDLER_DONE
+
+;---RC------------------------------------------------------
+_OS_DRV_I2C_MASTER_HW__IRQ_RC_START:
+	LDD ACCUM_L,Y+_OS_DRV_I2C_MASTER_HW__HEAP_FIELD_ADDR
+	LSL ACCUM_L
+	ORI ACCUM_L,0x01
+	STS TWDR,ACCUM_L
+	LDI ACCUM_L,(1<<TWINT)|(1<<TWEN)|(1<<TWIE)
+	STS TWCR,ACCUM_L
+	RJMP _OS_DRV_I2C_MASTER_HW__IRQ_HANDLER_DONE
+
+_OS_DRV_I2C_MASTER_HW__IRQ_RC_START_OK:
+	LDI ACCUM_L,(1<<TWINT)|(1<<TWEN)|(1<<TWIE)|(1<<TWEA)
+	STS TWCR,ACCUM_L
+	RJMP _OS_DRV_I2C_MASTER_HW__IRQ_HANDLER_DONE
+
+_OS_DRV_I2C_MASTER_HW__IRQ_RC_NEXT:
+	LDS ACCUM_L,TWDR										;Читаем байт
+
+	LDD ACCUM_EL,Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_DST_BUFF_POS+0
+	LDD ACCUM_EH,Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_DST_BUFF_POS+1
+	LDD XL,Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_DST_BUFF_LEN+0x00;Проверяем на переполнение
+	LDD XH,Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_DST_BUFF_LEN+0x01
+	CP XL,ACCUM_EL
+	CPC XH,ACCUM_EH
+	BRNE _OS_DRV_I2C_MASTER_HW__IRQ_RC_NEXT_NO_OVERFLOW
+	LDI ACCUM_L,OSR_OVERFLOW
+	RJMP _OS_DRV_I2C_MASTER_HW__IRQ_HANDLER_DONE_WITH_STATE
+_OS_DRV_I2C_MASTER_HW__IRQ_RC_NEXT_NO_OVERFLOW:
+	LDD XL,Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_DST_BUFF_ADDR+0;Сохраняем в буфер
+	LDD XH,Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_DST_BUFF_ADDR+1
+
+	ADIW XL,0x05
+	ADD XL,ACCUM_EL
+	ADC XH,ACCUM_EH
+	ST X,ACCUM_L
+
+	ADD ACCUM_EL,C0x01
+	ADC ACCUM_EH,C0x00
+	STD Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_DST_BUFF_POS+0,ACCUM_EL
+	STD Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_DST_BUFF_POS+1,ACCUM_EH
+	LDD XL,Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_DST_BUFF_LEN+0x00;Проверяем, последний ли байт
+	LDD XH,Y+_OS_DRV_I2C_MASTER_HW__HEAP_DRV_DST_BUFF_LEN+0x01
+	CP ACCUM_EL,XL
+	CPC ACCUM_EH,XH
+	LDI ACCUM_L,(1<<TWINT)|(1<<TWEN)|(1<<TWIE)|(1<<TWEA)	;Следующий байт (с ACK)
+	BRNE PC+0x02
+	LDI ACCUM_L,(1<<TWINT)|(1<<TWEN)|(1<<TWIE)				;Последний байт (с NACK)
+	STS TWCR,ACCUM_L
+	RJMP _OS_DRV_I2C_MASTER_HW__IRQ_HANDLER_DONE
+
+_OS_DRV_I2C_MASTER_HW__IRQ_RC_LAST:
+	LDI ACCUM_L,OSR_OK
+	RJMP _OS_DRV_I2C_MASTER_HW__IRQ_HANDLER_DONE_WITH_STATE
+.ENDIF

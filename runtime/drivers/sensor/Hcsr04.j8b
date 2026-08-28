@@ -1,0 +1,86 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import rtos.RtosDispatcher;
+
+// Не прмименять - реализация не корректная так как слишком большая погрешность из-за используемого функционала.
+//TODO необходим менеджер реализующий таймер (останавливающийся по событию)
+
+public class Hcsr04 implements DistanceSensor {
+	private final static byte DEFAULT_QUANTUM = 25;
+	private byte quantum;
+	private short iteractions;
+	private short rawValue;
+	private short triggerIoReg;
+	private short echoIoReg;
+	private byte errCode;
+
+//	public Hcsr04(byte triggerPin, byte echoPin) {
+//		this(triggerPin, echoPin, DEFAULT_QUANTUM); //не корректно работает похоже не передается HEAP iReg
+//	}
+	public Hcsr04(byte triggerPin, byte echoPin, byte quantum) {
+		Gpio.setLow(triggerPin);
+		Gpio.modeOut(triggerPin);
+		Gpio.modeIn(echoPin);
+		Gpio.setHigh(echoPin);
+		this.triggerIoReg = RtosCore.getIORegOutput(triggerPin);
+		this.echoIoReg = RtosCore.getIORegInput(echoPin);
+		this.quantum = quantum;
+		this.iteractions = 40000/quantum;
+	}
+
+	public void read() {
+		RtosDispatcher.lock();
+
+		errCode = DriverException.OK;
+		rawValue = 0;
+
+		short value = 0;
+		RtosCore.setIORegHigh(triggerIoReg);
+		RtosCore.delayUs(10);
+		RtosCore.setIORegLow(triggerIoReg);
+
+		for(short i=0; i<iteractions; i++) {
+			if(RtosCore.getIOReg(echoIoReg)) {
+				break;
+			}
+		}
+		else {
+			errCode = DriverException.NO_RESPONSE;
+			RtosDispatcher.unlock();
+			return;
+		}
+
+		for(short i=0; i<iteractions; i++) {
+			RtosCore.delayUs(quantum);
+			value++;
+			if(!RtosCore.getIOReg(echoIoReg)) {
+				rawValue = value;
+				break;
+			}
+		}
+		else {
+			errCode = DriverException.TIMEOUT;
+		}
+
+		RtosDispatcher.unlock();
+	}
+
+	@Override public short getMm() throws DriverException {
+		if(DriverException.OK!=errCode) DriverException.throw(errCode);
+		return (short)(20+rawValue*quantum*10/58);
+	}
+}

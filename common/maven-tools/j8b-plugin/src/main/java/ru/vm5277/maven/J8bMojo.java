@@ -33,15 +33,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
-import java.util.Set;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.project.MavenProject;
 import ru.vm5277.common.Device;
 import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.Logger;
+import ru.vm5277.common.enums.InteractiveMode;
 import ru.vm5277.common.enums.OptimizationType;
 import ru.vm5277.common.enums.PlatformType;
 import ru.vm5277.common.enums.StrictLevel;
+import ru.vm5277.common.enums.Verbosity;
 import ru.vm5277.common.flash.FlashTool;
 import ru.vm5277.common.flash.FlashToolProvider;
 import ru.vm5277.common.flash.InternalFlashTool;
@@ -65,8 +66,8 @@ public abstract class J8bMojo extends AbstractMojo {
 	@Parameter(property = "j8b.targetStdio", defaultValue = "")
 	protected String targetStdio;
 	
-	@Parameter(property = "j8b.verbose", defaultValue = "false")
-	protected boolean verbose;
+	@Parameter(property = "j8b.verbosity", defaultValue = "normal")
+	protected String verbosity;
 
 	@Parameter(defaultValue = "Main.j8b")
 	protected String mainFile;
@@ -100,6 +101,9 @@ public abstract class J8bMojo extends AbstractMojo {
 
 	@Parameter(property = "j8b.softReset", defaultValue = "false")
 	protected Boolean softReset;
+	
+	@Parameter(property = "j8b.includePaths", defaultValue = "")
+	protected String includePaths;
 	
 	@Parameter(property = "j8b.autoDownload", defaultValue = "true")
 	protected boolean autoDownload;
@@ -225,7 +229,7 @@ public abstract class J8bMojo extends AbstractMojo {
 												sourceDirectory);
 		}
 
-		if(!batch && verbose) getLog().info("Main source file: " + mainJ8bFile.getAbsolutePath());
+		if(!batch && !Verbosity.MINIMAL.name().equalsIgnoreCase(verbosity)) getLog().info("Main source file: " + mainJ8bFile.getAbsolutePath());
 
 		if (!prebuildDirectory.exists()) {
 			prebuildDirectory.mkdirs();
@@ -286,12 +290,15 @@ public abstract class J8bMojo extends AbstractMojo {
 			throw new MojoExecutionException("Main asm file not found: " + mainAsmFile.getAbsolutePath());
 		}
 
-		if(!batch && verbose) getLog().info("Main asm file: " + mainAsmFile.getAbsolutePath());
+		if(!batch && !Verbosity.MINIMAL.name().equalsIgnoreCase(verbosity)) getLog().info("Main asm file: " + mainAsmFile.getAbsolutePath());
+		File targetDbg = new File(outputSubDirectory.getAbsolutePath() + File.separator + mainName + ".dbg");
 		try {
-			copyFile(new File(prebuildDirectory.getAbsolutePath() + File.separator + mainName + ".dbg"),
-						new File(outputSubDirectory.getAbsolutePath() + File.separator + mainName + ".dbg"));
+			targetDbg.getParentFile().mkdirs();
+			targetDbg.createNewFile();
+			copyFile(new File(prebuildDirectory.getAbsolutePath() + File.separator + mainName + ".dbg"), targetDbg);
 		}
 		catch(Exception ex) {
+			getLog().warn("Exception while copying " + targetDbg.getAbsolutePath() + ": " + ex.getMessage());
 		}
 
 		Long flashSize = device.getDefNum("FLASH_SIZE");
@@ -307,7 +314,7 @@ public abstract class J8bMojo extends AbstractMojo {
 		}
 	}
 
-	public void doFlash(File outputSubDirectory, boolean interactive) throws MojoExecutionException {
+	public void doFlash(File outputSubDirectory, InteractiveMode interactive) throws MojoExecutionException {
 		String mainName = mainFile.substring(0, mainFile.lastIndexOf("."));
 		
 		int index = target.indexOf(":");
@@ -349,7 +356,7 @@ public abstract class J8bMojo extends AbstractMojo {
 			
 			args.add("-U");
 			args.add("flash:w:" + Paths.get(outputSubDirectory.getAbsolutePath(), mainName + "_cseg.hex").normalize().toString() + ":i");
-			exitCode = FlashTool.exec(toolPath.toString(), args, !verbose);
+			exitCode = FlashTool.exec(toolPath.toString(), args, Verbosity.MINIMAL.name().equalsIgnoreCase(verbosity));
 		}
 		
 		if(0!=exitCode) {
@@ -511,10 +518,16 @@ public abstract class J8bMojo extends AbstractMojo {
 			args.add(targetFreq);
 			args.add("-o");
 			args.add(prebuildDir.getAbsolutePath());
-			if(isBatch || !verbose) {
+			if(null!=includePaths && !includePaths.isEmpty()) {
+				for(String path : includePaths.split(",")) {
+					args.add("-I");
+					args.add(path.trim());
+				}
+			}
+			if(isBatch || Verbosity.MINIMAL.name().equalsIgnoreCase(verbosity)) {
 				args.add("-q");
 			}
-			else {
+			else if(!Verbosity.DEBUG.name().equalsIgnoreCase(verbosity)) {
 				args.add("--dump-ir");
 			}
 			if(null!=optMode) {
@@ -551,7 +564,7 @@ public abstract class J8bMojo extends AbstractMojo {
 	public int buildAsm(String toolkitPath, File sourceDir, File prebuildDir, File outputDir, String platformName, String mainName, boolean isBatch)
 																																throws MojoExecutionException {
 		int exitCode = 1;
-		
+
 		Path rtosPath = Paths.get(toolkitPath, "rtos", platformName);
 		if(!rtosPath.toFile().exists()) {
 			throw new MojoExecutionException("RTOS directory not found: " + rtosPath.toString() + "\n");
@@ -575,10 +588,10 @@ public abstract class J8bMojo extends AbstractMojo {
 			args.add(rtosPath.toAbsolutePath().toString());
 			args.add("-o");
 			args.add(outputDir.getAbsolutePath() + File.separator + mainName);
-			if(isBatch || !verbose) {
+			if(isBatch || Verbosity.MINIMAL.name().equalsIgnoreCase(verbosity)) {
 				args.add("-q");
 			}
-			if(verbose) {
+			else if(Verbosity.DEBUG.name().equalsIgnoreCase(verbosity)) {
 				String mapFileName = mainName + ".map";
 				String listFileName = mainName + ".lst";
 
@@ -586,6 +599,9 @@ public abstract class J8bMojo extends AbstractMojo {
 				args.add(mapFileName);
 				args.add("-l");
 				args.add(listFileName);
+				
+				args.add("-D");
+				args.add("os_ft_diag=1");
 			}
 			exitCode = FSUtils.runJ8BTool(Paths.get(toolkitPath), "ru.vm5277." + platformName + "_asm.Assembler" , args, null);
 		}
@@ -595,7 +611,7 @@ public abstract class J8bMojo extends AbstractMojo {
 		return exitCode;
 	}
 	
-	public int internalFlashHex(String toolkitPath, File outputDir, String mainName, boolean intercativeMode) throws MojoExecutionException {
+	public int internalFlashHex(String toolkitPath, File outputDir, String mainName, InteractiveMode intercativeMode) throws MojoExecutionException {
 		int exitCode = 1;
 		
 		File mainHexFile = new File(outputDir, mainName + ".hex");
@@ -613,11 +629,12 @@ public abstract class J8bMojo extends AbstractMojo {
 			args.add("-s");
 			args.add("-F");
 			args.add("-R");
-			if(intercativeMode) {
+			if(InteractiveMode.NONE!=intercativeMode) {
 				args.add("-I");
+				args.add(intercativeMode.toString().toLowerCase());
 			}
 			args.add("-w");
-			if(!verbose) {
+			if(Verbosity.MINIMAL.name().equalsIgnoreCase(verbosity)) {
 				args.add("-q");
 			}
 			exitCode = FSUtils.runJ8BTool(Paths.get(toolkitPath), "ru.vm5277.flasher.Main", args, null);

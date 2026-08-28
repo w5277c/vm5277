@@ -1,0 +1,150 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import rtos.RtosDispatcher;
+import drivers.ifaces.SpiSwHd;
+
+public class LedMatrixMax7219 implements GraphicsDisplay {
+	private final static byte REG_NOP = 0x00;
+	private final static byte REG_DIG0 = 0x01;
+	private final static byte REG_DIG1 = 0x02;
+	private final static byte REG_DIG2 = 0x03;
+	private final static byte REG_DIG3 = 0x04;
+	private final static byte REG_DIG4 = 0x05;
+	private final static byte REG_DIG5 = 0x06;
+	private final static byte REG_DIG6 = 0x07;
+	private final static byte REG_DIG7 = 0x08;
+	private final static byte REG_DECODE = 0x09;
+	private final static byte REG_INTENSITY = 0x0a;
+	private final static byte REG_SCANLIMIT = 0x0b;
+	private final static byte REG_SHUTDOWN = 0x0c;
+	private final static byte REG_DISPLAYTEST = 0x0f;
+
+	private short width;
+	private short height;
+	private SpiSwHd iface;
+	private byte csPort;
+	private boolean backlight = true;
+	private byte brightness = 0x07;
+	private short qnt;
+	private final byte[] buffer = new byte[0x02];
+
+	public LedMatrixMax7219(byte dinPort, byte csPort, byte clkPort, short width, short height) throws DriverException {
+		this.csPort = csPort;
+		this.width = width;
+		this.height = height;
+
+		if(0!=(width&0x07) || 0!=(height&0x07)) {
+			DriverException.throw(DriverException.INVALID_DATA);
+		}
+		this.qnt = width*height/64;
+
+		Gpio.setLow(clkPort);
+		Gpio.modeOut(clkPort);
+		Gpio.setLow(dinPort);
+		Gpio.modeOut(dinPort);
+		Gpio.setHigh(csPort);
+		Gpio.modeOut(csPort);
+
+		iface = new SpiSwHd(dinPort, clkPort, true, 0, false, false, false);
+
+		init();
+	}
+
+	@Override public void init() {
+        send(REG_DECODE, 0x00); // 3. Режим декодирования: выключен (прямое управление битами)
+        send(REG_INTENSITY, 7); // 4. Яркость: средняя
+        send(REG_SCANLIMIT, 0x07); // 2. Все 8 разрядов в работе (0-7)
+        send(REG_SHUTDOWN, 0x01); // 5. Включить дисплей
+        send(REG_DISPLAYTEST, 0x00); // 1. Выход из тестового режима
+
+		clear();
+	}
+
+	private void send(byte cmd, byte data) {
+		buffer[0] = cmd;
+		buffer[1] = data;
+		Gpio.setLow(csPort);
+		for(short i=0; i<qnt; i++) {
+			iface.comm(buffer, 2, null, 0, 100);
+		}
+		Gpio.setHigh(csPort);
+	}
+
+	@Override public void clear() {
+		for(byte i=REG_DIG0; i<=REG_DIG7; i++) {
+			send(i, 0x00);
+		}
+	}
+
+	@Override public void update() {}
+
+	@Override public short getWidth() { return width; }
+	@Override public short getHeight() { return height;	}
+
+    @Override public void setBacklight(boolean on) {
+		if(this.backlight!=on) {
+			this.backlight = on;
+        	send(REG_SHUTDOWN, on ? 0x01 : 0x00);
+        }
+    }
+
+    @Override public void setBright(byte b) {
+		if(this.brightness!=b) {
+			if(b>0x0f) b=0x0f;
+
+			this.brightness = b;
+			send(REG_INTENSITY, b);
+		}
+    }
+
+	@Override public void setContrast(byte b) {}
+    @Override public byte getMaxBright() { return 0x0f; }
+	@Override public byte getMaxContrast() { return 0x00; }
+
+	@Override public void drawImage(byte[] data, short xPos, short yPos, short imgWidth, short imgHeight) {
+    	if(0!=(xPos&0x07) || 0!=(imgWidth&0x07)) DriverException.throw(DriverException.UNSUPPORTED); // Проверка на кратность минимальному графическому объекту
+    	if(null==data || xPos>=this.width || yPos>=this.height || 0==imgWidth || 0==imgHeight) return; // Проверка границ и размеров - есть что делать?
+
+		short xEnd = xPos+imgWidth;
+		if(xEnd>this.width) xEnd = this.width;
+
+		short yEnd = yPos+imgHeight;
+		if(yEnd>this.height) yEnd = this.height;
+
+		if(xEnd==xPos || yEnd==yPos) return;
+
+		short xMax = width/8;
+		for(short y=0; y<height; y++) {
+			Gpio.setLow(csPort);
+        	for(short xChip=xMax; xChip>0; xChip--) {
+            	short x = (xChip-1)*8;
+				if(x>=xPos && y>=yPos && x<xEnd && y<yEnd) { // Область картинки
+					short dataOffset = (y-yPos)*(imgWidth/8)+(x-xPos)/8;
+					buffer[0] = (byte)(REG_DIG0 + (y&0x07));
+					buffer[1] = data[dataOffset];
+					iface.comm(buffer, 2, null, 0, 100);
+				}
+				else {
+					buffer[0] = 0;
+					buffer[1] = 0;
+					iface.comm(buffer, 2, null, 0, 100);
+				}
+            }
+       		Gpio.setHigh(csPort);
+        }
+    }
+}

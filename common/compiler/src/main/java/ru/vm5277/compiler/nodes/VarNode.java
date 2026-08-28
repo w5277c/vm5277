@@ -16,8 +16,11 @@
 
 package ru.vm5277.compiler.nodes;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.CodeGenerator;
@@ -36,8 +39,12 @@ import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.scopes.CGBlockScope;
+import ru.vm5277.common.cg.scopes.CGCondBlockScope;
+import ru.vm5277.common.cg.scopes.CGLoopBlockScope;
+import ru.vm5277.common.enums.CodegenResult;
+import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.expressions.ArrayExpression;
 import ru.vm5277.compiler.nodes.expressions.EnumExpression;
@@ -53,18 +60,24 @@ import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.compiler.semantic.VarSymbol;
 import ru.vm5277.compiler.semantic.InitNodeHolder;
 import ru.vm5277.common.lexer.Keyword;
+import ru.vm5277.common.lexer.SourceBuffer;
+import ru.vm5277.common.lexer.tokens.TAnnotation;
+import ru.vm5277.common.lexer.tokens.TNote;
 import ru.vm5277.compiler.Instance;
+import ru.vm5277.compiler.nodes.expressions.ArrayInitExpression;
 import ru.vm5277.compiler.nodes.expressions.PropertyExpression;
 
 public class VarNode extends AstNode implements InitNodeHolder {
-	private	final	Set<Keyword>	modifiers;
-	private			VarType			type;
-	private	final	String			name;
-	private			ExpressionNode	init;
+	private	final	Map<String, AnnotationParamNode>	annotations;
+	private	final	Set<Keyword>						modifiers;
+	private			VarType								type;
+	private	final	String								name;
+	private			ExpressionNode						init;
 	
-	public VarNode(Instance inst, TokenBuffer tb, Set<Keyword> modifiers, VarType type, String name) {
+	public VarNode(Instance inst, TokenBuffer tb, Map<String, AnnotationParamNode> annotations, Set<Keyword> modifiers, VarType type, String name) {
 		super(inst, tb);
 		
+		this.annotations = annotations;
 		this.modifiers = modifiers;
 		this.type = type;
 		this.name = name;
@@ -123,6 +136,43 @@ public class VarNode extends AstNode implements InitNodeHolder {
 			markWarning("Variable name should start with lowercase letter:" + name);
 		}
 
+		if(null!=annotations) {
+			for(String annotation : annotations.keySet()) {
+				if(!annotation.equals(TAnnotation.MELODY)) {
+					if(StrictLevel.LIGHT==inst.getStrictLevel()) {
+						markWarning("Unsupported var annotation: @" + annotation);
+					}
+					else if(StrictLevel.STRONG==inst.getStrictLevel()) {
+						markError("Unsupported var annotation: @" + annotation);
+						result = false;
+					}
+				}
+				else {
+					if(null!=init) {
+						markError("@Melody cannot be used on a variable with an initializer");
+						result = false;
+					}
+					else if(!type.isArray() || VarType.BYTE!=type.getElementType() || 0x01!=type.getArrayDepth()) {
+						markError("@Melody can only be applied to a one-dimensional byte array (byte[])");
+						result = false;
+					}
+					else {
+						try {
+							TNote tnote = new TNote(new SourceBuffer(annotations.get(TAnnotation.MELODY).getTextValue(0), 0x04));
+							byte[] data = (byte[])tnote.getValue();
+							VarType arrType = VarType.arrayOf(VarType.BYTE, 1);
+							init = new NewArrayExpression(inst, null, sp, arrType, new ArrayList<>(), new ArrayInitExpression(inst, data, sp, arrType));
+						}
+						catch(CompileException ex) {
+							markError(ex);
+							result = false;
+						}
+					}
+				}
+			}
+		}
+
+		
 		if(null!=init) {
 			result&=init.preAnalyze();
 			
@@ -196,9 +246,11 @@ public class VarNode extends AstNode implements InitNodeHolder {
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 
 		try {
-			cgScope = cg.enterLocal(parent, type, (-1 == type.getSize() ? cg.getRefSize() : type.getSize()), VarType.CSTR == type, name);
+			cgScope = cg.enterLocal(parent, type, (type.isReferenceType() ? cg.getRefSize() : type.getSize()), VarType.CSTR == type, name);
 			symbol.setCGScope(cgScope);
 			
+			((CGBlockScope)parent).addVar((CGVarScope)cgScope); // Перенесено из CGVarScope.build
+
 			// Проверка инициализации final-полей
 			if(isFinal() && init==null) {
 				markError("Final variable  '" + name + "' must be initialized");
@@ -309,8 +361,18 @@ public class VarNode extends AstNode implements InitNodeHolder {
 		//CGScope cgs = null == parent ? cgScope : parent;
 		CGVarScope vScope = (CGVarScope)cgScope;
 		
+		VarSymbol vSymbol = (VarSymbol)symbol;
+		Set<VarSymbol> varsInRange = ((BlockScope)vSymbol.getScope()).getVarsInRange(vSymbol.getNode().getSN(), vSymbol.getLastAccessedSN());
+		Set<CGCells> usedRegsCells = new HashSet<>();
+		for(VarSymbol vs : varsInRange) {
+			CGCellsScope cgCellsScope = (CGCellsScope)vs.getCGScope();
+			if(null!=cgCellsScope && null!=cgCellsScope.getCells() && CGCells.Type.REG==cgCellsScope.getCells().getType()) {
+				usedRegsCells.add(cgCellsScope.getCells());
+			}
+		}
+		
 		Boolean accUsed = null;
-		vScope.build();
+		vScope.build(usedRegsCells);
 		if(VarType.CSTR == type) {
 			if(init instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)init;
@@ -370,7 +432,7 @@ public class VarNode extends AstNode implements InitNodeHolder {
 					cg.popHeapReg(cgScope);
 				}
 				else if(initType.isArray()) {
-					cg.updateArrRefCount(cgScope, vScope.getCells(), true, ((CGCellsScope)cgScope).isArrayView());
+					cg.updateArrRefCount(cgScope, vScope.getCells(), true);
 				}
 				if(branch.isUsed()) {
 					cg.constToAcc(cgScope, 1, 1, false);
@@ -402,6 +464,7 @@ public class VarNode extends AstNode implements InitNodeHolder {
 				}
 				catch(Exception ex) {
 					System.out.println("TODO:" + ex.getMessage());
+					ex.printStackTrace();
 				}
 
 				if(!optimized) {
@@ -417,7 +480,7 @@ public class VarNode extends AstNode implements InitNodeHolder {
 					cg.popHeapReg(cgScope);
 				}
 				else if(init.getType().isArray()) {
-					cg.updateArrRefCount(cgScope, vScope.getCells(), true, ((CGCellsScope)vScope).isArrayView());
+					cg.updateArrRefCount(cgScope, vScope.getCells(), true);
 				}
 			}
 			else if(init instanceof EnumExpression) {
@@ -439,13 +502,22 @@ public class VarNode extends AstNode implements InitNodeHolder {
 					}
 					catch(Exception ex) {
 						System.out.println("TODO:" + ex.getMessage());
+						ex.printStackTrace();
 					}
 				}
 
 				if(!optimized) {
 					cg.accumLock(type);
-					init.codeGen(cg, true, excs);
-					cg.accToCells(cgScope, type, vScope);
+					Object _result = init.codeGen(cg, true, excs);
+					if(CodegenResult.RESULT_IN_FLAG==_result) {
+						cg.cellsToCells(cgScope, vScope.getCells(), type, new CGCells(CGCells.Type.FLAG), VarType.BOOLEAN);
+					}
+					else if(CodegenResult.RESULT_IN_ACCUM==_result) {
+						cg.cellsToCells(cgScope, vScope.getCells(), type, new CGCells(CGCells.Type.ACC), init.getType());
+					}
+					else {
+						throw new CompileException("Accum not used for expr:" + init);
+					}
 					cg.accumUnlock();
 					accUsed = true;
 				}
@@ -456,10 +528,12 @@ public class VarNode extends AstNode implements InitNodeHolder {
 					cg.popHeapReg(cgScope);
 				}
 				else if(initType.isArray()) {
-					cg.updateArrRefCount(cgScope, vScope.getCells(), true, ((CGCellsScope)vScope).isArrayView());
+					cg.updateArrRefCount(cgScope, vScope.getCells(), true);
 				}
 			}
 		}
+
+		releaseVars(cg);
 		return accUsed;
 	}
 

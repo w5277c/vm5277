@@ -14,27 +14,22 @@
  * limitations under the License.
  */
 
+.IFNDEF PIN_SET_HI
 .include "io/_port_offset.asm"
 .include "io/reg_bit_hi.asm"
-.IFNDEF PIN_SET_HI
-;--------------------------------------------------------
+;-----------------------------------------------------------
 PIN_SET_HI:
-;--------------------------------------------------------
+;-----------------------------------------------------------
 ;Устанвливаем пину высокий уровень
 ;IN: ACCUM_L-пин
-;--------------------------------------------------------
+;-----------------------------------------------------------
 	CPI ACCUM_L,0xff
-	BRNE PC+0x02
-	RET
-
-	PUSH_Z
-	PUSH ACCUM_L
-
+	BREQ _PIN_SET_HI__END
+	PUSH_A16
 	MCALL _PORT_OFFSET
-	ADIW ZL,0x02
-	MCALL REG_BIT_HI
-
-	POP ACCUM_L
-	POP_Z
+	ADD ACCUM_L,C0x02
+	MCALL REG_BIT_HI_NR
+	POP_A16
+_PIN_SET_HI__END:
 	RET
 .ENDIF

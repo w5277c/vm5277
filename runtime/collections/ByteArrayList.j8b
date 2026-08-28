@@ -1,0 +1,144 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+//Черновой
+public class ByteArrayList implements List {
+	private final static byte DEFAULT_CAPACITY = 12;
+
+	private byte[] data;
+	private short size;
+	private short capacity;
+	private byte chunkSize;
+
+	public ByteArrayList(byte chunkSize) {
+		this.chunkSize = (0==chunkSize ? DEFAULT_CAPACITY : chunkSize);
+		this.capacity = this.chunkSize;
+		data = new byte[capacity];
+		size = 0;
+	}
+
+	public ByteArrayList() {
+		this(DEFAULT_CAPACITY);
+	}
+
+	public void add(byte value) {
+		if(size==capacity) {
+        	capacity = size+chunkSize;
+        	byte[] newData = new byte[capacity];
+        	Array.copy(data, 0, newData, 0, size);
+        	data = newData;
+        }
+
+		data[size] = value;
+		size++;
+    }
+
+	public byte get(short index) throws BoundsException {
+        if(index<size) {
+            return data[index];
+        }
+        else {
+        	BoundsException.throw();
+        }
+    }
+
+	public void set(short index, byte value) throws BoundsException {
+		if(index<size) {
+			data[index] = value;
+		}
+        else {
+        	BoundsException.throw();
+        }
+	}
+
+    @Override public void remove(short index) throws BoundsException {
+		if(index<size) {
+        	for(short i=index; i<size-1; i++) {
+            	data[i] = data[i+1];
+            }
+        	size--;
+
+        	if((capacity-size)>=chunkSize) {
+        		capacity = capacity-chunkSize;
+       			byte[] newData = new byte[capacity];
+				Array.copy(data, 0, newData, 0, size);
+				data = newData;
+        	}
+        }
+        else {
+        	BoundsException.throw();
+        }
+    }
+
+	@Override public void clear() {
+		data = new byte[chunkSize];
+        capacity = chunkSize;
+        size = 0;
+    }
+
+	@Override public short size() {
+		return size;
+	}
+
+	@Override public boolean isEmpty() {
+		return 0==size;
+	}
+
+	public short indexOf(byte value) {
+		for(short i=0; i<size; i++) {
+			if(data[i]==value) {
+				return i;
+			}
+		}
+		return 0xffff;
+	}
+
+	public boolean contains(byte value) {
+		for(short i=0; i<size; i++) {
+			if(data[i]==value) {
+				return true;
+			}
+		}
+        return false;
+	}
+
+	public byte[] getData() {
+		byte[] result = new byte[size];
+		if(0!=size) {
+			Array.copy(data, 0, result, 0, size);
+		}
+		return result; // здесь не корректный подсчет ссылок
+	}
+
+	@Override public Comparison compare(short i, short j) throws BoundsException {
+		if(i>size || j>size) BoundsException.throw();
+
+		byte a=data[i];
+		byte b=data[j];
+
+		if(a==b) return Comparable.Comparison.EQUAL;
+		if(a>b) return Comparable.Comparison.GREATER;
+		return Comparable.Comparison.LESS;
+	}
+
+	@Override public void swap(short i, short j) throws BoundsException {
+		if(i>size || j>size) BoundsException.throw();
+
+		byte a=data[i];
+		data[i] = data[j];
+		data[j] = a;
+	}
+}

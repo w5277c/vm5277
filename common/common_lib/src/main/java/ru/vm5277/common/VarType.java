@@ -25,9 +25,12 @@ import java.util.Set;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class VarType {
-	public	static	final	String					CLASSNAME_MAIN		= "Main";
-	public	static	final	String					CLASSNAME_THREAD	= "Thread";
-	public	static	final	String					CLASSNAME_TIMER		= "Timer";
+	public	static	final	String					CLASSNAME_MAIN			= "Main";
+	public	static	final	String					CLASSNAME_THREAD		= "Thread";
+	public	static	final	String					CLASSNAME_TIMER			= "Timer";
+	public	static	final	String					CLASSNAME_RTOS_DRIVER	= "RtosDriver";
+	public	static	final	String					CLASSNAME_RTOS_CALLBACK	= "RtosCallback";
+	public	static	final	String					CLASSNAME_FLASH_DATA		= "FlashData";
 	
 	public	static	final	double					FIXED_MIN			= -128.0d;
 	public	static	final	double					FIXED_MAX			= 127.99609375d;
@@ -40,7 +43,7 @@ public class VarType {
 	private	static	final	Set<Integer>			USED_EXCEPTIONS		= new HashSet<>();
 
 	public	static	final	VarType			VOID		= new VarType(1, "void");
-	public	static	final	VarType			BOOL		= new VarType(2, "bool");
+	public	static	final	VarType			BOOLEAN		= new VarType(2, "boolean");
 	public	static	final	VarType			BYTE		= new VarType(3, "byte");
 	public	static	final	VarType			CHAR		= new VarType(4, "char");
 	public	static	final	VarType			SHORT		= new VarType(5, "short");
@@ -200,8 +203,8 @@ public class VarType {
 		return className != null ? className : name;
 	}
 
-	public boolean isClassType() {
-		return className != null || this == CLASS;
+	public boolean isClassType() { //Также возвращает Enum
+		return className!=null || this==CLASS;
 	}
 	
 	public boolean isObject() {
@@ -217,7 +220,7 @@ public class VarType {
 	}
 
 	public boolean isBoolean() {
-		return this == BOOL;
+		return this == BOOLEAN;
 	}
 	
 	public boolean isString() {
@@ -229,7 +232,7 @@ public class VarType {
 	}
 
 	public boolean isPrimitive() {
-		return this == BOOL || this == BYTE || this == CHAR || this == SHORT || this == INT || this == FIXED || this == CSTR;
+		return this == BOOLEAN || this == BYTE || this == CHAR || this == SHORT || this == INT || this == FIXED || this == CSTR;
 	}
 
 	public boolean isNumeric() {
@@ -249,7 +252,7 @@ public class VarType {
 	}
 	
 	public boolean isReferenceType() {
-		return this.isClassType() || this.isArray();
+		return !isEnum && (this.isClassType() || this.isArray());
 	}
 
 	public void checkRange(Number value) throws CompileException {
@@ -281,14 +284,16 @@ public class VarType {
 	}
 	
 	public int getSize() {
-		if(this == VOID) return 0;
-		if(this == BOOL) return 1;
-		if(this == BYTE) return 1;
-		if(this == CHAR) return 1;
+		if(VOID==this) return 0;
+		if(BOOLEAN==this) return 1;
+		if(BYTE==this) return 1;
+		if(CHAR==this) return 1;
 		if(this.isEnum) return 1;
-		if(this == SHORT) return 2;
-		if(this == FIXED) return 2;
-		if(this == INT) return 4;
+		if(SHORT==this) return 2;
+		if(FIXED==this) return 2;
+		if(INT==this) return 4;
+		if(CSTR==this) return 2; //TODO учитывать платформу!
+		if(EXCEPTION==this) return 0;
 		return -1; //TODO -1 - даем знать кодогенератору, что это ссылка, он сам должен определить используемый размер
 //		throw new CompileException("getSize() unsupported for VarType: " + toString());
 	}

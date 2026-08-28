@@ -17,7 +17,11 @@
 package ru.vm5277.compiler;
 
 import java.io.BufferedWriter;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import ru.vm5277.common.lexer.Operator;
 import ru.vm5277.common.VarType;
@@ -66,6 +70,7 @@ import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
 import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 import ru.vm5277.common.lexer.Keyword;
 import ru.vm5277.common.lexer.tokens.Token;
+import ru.vm5277.compiler.nodes.AnnotationParamNode;
 import ru.vm5277.compiler.nodes.expressions.CstrConcatExpression;
 import ru.vm5277.compiler.nodes.expressions.EmptyExpression;
 
@@ -114,6 +119,7 @@ public class ASTPrinter {
 	}
 
 	void printClass(ClassNode clazz) {
+		printAnnotations(clazz.getAnnotations());
 		printModifiers(clazz.getModifiers());
 		out.put("class " + clazz.getName() + " ");
 		ClassBlockNode cbn = clazz.getBody();
@@ -208,6 +214,7 @@ public class ASTPrinter {
 	}
 	
 	void printInterface(InterfaceNode iface) {
+		printAnnotations(iface.getAnnotations());
 		printModifiers(iface.getModifiers());
 		out.put("interface " + iface.getName() + " ");
 		InterfaceBodyNode ibn = iface.getBody();
@@ -233,6 +240,17 @@ public class ASTPrinter {
 		out.print();
 	}
 
+	void printAnnotations(Map<String, AnnotationParamNode> annotations) {
+		if(null!=annotations) {
+			List<String> keys = new ArrayList<>(annotations.keySet());
+			Collections.sort(keys);
+		
+			for(String key : keys) {
+				AnnotationParamNode apn = annotations.get(key);
+				out.put("@" + key + (null==apn ? "" : " (" + apn + ")")); out.print();
+			}
+		}
+	}
 	void printModifiers(Set<Keyword> modifiers) {
 		if(modifiers.contains(J8BKeyword.PRIVATE)) out.put(J8BKeyword.PRIVATE.getName().toLowerCase() + " ");
 		if(modifiers.contains(J8BKeyword.PUBLIC)) out.put(J8BKeyword.PUBLIC.getName().toLowerCase() + " ");
