@@ -25,7 +25,7 @@ public class Toolkit {
     private	static	final	int		HTTP_READ_TIMEOUT		= 3000;
 
 	public static boolean checkToolkit(Logger log, Path toolkitPath, String downloadUrl, boolean canDownload) {
-		if(null==toolkitPath) {
+		if(null==toolkitPath || toolkitPath.toString().trim().isEmpty()) {
 			toolkitPath = FSUtils.getToolkitPath();
 		}
 		if(!toolkitPath.toFile().exists()) {

@@ -2,16 +2,20 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>ru.vm5277</groupId>
-    <artifactId>avr_assembler</artifactId>
+    <artifactId>avr-assembler</artifactId>
     <version>0.3.2</version>
     <packaging>jar</packaging>
+
+	<parent>
+		<groupId>ru.vm5277</groupId>
+		<artifactId>vm5277-parent</artifactId>
+		<version>0.4.0</version>
+	</parent>
+
     <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.release>8</maven.compiler.release>
         <exec.mainClass>ru.vm5277.avr_asm.Assembler</exec.mainClass>
-		<graalvm.version>21.2.0</graalvm.version>
     </properties>
-    <name>avr_assembler</name>
+    <name>avr-assembler</name>
 	<build>
 		<resources>
 			<resource>
@@ -89,9 +93,8 @@
 	</profiles>
     <dependencies>
         <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>vm5277_common</artifactId>
-            <version>[0,)</version>
+            <groupId>ru.vm5277</groupId>
+            <artifactId>vm5277-common</artifactId>
         </dependency>
     </dependencies>
 </project>

@@ -2,14 +2,27 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>ru.vm5277</groupId>
-    <artifactId>stub_codegen</artifactId>
-    <version>0.3</version>
+    <artifactId>avr-codegen</artifactId>
+    <version>0.5.0</version>
     <packaging>jar</packaging>
-    <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.release>8</maven.compiler.release>
-        <exec.mainClass>ru.vm5277.stub_codegen.Generator</exec.mainClass>
-    </properties>
+
+	<parent>
+		<groupId>ru.vm5277</groupId>
+		<artifactId>vm5277-parent</artifactId>
+		<version>0.4.0</version>
+	</parent>
+
+	<name>avr-codegen</name>
+    <dependencies>
+        <dependency>
+            <groupId>ru.vm5277</groupId>
+            <artifactId>avr-assembler</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>ru.vm5277</groupId>
+            <artifactId>vm5277-common</artifactId>
+        </dependency>
+    </dependencies>
     <build>
 		<resources>
 			<resource>
@@ -17,7 +30,7 @@
 				<filtering>true</filtering>
 			</resource>
 		</resources>
-		<plugins>
+	    <plugins>
 			<plugin>
 	            <groupId>org.apache.maven.plugins</groupId>
 		        <artifactId>maven-resources-plugin</artifactId>
@@ -47,11 +60,4 @@
 
         <finalName>${project.artifactId}</finalName>
     </build>
-    <dependencies>
-        <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>vm5277_common</artifactId>
-            <version>[0,)</version>
-        </dependency>
-    </dependencies>
 </project>

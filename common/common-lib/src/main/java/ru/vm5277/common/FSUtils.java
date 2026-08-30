@@ -41,9 +41,13 @@ public class FSUtils {
 	public static Path getToolkitPath() {
 		String toolkitPath = System.getenv("vm5277");
 		if(null==toolkitPath || toolkitPath.isEmpty()) {
-			return null;
+			return Paths.get(System.getProperty("user.home"), "vm5277");
 		}
-		return Paths.get(toolkitPath).normalize().toAbsolutePath();
+		Path result = Paths.get(toolkitPath).normalize().toAbsolutePath();
+		if(result.toString().trim().isEmpty()) {
+			return Paths.get(System.getProperty("user.home"), "vm5277");
+		}
+		return result;
 	}
 
 	public static Path resolve(Path home, String path) {

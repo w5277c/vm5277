@@ -72,7 +72,7 @@
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>
 		<j8b.packaging.version>0.1.0</j8b.packaging.version>
-		<j8b.plugin.version>0.2.0</j8b.plugin.version>
+		<j8b.plugin.version>0.3.0</j8b.plugin.version>
 		<j8b.sourceDirectory>src</j8b.sourceDirectory>
 		<j8b.includePaths></j8b.includePaths>
 		<j8b.output.base>${project.build.directory}</j8b.output.base>

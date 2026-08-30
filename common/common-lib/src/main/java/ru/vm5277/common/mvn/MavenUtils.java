@@ -30,9 +30,9 @@ import static ru.vm5277.common.flash.FlashTool.TOOLS_DIRNAME;
 public class MavenUtils {
     private	static	final	int						HTTP_CONNECTION_TIMEOUT = 3000;
     private	static	final	int						HTTP_READ_TIMEOUT		= 3000;
-	public	static			String					DOWNLOAD_URL			= "https://vm5277.ru/tools/apache-maven-3.9.15-bin.zip";
+	public	static			String					DOWNLOAD_URL			= "https://vm5277.ru/tools/apache-maven-3.9.16-bin.zip";
 
-	public	final	static	String	DIRNAME	= "apache-maven-3.9.15";
+	public	final	static	String	DIRNAME	= "apache-maven-3.9.16";
 	
 	public static Path getPath(Logger log, Path toolkitPath, boolean canDownload) {
 		String filename = "mvn" + (FSUtils.isWindows() ? ".cmd" : "");
