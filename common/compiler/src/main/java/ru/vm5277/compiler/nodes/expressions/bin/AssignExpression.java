@@ -46,7 +46,6 @@ import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class AssignExpression extends BinaryExpression {
-	
     AssignExpression(Instance inst, TokenBuffer tb, SourcePosition sp, ExpressionNode left, Operator op, ExpressionNode right) {
         super(inst, tb, sp, left, op, right);
     }
@@ -55,6 +54,7 @@ public class AssignExpression extends BinaryExpression {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
+		this.scope = scope;
 		cgScope = cg.enterExpression(parent, cgScope, toString());
 
 		result&=rightExpr.postAnalyze(scope, cg, cgScope);
@@ -199,8 +199,8 @@ public class AssignExpression extends BinaryExpression {
 			//CGScope cgs = null == parent ? cgScope : parent;
 
 			// Для всех выражений должны быть удовлетворены зависимости
-			depCodeGen(cg, leftExpr.getSymbol(), excs);
-			depCodeGen(cg, rightExpr.getSymbol(), excs);
+			depCodeGen(cg, leftExpr.getSymbol(), scope, excs);
+			depCodeGen(cg, rightExpr.getSymbol(), scope, excs);
 
 			if(leftType.isReferenceType() && leftExpr instanceof VarFieldExpression) {
 				boolean saveAccRequired = true;

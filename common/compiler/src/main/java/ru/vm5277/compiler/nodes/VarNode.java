@@ -355,14 +355,24 @@ public class VarNode extends AstNode implements InitNodeHolder {
 	
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
+		// Позволяет обнаружить недописанную логику - все обращения к кодогенерации переменной должны содержать скоп вызывающего блока
+		throw new UnsupportedOperationException();
+	}
+	
+	public Object codeGen(CodeGenerator cg, boolean toAccum, BlockScope callerscope, CGExcs excs) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 
-		//CGScope cgs = null == parent ? cgScope : parent;
+		if(null==callerscope) { // Позволяет обнаружить недописанную логику - все обращения к кодогенерации переменной должны содержать скоп вызывающего блока
+			throw new CompileException("TODO: " + getFullInfo() + " callerScope is null");
+		}
+		
 		CGVarScope vScope = (CGVarScope)cgScope;
 		
 		VarSymbol vSymbol = (VarSymbol)symbol;
-		Set<VarSymbol> varsInRange = ((BlockScope)vSymbol.getScope()).getVarsInRange(vSymbol.getNode().getSN(), vSymbol.getLastAccessedSN());
+		// Постройка списка участвующих переменных должна осуществляться на уровне первого обращения к переменной, а не на уровне инициализации
+		// Иначе при вложенных блоках мы увидим переменные только первого блока
+		Set<VarSymbol> varsInRange = ((BlockScope)callerscope).getVarsInRange(vSymbol.getNode().getSN(), vSymbol.getLastAccessedSN());
 		Set<CGCells> usedRegsCells = new HashSet<>();
 		for(VarSymbol vs : varsInRange) {
 			CGCellsScope cgCellsScope = (CGCellsScope)vs.getCGScope();

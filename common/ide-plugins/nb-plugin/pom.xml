@@ -106,10 +106,10 @@
         </dependency>
         <dependency>
             <groupId>ru.vm5277</groupId>
-            <artifactId>lsp_server</artifactId>
-            <version>[0,)</version>
+            <artifactId>lsp-server</artifactId>
+            <version>0.3.0</version>
         </dependency>
-        <dependency>
+		<dependency>
             <groupId>org.netbeans.api</groupId>
             <artifactId>org-netbeans-modules-editor-settings</artifactId>
             <version>RELEASE230</version>

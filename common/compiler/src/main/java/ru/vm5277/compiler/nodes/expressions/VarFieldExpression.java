@@ -52,6 +52,7 @@ public class VarFieldExpression extends ExpressionNode {
 	private final	String			name;
 	private			CIScope			targetScope;
 	private			boolean			isInliningMode;
+	private			Scope			scope;
 	
     public VarFieldExpression(Instance inst, TokenBuffer tb, SourcePosition sp, Integer sn, ExpressionNode pathExpr, String name) {
 		this(inst, tb, sp, sn, pathExpr, name, false);
@@ -148,6 +149,7 @@ public class VarFieldExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
+		this.scope = scope;
 		cgScope = cg.enterExpression(parent, cgScope, toString());
 
 		if(null==symbol && null!=targetExpr) {
@@ -266,7 +268,7 @@ public class VarFieldExpression extends ExpressionNode {
 		// Актуализируем symbol
 		//getSymbol();
 		
-		depCodeGen(cg, excs);
+		depCodeGen(cg, symbol, scope, excs);
 /*			if(symbol instanceof AliasSymbol) {
 				Symbol vfSymbol = scope.resolveVFSymbol(value);
 				while(vfSymbol instanceof AliasSymbol) {
@@ -318,7 +320,7 @@ public class VarFieldExpression extends ExpressionNode {
 	}
 	
 	public void codeGen(CodeGenerator cg, boolean isInvert, boolean opOr, CGBranch brScope, CGExcs excs) throws CompileException {
-		depCodeGen(cg, excs);
+		depCodeGen(cg, symbol, scope, excs);
 		
 		if(null!=brScope) {
 			CGCellsScope cScope = (CGCellsScope)symbol.getCGScope();

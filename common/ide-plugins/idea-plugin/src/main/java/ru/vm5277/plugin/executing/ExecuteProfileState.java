@@ -11,7 +11,10 @@ import com.intellij.execution.runners.ExecutionEnvironment;
 import com.intellij.execution.runners.ProgramRunner;
 import com.intellij.execution.ui.ConsoleView;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.module.ModuleManager;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.projectRoots.ProjectJdkTable;
+import com.intellij.openapi.roots.ModuleRootManager;
 import org.jetbrains.annotations.NotNull;
 import ru.vm5277.common.FSUtils;
 import ru.vm5277.common.StrUtils;
@@ -19,10 +22,30 @@ import ru.vm5277.common.enums.Verbosity;
 import ru.vm5277.common.flash.FlashToolParam;
 import ru.vm5277.common.flash.InternalFlashTool;
 import ru.vm5277.common.mvn.MavenUtils;
-
+import com.intellij.openapi.roots.ProjectRootManager;
+import com.intellij.openapi.projectRoots.Sdk;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
+import java.util.Map;
+import com.intellij.openapi.projectRoots.Sdk;
+import com.intellij.notification.Notification;
+import com.intellij.notification.NotificationDisplayType;
+import com.intellij.notification.NotificationGroup;
+import com.intellij.notification.NotificationType;
+import com.intellij.notification.Notifications;
+import com.intellij.openapi.actionSystem.AnAction;
+import com.intellij.openapi.actionSystem.AnActionEvent;
+import com.intellij.openapi.module.Module;
+import com.intellij.openapi.module.ModuleManager;
+import com.intellij.openapi.project.Project;
+import com.intellij.openapi.projectRoots.ProjectJdkTable;
+import com.intellij.openapi.projectRoots.Sdk;
+import com.intellij.openapi.roots.ModuleRootManager;
+import com.intellij.openapi.roots.ProjectRootManager;
+import com.intellij.openapi.roots.ProjectRootManager;
+import com.intellij.openapi.projectRoots.ProjectJdkTable;
+import org.jetbrains.annotations.NotNull;
 
 public class ExecuteProfileState extends CommandLineState {
 	private static final Logger LOG = Logger.getInstance(ExecuteProfileState.class);
@@ -118,7 +141,9 @@ public class ExecuteProfileState extends CommandLineState {
             commandLine.addParameters("-Dj8b.inludePaths=$vm5277" +  File.separator + "addons" + File.separator);
         }
 		commandLine.setWorkDirectory(projectPath);
+		MavenStartup.setJavaHome(project, commandLine);
 
 		return commandLine;
 	}
+
 }

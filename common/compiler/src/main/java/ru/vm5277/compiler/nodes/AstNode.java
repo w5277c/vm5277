@@ -60,7 +60,10 @@ import ru.vm5277.common.lexer.Keyword;
 import ru.vm5277.common.lexer.tokens.TAnnotation;
 import ru.vm5277.common.lexer.tokens.Token;
 import ru.vm5277.compiler.Instance;
+import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
+import ru.vm5277.compiler.semantic.BlockScope;
 import ru.vm5277.compiler.semantic.FieldSymbol;
+import ru.vm5277.compiler.semantic.VarSymbol;
 
 public abstract class AstNode extends SemanticAnalyzer {
     private				static	int						globalCntr	= 0;
@@ -701,15 +704,21 @@ public abstract class AstNode extends SemanticAnalyzer {
 	}
 	
 	public CGScope depCodeGen(CodeGenerator cg, CGExcs excs) throws CompileException {
-		return depCodeGen(cg, symbol, excs);
+		return depCodeGen(cg, symbol, null, excs);
 	}
-	protected CGScope depCodeGen(CodeGenerator cg, Symbol symbol, CGExcs excs) throws CompileException {
+	protected CGScope depCodeGen(CodeGenerator cg, Symbol symbol, Scope callerScope, CGExcs excs) throws CompileException {
 		if(null!=symbol && symbol instanceof AstHolder && !symbol.isNative()) {
 			AstNode node = ((AstHolder)symbol).getNode();
 			if(null != node) {
 				// Генерация кода зависимостей не должна влиять на текущий размер аккумулятора
 				CGAccum accum = cg._getAcc().clone();
-				Object obj = node.codeGen(cg, false, excs);
+				Object obj = null;
+				if(node instanceof VarNode) {
+					obj = ((VarNode)node).codeGen(cg, cgDone, (BlockScope)callerScope, excs);
+				}
+				else {
+					obj = node.codeGen(cg, false, excs);
+				}
 				cg._setAcc(accum);
 				if(null != obj) return symbol.getCGScope();
 			}

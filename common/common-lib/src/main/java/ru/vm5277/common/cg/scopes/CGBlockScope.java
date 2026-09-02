@@ -275,7 +275,7 @@ public class CGBlockScope extends CGScope {
 			Collections.sort(tmp);
 			int index = 0;
 			for(RegPair pair : tmp) {
-				if(pair.isFree() && (null==usedRegsShot || !usedRegsShot.contains(usedRegsShot))) {
+				if(pair.isFree() && (null==usedRegsShot || !usedRegsShot.contains(pair))) {
 					result[index++] = pair;
 					if(index==size) {
 						for(RegPair rp : result) {

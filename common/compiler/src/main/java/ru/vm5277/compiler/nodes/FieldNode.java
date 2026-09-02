@@ -520,7 +520,9 @@ public class FieldNode extends AstNode implements InitNodeHolder {
 				}
 				else if(init instanceof EnumExpression) {
 					cg.accumLock(type);
-					cg.constToCells(cgScope, ((EnumExpression)init).getIndex(), fScope.getCells(), false);
+					if(0!=((EnumExpression)init).getIndex()) { // Поле уже проинициализировано значением 0
+						cgScope.append(cg.constToCells(cgScope, ((EnumExpression)init).getIndex(), fScope.getCells(), false));
+					}
 					cg.accumUnlock();
 				}
 				else {

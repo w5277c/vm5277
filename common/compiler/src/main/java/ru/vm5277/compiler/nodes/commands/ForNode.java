@@ -446,7 +446,12 @@ public class ForNode extends CommandNode {
 			}
 
 			if(null!=init) {
-				init.codeGen(cg, false, excs);
+				if(init instanceof VarNode) {
+					((VarNode)init).codeGen(cg, false, forScope, excs);
+				}
+				else {
+					init.codeGen(cg, false, excs);
+				}
 			}
 //TODO См. в IfNode, необходима проверка на результат condition.codeGen	
 			if(null!=condition && !alwaysTrue) {

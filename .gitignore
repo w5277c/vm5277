@@ -17,3 +17,6 @@
 /common/ide-plugins/nb-plugin/target/
 /rtos/avr/.idea
 /tools/
+/common/common-lib/target/
+/common/avr-codegen/target/
+/common/stub-codegen/target/

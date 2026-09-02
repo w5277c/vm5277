@@ -21,18 +21,39 @@
 		<maven.compiler.source>1.8</maven.compiler.source>
 		<maven.compiler.target>1.8</maven.compiler.target>
 		<j8b.packaging.version>0.1.0</j8b.packaging.version>
-		<j8b.plugin.version>0.2.0</j8b.plugin.version>
+		<j8b.plugin.version>0.3.0</j8b.plugin.version>
 	</properties>
 
 	<profiles>
 		<profile>
 			<id>default</id>
-			<activation>
-				<activeByDefault>true</activeByDefault>
-			</activation>
+				<activation>
+					<activeByDefault>true</activeByDefault>
+				</activation>
 			<properties>
+				<j8b.target>avr:atmega328p</j8b.target>
 				<j8b.targetFreq>16</j8b.targetFreq>
-				</properties>
+				<j8b.targetStdio>PD0/PD1</j8b.targetStdio>
+				<j8b.softReset>false</j8b.softReset>
+			</properties>
+		</profile>
+		<profile>
+			<id>attiny13a</id>
+			<properties>
+				<j8b.target>avr:attiny13a</j8b.target>
+				<j8b.targetFreq>9.6</j8b.targetFreq>
+				<j8b.targetStdio>PB2</j8b.targetStdio>
+				<j8b.softReset>true</j8b.softReset>
+			</properties>
+		</profile>
+		<profile>
+		<id>attiny2313a</id>
+			<properties>
+				<j8b.target>avr:attiny2313a</j8b.target>
+				<j8b.targetFreq>8</j8b.targetFreq>
+				<j8b.targetStdio>PB7</j8b.targetStdio>
+				<j8b.softReset>true</j8b.softReset>
+			</properties>
 		</profile>
 		<profile>
 			<id>arduino-nano</id>
@@ -47,6 +68,15 @@
 			<id>arduino-uno</id>
 			<properties>
 				<j8b.target>avr:atmega328p</j8b.target>
+				<j8b.targetFreq>16</j8b.targetFreq>
+				<j8b.targetStdio>PD0/PD1</j8b.targetStdio>
+				<j8b.softReset>false</j8b.softReset>
+			</properties>
+		</profile>
+		<profile>
+			<id>atmega16a</id>
+			<properties>
+				<j8b.target>avr:atmega16a</j8b.target>
 				<j8b.targetFreq>16</j8b.targetFreq>
 				<j8b.targetStdio>PD0/PD1</j8b.targetStdio>
 				<j8b.softReset>false</j8b.softReset>

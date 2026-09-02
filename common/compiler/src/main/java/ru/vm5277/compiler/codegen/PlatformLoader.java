@@ -32,10 +32,10 @@ import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.messages.MessageContainer;
 
 public class PlatformLoader {
-	private	static	final	String	LIB_CG_POSTFIX		= "_codegen";
+	private	static	final	String	LIB_CG_POSTFIX		= "-codegen";
 	private	static	final	String	LIB_CG_CLASSPREFIX	= "ru.vm5277.compiler.";
 	private	static	final	String	LIB_CG_CLASSPOSTFIX	= "_codegen.Generator";
-	private	static	final	String	LIB_ASM_POSTFIX		= "_assembler";
+	private	static	final	String	LIB_ASM_POSTFIX		= "-assembler";
 	private	static	final	String	LIB_ASM_CLASSPREFIX	= "ru.vm5277.";
 	private	static	final	String	LIB_ASM_CLASSPOSTFIX= "_asm.Assembler";
 

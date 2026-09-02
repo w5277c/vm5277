@@ -979,6 +979,48 @@ public class Generator extends CodeGenerator {
 								}
 							}
 							break;
+						case ARGS:
+						case STACK_FRAME:
+							if(leftIsFixed && !rightIsFixed) {
+								if(0!=index && index<rightSize) {
+									cont.append(new CGIAsmIReg(	'y', true, "j8b_atom", rightCells.getId(index-1), getCurBlockScope(scope),
+																(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
+									cont.append(new CGIAsmIReg(	'y', false, "j8b_atom", leftCells.getId(index), getCurBlockScope(scope),
+																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
+									threadSafe=false;
+								}
+								else {
+									cont.append(new CGIAsmIReg(	'y', false, "c0x00", leftCells.getId(index), getCurBlockScope(scope),
+																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
+								}
+							}
+							else if(!leftIsFixed && rightIsFixed) {
+								if((index+1)<rightSize) {
+									cont.append(new CGIAsmIReg(	'y', true, "j8b_atom", rightCells.getId(index+1), getCurBlockScope(scope),
+																(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
+									cont.append(new CGIAsmIReg(	'y', false, "j8b_atom", leftCells.getId(index), getCurBlockScope(scope),
+																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
+									threadSafe=false;
+								}
+								else {
+									cont.append(new CGIAsmIReg(	'y', false, "c0x00", leftCells.getId(index), getCurBlockScope(scope),
+																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
+								}
+							}
+							else {
+								if(index<rightSize) {
+									cont.append(new CGIAsmIReg(	'y', true, "j8b_atom", rightCells.getId(index), getCurBlockScope(scope),
+																(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
+									cont.append(new CGIAsmIReg(	'y', false, "j8b_atom", leftCells.getId(index), getCurBlockScope(scope),
+																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
+									threadSafe=false;
+								}
+								else {
+									cont.append(new CGIAsmIReg(	'y', false, "c0x00", leftCells.getId(index), getCurBlockScope(scope),
+																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
+								}
+							}
+							break;
 						default:
 							throw new CompileException("cellTocells " + info + " unsupported yet");
 					}
@@ -1328,6 +1370,17 @@ public class Generator extends CodeGenerator {
 								cont.append(new CGIAsm("adc", "r"+leftCells.getId(index) + ",c0x00"));
 							}
 							break;
+						case ARGS:
+						case STACK_FRAME:
+							cont.append(new CGIAsmMv("mov", "j8b_atom", "c0x00"));
+							if((!leftIsFixed && 0==index) || (leftIsFixed && 1==index)) {
+								cont.append(new CGIAsm("adc", "j8b_atom" + ",c0x00"));
+							}
+							cont.append(new CGIAsmIReg(	'y', false, "j8b_atom", leftCells.getId(index),
+														getCurBlockScope(scope), (CGBlockScope)leftCells.getObject(),
+														CGCells.Type.ARGS == leftCells.getType()));
+							threadSafe=false;
+							break;
 						default:
 							throw new CompileException("cellTocells " + info + " unsupported yet");
 					}
@@ -1380,7 +1433,9 @@ public class Generator extends CodeGenerator {
 																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
 								}
 								else {
-									cont.append(new CGIAsmLd("ldi", "r"+rightCells.getId(index), "0"));
+									cont.append(new CGIAsmIReg(	'y', false, "c0x00", leftCells.getId(index),
+																getCurBlockScope(scope), (CGBlockScope)leftCells.getObject(),
+																CGCells.Type.ARGS == leftCells.getType()));
 								}
 							}
 							else if(!leftIsFixed && rightIsFixed) {
@@ -1389,7 +1444,9 @@ public class Generator extends CodeGenerator {
 																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
 								}
 								else {
-									cont.append(new CGIAsmLd("ldi", "r"+rightCells.getId(index), "0"));
+									cont.append(new CGIAsmIReg(	'y', false, "c0x00", leftCells.getId(index),
+																getCurBlockScope(scope), (CGBlockScope)leftCells.getObject(),
+																CGCells.Type.ARGS == leftCells.getType()));
 								}
 							}
 							else {
@@ -1398,7 +1455,9 @@ public class Generator extends CodeGenerator {
 																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
 								}
 								else {
-									cont.append(new CGIAsmLd("ldi", "r"+rightCells.getId(index), "0"));
+									cont.append(new CGIAsmIReg(	'y', false, "c0x00", leftCells.getId(index),
+																getCurBlockScope(scope), (CGBlockScope)leftCells.getObject(),
+																CGCells.Type.ARGS == leftCells.getType()));
 								}
 							}
 							break;

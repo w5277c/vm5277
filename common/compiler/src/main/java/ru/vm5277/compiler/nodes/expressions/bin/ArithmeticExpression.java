@@ -42,7 +42,6 @@ import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class ArithmeticExpression extends BinaryExpression {
-	
     ArithmeticExpression(Instance inst, TokenBuffer tb, SourcePosition sp, ExpressionNode left, Operator op, ExpressionNode right) {
         super(inst, tb, sp, left, op, right);
     }
@@ -51,6 +50,7 @@ public class ArithmeticExpression extends BinaryExpression {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
+		this.scope = scope;
 		cgScope = cg.enterExpression(parent, cgScope, toString());
 
 		// Анализ операндов
@@ -227,8 +227,8 @@ public class ArithmeticExpression extends BinaryExpression {
 		ExpressionNode expr2 = rightExpr;
 
 		// Похоже для всех выражений должны быть удовлетворены зависимости
-		depCodeGen(cg, expr1.getSymbol(), excs);
-		depCodeGen(cg, expr2.getSymbol(), excs);
+		depCodeGen(cg, expr1.getSymbol(), scope, excs);
+		depCodeGen(cg, expr2.getSymbol(), scope, excs);
 		
 		// Оптимизация порядка для коммутативных операций
 		if(operator.isCommutative()) {

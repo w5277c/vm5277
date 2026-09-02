@@ -17,7 +17,7 @@
 @RtosFeature("OS_FT_IRQ_ADC_BLOCK")
 public class Adc implements AdcContract {
     @Native("_DRV_ADC__STAT_FIELD_REF")
-    private static AdcReference ref = AdcReference.INTERNAL_VREF;
+    private static AdcReference ref = AdcReference.INTERNAL_CAP;
     @Native("_DRV_ADC__STAT_FIELD_PRESC")
     private static byte prescaler = 64;
     @Native("_DRV_ADC__STAT_FIELD_MODE")
@@ -38,7 +38,7 @@ public class Adc implements AdcContract {
     @Override static boolean isBusy() {return 0!=(flags&(1<<AdcContract.FLAG_BUSY));}
     @Override static short getRawValue() {return rawValue;}
 	@Override static byte getResolution() {return 10;} // Вероятно нужно вынести в RTOS, так как вероятно не все ADC у AVR 10 битные
-    @Override static public native void init() throws DriverException;
+    @Override static public native void init(RtosCallback callback) throws DriverException;
     @Override static public native void start();
     @Override static public native void shutdown();
 	// Эти параметры могу быть применены без повторного вызова init()

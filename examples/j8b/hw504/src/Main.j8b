@@ -28,10 +28,14 @@ class Main {
 		Gpio.modeIn(ArduinoUno.PIN_D7);
 		Gpio.setHigh(ArduinoUno.PIN_D7);
 
-		short halfValue = 512;//(1<<Adc.getResolution()/2);
+		Adc.init(null);
+		Adc.setChannel(ArduinoUno.ADC_CHANNEL_A0);
+		short centerX = Adc.read();
+		Adc.setChannel(ArduinoUno.ADC_CHANNEL_A1);
+		short centerY = Adc.read();
 
 		while(true) {
-			Adc.init();
+			Adc.init(null);
 
 			boolean released = Gpio.get(ArduinoUno.PIN_D7);
 			Adc.setChannel(ArduinoUno.ADC_CHANNEL_A0);
@@ -42,11 +46,11 @@ class Main {
 			Adc.shutdown();
 
 			System.out("x:");
-			if(vrX<halfValue) System.out("-" + (halfValue-vrX));
-			else System.out(vrX-halfValue);
+			if(vrX<centerX) System.out("-" + (centerX-vrX));
+			else System.out(vrX-centerX);
 			System.out(", y:");
-			if(vrY<halfValue) System.out("-" + (halfValue-vrY));
-			else System.out(vrY-halfValue);
+			if(vrY<centerY) System.out("-" + (centerY-vrY));
+			else System.out(vrY-centerY);
 			System.out(", pressed:" + !released + "\n");
 			Thread.sleep(500);
 		}

@@ -1,4 +1,7 @@
 package ru.vm5277.plugin.executing;
+import com.intellij.execution.configurations.GeneralCommandLine;
+import com.intellij.execution.process.ProcessOutput;
+import com.intellij.execution.util.ExecUtil;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.fileChooser.FileChooser;
 import com.intellij.openapi.fileChooser.FileChooserDescriptor;
@@ -34,6 +37,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 public class FlashBootloaderDialog extends DialogWrapper {
@@ -591,29 +595,37 @@ public class FlashBootloaderDialog extends DialogWrapper {
 					tmpDirPath.toFile().deleteOnExit();
 
 					appendLog("Executing: " + mkbootCmdField.getText() + "\n");
-					ProcessBuilder mkBootPb = new ProcessBuilder(parseCommand(mkbootCmdField.getText()));
-					mkBootPb.directory(tmpDirPath.toFile());
-					mkBootPb.redirectErrorStream(true);
-					Process mkbootProcess = mkBootPb.start();
-					int exitCode = readProcessOutput(mkbootProcess);
-					if (0 != exitCode) {
-						appendLog("\n=== j8bmb failed with exit code " + exitCode + " ===\n");
+					String[] mkbootParts = parseCommand(mkbootCmdField.getText());
+					GeneralCommandLine mkbootCmd = new GeneralCommandLine();
+					mkbootCmd.setExePath(mkbootParts[0]);
+					if(mkbootParts.length>1) {
+						mkbootCmd.addParameters(Arrays.copyOfRange(mkbootParts, 1, mkbootParts.length));
+					}
+					mkbootCmd.setWorkDirectory(tmpDirPath.toFile());
+					MavenStartup.setJavaHome(project, mkbootCmd);
+					ProcessOutput mkbootOutput = ExecUtil.execAndGetOutput(mkbootCmd);
+					appendLog(mkbootOutput.getStdout());
+					if (mkbootOutput.getExitCode() != 0) {
+						appendLog("\n=== j8bmb failed with exit code " + mkbootOutput.getExitCode() + " ===\n");
 						return;
 					}
 
 					appendLog("\n\nExecuting: " + flashCmdField.getText() + "\n");
-					ProcessBuilder flashPb = new ProcessBuilder(parseCommand(flashCmdField.getText()));
-					flashPb.directory(tmpDirPath.toFile());
-					flashPb.redirectErrorStream(true);
-
-					Process flashProcess = flashPb.start();
-					exitCode = readProcessOutput(flashProcess);
-					if (0 != exitCode) {
-						appendLog("\n=== Flash failed with exit code " + exitCode + " ===\n");
+					String[] flashParts = parseCommand(flashCmdField.getText());
+					GeneralCommandLine flashCmd = new GeneralCommandLine();
+					flashCmd.setExePath(flashParts[0]);
+					if(flashParts.length>1) {
+						flashCmd.addParameters(Arrays.copyOfRange(flashParts, 1, flashParts.length));
+					}
+					flashCmd.setWorkDirectory(tmpDirPath.toFile());
+					MavenStartup.setJavaHome(project, flashCmd);
+					ProcessOutput flashOutput = ExecUtil.execAndGetOutput(flashCmd);
+					appendLog(flashOutput.getStdout());
+					if (flashOutput.getExitCode() != 0) {
+						appendLog("\n=== Flash failed with exit code " + flashOutput.getExitCode() + " ===\n");
 						return;
 					}
 					appendLog("\n=== Flash completed successfully ===\n");
-
 				} catch (Exception ex) {
 					LOG.error(ex);
 					appendLog("\n=== Error: " + ex.getMessage() + " ===\n");
@@ -637,15 +649,6 @@ public class FlashBootloaderDialog extends DialogWrapper {
 		}, "FlashBootloader-Thread").start();
 	}
 
-	private int readProcessOutput(Process process) throws IOException, InterruptedException {
-		BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-		String line;
-		while((line=reader.readLine())!=null) {
-			appendLog(line + "\n");
-		}
-		return process.waitFor();
-	}
-
 	private void appendLog(final String text) {
 		SwingUtilities.invokeLater(new Runnable() {
 			@Override
@@ -657,7 +660,7 @@ public class FlashBootloaderDialog extends DialogWrapper {
 	}
 	private void generateCommands() {
 		try {
-			Path j8bmbPath = toolkitPath.resolve("bin").resolve("j8bmb" + (FSUtils.isWindows() ? ".exe" : ".sh")).normalize();
+			Path j8bmbPath = toolkitPath.resolve("bin").resolve("j8bmb" + (FSUtils.isWindows() ? ".cmd" : ".sh")).normalize();
 
 			StringBuilder mkbootCmdSB = new StringBuilder(j8bmbPath.toString());
 			mkbootCmdSB.append(" ").append(((PlatformType)platformCombo.getSelectedItem()).name().toLowerCase());

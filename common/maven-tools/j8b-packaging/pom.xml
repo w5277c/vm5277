@@ -4,7 +4,7 @@
 	<name>j8b_mvn_packaging</name>
 	<parent>
 		<groupId>ru.vm5277</groupId>
-		<artifactId>j8b-maven-tools</artifactId>
+		<artifactId>maven-tools</artifactId>
 		<version>0.2.0</version>
 	</parent>
 

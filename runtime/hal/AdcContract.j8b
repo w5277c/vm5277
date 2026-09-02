@@ -17,8 +17,8 @@
 public interface AdcContract extends RtosDriver {
     @Native("_DRV_ADC__REF_")
     public enum AdcReference {
-        INTERNAL_VREF, //Первые значения взяты с Atmega328
-        EXTERNAL_AREF0,
+        EXTERNAL, //Первые значения взяты с Atmega328
+        INTERNAL_CAP,
         INTERNAL_1_1V, //1.1V
         INTERNAL_2_56V;//2.56V
     }
@@ -39,7 +39,7 @@ public interface AdcContract extends RtosDriver {
     void setMode(AdcMode mode);
     void setCallback(RtosCallback callback);
 
-    void init() throws DriverException;
+    void init(RtosCallback callback) throws DriverException;
     void start();
     void shutdown();
 

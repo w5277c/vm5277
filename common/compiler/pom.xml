@@ -2,14 +2,18 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>ru.vm5277</groupId>
-    <artifactId>j8b_compiler</artifactId>
+    <artifactId>compiler</artifactId>
     <version>0.7.0</version>
     <packaging>jar</packaging>
-    <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.release>8</maven.compiler.release>
+
+	<parent>
+		<groupId>ru.vm5277</groupId>
+		<artifactId>vm5277-parent</artifactId>
+		<version>0.4.0</version>
+	</parent>
+
+	<properties>
         <exec.mainClass>ru.vm5277.compiler.Main</exec.mainClass>
-		<graalvm.version>21.2.0</graalvm.version>
     </properties>
 
     <dependencies>
@@ -27,18 +31,15 @@
 		</dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>stub_codegen</artifactId>
-            <version>[0,)</version>
+            <artifactId>stub-codegen</artifactId>
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>avr_codegen</artifactId>
-            <version>[0,)</version>
+            <artifactId>avr-codegen</artifactId>
         </dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>vm5277_common</artifactId>
-            <version>[0,)</version>
+            <artifactId>vm5277-common</artifactId>
         </dependency>
     </dependencies>
 	<build>

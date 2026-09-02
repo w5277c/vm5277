@@ -3,14 +3,19 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>ru.vm5277</groupId>
     <artifactId>flasher</artifactId>
-    <version>0.4</version>
+    <version>0.4.0</version>
     <packaging>jar</packaging>
-    <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.release>8</maven.compiler.release>
+
+	<parent>
+		<groupId>ru.vm5277</groupId>
+		<artifactId>vm5277-parent</artifactId>
+		<version>0.4.0</version>
+	</parent>
+
+	<properties>
         <exec.mainClass>ru.vm5277.flasher.Main</exec.mainClass>
-		<graalvm.version>21.2.0</graalvm.version>
 	</properties>
+
 	<name>flasher</name>
 	<build>
 		<resources>
@@ -124,8 +129,7 @@
 		</dependency>
         <dependency>
             <groupId>${project.groupId}</groupId>
-            <artifactId>vm5277_common</artifactId>
-            <version>[0,)</version>
+            <artifactId>vm5277-common</artifactId>
         </dependency>
         <dependency>
             <groupId>com.googlecode.lanterna</groupId>

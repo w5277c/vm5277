@@ -23,6 +23,7 @@ import ru.vm5277.lsp.server.tokens_info.LSPMethodInfo;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -150,7 +151,7 @@ public class J8BLanguageServer extends LanguageServer {
 				timestampsCache.put(filePath, file.lastModified());
 				
 				Lexer lexer = new Lexer(LexerType.J8B, file, null, 4, false);
-				Path path = Path.of(filePath);
+				Path path = Paths.get(filePath);
 				Instance inst = new Instance(toolkitPath, runtimePath, new MessageContainer(Integer.MAX_VALUE, false, true), 4);
 				ASTParser parser = new ASTParser(inst, path.getParent());
 				try {

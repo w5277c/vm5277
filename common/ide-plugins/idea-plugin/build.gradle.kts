@@ -5,7 +5,7 @@ plugins {
 }
 
 group = "ru.vm5277"
-version = "1.4"
+version = "0.1.4"
 
 repositories {
     mavenCentral()
@@ -19,7 +19,7 @@ repositories {
 }
 
     dependencies {
-        implementation("ru.vm5277:lsp_server:+")
+        implementation("ru.vm5277:lsp-server:+")
         intellijPlatform {
             create("IC", "2025.1.4.1")
             testFramework(org.jetbrains.intellij.platform.gradle.TestFrameworkType.Platform)

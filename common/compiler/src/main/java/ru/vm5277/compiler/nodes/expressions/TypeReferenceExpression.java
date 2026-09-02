@@ -40,6 +40,7 @@ public class TypeReferenceExpression extends ExpressionNode {
 	private		final	TypeReferenceExpression	parentExpr;
 	private				String					lastId;
 	protected			CIScope					cis;
+	private				Scope					scope;
 	
 	public TypeReferenceExpression(Instance inst, TokenBuffer tb, TypeReferenceExpression parentExpr, String lastId) {
 		super(inst, tb);
@@ -135,7 +136,7 @@ public class TypeReferenceExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		
+		this.scope = scope;
 		// Находим тип-класс, если он существует
 		if(null!=type && !type.isClassType() && VarType.EXCEPTION!=type) {
 			markError("Type '" + lastId + "' not found");
@@ -170,7 +171,7 @@ public class TypeReferenceExpression extends ExpressionNode {
 		for(Symbol symbol : cis.getFields().values()) {
 			FieldSymbol fSymbol = (FieldSymbol)symbol;
 			if(!fSymbol.isFinal() && fSymbol.isStatic()) {
-				depCodeGen(cg, fSymbol, excs);
+				depCodeGen(cg, fSymbol, scope, excs);
 			}
 		}
 		

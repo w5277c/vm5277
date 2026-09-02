@@ -2,14 +2,20 @@ package ru.vm5277.plugin.executing;
 
 import com.intellij.execution.RunManagerListener;
 import com.intellij.execution.RunnerAndConfigurationSettings;
+import com.intellij.execution.configurations.GeneralCommandLine;
 import com.intellij.execution.configurations.RunConfiguration;
 import com.intellij.execution.configurations.RuntimeConfigurationException;
+import com.intellij.notification.*;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.PathManager;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.module.Module;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.project.ProjectManager;
 import com.intellij.openapi.project.ProjectManagerListener;
+import com.intellij.openapi.projectRoots.ProjectJdkTable;
+import com.intellij.openapi.projectRoots.Sdk;
+import com.intellij.openapi.roots.ProjectRootManager;
 import com.intellij.openapi.startup.ProjectActivity;
 import com.intellij.openapi.vfs.LocalFileSystem;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -24,10 +30,12 @@ import ru.vm5277.common.Toolkit;
 import ru.vm5277.common.mvn.MavenUtils;
 import ru.vm5277.plugin.asm.AsmSyntaxHighlighterFactory;
 
+import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 
 public class MavenStartup implements ProjectActivity {
 	public static VirtualFile projectsDir;
@@ -50,7 +58,9 @@ public class MavenStartup implements ProjectActivity {
 
 		if(Toolkit.checkToolkit(null, FSUtils.getToolkitPath(), Toolkit.DONWLOAD_URL, false)) {
 			toolkitPath = FSUtils.getToolkitPath();
+			if(null!=toolkitPath && toolkitPath.toString().trim().isEmpty()) toolkitPath = null;
 			mavenPath = MavenUtils.getPath(null, toolkitPath, false);
+			if(null!=mavenPath && mavenPath.toString().trim().isEmpty()) mavenPath = null;
 		}
 		else {
 			toolkitPath = null;
@@ -106,5 +116,59 @@ public class MavenStartup implements ProjectActivity {
 		);
 
 		return Unit.INSTANCE;
+	}
+
+	public static String getSdkPath(Project project) {
+		Sdk sdk = (null==project ? null : ProjectRootManager.getInstance(project).getProjectSdk());
+		if(null!=sdk) return sdk.getHomePath();
+		Sdk[] allJdks = ProjectJdkTable.getInstance().getAllJdks();
+		for (Sdk _sdk : allJdks) {
+			if (null!=_sdk.getHomePath() && !_sdk.getHomePath().isEmpty()) {
+				return _sdk.getHomePath();
+			}
+		}
+		String ideaHomePath = PathManager.getHomePath();
+		if(!ideaHomePath.isEmpty()) {
+			String jbrPath = ideaHomePath + File.separator + "jbr";
+			if(new File(jbrPath).exists()) {
+				return jbrPath;
+			}
+		}
+
+		NotificationGroup notificationGroup = new NotificationGroup(
+			"J8B SDK Notifications",
+			NotificationDisplayType.BALLOON,
+			true
+		);
+		Notification notification = notificationGroup.createNotification(
+			"JDK Not Configured",
+			"Please configure JDK in:\nFile → Project Structure → Project → SDK",
+			NotificationType.ERROR
+		);
+		Notifications.Bus.notify(notification, project);
+		return null;
+	}
+
+	public static void setJavaHome(Project project, GeneralCommandLine commandLine) {
+		Map<String, String> env = commandLine.getEnvironment();
+		Map<String, String> systemEnv = System.getenv();
+		for (Map.Entry<String, String> entry : systemEnv.entrySet()) {
+			env.putIfAbsent(entry.getKey(), entry.getValue());
+		}
+
+		String sdkPath = MavenStartup.getSdkPath(project);
+		if(null!=sdkPath && !sdkPath.isEmpty()) {
+			// Добавляем JAVA_HOME
+			env.put("JAVA_HOME", sdkPath);
+
+			// Добавляем JAVA_HOME/bin в PATH (с сохранением существующего PATH)
+			String javaBin = sdkPath + File.separator + "bin";
+			String existingPath = env.get("PATH");
+			if (existingPath != null && !existingPath.isEmpty()) {
+				env.put("PATH", javaBin + File.pathSeparator + existingPath);
+			} else {
+				env.put("PATH", javaBin);
+			}
+		}
 	}
 }

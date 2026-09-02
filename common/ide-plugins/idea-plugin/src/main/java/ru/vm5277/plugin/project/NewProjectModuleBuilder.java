@@ -2,6 +2,7 @@ package ru.vm5277.plugin.project;
 
 import com.intellij.execution.ExecutionException;
 import com.intellij.execution.configurations.GeneralCommandLine;
+import com.intellij.execution.process.ProcessOutput;
 import com.intellij.execution.util.ExecUtil;
 import com.intellij.ide.util.projectWizard.*;
 import com.intellij.openapi.application.ApplicationManager;
@@ -12,6 +13,7 @@ import com.intellij.openapi.module.ModifiableModuleModel;
 import com.intellij.openapi.module.ModuleType;
 import com.intellij.openapi.options.ConfigurationException;
 import com.intellij.openapi.project.Project;
+import com.intellij.openapi.ui.Messages;
 import com.intellij.openapi.ui.TextFieldWithBrowseButton;
 import com.intellij.openapi.util.IconLoader;
 import com.intellij.openapi.vfs.VirtualFile;
@@ -29,8 +31,12 @@ import java.awt.*;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.File;
+import java.io.InputStream;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.Map;
+import java.nio.file.Files;
 
 public class NewProjectModuleBuilder extends ModuleBuilder {
 	public static final int LABEL_WIDTH = 150;
@@ -252,6 +258,8 @@ public class NewProjectModuleBuilder extends ModuleBuilder {
 	public @Nullable Module commitModule(@NotNull Project project, @Nullable ModifiableModuleModel model) {
 		Module module = super.commitModule(project, model);
 
+		copyArcheType();
+
 		Path mvnPath = MavenUtils.getPath(null, FSUtils.getToolkitPath(), false);
 		if(null==mvnPath) {
 			LOG.error("Maven tool is not available");
@@ -271,21 +279,32 @@ public class NewProjectModuleBuilder extends ModuleBuilder {
 						"-DartifactId=" + getArtifactId(),
 						"-DarchetypeGroupId=ru.vm5277",
 						"-DarchetypeArtifactId=j8b-archetype",
+						"-DarchetypeRepository=https://vm5277.ru/maven-repo/",
+						"-DarchetypeVersion=0.1.0",
 						"-DinteractiveMode=false",
 						"-Dversion=" + getVersion()
 					);
-					ExecUtil.execAndGetOutput(cmd);
+					MavenStartup.setJavaHome(project, cmd);
 
-					File mavenDir = Paths.get(moduleDir).resolve(getArtifactId()).normalize().toFile();
-					FSUtils.moveUp(mavenDir);
-					mavenDir.delete();
-
-					ApplicationManager.getApplication().invokeLater(new Runnable() {
-						@Override
-						public void run() {
-							VirtualFileManager.getInstance().refreshWithoutFileWatcher(true);
+					ProcessOutput output = ExecUtil.execAndGetOutput(cmd);
+					if (output.getExitCode() == 0) {
+						// Даем Maven время закрыть все файлы
+						try {
+							Thread.sleep(500);
 						}
-					});
+						catch (InterruptedException ignored) {}
+
+						File mavenDir = Paths.get(moduleDir).resolve(getArtifactId()).normalize().toFile();
+						FSUtils.moveUp(mavenDir);
+						mavenDir.delete();
+
+						ApplicationManager.getApplication().invokeLater(new Runnable() {
+							@Override
+							public void run() {
+								VirtualFileManager.getInstance().refreshWithoutFileWatcher(true);
+							}
+						});
+					}
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -293,6 +312,28 @@ public class NewProjectModuleBuilder extends ModuleBuilder {
 		}
 
 		return module;
+	}
+
+	private void copyArcheType() {
+		File localRepo = new File(System.getProperty("user.home"), ".m2/repository/ru/vm5277/j8b-archetype/0.1.0");
+		File localJar = new File(localRepo, "j8b-archetype-0.1.0.jar");
+		File localPom = new File(localRepo, "j8b-archetype-0.1.0.pom");
+
+		if (!localJar.exists() || !localPom.exists()) {
+			try {
+				InputStream jarStream = getClass().getResourceAsStream("/j8b-archetype-0.1.0.jar");
+				InputStream pomStream = getClass().getResourceAsStream("/j8b-archetype-0.1.0.pom");
+
+				if (jarStream != null && pomStream != null) {
+					localRepo.mkdirs();
+					Files.copy(jarStream, localJar.toPath(), StandardCopyOption.REPLACE_EXISTING);
+					Files.copy(pomStream, localPom.toPath(), StandardCopyOption.REPLACE_EXISTING);
+				}
+				jarStream.close();
+				pomStream.close();
+			}
+			catch (Exception skip) {}
+		}
 	}
 
 	public String getGroupId() { return groupIdField.getText(); }

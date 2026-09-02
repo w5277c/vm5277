@@ -2,18 +2,20 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
     <groupId>ru.vm5277</groupId>
-    <artifactId>lsp_server</artifactId>
-    <version>0.3</version>
+    <artifactId>lsp-server</artifactId>
+    <version>0.3.0</version>
     <packaging>jar</packaging>
-    <dependencies>
+
+	<parent>
+		<groupId>ru.vm5277</groupId>
+		<artifactId>vm5277-parent</artifactId>
+		<version>0.4.0</version>
+	</parent>
+
+	<dependencies>
         <dependency>
-            <groupId>${project.groupId}</groupId>
-            <artifactId>j8b_compiler</artifactId>
-            <version>[0,)</version>
+            <groupId>ru.vm5277</groupId>
+            <artifactId>compiler</artifactId>
         </dependency>
     </dependencies>
-    <properties>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <maven.compiler.release>11</maven.compiler.release>
-    </properties>
 </project>

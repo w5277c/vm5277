@@ -125,10 +125,11 @@ public class BlockScope extends Scope {
 		for(Symbol symbol : variables.values()) {
 			if(symbol instanceof VarSymbol) {
 				VarSymbol vSymbol = (VarSymbol)symbol;
-				if(vSymbol.getNode().getSN()<minAstSn) {
+				if(null==vSymbol.getLastAccessedSN()) continue; // Нигде не используется
+				if(vSymbol.getLastAccessedSN()<minAstSn) {
 					outOfRange = true;
 				}
-				else if(vSymbol.getNode().getSN()<=maxAstSn) {
+				else if(vSymbol.getNode().getSN()<=maxAstSn || vSymbol.getLastAccessedSN()<=maxAstSn) {
 					result.add(vSymbol);
 				}
 			}
