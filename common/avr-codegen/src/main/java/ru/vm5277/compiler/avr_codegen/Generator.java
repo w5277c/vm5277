@@ -728,19 +728,8 @@ public class Generator extends CodeGenerator {
 			acc.setBytes(leftSize);
 		}
 		
-		// Запись 1 байта в переменную или в аккумулятор потокобезопасна
-		boolean threadSafe = (1==size || CGCells.Type.ACC==leftCells.getType());
-		// Проверяем на аккумулятор левую часть если представлена в виде регистров
-		if(!threadSafe && CGCells.Type.REG == leftCells.getType()) {
-			boolean accRegOnly=true;
-			for(int index=0; index<leftCells.getSize(); index++) {
-				if(!isAccumReg((byte)leftCells.getId(index))) {
-					accRegOnly = false;
-					break;
-				}
-			}
-			if(accRegOnly) threadSafe = true;
-		}
+		// Потоко не безопасо, если используется j8b_atom, если один из операндов HEAP, ARRAY, STAT или HEAP_ALT и общий размер больше байта
+		boolean threadSafe = true;
 		
 		byte[] accRegs = getAccRegs(0x04);
 		if(CGCells.Type.ACC==leftCells.getType() && null!=leftCells.getIds()) {
@@ -768,6 +757,8 @@ public class Generator extends CodeGenerator {
 					// Теперь размеры одинаковые
 					switch(leftCells.getType()) {
 						case ARRAY:
+							if(1<size) threadSafe = false;
+							
 							if(leftIsFixed && !rightIsFixed) {
 								cont.append(new CGIAsm("st", "x+," + (0==index ? "c0x00" : regsStr[index-1])));
 							}
@@ -779,6 +770,8 @@ public class Generator extends CodeGenerator {
 							}
 							break;
 						case HEAP:
+							if(1<size) threadSafe = false;
+							
 							if(leftIsFixed && !rightIsFixed) {
 								cont.append(new CGIAsmIReg('z', false, (0==index ? "c0x00" : regsStr[index-1]), leftCells.getId(index)));
 							}
@@ -835,6 +828,8 @@ public class Generator extends CodeGenerator {
 							}
 							break;
 						case STAT:
+							if(1<size) threadSafe = false;
+							
 							if(leftIsFixed && !rightIsFixed) {
 								if(0==index) {
 									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",0"));
@@ -871,6 +866,8 @@ public class Generator extends CodeGenerator {
 				case STACK_FRAME:
 					switch(leftCells.getType()) {
 						case ARRAY:
+							if(1<size) threadSafe = false;
+							
 							if(leftIsFixed && !rightIsFixed) {
 								if(0!=index && index<rightSize) {
 									cont.append(new CGIAsmIReg(	'y', true, "r16", rightCells.getId(index-1), getCurBlockScope(scope),
@@ -903,6 +900,8 @@ public class Generator extends CodeGenerator {
 							}
 							break;
 						case HEAP:
+							if(1<size) threadSafe = false;
+							
 							if(leftIsFixed && !rightIsFixed) {
 								if(0!=index && index<rightSize) {
 									cont.append(new CGIAsmIReg(	'y', true, "r16", rightCells.getId(index-1), getCurBlockScope(scope),
@@ -1026,6 +1025,8 @@ public class Generator extends CodeGenerator {
 					}
 					break;
 				case ARRAY:
+					if(1<size) threadSafe = false;
+					
 					switch(leftCells.getType()) {
 						case ACC:
 							if(leftIsFixed && !rightIsFixed) {
@@ -1179,6 +1180,8 @@ public class Generator extends CodeGenerator {
 							}
 							break;
 						case ARRAY:
+							if(1<size) threadSafe = false;
+							
 							if(leftIsFixed && !rightIsFixed) {
 								if(0!=index && index<=rightCells.getSize()) {
 									cont.append(new CGIAsm("st", "x+," + getConstReg(cont, (byte)19, rightCells.getId(index-1))));
@@ -1205,6 +1208,8 @@ public class Generator extends CodeGenerator {
 							}
 							break;
 						case HEAP:
+							if(1<size) threadSafe = false;
+							
 							if(leftIsFixed && !rightIsFixed) {
 								if(0!=index && index<=rightCells.getSize()) {
 									String reg = getConstReg(cont, (byte)19, rightCells.getId(index-1));
@@ -1234,6 +1239,8 @@ public class Generator extends CodeGenerator {
 							}
 							break;
 						case HEAP_ALT:
+							if(1<size) threadSafe = false;
+							
 							if(0==index && 0!=leftCells.getId(0)) {
 								cont.append(new CGIAsm("subi", "r26,low(-" + leftCells.getId(0) + ")"));
 								cont.append(new CGIAsm("sbci", "r27,high(-" + leftCells.getId(0) + ")"));
@@ -1290,6 +1297,8 @@ public class Generator extends CodeGenerator {
 							}
 							break;
 						case STAT:
+							if(1<size) threadSafe = false;
+							
 							if(leftIsFixed && !rightIsFixed) {
 								if(0!=index && index<=rightCells.getSize()) {
 									String reg = getConstReg(cont, (byte)19, rightCells.getId(index-1));
@@ -1462,6 +1471,8 @@ public class Generator extends CodeGenerator {
 							}
 							break;
 						case ARRAY:
+							if(1<size) threadSafe = false;
+							
 							if(leftIsFixed && !rightIsFixed) {
 								if(0!=index && index<rightSize) {
 									cont.append(new CGIRAsm("st", "x+", "r" + rightCells.getId(index-1)));
@@ -1488,6 +1499,8 @@ public class Generator extends CodeGenerator {
 							}
 							break;
 						case HEAP:
+							if(1<size) threadSafe = false;
+							
 							if(leftIsFixed && !rightIsFixed) {
 								if(0!=index && index<=rightCells.getSize()) {
 									cont.append(new CGIAsmIReg('z', false, "r"+rightCells.getId(index-1), leftCells.getId(index)));
@@ -1588,6 +1601,8 @@ public class Generator extends CodeGenerator {
 							}
 							break;
 						case ARRAY:
+							if(1<size) threadSafe = false;
+						
 							if(leftIsFixed && !rightIsFixed) {
 								if(0!=index && index<rightSize) {
 									cont.append(new CGIRAsm("pop", "j8b_atom"));
@@ -1623,6 +1638,8 @@ public class Generator extends CodeGenerator {
 							}
 							break;
 						case HEAP:
+							if(1<size) threadSafe = false;
+							
 							if(leftIsFixed && !rightIsFixed) {
 								if(0!=index && index<rightSize) {
 									cont.append(new CGIRAsm("pop", "j8b_atom"));
@@ -1699,6 +1716,8 @@ public class Generator extends CodeGenerator {
 							}
 							break;
 						case STAT:
+							if(1<size) threadSafe = false;
+							
 							if(leftIsFixed && !rightIsFixed) {
 								if(0!=index && index<=rightCells.getSize()) {
 									cont.append(new CGIRAsm("pop", "j8b_atom"));
@@ -1735,6 +1754,8 @@ public class Generator extends CodeGenerator {
 					}
 					break;
 				case STAT:
+					if(1<size) threadSafe = false;
+					
 					switch(leftCells.getType()) {
 						case REG:
 							if(leftIsFixed && !rightIsFixed) {
@@ -1767,6 +1788,8 @@ public class Generator extends CodeGenerator {
 					}
 					break;
 				case HEAP_ALT:
+					if(1<size) threadSafe = false;
+					
 					switch(leftCells.getType()) {
 						case REG:
 							if(0==index) {
@@ -1809,6 +1832,8 @@ public class Generator extends CodeGenerator {
 					}
 					break;
 				case HEAP:
+					if(1<size) threadSafe = false;
+					
 					switch(leftCells.getType()) {
 						case ACC:
 							if(leftIsFixed && !rightIsFixed) {
@@ -1901,8 +1926,8 @@ public class Generator extends CodeGenerator {
 		}
 		
 		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING) && !threadSafe) {
-			dispLockCont.append(new CGIAsm("set"));
-			cont.append(new CGIAsm("clt"));
+			dispLockCont.append(new CGIAsmCall(CALL_INSTR, RTOSLibs.DISPATCHER_PROCS.OS_DISPATCHER_LOCK.name().toLowerCase(), true));
+			cont.append(new CGIAsmCall(CALL_INSTR, RTOSLibs.DISPATCHER_PROCS.OS_DISPATCHER_UNLOCK.name().toLowerCase(), true));
 		}
 		scope.append(cont);
 	}
@@ -2312,8 +2337,11 @@ public class Generator extends CodeGenerator {
 	 * @throws CompileException
 	 */
 	public void regsToVar(CGScope scope, byte[] regs, int usedRegsQnt, CGCells cells) throws CompileException {
-		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("set"));
-		
+		CGIContainer dispLockCont = new CGIContainer();
+		scope.append(dispLockCont);
+
+		boolean threadSafe = true;
+
 		switch(cells.getType()) {
 			case REG:
 				regsMv(scope, regs, cellsToRegs(cells));
@@ -2336,12 +2364,14 @@ public class Generator extends CodeGenerator {
 				break;
 			case ARGS:
 			case STACK_FRAME:
+				if(1<cells.getSize() || 1<usedRegsQnt) threadSafe = false;
 				for(int i=0; i<cells.getSize(); i++) {
 					scope.append(new CGIAsmIReg('y', false, "r" + regs[i], cells.getId(i), getCurBlockScope(scope),
 												(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
 				}
 				break;
 			case STAT:
+				if(1<cells.getSize() || 1<usedRegsQnt) threadSafe = false;
 				for(int i=0; i<cells.getSize(); i++) {
 					scope.append(new CGIAsm("sts", "_OS_STAT_POOL+" + cells.getId(i) + ",r" + regs[i]));
 				}
@@ -2354,7 +2384,10 @@ public class Generator extends CodeGenerator {
 			scope.append(new CGIAsmLd("ldi", "r" + cells.getId(i), "0x00"));
 		}
 		
-		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING) && !threadSafe) {
+			dispLockCont.append(new CGIAsmCall(CALL_INSTR, RTOSLibs.DISPATCHER_PROCS.OS_DISPATCHER_LOCK.name().toLowerCase(), true));
+			scope.append(new CGIAsmCall(CALL_INSTR, RTOSLibs.DISPATCHER_PROCS.OS_DISPATCHER_UNLOCK.name().toLowerCase(), true));
+		}
 	}
 
 	public int getRegPos(byte[] regs, int offset, byte reg) {
@@ -2650,14 +2683,14 @@ public class Generator extends CodeGenerator {
 	}
 		
 	@Override
-	public void cellsAction(CGScope scope, CGCells leftCells, Operator op, CGCells rightCells, boolean leftIsFixed, boolean rightIsFixed, CGExcs excs)
+	public void cellsAction(CGScope scope, CGCells leftCells, VarType leftType, Operator op, CGCells rightCells, VarType rightType, CGExcs excs)
 																																	throws CompileException {
 		switch (leftCells.getType()) {
 			case ACC:
-				accAndCellsAction(scope, op, rightCells, rightIsFixed, excs);
+				accAndCellsAction(scope, op, rightCells, rightType.isFixedPoint(), excs);
 				break;
 			case REG:
-				regsAndCellsAction(scope, leftCells, op, rightCells, leftIsFixed, rightIsFixed, excs);
+				regsAndCellsAction(scope, leftCells, op, rightCells, leftType.isFixedPoint(), rightType.isFixedPoint(), excs);
 				break;
 			default:
 				throw new CompileException("Cells action, left cells type:" + leftCells.getType() + " - unsupported yet");

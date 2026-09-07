@@ -36,7 +36,6 @@ public class ASMKeyword extends Keyword {
 	public	static	final	Keyword					ENDIF	= new Keyword(".endif", TokenType.DIRECTIVE, LexerType.ASM);
 	public	static	final	Keyword					IF		= new Keyword(".if", TokenType.DIRECTIVE, LexerType.ASM);
 	public	static	final	Keyword					ELSE	= new Keyword(".else", TokenType.DIRECTIVE, LexerType.ASM);
-	public	static	final	Keyword					ELSEIF	= new Keyword(".elseif", TokenType.DIRECTIVE, LexerType.ASM);
 	public	static	final	Keyword					ELIF	= new Keyword(".elif", TokenType.DIRECTIVE, LexerType.ASM);
 	// Диагностические сообщения
 	public	static	final	Keyword					MESSAGE	= new Keyword(".message", TokenType.DIRECTIVE, LexerType.ASM);
@@ -82,7 +81,7 @@ public class ASMKeyword extends Keyword {
 	public	static	final	Keyword					HWRD	= new Keyword("hwrd", TokenType.COMMAND, LexerType.ASM);
 	public	static	final	Keyword					PAGE	= new Keyword("page", TokenType.COMMAND, LexerType.ASM);
 	public	static	final	Keyword					EXP2	= new Keyword("exp2", TokenType.COMMAND, LexerType.ASM);
-	public	static	final	Keyword					LOG		= new Keyword("log", TokenType.COMMAND, LexerType.ASM);
+	public	static	final	Keyword					LOG2	= new Keyword("log2", TokenType.COMMAND, LexerType.ASM);
 
 	public ASMKeyword(String name, TokenType tokenType) {
 		super(name, tokenType, LexerType.ASM);

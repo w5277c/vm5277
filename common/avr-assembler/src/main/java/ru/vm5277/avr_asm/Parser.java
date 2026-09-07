@@ -115,7 +115,7 @@ public class Parser {
 						if(ASMKeyword.IFDEF.getName().equals(kd)) {IfDefNode.parse(tb, scope, mc); continue;}
 						if(ASMKeyword.IFNDEF.getName().equals(kd)) {IfNDefNode.parse(tb, scope, mc); continue;}
 						if(ASMKeyword.ELSE.getName().equals(kd)) {ElseNode.parse(tb, scope, mc); continue;}
-						if(ASMKeyword.ELSEIF.getName().equals(kd) || ASMKeyword.ELIF.getName().equals(kd)) {ElseIfNode.parse(tb, scope, mc); continue;}
+						if(ASMKeyword.ELIF.getName().equals(kd)) {ElseIfNode.parse(tb, scope, mc); continue;}
 						//TODO остальные директивы с условиями
 					}
 					tb.skipLine(); continue;
@@ -142,7 +142,7 @@ public class Parser {
 						if(ASMKeyword.IFDEF.getName().equals(kd)) {IfDefNode.parse(tb, scope, mc); continue;}
 						if(ASMKeyword.IFNDEF.getName().equals(kd)) {IfNDefNode.parse(tb, scope, mc); continue;}
 						if(ASMKeyword.ELSE.getName().equals(kd)) {ElseNode.parse(tb, scope, mc); continue;}
-						if(ASMKeyword.ELSEIF.getName().equals(kd) || ASMKeyword.ELIF.getName().equals(kd)) {ElseIfNode.parse(tb, scope, mc); continue;}
+						if(ASMKeyword.ELIF.getName().equals(kd)) {ElseIfNode.parse(tb, scope, mc); continue;}
 						if(ASMKeyword.MESSAGE.getName().equals(kd)) {MessageNode.parse(tb, scope, mc); continue;}
 						if(ASMKeyword.WARNING.getName().equals(kd)) {WarningNode.parse(tb, scope, mc); continue;}
 						if(ASMKeyword.ERROR.getName().equals(kd)) {ErrorNode.parse(tb, scope, mc); continue;}

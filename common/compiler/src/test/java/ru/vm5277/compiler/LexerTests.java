@@ -244,7 +244,7 @@ public class LexerTests {
         assertEquals(1, tokens.size() - 1); // -1 для EOF
         
 		assertEquals(TokenType.NOTE, tokens.get(0).getType());
-		assertEquals("0x884444c8444044844737", toStringValue(tokens.get(0).getValue()));
+		assertEquals("0x845454c4545054825747", toStringValue(tokens.get(0).getValue()));
     }
 	
     @Test

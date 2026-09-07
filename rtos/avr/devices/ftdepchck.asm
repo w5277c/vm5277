@@ -31,9 +31,6 @@
 .IF OS_FT_MULTITHREADING==0x01 || OS_FT_STIMER==0x01
 	.SET	OS_FT_TIMER 							= 0x01	;Многопоточность и программные таймеры используют таймер
 .ENDIF
-.IF OS_FT_TIMER==0x01
-	.SET OS_FT_IRQ_TIMER_BLOCK						= 0x01	; Таймер зависит о таблицы прерываний
-.ENDIF
 
 .IF OS_FT_IRQ_INT_BLOCK==0x01 || OS_FT_IRQ_PCINT_BLOCK==0x01 || OS_FT_IRQ_WD_BLOCK==0x01 || OS_FT_IRQ_TIMER_CAPTURE_BLOCK==0x01
     .SET OS_FT_IR_TABLE                             = 0x01

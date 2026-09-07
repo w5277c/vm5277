@@ -159,13 +159,13 @@ public class ASTPrinter {
 					out.put("enum ");
 					out.put(en.getName());
 					out.put(" {");
-					if(!en.getValues().isEmpty()) {
+					if(!en.getItems().isEmpty()) {
 						out.print();
 						out.extend();
-						for(int i=0; i<en.getValues().size(); i++) {
+						for(int i=0; i<en.getItems().size(); i++) {
 							
-							out.put(en.getValues().get(i).toUpperCase());
-							if(i!=en.getValues().size()-1) {
+							out.put(en.getItems().get(i).toUpperCase());
+							if(i!=en.getItems().size()-1) {
 								out.put(",");
 							}
 							else {

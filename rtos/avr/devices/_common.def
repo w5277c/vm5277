@@ -89,7 +89,7 @@
 	.EQU    OSR_OVERFLOW                            = 0x0a  ;Попытка переполнения буфера
 	.EQU    OSR_CANCELLED                           = 0x0b  ;Отменено программно
 	.EQU    OSR_UNSUPPORTED                         = 0x0c  ;Не поддерживается
-    .EQU    OSR_NO_AVAILABLE_MODEL                  = 0x0d  ;Не поддерживаемая модель
+    .EQU    OSR_NO_AVAILABLE                        = 0x0d  ;Нет в наличии (ресурс исчерпан)
     .EQU    OSR_INVALID_PARAM                       = 0x0e  ;Не корректный параметр
     .EQU    OSR_UNSUPPORTED_PARAM                   = 0x0f  ;Не поддерживаемое значение параметра
 ;---OS-NATIVE-EXCEPTION-CODES-------------------------------;Коды Native исключения

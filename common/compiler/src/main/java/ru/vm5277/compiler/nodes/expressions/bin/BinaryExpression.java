@@ -295,7 +295,7 @@ public class BinaryExpression extends ExpressionNode {
 					throw new CompileException("Accum not used for operand:" + expr2);
 				}
 				// Выполняем логическую операцию со значением в стеке
-				cg.cellsAction(cgScope, new CGCells(CGCells.Type.ACC), operator, new CGCells(CGCells.Type.STACK, 1), false, false, excs);
+				cg.cellsAction(cgScope, new CGCells(CGCells.Type.ACC), expr2.getType(), operator, new CGCells(CGCells.Type.STACK, 1), expr1.getType(), excs);
 			}
 			else {
 				//TODO Генерирует не оптимальное количество переходов, оптимизатор решит эту задачу, но лучше оптимизировать сразу
@@ -334,7 +334,7 @@ public class BinaryExpression extends ExpressionNode {
 					result = null;
 				}
 				else if(expr1 instanceof UnaryExpression) {
-					// Работа с branch - похоже артефак который в добавок ломал логику
+					// Работа с branch - похоже артефакт который в добавок ломал логику
 //					((CGBranch)branch).pushEnd(new CGLabelScope(null, null, LabelNames.LOCGIC_NOT_END, true));
 					((UnaryExpression)expr1).codeGen(cg, isInvert, Operator.OR == operator, false, excs);
 //					CGLabelScope lbScope = ((CGBranch)branch).popEnd();
@@ -370,7 +370,27 @@ public class BinaryExpression extends ExpressionNode {
 
 				}
 				else {
-					expr2.codeGen(cg, false, excs);
+					Object _result = expr2.codeGen(cg, true, excs);
+					// Выражение может вернуть результат в виде флага CPU
+					if(_result instanceof CodegenResult) {
+						if(CodegenResult.RESULT_IN_FLAG==(CodegenResult)_result) {
+							cg.boolFlagCond(cgScope, false, branch);
+						}
+						else if(CodegenResult.RESULT_IN_INV_FLAG==(CodegenResult)_result) {
+							cg.boolFlagCond(cgScope, true, branch);
+						}
+						else if(CodegenResult.TRUE==(CodegenResult)_result) {
+							releaseVars(cg);
+							return !isInvert ? CodegenResult.TRUE : CodegenResult.FALSE;
+						}
+						else if(CodegenResult.FALSE==(CodegenResult)_result) {
+							releaseVars(cg);
+							return isInvert ? CodegenResult.TRUE : CodegenResult.FALSE;
+						}
+						else {
+							throw new CompileException("TODO: Not realized yet:" + getFullInfo());
+						}
+					}
 				}
 
 				if(opOr ^ (Operator.OR == operator)) {
@@ -399,8 +419,7 @@ public class BinaryExpression extends ExpressionNode {
 			}
 
 			if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumLock(VarType.FIXED);
-			cg.cellsAction(cgScope, new CGCells(CGCells.Type.ACC), operator, new CGCells(CGCells.Type.STACK, size),
-							expr1.getType().isFixedPoint(), expr2.getType().isFixedPoint(), excs);
+			cg.cellsAction(cgScope, new CGCells(CGCells.Type.ACC), expr1.getType(), operator, new CGCells(CGCells.Type.STACK, size), expr2.getType(), excs);
 			if(operator.isAssignment()) {
 				cg.accToCells(cgScope, expr1.getType(), (CGCellsScope)expr1.getSymbol().getCGScope());
 			}

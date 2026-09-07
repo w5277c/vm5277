@@ -193,7 +193,7 @@ public abstract class CodeGenerator extends CGScope {
 	public abstract void setHeapReg(CGScope scope, CGCells cells) throws CompileException;
 	public abstract void constToAcc(CGScope scope, int sizeInBytes, long value, boolean isFixed) throws CompileException;
 	public abstract CGIContainer constToCells(CGScope scope, long value, CGCells cells, boolean isFixed) throws CompileException;
-	public abstract void cellsAction(CGScope scope, CGCells leftCells, Operator op, CGCells rightCells, boolean leftisFixed, boolean rightIsFixed, CGExcs excs) throws CompileException;
+	public abstract void cellsAction(CGScope scope, CGCells leftCells, VarType leftType, Operator op, CGCells rightCells, VarType rightType, CGExcs excs) throws CompileException;
 	public abstract void constAction(CGScope scope, CGCells cells, Operator op, long k, boolean isFixed, CGExcs excs) throws CompileException;
 	public abstract void cellsOpCells(CGScope scope, CGCells leftCells, VarType leftType, Operator op, CGCells rightCells, VarType rightType) throws CompileException;
 	public abstract void cellsCpCells(CGScope scope, CGCells leftCells, VarType leftType, CGCells rightCells, VarType rigthType, Operator op, boolean isNot, boolean isOr, CGBranch branchScope) throws CompileException;

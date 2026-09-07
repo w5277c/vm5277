@@ -29,6 +29,7 @@
 	.EQU	OS_RAM_BORDER_SIZE						= 0x20	;Минимальное допустимое расстояние между вершинами FREE_RAM и STACK
 	.EQU    OS_PORTS_LAST                           = 0x03  ;Номер последнего порта (A-0,B-1,C-2,D-3,E-4,...)
 	.EQU	OS_ADC_CHANNELS_QNT						= 0x09	;Количество каналов ADC
+	.EQU	OS_TIMERS_QNT						    = 0x03	;Количество аппаратных таймеров
 
 .IFNDEF OS_STACK_SIZE
 	.SET	OS_STACK_SIZE							= 0xc0	;Общий стек(192 байта)
@@ -143,14 +144,24 @@
 	.SET OS_IRQ_TIMER1_OVF = _OS_IRQ_RAM_TABLE_SIZE
 	.DW _OS_IRQ_RAM_TABLE_SIZE
 	.SET	_OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
-    .IF OS_FT_TIMER == 0x01									; Timer/Counter0 Compare Match A
-    	JMP		_OS_SYSTIMER_HANDLER
+.ELSE
+    JMP		_OS_INIT										; Failure -> reset
+    JMP		_OS_INIT										; Failure -> reset
+    JMP		_OS_INIT										; Failure -> reset
+.ENDIF
+.IF OS_FT_TIMER == 0x01									    ; Timer/Counter0 Compare Match A
+    JMP		_OS_SYSTIMER_HANDLER
+.ELSE
+    .IF OS_FT_IRQ_TIMER_BLOCK==0x01
+        RCALL	_OS_IRQ_HANDLER
+   	    .SET OS_IRQ_TIMER0_CMPA = _OS_IRQ_RAM_TABLE_SIZE
+        .DW _OS_IRQ_RAM_TABLE_SIZE
+        .SET	_OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
     .ELSE
-	    RCALL	_OS_IRQ_HANDLER
-    	.SET OS_IRQ_TIMER0_CMPA = _OS_IRQ_RAM_TABLE_SIZE
-	    .DW _OS_IRQ_RAM_TABLE_SIZE
-	    .SET	_OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
+        JMP		_OS_INIT										; Failure -> reset
     .ENDIF
+.ENDIF
+.IF OS_FT_IRQ_TIMER_BLOCK==0x01
 	RCALL	_OS_IRQ_HANDLER								    ; Timer/Counter0 Compare Match B
 	.SET OS_IRQ_TIMER0_CMPB = _OS_IRQ_RAM_TABLE_SIZE
 	.DW _OS_IRQ_RAM_TABLE_SIZE
@@ -160,10 +171,6 @@
 	.DW _OS_IRQ_RAM_TABLE_SIZE
 	.SET	_OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
 .ELSE
-    JMP		_OS_INIT										; Failure -> reset
-    JMP		_OS_INIT										; Failure -> reset
-    JMP		_OS_INIT										; Failure -> reset
-    JMP		_OS_INIT										; Failure -> reset
     JMP		_OS_INIT										; Failure -> reset
     JMP		_OS_INIT										; Failure -> reset
 .ENDIF
@@ -259,6 +266,11 @@ PORTS_MASK:												    ;Таблица реальных портов(пин�
 INT_TABLE:
 	.db	INT0_PORT,INT1_PORT
 .ENDIF
+.IF OS_FT_IRQ_TIMER_BLOCK==0x01
+TIMER_TABLE:
+    ;По два байта на таймер, где |bqqqqppp|pppppppp| b=8/16бит, q-максимальное кол-во бит делителя, p-битмаска prescaler
+    .dw 0b0101110101001001, 0b1101110101001001, 0b0101110111101001
+.ENDIF
 .IF OS_FT_IRQ_PCINT_BLOCK==0x01
 PCINT_TABLE: ;TODO рудимент?
 	.db	0x00,PCMSK0,PCMSK1,PCMSK2
@@ -290,7 +302,7 @@ PCINT_TABLE: ;TODO рудимент?
 .ENDMACRO
 
 ;ATOMIC_REQUIRED
-.MACRO _OS_TIMER_INIT_NR
+.MACRO _OS_SYSTIMER_INIT_NR
 	_OS_POWER_ON PRTIM0										;Подпитываю TIMER0
 	LDI ACCUM_L,(1<<WGM01)|(0<<WGM00)
 	STS TCCR0A,ACCUM_L

@@ -17,6 +17,8 @@
 package ru.vm5277.compiler.nodes;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -728,7 +730,14 @@ public abstract class AstNode extends SemanticAnalyzer {
 	
 	protected void releaseVars(CodeGenerator cg) throws CompileException {
 		if(null==cgScope || cgScope.getLiveVars().isEmpty()) return;
-		for(CGVarScope vScope : cgScope.getLiveVars()) {
+		List<CGVarScope> liveVars = new ArrayList<>(cgScope.getLiveVars());
+		Collections.sort(liveVars, new Comparator<CGVarScope>() {
+			@Override
+			public int compare(CGVarScope vScope1, CGVarScope vScope2) {
+				return Integer.compare(vScope1.getResId(), vScope2.getResId());
+			}
+		});
+		for(CGVarScope vScope : liveVars) {
 			vScope.checkAndRelease(cg, cgScope);
 		}
 	}

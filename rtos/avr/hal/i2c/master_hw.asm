@@ -17,7 +17,7 @@
 .include "stdio/out_hex8.asm"
 .include "stdio/out_char.asm"
 
-.include "drivers/i2c/common.asm"
+.include "hal/i2c/common.asm"
 .include "core/irq_set.asm"
 .include "sys/proc_await.asm"
 

@@ -19,7 +19,7 @@
 
 ;TODO пока поддержка только одного UART
 
-.include "drivers/uart/common.asm"
+.include "hal/uart/common.asm"
 .include "core/irq_set.asm"
 .include "math/div32.asm"
 .include "drivers/mem/circ_buff16.asm"

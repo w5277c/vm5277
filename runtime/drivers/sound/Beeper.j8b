@@ -14,47 +14,45 @@
  * limitations under the License.
  */
 
-// Частота програмного таймера 5КГц - сильные искажения выше малой октавы
+import hal.HwTimerManager;
 
-@RegisterSoftTimer(timerId) //@RegisterSoftTimer({TIMER0_ID, TIMER1_ID})
 public class Beeper implements RtosCallback, RtosDriver {
 	private static final short QUARTER_MS = 500;
-	private static final short[] PERIODS = new short[]{
-    	1000000 / 1635 / 2 / 2,  // C0  (16.35 Гц)  → 306/2
-    	1000000 / 1732 / 2 / 2,  // C#0 (17.32 Гц)  → 289/2
-    	1000000 / 1835 / 2 / 2,  // D0  (18.35 Гц)  → 273/2
-    	1000000 / 1945 / 2 / 2,  // D#0 (19.45 Гц)  → 258/2
-    	1000000 / 2060 / 2 / 2,  // E0  (20.60 Гц)  → 243/2
-    	1000000 / 2183 / 2 / 2,  // F0  (21.83 Гц)  → 229/2
-    	1000000 / 2313 / 2 / 2,  // F#0 (23.13 Гц)  → 216/2
-   		1000000 / 2450 / 2 / 2,  // G0  (24.50 Гц)  → 204/2
-    	1000000 / 2596 / 2 / 2,  // G#0 (25.96 Гц)  → 193/2
-    	1000000 / 2750 / 2 / 2,  // A0  (27.50 Гц)  → 182/2
-    	1000000 / 2914 / 2 / 2,  // A#0 (29.14 Гц)  → 172/2
-    	1000000 / 3087 / 2 / 2   // B0  (30.87 Гц)  → 162/2
+	private static final short[] PERIODS = new short[] {
+    	100000000 / 1635 / 2,  // C0  (16.35 Гц)  → 30581
+    	100000000 / 1732 / 2,  // C#0 (17.32 Гц)  → 28868
+    	100000000 / 1835 / 2,  // D0  (18.35 Гц)  → 27247
+    	100000000 / 1945 / 2,  // D#0 (19.45 Гц)  → 25706
+    	100000000 / 2060 / 2,  // E0  (20.60 Гц)  → 24271
+    	100000000 / 2183 / 2,  // F0  (21.83 Гц)  → 22904
+    	100000000 / 2313 / 2,  // F#0 (23.13 Гц)  → 21616
+   		100000000 / 2450 / 2,  // G0  (24.50 Гц)  → 20408
+    	100000000 / 2596 / 2,  // G#0 (25.96 Гц)  → 19260
+    	100000000 / 2750 / 2,  // A0  (27.50 Гц)  → 18181
+    	100000000 / 2914 / 2,  // A#0 (29.14 Гц)  → 17158
+    	100000000 / 3087 / 2   // B0  (30.87 Гц)  → 16196
 	};
+
 	private byte port;
 	private short ioReg;
-	private final byte timerId;
-	private boolean stopRequested;
 
 	public Beeper(byte port) {
 		this.port = port;
 		this.ioReg = RtosCore.getIORegOutput(port);
 	}
 
-	public void play(byte[] data) { //TODO synchronized
-		stopRequested = false;
-
-		short delay = QUARTER_MS*4/2;
+	public void play(byte[] data) throws DriverException {
+		short delay = QUARTER_MS;
+		byte timerId = HwTimerManager.register(PERIODS[0], HwTimerManager.Resolution.RES_16BIT, this, 0x00);
 
 		short length = data.length;
 		Gpio.modeOut(port);
-		for(short i=0; i<length && !stopRequested; i++) {
+		for(short i=0; i<length && Thread.isAlive(); i++) {
 			byte b = data[i];
 			if(0!=(b&0x80)) {
-				delay = QUARTER_MS*4/(b&0x3f);
+				delay = QUARTER_MS*2/(b&0x3f);
 				if(0!=(b&0x40)) {
+					HwTimerManager.stop(timerId);
 					Gpio.modeIn(port);
 					Thread.sleep(delay);
 					Gpio.modeOut(port);
@@ -63,19 +61,14 @@ public class Beeper implements RtosCallback, RtosDriver {
 			else {
 				short period = PERIODS[b&0x0f]>>((b>>4)&0x07);
 				if(0==period) period = 1;
-
-				RtosCore.startSoftTimer(this, timerId, 0, period);
+				HwTimerManager.restart(timerId, period);
 				Thread.sleep(delay);
-				RtosCore.stopSoftTimer(timerId);
 			}
 		}
 
+		HwTimerManager.unregister(timerId);
 		Gpio.modeIn(port);
 		Gpio.setLow(port);
-	}
-
-	public void stopRequest() {
-		stopRequested = true;
 	}
 
 	@Override

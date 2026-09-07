@@ -30,7 +30,7 @@ public exception DriverException extends RuntimeException {
 	OVERFLOW,
 	CLOSED,
 	UNSUPPORTED,
-	NO_AVAILABLE_MODEL,
+	NO_AVAILABLE,
 	INVALID_PARAM,
 	UNSUPPORTED_PARAM;
 }

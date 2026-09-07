@@ -28,7 +28,7 @@
 			<plugin>
 				<groupId>ru.vm5277</groupId>
 				<artifactId>j8b-plugin</artifactId>
-				<version>0.1.0</version>
+				<version>0.3.0</version>
 				<executions>
 					<execution>
 						<id>compile-j8b</id>

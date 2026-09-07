@@ -56,7 +56,7 @@ public class Generator extends CodeGenerator {
 	@Override public void setHeapReg(CGScope scope, CGCells cells) throws CompileException {}
 	@Override public void constToAcc(CGScope scope, int size, long value, boolean isFixed) {}
 	@Override public CGIContainer constToCells(CGScope scope, long value, CGCells cells, boolean isFixed) throws CompileException {return null;}
-	@Override public void cellsAction(CGScope scope, CGCells leftcells, Operator op, CGCells rightCells, boolean leftisFixed, boolean rightIsFixed, CGExcs excs) throws CompileException {}
+	@Override public void cellsAction(CGScope scope, CGCells leftCells, VarType leftType, Operator op, CGCells rightCells, VarType rightType, CGExcs excs) throws CompileException {}
 	@Override public void constAction(CGScope scope, CGCells cells, Operator op, long k, boolean isFixed, CGExcs excs) throws CompileException {}
 	@Override public CGIContainer pushAccBE(CGScope scope, int size, boolean strong) throws CompileException {return null;} 
 	@Override public CGIContainer pushAccLE(CGScope scope, int size) throws CompileException {return null;}

@@ -367,7 +367,7 @@ _OS_INIT:
 	STS _OS_TIMER_CNTR,TEMP_L
 
 	;Запуск таймеров
-	_OS_TIMER_INIT_NR
+	_OS_SYSTIMER_INIT_NR
 .ENDIF
 
 	;Инициализируем начальное значение псевдослучайного числа
@@ -448,6 +448,9 @@ _OS_IRQ_HANDLER__SUBROUTINE:
 	CPC ATOM_H,C0x00
 	BREQ _OS_IRQ_HANDLER__SKIP
 
+	PUSH J8B_ATOM											;Верхний уровень может использовать ACC и J8B_ATOM - остальные регистры он должне сам восстановить
+	PUSH_A32
+
 	LDD ZL,Y+_OS_IRQ_RAM_TABLE__OFFSET_RES_ID
 	PUSH ZL
 
@@ -462,6 +465,8 @@ _OS_IRQ_HANDLER__SUBROUTINE:
 _OS_IRQ_HANDLER__RETPOINT:
 	CLI														;Важно запрещать глобальные прерывания поскольку дальше в коде могут быть
 	POP ZL													;разрешены INT, PCINT и прочие - при этом существенно раньше, чем произойдет освобождение стека и RETI
+	POP_A32
+	POP J8B_ATOM
 _OS_IRQ_HANDLER__SKIP:
 	RET
 .ENDIF
@@ -505,7 +510,7 @@ _OS_SYSTIMER_HANDLER__STIMER_LOOP:
 	CP ACCUM_L,C0x00
 	CPC ACCUM_H,C0x00
 	BRCS PC+0x02											;Пропускаем переход если было переполнение (проверка для шага -2)
-	BRNE _OS_SYSTIMER_HANDLER__STIMER_NEXT						;Переходим к следующему если не 0
+	BRNE _OS_SYSTIMER_HANDLER__STIMER_NEXT					;Переходим к следующему если не 0
 
 	;Сработка таймера
 	STD Y+_OS_STIMER_TABLE__OFFSET_HEAP_ADDR+0x00,C0x00		;Блокируем таймер исключая повторное срабатывание

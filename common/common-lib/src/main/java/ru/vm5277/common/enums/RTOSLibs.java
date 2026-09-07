@@ -72,6 +72,11 @@ public enum RTOSLibs {
 		J8BPROC_CLASS_REFCOUNT_DEC_NR;
 	}
 
+	public static enum DISPATCHER_PROCS {
+		OS_DISPATCHER_LOCK,
+		OS_DISPATCHER_UNLOCK
+	}
+	
 	private	final	String	path;
 	private			boolean	required;
 	

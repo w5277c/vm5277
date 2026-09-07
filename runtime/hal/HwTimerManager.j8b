@@ -1,0 +1,115 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import rtos.RtosDispatcher;
+import rtos.RtosCallback;
+
+public class HwTimerManager implements RtosDriver {
+	public enum Resolution {
+		RES_8BIT(8),
+		RES_10BIT(10),
+		RES_16BIT(16),
+		RES_24BIT(24),
+		RES_32BIT(32),
+		RES_64BIT(64),
+		RES_ANY_BITS(255)
+	}
+	private static byte usedBitMap;
+
+    /**
+     * Регистрирует callback на событие таймера.
+     * @param perido - период таймера в микросекундах(us)
+     * @param callback - обработчик событий
+     * @return ID регистрации (byte)
+     * @throws DriverException
+     */
+	public static byte register(short maxPeriod, Resolution resolution, RtosCallback callback, byte resId) throws DriverException {
+		if(null==callback) NullPointerException.throw();
+
+		RtosDispatcher.lock();
+		byte quantity = _quantity();
+		for(byte index=0; index<quantity; index++) {
+			byte result = 1<<index;
+			if(0==(usedBitMap&result) && _checkPeriod(index, maxPeriod, resolution)) {
+				_init(index, maxPeriod, callback, resId);
+				usedBitMap |=result;
+				RtosDispatcher.unlock();
+				return index;
+			}
+		}
+		RtosDispatcher.unlock();
+		DriverException.throw(DriverException.NO_AVAILABLE);
+	}
+
+
+	/**
+ 	* Освобождает регистрацию.
+ 	* @param id - ID регистрации (полученный от register)
+ 	* @throws DriverException
+ 	*/
+	public static void unregister(byte id) throws DriverException {
+		byte bitNum = (1<<id);
+
+		RtosDispatcher.lock();
+		if(0!=(usedBitMap&bitNum)) {
+			_disable(id);
+			usedBitMap&=(~bitNum);
+			RtosDispatcher.unlock();
+		}
+		else {
+			RtosDispatcher.unlock();
+			DriverException.throw(DriverException.INVALID_PARAM);
+		}
+	}
+
+	public static void start(byte id) {
+		if(0!=(usedBitMap&(1<<id))) {
+			_enable(id);
+		}
+		else {
+			DriverException.throw(DriverException.INVALID_PARAM);
+		}
+	}
+
+	public static void restart(byte id, short period) {
+		if(0!=(usedBitMap&(1<<id))) {
+			_disable(id);
+			if(!_setPeriod(id, period)) {
+				DriverException.throw(DriverException.NO_AVAILABLE);
+			}
+			_enable(id);
+		}
+		else {
+			DriverException.throw(DriverException.INVALID_PARAM);
+		}
+	}
+
+	public static void stop(byte id) {
+		if(0!=(usedBitMap&(1<<id))) {
+			_disable(id);
+		}
+		else {
+			DriverException.throw(DriverException.INVALID_PARAM);
+		}
+	}
+
+	private static native byte _quantity();
+	private static native boolean _checkPeriod(byte timerId, short maxPeriodUs, Resolution resolution);
+	private static native boolean _init(byte timerId, short maxPeriodUs, RtosCallback callback, byte resId);
+	private static native void _enable(byte timerId);
+	private static native boolean _setPeriod(byte timerId, short periodUs);
+	private static native void _disable(byte timerId);
+}

@@ -16,37 +16,41 @@
 
 package ru.vm5277.compiler.semantic;
 
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class EnumScope extends CIScope {
-	private	List<String>	values;
+	private	Map<Integer, String>	items;
 	
-	public EnumScope(String name, Scope parent, List<String> values) throws CompileException {
+	public EnumScope(String name, Scope parent, Map<Integer, String> items) throws CompileException {
 		super(parent);
 		
 		if(parent instanceof EnumScope) {
 			throw new CompileException("Enum " + name + " can only be declared within a class.");
 		}
 		
-		if(values.isEmpty() || 255<values.size()) {
-			throw new CompileException("Enum " + name + " values quantity out of range (1-256): " + values.size());
+		if(items.isEmpty() || 255<items.size()) {
+			throw new CompileException("Enum " + name + " values quantity out of range (1-256): " + items.size());
 		}
 
 		this.name = name;
-		this.values = values;
+		this.items = items;
 	}
 	
-	public int getValueIndex(String value) {
-		return values.indexOf(value);
+	public Integer getValueIndex(String value) {
+		for(Map.Entry<Integer, String> entry : items.entrySet()) {
+			if(entry.getValue().equals(value)) return entry.getKey();
+		}
+		return null;
 	}
 	
 	public String getValue(int index) {
-		if(values.size()<=index) return null;
-		return values.get(index);
+		if(items.size()<=index) return null;
+		return items.get(index);
 	}
 	
 	public int getSize() {
-		return values.size();
+		return items.size();
 	}
 }

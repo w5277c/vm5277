@@ -18,7 +18,16 @@ import boards.ArduinoUno;
 import drivers.sound.Beeper;
 
 class Main {
-	@Melody("/8-c3-d3-d#3-c3-d3-d#3-d#3-f3-g3-d#3-f3-g3-f3-g3-a3-f3-g3-a3-g#3-a#3-c4-g#3-a#3-c4-c4-p-c4-c4-c4-c4")
+	@Melody("/10-c3-d3-d#3-c3-d3-d#3-d#3-f3-g3-d#3-f3-g3-f3-g3-a3-f3-g3-a3-g#3-a#3-c4-g#3-a#3-c4-c4-p-c4-c4-c4-c4")
+//	@Melody("/8-e3-e3-e3-p-e3-e3-e3-p-e3-g3-c3-d3-e3-p-f3-f3-f3-f3-f3-e3-e3-e3-e3-d3-d3-e3-d3-p-g3")
+//	@Melody("/8-c4-c#4-d4-d#4-e4-f4-f#4-g4-g#4-a4-a#4-b4-c5-c#5-d5-d#5-e5-f5-f#5-g5-g#5-a5-a#5-b5")
+//	@Melody("/8-e3-e3-p-e3-p-c3-e3-p-g3-p-p-p-g2-p-p-p-c3-p-p-g2-p-e2-p-a2-p-b2-p-a#2-a2-g2-e3-g3-a3-f3-g3-p-e3-c3-d3-b2")
+//	@Melody("/16-b4-e5")
+//	@Melody("/16-e4-g4-e5-c5-g4-e4")
+//	@Melody("/16-c4-e4-g4-c5")
+//	@Melody("/8-c3-c#3-c3-c#3-c3-c#3-c3")
+//	@Melody("/32-c4-p-c4-p-c4-p-d#4-p-c#4-p-c4-p-b3-p-c4")
+
 	private static final byte[] DATA;
 
 	public static void main() {
@@ -28,7 +37,7 @@ class Main {
 			System.out("Проигрывание мелодии...");
 			beeper.play(DATA);
 			System.out("завершено.\n");			
-			Thread.sleep(1000);
+			Thread.sleep(2000);
 		}
 	}
 }

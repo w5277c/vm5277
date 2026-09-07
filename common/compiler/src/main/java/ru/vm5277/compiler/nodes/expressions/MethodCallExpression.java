@@ -394,9 +394,17 @@ public class MethodCallExpression extends ExpressionNode {
 					markError("Method System.setParam(byte param, byte value) supports constants only");
 					result=false;
 				}
-				
 			}
 
+			// Фичу мультипоточности включаем если обнаружен вызов Thread.start() или Timer.start(short),
+			// на создание класса не обращаем внимание - он может не использоваться
+			if(result && null!=symbol && symbol.isNative()) {
+				if(	(0x00==argTypes.length && null!=cis && "Thread".equals(cis.getName()) && "start".equals(methodName)) ||
+					(0x01==argTypes.length && null!=cis && "Timer".equals(cis.getName()) && "start".equals(methodName))) {
+				
+					cg.setFeature(RtosFeature.OS_FT_MULTITHREADING);
+				}
+			}
 		}
 		catch (CompileException e) {
 			markError(e.getMessage());
@@ -609,16 +617,13 @@ public class MethodCallExpression extends ExpressionNode {
 		else if(signature.endsWith(".finalize()")) {
 			throw new CompileException("finalize method not supported yet");
 		}
+//---THREAD.ISALIVE
+		else if(symbol.isNative() && !cg.isSupportedFunct(RtosFeature.OS_FT_MULTITHREADING.name()) && signature.equals("Thread.isAlive()")) {
+			// Если многопоточность не используется то этот метод всегда возвращает константную TRUE
+			result = CodegenResult.TRUE;
+		}
 //---NATIVE--------
 		else if(symbol.isNative()) {
-			// Фичу мультипоточности включаем если обнаружен вызов Thread.start()
-			if(signature.equals("Thread.start()")) {
-				cg.setFeature(RtosFeature.OS_FT_MULTITHREADING);
-			}
-			if(signature.equals("Timer.start(short)")) {
-				cg.setFeature(RtosFeature.OS_FT_MULTITHREADING);
-			}
-			
 			if(	signature.equals("System.out(cstr)") && args.get(0) instanceof LiteralExpression &&
 				VarType.CSTR==args.get(0).getType() && ((LiteralExpression)args.get(0)).getStringValue().isEmpty()) {
 				// Ничего не делаем
@@ -1349,6 +1354,9 @@ public class MethodCallExpression extends ExpressionNode {
 			VarType argType = argTypes[i];
 			if(symbol.isNative() && argType.isArray()) {
 				signature += argType.toString();
+			}
+			else if(symbol.isNative() && argType.isEnum()) { // Любой Enum передается в нативный метод как константа типа Byte
+				signature += VarType.BYTE.getName();
 			}
 			else if(symbol.isNative() && argType.isClassType()) {
 				signature += VarType.CLASS.getName();

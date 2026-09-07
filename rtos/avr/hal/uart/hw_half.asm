@@ -25,7 +25,7 @@
 
 .IFNDEF OS_DRV_UART_HWH__INIT
 .include "j8b/_arr_offset.asm"
-.include "drivers/uart/common.asm"
+.include "hal/uart/common.asm"
 .include "core/irq_set.asm"
 
 ;Состояния драйвера

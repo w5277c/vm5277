@@ -66,7 +66,7 @@ import ru.vm5277.common.lexer.SourceBuffer;
 			}
 
 			if('p'==ch || 'r'==ch) {
-				byteBuffer.add((byte) (0x80|0x40|currentDuration));
+				byteBuffer.add((byte) (0x80|0x40|(currentDuration/2)));
 				strValue.append('p');
 				continue;
 			}
@@ -79,21 +79,26 @@ import ru.vm5277.common.lexer.SourceBuffer;
 					skipToken(sb);
 					throw new CompileException("Invalid duration");
 				}
-				char ch2 = '0';
+				Character ch2 = null;
 				if(sb.available()) {
 					ch2 = sb.peek();
-					if(!Character.isDigit(ch2)) {
-						ch2 = '0';
-					}
-					else {
+					if(Character.isDigit(ch2)) {
+						currentDuration = (byte)(Character.getNumericValue(ch2) + Character.getNumericValue(ch)*10);
+						strValue.append(ch).append(ch2);
 						sb.next();
 					}
+					else {
+						currentDuration = (byte)Character.getNumericValue(ch);
+						strValue.append(ch);
+					}
 				}
-				currentDuration = (byte)(Character.getNumericValue(ch2)*16 + Character.getNumericValue(ch));
-				strValue.append(ch);
-				if(currentDuration>=32) currentDuration = 31;
+				else {
+					currentDuration = (byte)Character.getNumericValue(ch);
+					strValue.append(ch);
+				}
+				if(currentDuration>=64) currentDuration = 63;
 				if(0==currentDuration) currentDuration = 1;
-				byteBuffer.add((byte)(0x80|currentDuration)); // Бит 7=1 (длительность)
+				byteBuffer.add((byte)(0x80|(currentDuration/2))); // Бит 7=1 (длительность)
 				continue;
 			}
 			
@@ -134,12 +139,14 @@ import ru.vm5277.common.lexer.SourceBuffer;
 				int octave = 4;
 				ch = sb.peek();
 				if(sb.available(1) && Character.isDigit(ch)) {
-					octave = Character.getNumericValue(ch) - 1;
+					octave = Character.getNumericValue(ch); 
 					strValue.append(ch);
 					sb.next();
 				}
 				if(octaveOvf) octave++;
-				
+				if(octave>7) {
+					throw new CompileException("Octave out of range (0-7): " + octave);
+				}
 				byteBuffer.add((byte) ((octave << 4) | packedNote));
 				continue;
 			}

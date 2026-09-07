@@ -245,8 +245,9 @@ public class ArithmeticExpression extends BinaryExpression {
 			// а значит снижается вероятность помещения одного из операндов в стек
 			// При этом нельзя допускать, чтобы размер левого операнда был меньше правого
 			//TODO добавить остальные типы выражений, данные которых можно также получить без аккумулятора
+			//(leftExpr instanceof LiteralExpression && leftTypeSize<=rightTypeSize) - не важно какой размер, константа всегда должна быть справа
 			if(	(leftExpr instanceof VarFieldExpression && !(rightExpr instanceof VarFieldExpression) && leftTypeSize<=rightTypeSize) ||
-				(leftExpr instanceof LiteralExpression && leftTypeSize<=rightTypeSize) ||
+				(leftExpr instanceof LiteralExpression) ||
 				(leftTypeSize<rightTypeSize)) {
 				
 				expr1 = rightExpr;
@@ -354,8 +355,8 @@ public class ArithmeticExpression extends BinaryExpression {
 				}
 				boolean isFixed = expr1.getType().isFixedPoint() || expr2.getType().isFixedPoint();
 				if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumLock(VarType.FIXED);
-				cg.cellsAction(cgScope, new CGCells(CGCells.Type.ACC), operator, ((CGCellsScope)expr2.getSymbol().getCGScope()).getCells(),
-								expr2.getType().isFixedPoint(), expr2.getType().isFixedPoint(), excs);
+				cg.cellsAction(	cgScope, new CGCells(CGCells.Type.ACC), expr1.getType(), operator, ((CGCellsScope)expr2.getSymbol().getCGScope()).getCells(),
+								expr2.getType(), excs);
 				if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumUnlock();
 //			}
 		}
@@ -399,32 +400,65 @@ public class ArithmeticExpression extends BinaryExpression {
 					throw new CompileException("Accum not used for operand:" + rightExpr);
 				}
 				if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumLock(VarType.FIXED);
-				cg.cellsAction(	cgScope, new CGCells(CGCells.Type.ACC), operator, new CGCells(CGCells.Type.STACK, size),
-								expr1.getType().isFixedPoint(), expr2.getType().isFixedPoint(), excs);
+				cg.cellsAction(	cgScope, new CGCells(CGCells.Type.ACC), rightExpr.getType(), operator, new CGCells(CGCells.Type.STACK, size),
+								leftExpr.getType(), excs);
 				if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumUnlock();
 			}
 		}
+		else if(!operator.isCommutative() && leftExpr instanceof LiteralExpression) {
+			// Сюда попадаем, если слева константа и не коммутативная операция - мы не можем ее просто перенести вправо, и использовать как константу
+			// Значит вычисляем проавую часть помещая ее в стек, а затем помещаем константу в аккумулятор
+			// Нужно изменить порядок обработки аргументов, что бы первым выполнялся правыйй аргумент
+			cgScope.swap(expr1.getCGScope(), expr2.getCGScope());
+			
+			LiteralExpression leConst = (LiteralExpression)expr1;
+
+			// Вычисляем правый опреанд в аккумулятор
+			if(CodegenResult.RESULT_IN_ACCUM!=rightExpr.codeGen(cg, true, excs)) {
+				throw new CompileException("Accum not used for operand:" + rightExpr);
+			}
+			// Определяем максмальный размер операнда
+			int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
+			//Помещаем значение правого операнда из аккумулятора в стек
+			cg.pushAccBE(rightExpr.getCGScope(), size, false);
+
+			// Помещаем левый операнд(константу) в аккумулятор
+			if(CodegenResult.RESULT_IN_ACCUM != leftExpr.codeGen(cg, true, excs)) {
+				throw new CompileException("Accum not used for operand:" + leftExpr);
+			}
+			if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumLock(VarType.FIXED);
+			// Выполняем вычиление
+			cg.cellsAction(	cgScope, new CGCells(CGCells.Type.ACC), leftExpr.getType(), operator, new CGCells(CGCells.Type.STACK, size),
+							rightExpr.getType(), excs);
+			if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumUnlock();
+		}
 		//================ Other ================================
 		else {
-			//TODO проверить cgScope.swap(expr1.getCGScope(), expr2.getCGScope());
+			// В стек должен быть помещен обязательно правый операнд(expr2), а левый будет в аккумуляторе
+			
+			// Также нужно убедиться, что первым в кодогенерации будет (expr2)
+			cgScope.swap(expr1.getCGScope(), expr2.getCGScope());
+			
+			// Логика для выражения PERIODS[b&0x0f]>>((b>>4)&0x07); верная
+			
+			
+			// Определяем максимальный размер операнда
+			int size = (leftType.getSize() > rightType.getSize() ? leftType.getSize() : rightType.getSize());
+			// Строим код для expr1(результат в аккумуляторе)
+			if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, true, excs)) {
+				throw new CompileException("Accum not used for operand:" + expr2);
+			}
+			// Помещаем в стек значение первого операнда (после его отстройки)
+			cg.pushAccBE(expr2.getCGScope(), size, false);
 
 			if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, true, excs)) {
 				throw new CompileException("Accum not used for operand:" + expr1);
 			}					
 
-			// Определяем максмальный размер операнда
-			int size = (leftType.getSize() > rightType.getSize() ? leftType.getSize() : rightType.getSize());
-			// Выполняем операцию, левый операнд - аккумулятор, правый операнд - значение на вершине стека
-			cg.pushAccBE(expr1.getCGScope(), size, false);
-			// Строим код для expr1(результат в аккумуляторе)
-			if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, true, excs)) {
-				throw new CompileException("Accum not used for operand:" + expr2);
-			}
-
 			// Аккумулятор уже необходимого размера, но нужно проверить на Fixed
-			if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumLock(VarType.FIXED);
-			cg.cellsAction(	cgScope, new CGCells(CGCells.Type.ACC), operator, new CGCells(CGCells.Type.STACK, size),
-							leftType.isFixedPoint(), rightType.isFixedPoint(), excs);
+			if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumLock(VarType.FIXED); //TODO артефакт? Мы и так передаем тип, но что если есть вложенные выражения? 
+			// Выполняем операцию, левый операнд - аккумулятор, правый операнд - значение на вершине стека
+			cg.cellsAction(cgScope, new CGCells(CGCells.Type.ACC), expr1.getType(), operator, new CGCells(CGCells.Type.STACK, size), expr2.getType(), excs);
 			if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumUnlock();
 		}
 		

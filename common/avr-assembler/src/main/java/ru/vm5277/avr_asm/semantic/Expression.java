@@ -174,9 +174,9 @@ public class Expression extends Node {
 			else if(ASMKeyword.LWRD.getName().equals(name)) return new LiteralExpression(value & 0xffff);
 			else if(ASMKeyword.HWRD.getName().equals(name)) return new LiteralExpression((value >> 16) & 0xffff);
 			else if(ASMKeyword.EXP2.getName().equals(name)) return new LiteralExpression(1 << value);
-			else if(ASMKeyword.LOG.getName().equals(name)) {
+			else if(ASMKeyword.LOG2.getName().equals(name)) {
 				long result = 0;
-				while (0x01 <= value) {
+				while(0x01<value) {
 					value = value >> 0x01;
 					result++;
 				}
