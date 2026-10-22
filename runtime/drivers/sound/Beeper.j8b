@@ -16,23 +16,7 @@
 
 import hal.HwTimerManager;
 
-public class Beeper implements RtosCallback, RtosDriver {
-	private static final short QUARTER_MS = 500;
-	private static final short[] PERIODS = new short[] {
-    	100000000 / 1635 / 2,  // C0  (16.35 Гц)  → 30581
-    	100000000 / 1732 / 2,  // C#0 (17.32 Гц)  → 28868
-    	100000000 / 1835 / 2,  // D0  (18.35 Гц)  → 27247
-    	100000000 / 1945 / 2,  // D#0 (19.45 Гц)  → 25706
-    	100000000 / 2060 / 2,  // E0  (20.60 Гц)  → 24271
-    	100000000 / 2183 / 2,  // F0  (21.83 Гц)  → 22904
-    	100000000 / 2313 / 2,  // F#0 (23.13 Гц)  → 21616
-   		100000000 / 2450 / 2,  // G0  (24.50 Гц)  → 20408
-    	100000000 / 2596 / 2,  // G#0 (25.96 Гц)  → 19260
-    	100000000 / 2750 / 2,  // A0  (27.50 Гц)  → 18181
-    	100000000 / 2914 / 2,  // A#0 (29.14 Гц)  → 17158
-    	100000000 / 3087 / 2   // B0  (30.87 Гц)  → 16196
-	};
-
+public class Beeper implements BeeperCommon, NativeCallback {
 	private byte port;
 	private short ioReg;
 
@@ -41,34 +25,42 @@ public class Beeper implements RtosCallback, RtosDriver {
 		this.ioReg = RtosCore.getIORegOutput(port);
 	}
 
-	public void play(byte[] data) throws DriverException {
-		short delay = QUARTER_MS;
-		byte timerId = HwTimerManager.register(PERIODS[0], HwTimerManager.Resolution.RES_16BIT, this, 0x00);
-
-		short length = data.length;
-		Gpio.modeOut(port);
-		for(short i=0; i<length && Thread.isAlive(); i++) {
-			byte b = data[i];
-			if(0!=(b&0x80)) {
-				delay = QUARTER_MS*2/(b&0x3f);
-				if(0!=(b&0x40)) {
-					HwTimerManager.stop(timerId);
-					Gpio.modeIn(port);
+	public void play(byte[] data) throws DriverException, NativeException {
+		byte timerId = 0xff;
+		try {
+			short delay = QUARTER_MS;
+			timerId = HwTimerManager.register(FlashData.readShort(PERIODS, 0), HwTimerManager.Resolution.RES_16BIT, this, 0x00);
+			short length = data.length;
+			Gpio.modeOut(port);
+			for(short i=0; i<length && Thread.isAlive(); i++) {
+				byte b = data[i];
+				if(0!=(b&0x80)) {
+					delay = (short)(QUARTER_MS*2)/(b&0x3f);
+					if(0!=(b&0x40)) {
+						HwTimerManager.stop(timerId);
+					}
 					Thread.sleep(delay);
-					Gpio.modeOut(port);
+				}
+				else {
+					try {
+						short period = FlashData.readShort(PERIODS,(short)((b&0x0f)*2))>>((b>>4)&0x07);
+						if(0==period) period = 1;
+						HwTimerManager.restart(timerId, period);
+						Thread.sleep(delay);
+					}
+					catch(NativeException ex) {
+						break;
+					}
 				}
 			}
-			else {
-				short period = PERIODS[b&0x0f]>>((b>>4)&0x07);
-				if(0==period) period = 1;
-				HwTimerManager.restart(timerId, period);
-				Thread.sleep(delay);
-			}
 		}
-
-		HwTimerManager.unregister(timerId);
-		Gpio.modeIn(port);
-		Gpio.setLow(port);
+		finally {
+			if(0xff!=timerId) {
+				HwTimerManager.unregister(timerId);
+			}
+			Gpio.modeIn(port);
+			Gpio.setLow(port);
+		}
 	}
 
 	@Override

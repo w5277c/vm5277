@@ -44,7 +44,7 @@ public class UartHwHd implements RtosHalfDuplexIface, UartCommon {
 	private	Parity parity;
 	private StopBits stopBits;
 	private short magic;
-	private RtosCallback magicCallback;
+	private NativeCallback magicCallback;
 	private	byte dirPin;
 	private byte features;
 	private byte state;
@@ -57,7 +57,7 @@ public class UartHwHd implements RtosHalfDuplexIface, UartCommon {
 
 	}
 
-	public void enableMagicDetection(short magic, RTOSCallback magicCallback) {
+	public void enableMagicDetection(short magic, NativeCallback magicCallback) {
 		this.magic = magic;
 		this.magicCallback = magicCallback;
 		this.features |= (1<<Feature.MAGIC);

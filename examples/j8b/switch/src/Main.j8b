@@ -54,7 +54,5 @@ class Main {
 			case 15,20..25,16,17,30,32: System.out("\nСработал 'case 15,20..25,16,17,30,32'");
 			default: System.out("\nСработал 'default'");
 		}
-
-		System.out("\ndone");
 	}
 }

@@ -30,7 +30,7 @@ class Main {
 		System.out("\nf2=");	
 		System.out(f2);
 
-		System.out("\n");
+		System.out('\n');
 
 		System.out("\ns1+2 [12]=");
 		System.out(s1 + 2);	//12
@@ -53,10 +53,10 @@ class Main {
 		System.out("\ns1*8 [80]=");
 		System.out(s1 * 8);//80
 
-		System.out("\ns1*1.5 [15]=");
+		System.out("\ns1*1.5 [15.00]=");
 		System.out(s1 * 1.5);//15
 
-		System.out("\nf1*1.5 [9]=");
+		System.out("\nf1*1.5 [9.00]=");
 		System.out(f1 * 1.5);//9
 
 		System.out("\ns1/8 [1]=");
@@ -83,7 +83,7 @@ class Main {
 		System.out("\nf1*f2 [9.00]=");
 		System.out(f1 * f2);//9.00
 
-		System.out("\nf1/f2 [4/00]=");
+		System.out("\nf1/f2 [4.00]=");
 		System.out(f1 / f2);//4.00
 
 		System.out("\ns1*1000000000 [Exc]=");

@@ -26,6 +26,7 @@ import ru.vm5277.common.cg.RegPair;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.items.CGItem;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.lexer.SourcePosition;
 
 public class CGScope extends CGIContainer {
 	public		final	static	int						VERBOSE_NO	= 0;
@@ -42,7 +43,9 @@ public class CGScope extends CGIContainer {
 	protected					int						resId;
 	private						int						sbPos		= 0;
 	public				static	int						verbose;
-
+	private						SourcePosition			sp;
+	
+	
 	public static synchronized int genId() {
 		return idCntr++;
 	}
@@ -55,8 +58,9 @@ public class CGScope extends CGIContainer {
 		name = "";
 	}
 	
-	public CGScope(CGScope parent, int resId, String name) {
+	public CGScope(CGScope parent, SourcePosition sp, int resId, String name) {
 		this.parent = parent;
+		this.sp = sp;
 		this.name = name;
 		this.resId = resId;
 		
@@ -65,8 +69,9 @@ public class CGScope extends CGIContainer {
 		}
 	}
 	
-	public CGScope(CGScope parentScope, int resId, CGScope oldScope, String name) {
+	public CGScope(CGScope parentScope, SourcePosition sp, int resId, CGScope oldScope, String name) {
 		this.parent = parentScope;
+		this.sp = sp;
 		this.name = name;
 		this.resId = resId;
 		
@@ -177,6 +182,10 @@ public class CGScope extends CGIContainer {
 	
 	public int getVerbose() {
 		return verbose;
+	}
+	
+	public SourcePosition getSp() {
+		return sp;
 	}
 	
 	@Override

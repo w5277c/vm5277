@@ -14,13 +14,30 @@
  * limitations under the License.
  */
 
+//TODO добавить проерку на переданный адрес метода вместо ссылки
+
 .IFNDEF J8BPROC_CALLBACK_ADDR
 ;-----------------------------------------------------------
 J8BPROC_CALLBACK_ADDR:
 ;-----------------------------------------------------------
-;IN; Y-адрес на HEAP
+;IN; Y-адрес на HEAP или адрес метода callback
 ;OUT:ACCUM_EL/EH-адрес метода callback
 ;-----------------------------------------------------------
+// Проверяем специальный бит определяющий тип данных
+.IF FLASH_SIZE<=0x8000 && SRAM_SIZE<=0x8000
+	SBRS YH,0x07
+	RJMP J8BPROC_CALLBACK_ADDR__CONTINUE
+	MOVW ACCUM_EL,YL
+	ANDI ACCUM_EH,0x7f										;Если адрес метода - выключаем бит
+	LSR ACCUM_EH
+	ROR ACCUM_EL
+	LDI YL,0x00
+	LDI YH,0x00
+	RET
+.ELIF FLASH_SIZE<=0x800000 && SRAM_SIZE<=0x800000
+	.ERROR "Only callback bit position 15 is currently supported"
+.ENDIF
+J8BPROC_CALLBACK_ADDR__CONTINUE:
 	PUSH_Z
 	PUSH_Y
 	PUSH_A16

@@ -134,9 +134,9 @@ public class NewArrayExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterExpression(parent, cgScope, toString());
+		cgScope = cg.enterExpression(parent, sp, cgScope, toString());
 		
-		headerCgScope = new CGScope(cgScope, CGScope.genId(), "header");
+		headerCgScope = new CGScope(cgScope, null, CGScope.genId(), "header");
 		
 		if(null==constDimensions) {
 			constDimensions = new int[]{0, 0, 0};
@@ -164,7 +164,7 @@ public class NewArrayExpression extends ExpressionNode {
 			}
 		}
 
-		bodyCgScope = new CGScope(cgScope, CGScope.genId(), "body");
+		bodyCgScope = new CGScope(cgScope, sp, CGScope.genId(), "body");
 		
 		if(null==constDimensions) {
 			cg.setFeature(RtosFeature.OS_ARRAY_3D);
@@ -185,7 +185,7 @@ public class NewArrayExpression extends ExpressionNode {
 		if(null!=arrayInitiExpr) {
 			result&=arrayInitiExpr.postAnalyze(scope, cg, cgScope);
 		}
-		tailCgScope = new CGScope(cgScope, CGScope.genId(), "tail");
+		tailCgScope = new CGScope(cgScope, sp, CGScope.genId(), "tail");
 		
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
@@ -240,7 +240,7 @@ public class NewArrayExpression extends ExpressionNode {
 		List<ExpressionNode> result = new ArrayList<>();
 		for(int i=0; i<0x03; i++) {
 			if(0==constDimensions[i]) break;
-			result.add(new LiteralExpression(inst, tb, constDimensions[i]));
+			result.add(new LiteralExpression(inst, tb, sp, constDimensions[i]));
 		}
 		return result;
 	}
@@ -294,6 +294,7 @@ public class NewArrayExpression extends ExpressionNode {
 					cg.pushConst(expr.getCGScope(), 0x02, ((LiteralExpression)expr).getNumValue(), false);
 				}
 				else {
+					cg._getAcc().setCast(VarType.SHORT);
 					expr.codeGen(cg, true, excs);
 					//TODO 0x02 - количество байт под размер массива
 					cg.pushAccBE(expr.getCGScope(), 0x02, true); //Для извлечения в стеке в порядке LE

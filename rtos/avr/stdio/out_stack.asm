@@ -16,49 +16,30 @@
 
 ;Выводим блок памяти на STDIO порт
 .IFNDEF OS_OUT_STACK_NR
-	.include "stdio/out_hex8.asm"
+	.include "stdio/out_rambytes.asm"
 	.include "stdio/out_cstr.asm"
-	.include "stdio/out_char.asm"
 
 _OS_OUT_STACK_NR__TEXT:
-	.db "~STACK:",0x00
+	.db "STACKDUMP:",0x00,0x00
 ;-----------------------------------------------------------
 OS_OUT_STACK_NR:
 ;-----------------------------------------------------------
 ;Выводим данные стека
-;MID: YL/H
 ;-----------------------------------------------------------
-	LDS YL,SPL
-.IFDEF SPH
-	LDS YH,SPH
-.ELSE
-	LDI YH,0x00
-.ENDIF
-	ADIW YL,0x03
-
 	PUSH_A16
+	PUSH_T16
+	PUSH_Z
+
 	LDI ACCUM_H,high(_OS_OUT_STACK_NR__TEXT*2)
 	LDI ACCUM_L,low(_OS_OUT_STACK_NR__TEXT*2)
 	MCALL OS_OUT_CSTR
+	LDI TEMP_H,high(OS_STACK_SIZE)
+	LDI TEMP_L,low(OS_STACK_SIZE)
+	LDI_Z SRAM_START+SRAM_SIZE-OS_STACK_SIZE
+	MCALL OS_OUT_RAMBYTES_NR
 
-	MOV ACCUM_L,YH
-	MCALL OS_OUT_HEX8
-	MOV ACCUM_L,YL
-	MCALL OS_OUT_HEX8
-	LDI ACCUM_L,':'
-	MCALL OS_OUT_CHAR
-
-_OS_OUT_STACK_NR__LOOP:
-	LD ACCUM_L,Y+
-	MCALL OS_OUT_HEX8
-	CPI YL,low(SRAM_START+SRAM_SIZE)
-	BRNE _OS_OUT_STACK_NR__LOOP
-	CPI YH,high(SRAM_START+SRAM_SIZE)
-	BRNE _OS_OUT_STACK_NR__LOOP
-
-	LDI ACCUM_L,'\n'
-	MCALL OS_OUT_CHAR
-
+	POP_Z
+	POP_T16
 	POP_A16
 	RET
 .endif

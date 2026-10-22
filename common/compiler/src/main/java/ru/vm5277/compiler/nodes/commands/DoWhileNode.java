@@ -113,7 +113,7 @@ public class DoWhileNode extends CommandNode {
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
-		cgScope = cg.enterLoopBlock(parent, "do-while3");
+		cgScope = cg.enterLoopBlock(parent, sp, "do-while3");
 		cgScope.append(((CGLoopBlockScope)cgScope).getStartLbScope());
 		
 		// Анализ тела цикла

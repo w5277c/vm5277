@@ -91,14 +91,14 @@ public class Lexer {
 				tokens.add(token);
 			}
 		}
-		tokens.add(new Token(sb, sb.snapSP(), TokenType.EOF));
+		tokens.add(new Token(sb, sb.snap(), TokenType.EOF));
 	}
 	
 	public Token parseToken(SourceBuffer sb) {
 		if(!sb.available()) {
-			return new Token(sb, sb.snapSP(), TokenType.EOF);
+			return new Token(sb, sb.snap(), TokenType.EOF);
 		}
-		SourcePosition sp = sb.snapSP();
+		SourcePosition sp = sb.snap();
 
 		try {
 			if('\n'==sb.peek()) {
@@ -130,7 +130,7 @@ public class Lexer {
 				//Блок данных
 				if(sb.available(2) && '#'==sb.peek()) {
 					sb.next();
-					sp = sb.snapSP();
+					sp = sb.snap();
 					char blockType = sb.peek();
 					sb.next();
 
@@ -192,7 +192,7 @@ public class Lexer {
 
 			// Операторы
 			Token token = TOpearator.parse(sb);
-			if (null != token) {
+			if(null!=token) {
 				return token;
 			}
 
@@ -215,7 +215,9 @@ public class Lexer {
 					}
 					// Добавляем проверку на метку
 					if(sb.available() && ':'==sb.peek()) {
-						token = new TLabel(token, sb);
+						if(!sb.available(1) || ':'!=sb.peek(1)) {
+							token = new TLabel(token, sb);
+						}
 					}
 				}
 				return token;
@@ -311,7 +313,7 @@ public class Lexer {
 				while(sb.available() && ('\n'!=sb.peek() || ';'!=sb.peek())) {
 					sb.next();
 				}
-				throw new CompileException("Unterminated block comment", sb.snapSP());
+				throw new CompileException("Unterminated block comment", sb.snap());
 			}
 		}
 		return false;

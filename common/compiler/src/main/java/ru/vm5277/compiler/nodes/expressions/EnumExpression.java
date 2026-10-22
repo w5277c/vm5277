@@ -16,6 +16,8 @@
 
 package ru.vm5277.compiler.nodes.expressions;
 
+import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.enums.CodegenResult;
@@ -83,7 +85,7 @@ public class EnumExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterExpression(parent, cgScope, toString());
+		cgScope = cg.enterExpression(parent, sp, cgScope, toString());
 		
 		targetScope = (EnumScope)targetExpr.getScope();
 		index = targetScope.getValueIndex(value);
@@ -104,7 +106,7 @@ public class EnumExpression extends ExpressionNode {
 		cgDone = true;
 
 		if(toAccum) {
-			cg.constToAcc(cgScope, 0x01, index, false);
+			cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ACC), null, new CGCells(index), VarType.BYTE, null);
 			releaseVars(cg);
 			return CodegenResult.RESULT_IN_ACCUM;
 		}

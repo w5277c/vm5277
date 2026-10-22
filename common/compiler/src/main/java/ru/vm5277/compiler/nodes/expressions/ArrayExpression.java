@@ -99,7 +99,7 @@ public class ArrayExpression extends ExpressionNode {
 		int cellSize = (-1==type.getSize() ? cg.getResId() : type.getSize());
 
 		if(null!=cgScope) cgScope.disable();
-		cgScope = cg.enterArrayExpression(parent, type, cellSize, arrCells);
+		cgScope = cg.enterArrayExpression(parent, sp, type, cellSize, arrCells);
 		
 		result&=targetExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
@@ -225,6 +225,8 @@ public class ArrayExpression extends ExpressionNode {
 		CodegenResult result = null;
 		excs.setSourcePosition(sp);
 		
+		VarType cast = cg._getAcc().pullCast();
+		
 		if(CodegenResult.ACCUM_USED==targetExpr.codeGen(cg, false, excs)) result = CodegenResult.ACCUM_USED;
 
 		CGCellsScope cScope = (CGCellsScope)targetExpr.getSymbol().getCGScope(CGCellsScope.class);
@@ -260,6 +262,7 @@ public class ArrayExpression extends ExpressionNode {
 			}
 			for(int i=indexExprs.size()-1; i>=0; i--) {
 				ExpressionNode indexExpr = indexExprs.get(i);
+				
 				if(indexExpr instanceof LiteralExpression && ((LiteralExpression)indexExpr).type.isInteger()) {
 					int index = (int)((LiteralExpression)indexExpr).getNumValue();
 					//cg.pushConst(indexExpr.getCGScope(), 0x02, index, false);
@@ -295,7 +298,6 @@ public class ArrayExpression extends ExpressionNode {
 						}
 						
 						if(!optimized) {
-							cg.accumLock(VarType.SHORT);
 							if(CodegenResult.RESULT_IN_ACCUM == indexExpr.codeGen(cg, true, excs)) {
 								//0x02 - количество байт под размер массива
 								//cg.pushAccLE(indexExpr.getCGScope(), 0x02);
@@ -309,7 +311,6 @@ public class ArrayExpression extends ExpressionNode {
 																	(indexExpr.getType().isReferenceType() ? cg.getRefSize() : indexExpr.getType().getSize())));
 
 							}
-							cg.accumUnlock();
 						}
 					}
 				}
@@ -334,7 +335,7 @@ public class ArrayExpression extends ExpressionNode {
 			cg.computeArrCellAddr(cgScope, null, arrCells, excs);
 		}
 		if(toAccum) {
-			cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ACC), null, (CGArrCells)((CGCellsScope)symbol.getCGScope()).getCells(), type);
+			cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ACC), type, (CGArrCells)((CGCellsScope)symbol.getCGScope()).getCells(), type, cast);
 //			cg.arrToAcc(cgScope, (CGArrCells)((CGCellsScope)symbol.getCGScope()).getCells(), type.isFixedPoint());
 			result = CodegenResult.RESULT_IN_ACCUM;
 		}
@@ -424,7 +425,6 @@ public class ArrayExpression extends ExpressionNode {
 						}
 						
 						if(!optimized) {
-							cg.accumLock(VarType.SHORT);
 							if(CodegenResult.RESULT_IN_ACCUM == indexExpr.codeGen(cg, true, excs)) {
 								//0x02 - количество байт под размер массива
 								cg.pushAccLE(indexExpr.getCGScope(), 0x02);
@@ -433,7 +433,6 @@ public class ArrayExpression extends ExpressionNode {
 								cg.pushCells(indexExpr.getCGScope(), 0x02, new CGCells(CGCells.Type.ARRAY,
 																	(indexExpr.getType().isReferenceType() ? cg.getRefSize() : indexExpr.getType().getSize())));
 							}
-							cg.accumUnlock();
 						}
 					}
 				}
@@ -461,7 +460,18 @@ public class ArrayExpression extends ExpressionNode {
 				indexData = (arrCells.getIndexConst(0x01) * 0x10000);
 			}
 			//TODO !!!
-			cg.constToAcc(cgScope, (arrCells.getDepth())*2, indexData, false);
+			VarType _type;
+			if(arrCells.getDepth()==0x01) {
+				 _type = VarType.SHORT;
+			}
+			else if(arrCells.getDepth()==0x02) {
+				_type = VarType.INT;
+			}
+			else {
+				throw  new CompileException("COMPILER EROROR: Can't put to accum 6 bytes value (can't be depth=3 for view)");
+			}
+			//cg.constToAcc(cgScope, (arrCells.getDepth())*2, indexData, false);
+			cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ACC), VarType.SHORT, new CGCells(indexData), null, null);
 		}
 		cg.eNewArrView(cgScope, indexExprs.size()-1, excs);
 

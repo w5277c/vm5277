@@ -37,6 +37,7 @@ import static ru.vm5277.common.cg.scopes.CGScope.verbose;
 import ru.vm5277.common.enums.InstanceType;
 import ru.vm5277.common.enums.OptimizationType;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.lexer.SourcePosition;
 
 // STACK(reg Y) - необходимо выделять блок памяти в стеке для локальных переменных, Y не изменяем. Y изменяется только если выходим за 64 слова, затем
 // его нужно восстановить. Смещения адресов локальных перменных высчитывааются от начала выделенного блока в методе
@@ -44,7 +45,7 @@ import ru.vm5277.common.exceptions.CompileException;
 
 public class CGBlockScope extends CGScope {
 	private				CodeGenerator				cg;
-	private				CGLabelScope				lbEScope;
+	private				CGLabelScope				endLbScope;
 	private		final	Map<Integer, CGVarScope>	vars			= new HashMap<>();
 	protected			int							stackOffset		= 0; // Размер блока в стеке, выделенный под локальные переменные
 	private		final	HashMap<Byte,RegPair>		regsPool; // Все доступные регистры под переменные, хранят признак свободен(true)/занят для текущего уровня
@@ -53,9 +54,10 @@ public class CGBlockScope extends CGScope {
 	private				CGMethodScope				mScope;
 	private				boolean						isFirstBlock;
 	private				Set<String>					labels			= new HashSet<>();
+	private				CGIContainer				header			= new CGIContainer();
 	
-	public CGBlockScope(CodeGenerator cg, CGScope parent, int id, String comment) {
-		super(parent, id, comment);
+	public CGBlockScope(CodeGenerator cg, CGScope parent, SourcePosition sp, int id, String comment) {
+		super(parent, sp, id, comment);
 		
 		this.cg = cg;
 		
@@ -63,25 +65,38 @@ public class CGBlockScope extends CGScope {
 
 		if(parent instanceof CGMethodScope) isFirstBlock = true;
 
+		append(header);
+		
 		mScope = (CGMethodScope)parent.getScope(CGMethodScope.class);
 		mScope.addBlockScope(this);
 
-		lbEScope = new CGLabelScope(null, null, LabelNames.BLOCK_END, false);
+		endLbScope = new CGLabelScope(null, null, LabelNames.BLOCK_END, true);
 	}
 	
 	public void build(CodeGenerator cg, boolean isLaunchPoint, CGExcs excs) throws CompileException {
 		CGIContainer cont = new CGIContainer();
-
+		
+		if(VERBOSE_LO<=verbose) {
+			header.append(new CGIText(";build " + toString()));
+		} 
+		
 		InstanceType instType = InstanceType.CLASS;
 		if(isFirstBlock && mScope.getParent() instanceof CGClassScope) {
 			instType = ((CGClassScope)mScope.getParent()).getInstType();
 		}
 
-		boolean asCallback = (	isFirstBlock && !isLaunchPoint &&
-								(InstanceType.THREAD==instType  || InstanceType.TIMER==instType) && mScope.getSignature().equals("run()")) ||
-								(InstanceType.RTOS_CALLBACK==instType && mScope.getSignature().equals("callback(byte)"));
 
-		if(0!=mScope.getArgsStackSize() || 0!=stackOffset) {
+		//TODO Нужно сохранить общую модель начала и конца метода (push Y... jmp j8bproc_mfin_sf)
+		// Так как вызов может быть не только для коллбека но и для обычного статического метода
+		// Также нужно посмотреть на run() метод, лучше оставить как есть, но есть вероятность, что его тоже придется привести к такому же виду
+/*		boolean asCallback = (	isFirstBlock && !isLaunchPoint &&
+								(InstanceType.THREAD==instType  || InstanceType.TIMER==instType) && mScope.getSignature().equals("run()")) ||
+								(InstanceType.NATIVE_CALLBACK==instType && mScope.getSignature().equals("callback(byte)"));
+*/
+		boolean asCallback = (	isFirstBlock && !isLaunchPoint &&
+								(InstanceType.THREAD==instType  || InstanceType.TIMER==instType) && mScope.getSignature().equals("run()"));
+
+		if(mScope.hasStackUsage()) {// && (0!=mScope.getArgsStackSize() || 0!=stackOffset)) {
 			cg.stackPrepare(cont, isFirstBlock, mScope.getArgsStackSize(), stackOffset, asCallback, excs);
 		}
 
@@ -101,9 +116,8 @@ public class CGBlockScope extends CGScope {
 		}
 			
 		prepend(cont);
-		if(VERBOSE_LO <= verbose) prepend(new CGIText(";build " + this.getClass().getSimpleName() + " '" + name + "'"));
 		
-		append(lbEScope);
+		append(endLbScope);
 		if(!isLaunchPoint && isFirstBlock) {
 			if(!regs.isEmpty()) {
 				Collections.sort(regs, new Comparator<Byte>() {
@@ -133,16 +147,23 @@ public class CGBlockScope extends CGScope {
 
 		
 		if(isFirstBlock) {
-			if(isLaunchPoint) {
-				cg.terminate(this, true, !excs.getProduced().isEmpty());
+			
+			append(((CGMethodScope)parent).getEndLabel());
+			// Для конструкторов в конец добавляет точку выхода иницализационного блока (используется, если реализзован тольк оодин конструктор) 
+			if(null==((CGMethodScope)parent).getType()) {
+				append(((CGClassScope)parent.getParent()).getInstInitEndLabel());
 			}
-			else { // TODO класс не может реализовывать сразу thread, timer и rtos_callback, или может?
-				// Для нити, таймера и RtosCallback отдельная процедура выхода - просто ret
+			if(isLaunchPoint) {
+				// Перенос terminate в 'Main:' cg.terminate(this, true, !excs.getProduced().isEmpty());
+				append(cg.finMethod(mScope.getType(), mScope.getArgStackSize(), stackOffset, mScope.hasStackUsage()));
+			}
+			else { // TODO класс не может реализовывать сразу thread, timer и native_callback, или может?
+				// Для нити, таймера и NativeCallback отдельная процедура выхода - просто ret
 				if(asCallback) {
 					append(cg.eReturn(null, VarType.VOID, null));
 				}
 				else {
-					append(cg.finMethod(mScope.getType(), mScope.getArgStackSize(), stackOffset));
+					append(cg.finMethod(mScope.getType(), mScope.getArgStackSize(), stackOffset, mScope.hasStackUsage()));
 				}
 			}
 		}
@@ -164,7 +185,7 @@ public class CGBlockScope extends CGScope {
 			}
 		}
 		
-		if(VERBOSE_LO <= verbose) append(new CGIText(";block end"));
+		if(VERBOSE_LO<=verbose) append(new CGIText(";end of " + toString()));
 	}
 
 	CGMethodScope getMethodScope() {
@@ -291,6 +312,8 @@ public class CGBlockScope extends CGScope {
 			}
 		}
 
+		getMethodScope().markStackUsed();
+		
 		// Не удалось занять регистры, выделяем память в стек фрейме
 		CGCells cells = new CGCells(CGCells.Type.STACK_FRAME, size, stackOffset);
 		cells.setObject(this);
@@ -320,7 +343,7 @@ public class CGBlockScope extends CGScope {
 	}
 	
 	public CGLabelScope getEndLabel() {
-		return lbEScope;
+		return endLbScope;
 	}
 
 	@Override

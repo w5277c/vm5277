@@ -4,7 +4,7 @@
 
 	<groupId>ru.vm5277</groupId>
 	<artifactId>runtime</artifactId>
-	<version>1.0-SNAPSHOT</version>
+	<version>0.3.0</version>
 	<packaging>jar</packaging>
 
 	<name>VM5277 RUNTIME</name>

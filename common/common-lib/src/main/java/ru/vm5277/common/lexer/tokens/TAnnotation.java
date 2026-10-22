@@ -21,19 +21,36 @@ import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.lexer.TokenType;
 
 public class TAnnotation extends Token {
-	public	static	final	String	OVERRIDE				= "Override"; // Реализация метода на основе контракта из интерфейса
-	public	static	final	String	EXPAND_HEAP				= "ExpandHeap"; // Расширить HEAP на указанный размер (для RTOS драйвера)
-	public	static	final	String	REGISTER_SOFT_TIMER		= "RegisterSoftTimer"; // Статическая регистрация программного таймера с записью его идентификатора в поле/переменную
-	public	static	final	String	MELODY					= "Melody";	// Сформировать байтовое представление мелодии и поместить в поле/переменную-массив
-	public	static	final	String	FLASH_DATA				= "FlashData"; // Сформировать блок данных в FLASH и записать адрес в поле
-	public	static	final	String	ENTRY_POINT				= "EntryPoint"; // Не исключаемые из кодогенерации методы (только для интерфейсов)
-	public	static	final	String	NATIVE					= "Native"; // Генерируем дефайны в ассембеле с адресами static полей RtosDriver наследников
+	// Реализация метода на основе контракта из интерфейса
+	public	static	final	String	OVERRIDE				= "Override";
+	// Расширить HEAP на указанный размер (для RTOS драйвера)
+	public	static	final	String	EXPAND_HEAP				= "ExpandHeap";
+	// Статическая регистрация программного таймера с записью его идентификатора в поле/переменную
+	public	static	final	String	REGISTER_SOFT_TIMER		= "RegisterSoftTimer";
+	// Сформировать байтовое представление мелодии и поместить в поле/переменную-массив
+	public	static	final	String	MELODY					= "Melody";
+	// Сформировать блок данных в FLASH и записать адрес в поле
+	public	static	final	String	FLASH_DATA				= "FlashData";
+	// Не исключаемые из кодогенерации методы (только для интерфейсов)
+	public	static	final	String	ENTRY_POINT				= "EntryPoint";
+	// Генерируем дефайны в ассембеле с адресами static полей RtosDriver наследников
+	public	static	final	String	NATIVE					= "Native";
+	// Используется в описании аргумента с типом NativeCallback - прокидывает в методе аргумент дальше не позволяя с ним взаимодейстовать
+	public	static	final	String	PASSTHROUGH				= "Passthrough";
+	/*TODO нужно реализовать семантику:
+	  1 - оератор :: разрешен только в качестве параметра (с типом NativeCallback) в нативном методе или в методе с аннотацией @Passthrough для параметра
+	  2 - в методе параметр с аннтоацией @Passthrough не может использоваться кроме как в вызове нативного метода или метода с аннотацией @Passthrough для параметра
+	  3 - аннотация @Passthrough применима только для NativeCallback и наследований/реализаций от него
+	*/
 	//TODO реализовать генерацию HEX файла для EEPROM и его прошивку, выполнить доработку для всех компонентов.
-	public	static	final	String	EEPROM_DATA				= "EepromData"; // Сформировать блок данных для EEPROM и записать адрес в поле 
-
-	public	static	final	String	RTOS_FEATURE			= "RtosFeature"; // Включить фичу
-	public	static	final	String	RTOS_PARAM_EQ			= "RtosParamEq"; // Компилировать блок, если значение параметра соответствует
-	public	static	final	String	RTOS_PARAM_NOT_EQ		= "RtosParamNotEq"; // Компилировать блок, если значение параметра не соответствует
+	// Сформировать блок данных для EEPROM и записать адрес в поле 
+	public	static	final	String	EEPROM_DATA				= "EepromData";
+	// Включить фичу
+	public	static	final	String	RTOS_FEATURE			= "RtosFeature";
+	// Компилировать блок, если значение параметра соответствует
+	public	static	final	String	RTOS_PARAM_EQ			= "RtosParamEq";
+	// Компилировать блок, если значение параметра не соответствует
+	public	static	final	String	RTOS_PARAM_NOT_EQ		= "RtosParamNotEq";
 	
 	public TAnnotation(SourceBuffer sb, SourcePosition sp) {
 		super(sb, sp);

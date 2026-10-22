@@ -122,8 +122,8 @@ public class Scope {
 	public void leaveImport(SourcePosition sp) throws CriticalParseException, CompileException {
 		IncludeSymbol cur = currentInclude;
 		currentInclude = currentInclude.getParent();
-		if(0 != cur.getBlockCntr()) {
-			throw new CompileException("Unbalanced conditional blocks (expected " + cur.getBlockCntr() + " more END directives)", sp);
+		if(0 != cur.getBlockCounter()) {
+			throw new CompileException("Unbalanced conditional blocks (expected " + cur.getBlockCounter() + " more END directives)", sp);
 		}
 	}
 	

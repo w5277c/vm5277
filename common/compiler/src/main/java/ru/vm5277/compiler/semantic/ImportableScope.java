@@ -16,6 +16,7 @@
 
 package ru.vm5277.compiler.semantic;
 
+import java.util.Set;
 import ru.vm5277.common.exceptions.CompileException;
 
 public interface ImportableScope {
@@ -23,5 +24,5 @@ public interface ImportableScope {
 	public void addStaticImport(String importPath, String alias) throws CompileException;
 	public void addCI(CIScope cis, boolean isInternal) throws CompileException;
 	public boolean checkStaticImportExists(String path);
-	public CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess);
+	public CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess, Set<CIScope> checked);
 }

@@ -37,7 +37,6 @@ import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.Instance;
-import ru.vm5277.compiler.Main;
 import ru.vm5277.compiler.nodes.CatchBlock;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
@@ -47,7 +46,8 @@ import ru.vm5277.compiler.semantic.Scope;
 
 public class TryNode extends CommandNode {
 	private	BlockNode				tryBlock;
-	public	List<CatchBlock>		catchBlocks	= new ArrayList<>();
+	private	List<CatchBlock>		catchBlocks	= new ArrayList<>();
+	private	BlockNode				finallyBlock;
 	
 	public TryNode(Instance inst, TokenBuffer tb) {
 		super(inst, tb);
@@ -88,6 +88,12 @@ public class TryNode extends CommandNode {
 						tb.skip(Delimiter.LEFT_BRACE);
 					}
 				}
+				if(tb.match(J8BKeyword.FINALLY)) {
+					consumeToken(tb); // Потребляем "finally"
+					consumeToken(tb, Delimiter.LEFT_BRACE);
+					finallyBlock = new BlockNode(inst, tb, true, false, "finally");
+					tryBlock.setHasFinally();
+				}
 			}
 			catch(CompileException ex) {
 				markError(ex);
@@ -115,8 +121,8 @@ public class TryNode extends CommandNode {
 			result = false;
 		}
 
-		if(catchBlocks.isEmpty()) {
-			markError("Missing catch block");
+		if(catchBlocks.isEmpty() && null==finallyBlock) {
+			markError("Missing catch/finally block");
 			result = false;
 		}
 
@@ -128,6 +134,10 @@ public class TryNode extends CommandNode {
 			for(CatchBlock cBlock : catchBlocks) {
 				result&=cBlock.preAnalyze();
 			}
+		}
+		
+		if(result&& null!=finallyBlock) {
+			result&=finallyBlock.preAnalyze();
 		}
 		
 		return result;
@@ -145,19 +155,23 @@ public class TryNode extends CommandNode {
 			}
 		}
 		
+		if(result&& null!=finallyBlock) {
+			result&=finallyBlock.declare(scope);
+		}
+		
 		return result;
 	}
 	
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
-		cgScope = cg.enterCommand(parent, "try");
+		cgScope = cg.enterCommand(parent, sp, "try");
 		
-		CGScope tryScope = new CGBlockScope(cg, parent, CGScope.genId(), "try");
-		CGScope catchScope = new CGBlockScope(cg, parent, CGScope.genId(), "catch");
+		CGScope tryScope = new CGBlockScope(cg, parent, sp, CGScope.genId(), "try");
 
 		// Сначала выполняет обработку catch блоков, так как минимум нам нужно заполнить в BlockScope handlingExcsScopes
-		if(result) {
+		if(result && !catchBlocks.isEmpty()) {
+			CGScope catchScope = new CGBlockScope(cg, parent, sp, CGScope.genId(), "catch");
 			for(CatchBlock cBlock : catchBlocks) {
 				result&=cBlock.postAnalyze(cBlock.getScope(), cg, catchScope, tryBlock);
 			}
@@ -167,6 +181,11 @@ public class TryNode extends CommandNode {
 			result&=tryBlock.postAnalyze(tryBlock.getScope(), cg, tryScope);
 		}
 
+		if(result && null!=finallyBlock) {
+			CGScope finallyScope = new CGBlockScope(cg, parent, sp, CGScope.genId(), "finally");
+			result&=finallyBlock.postAnalyze(finallyBlock.getScope(), cg, finallyScope);
+		}
+		
 		if(result) {
 			BlockScope tryBlockScope = tryBlock.getScope();
 			int runtimeExceptionId = VarType.getExceptionId(J8BException.RuntimeException.name());
@@ -191,8 +210,11 @@ public class TryNode extends CommandNode {
 		for(CatchBlock cBlock : catchBlocks) {
 			cBlock.codeOptimization(cBlock.getScope(), cg);
 		}
+		
+		if(null!=finallyBlock) {
+			finallyBlock.codeOptimization(scope, cg);
+		}
 	}
-
 	
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
@@ -210,6 +232,7 @@ public class TryNode extends CommandNode {
 		}
 		newExcs.getRuntimeChecks().putAll(excs.getRuntimeChecks());
 
+		newExcs.setMethodEndLabel(tbs.getEndLabel());
 		tryBlock.codeGen(cg, false, newExcs);
 
 		for(CatchBlock cBlock : catchBlocks) {
@@ -251,6 +274,11 @@ public class TryNode extends CommandNode {
 				cBlock.codeGen(cg, cgScope, false, excs, isUsed);
 			}
 		}
+		
+		if(null!=finallyBlock) {
+			finallyBlock.codeGen(cg, false, newExcs);
+		}
+		
 		excs.getProduced().addAll(newExcs.getProduced());
 		
 		releaseVars(cg);
@@ -262,6 +290,7 @@ public class TryNode extends CommandNode {
 		List<AstNode> result = new ArrayList<>();
 		result.add(tryBlock);
 		result.addAll(catchBlocks);
+		if(null!=finallyBlock) result.add(finallyBlock);
 		return result;
 	}
 }

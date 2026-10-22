@@ -24,7 +24,7 @@ import hal.PinEventPolicy;
 // UART(UARTSwFull) - программный полнодуплексный драйвер двухпроводного UART-интерфейса,
 // где RX-линия приема данных, а TX-линия передачи данных.
 
-public class UartSwFd implements InputStream, OutputStream, UartCommon, Closeable, RtosCallback {
+public class UartSwFd implements InputStream, OutputStream, UartCommon, Closeable, NativeCallback {
 	public enum Flags {
 		OPEN,
 		SENDING,

@@ -17,7 +17,7 @@
 package ru.vm5277.common;
 
 import java.io.IOException;
-import ru.vm5277.common.enums.RTOSParam;
+import ru.vm5277.common.enums.RtosParam;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
@@ -34,22 +34,24 @@ public class Device {
 	private					String							mcuName;
 	private					OptimizationType				optimizationType;
 	private					StrictLevel						strictLevel;
-	private					Map<RTOSParam, Object>			params;
+	private					Map<RtosParam, Object>			params;
 	private					Path							defsPath;
 	private					Path							rtosDefsPath;
 	private					DefReader						defReader;
-
+	private					Map<String, NativeBinding>		localNbMap;
+	
 	private					Long							ramSize;
 	private					Long							flashSize;
 	private					boolean							allowsBootloader;
 	
-	public Device(Path toolkitPath, PlatformType platformType, String mcuName) throws IOException, CompileException {
-		this(toolkitPath, null, platformType, mcuName, null, OptimizationType.SIZE, StrictLevel.LIGHT);
+	public Device(PlatformType platformType, String mcuName) throws IOException, CompileException {
+		this(null, platformType, mcuName, null, null, OptimizationType.SIZE, StrictLevel.LIGHT);
 	}
-	public Device(	Path toolkitPath, Path rtosPath, PlatformType platformType, String mcuName, Map<RTOSParam, Object> params,
-					OptimizationType optimizationType, StrictLevel strictLevel) throws IOException, CompileException {
+	public Device(	Path rtosPath, PlatformType platformType, String mcuName, Map<RtosParam, Object> params,
+					Map<String, NativeBinding> localNbMap, OptimizationType optimizationType, StrictLevel strictLevel) throws IOException, CompileException {
 		this.mcuName = mcuName;
 		this.params = params;
+		this.localNbMap = localNbMap;
 		this.optimizationType = optimizationType;
 		this.strictLevel = strictLevel;
 		
@@ -61,7 +63,8 @@ public class Device {
 			}
 		}
 		
-		if(null!=toolkitPath) {
+		if(!"stub".equals(mcuName)) {
+			Path toolkitPath = FSUtils.getToolkitPath();
 			defsPath = toolkitPath.resolve("defs").resolve(platformType.name().toLowerCase());
 			rtosDefsPath = toolkitPath.resolve("rtos").resolve(platformType.name().toLowerCase()).resolve("devices");
 
@@ -72,7 +75,7 @@ public class Device {
 			if(null!=rtosDefsPath) {
 				defReader.parse(rtosDefsPath.resolve(mcuName + ".def"));
 			}
-			
+
 			ramSize = defReader.getNum("SRAM_SIZE");
 			flashSize = defReader.getNum("FLASH_SIZE");
 			allowsBootloader = (null!=flashSize && flashSize>=MIN_FLASH_SIZE_FOR_BOOTLOADER);
@@ -91,13 +94,13 @@ public class Device {
 		return strictLevel;
 	}
 	
-	public Object getParam(RTOSParam param) {
+	public Object getParam(RtosParam param) {
 		return params.get(param);
 	}
-	public void setParam(RTOSParam param, int value) {
+	public void setParam(RtosParam param, int value) {
 		params.put(param, value);
 	}
-	public boolean containsParam(RTOSParam param) {
+	public boolean containsParam(RtosParam param) {
 		return params.keySet().contains(param);
 	}
 
@@ -122,6 +125,17 @@ public class Device {
 		return platform.getType().name().toLowerCase() + ":" + mcuName;
 	}
 
+	public long getRamSize() {
+		return ramSize;
+	}
+	public long getFlashSize() {
+		return flashSize;
+	}
+	
+	public Map<String, NativeBinding> getLocalNbMap() {
+		return localNbMap;
+	}
+	
 	@Override
 	public String toString() {
 		return platform.getType().name() + ":" + mcuName + ", opt:" + optimizationType.name() + ", strict:" + strictLevel.name();

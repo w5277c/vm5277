@@ -158,12 +158,12 @@ public class ExceptionScope extends CIScope {
 	}
 
 	@Override
-	public CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess) {
+	public CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess, Set<CIScope> checked) {
 		return null;
 	}
 
 	@Override
-	public Symbol resolveField(Scope caller, String name, boolean isQualifiedAccess) throws CompileException {
+	public Symbol resolveField(Scope caller, String name, boolean isQualifiedAccess, Set<CIScope> checked) throws CompileException {
 		getValueIndex(name);
 		
 		return new FieldSymbol(name, VarType.BYTE, true, true, false, this, null);

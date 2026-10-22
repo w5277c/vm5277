@@ -17,6 +17,7 @@
 package ru.vm5277.compiler.nodes;
 
 import java.io.File;
+import java.util.HashSet;
 import java.util.List;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
@@ -166,7 +167,7 @@ public class ImportNode extends AstNode {
 		}
 		else {
 			// Проверяем существование класса
-			if(null==iScope.resolveCI(null, importStr, false)) {
+			if(null==iScope.resolveCI(null, importStr, false, new HashSet<>())) {
 				markError("Imported class not found: " + importStr);
 				result = false;
 			}

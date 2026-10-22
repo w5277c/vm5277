@@ -53,6 +53,7 @@ public class J8BKeyword extends Keyword {
 	//Исключения
 	public	static	final	Keyword					TRY			= new Keyword("try", TokenType.COMMAND, LexerType.J8B);
 	public	static	final	Keyword					CATCH		= new Keyword("catch", TokenType.KEYWORD, LexerType.J8B);
+	public	static	final	Keyword					FINALLY		= new Keyword("finally", TokenType.KEYWORD, LexerType.J8B);
 	public	static	final	Keyword					THROWS		= new Keyword("throws", TokenType.OOP, LexerType.J8B);
 	//Остальное
 	public	static	final	Keyword					IMPORT		= new Keyword("import", TokenType.KEYWORD, LexerType.J8B);

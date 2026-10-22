@@ -159,7 +159,8 @@ public class MethodNode extends AstNode {
         
 		while(!tb.match(TokenType.EOF) && !tb.match(Delimiter.RIGHT_PAREN)) {
 			try {
-				params.add(new ParameterNode(inst, tb));
+				Map<String, AnnotationParamNode> annotations = collectAnnotations(tb);
+				params.add(new ParameterNode(inst, tb, annotations));
 				if (tb.match(Delimiter.COMMA)) {
 					consumeToken(tb); // Потребляем ','
 					continue;
@@ -396,10 +397,10 @@ public class MethodNode extends AstNode {
 		debugAST(this, POST, true, getFullInfo());
 
 		if(null==returnType) {
-			cgScope = cg.enterConstructor(parent);
+			cgScope = cg.enterConstructor(parent, sp);
 		}
 		else {
-			cgScope = cg.enterMethod(parent, returnType, name);
+			cgScope = cg.enterMethod(parent, sp, returnType, name);
 		}
 		symbol.setCGScope(cgScope);
 		
@@ -421,7 +422,7 @@ public class MethodNode extends AstNode {
 						//TODO что насчет пути для импорта?
 						// Формируем список идентификаторов исключений с учетом иерархии наследования
 						String path = ((TypeReferenceExpression)expr).getQualifiedPath();
-						CIScope ciScope = scope.resolveCI(null, path, false);
+						CIScope ciScope = scope.resolveCI(null, path, false, new HashSet<>());
 						if(ciScope instanceof ExceptionScope) {
 
 							methodScope.addExceptionScope((ExceptionScope)ciScope);
@@ -456,6 +457,10 @@ public class MethodNode extends AstNode {
 							result = false;
 						}
 
+					}
+					else {
+						markError("Invalid expression for exception: " + expr.toString());
+						result = false;
 					}
 				}
 			}
@@ -533,7 +538,7 @@ public class MethodNode extends AstNode {
 					try {
 						int size = (pSymbol.getType().isReferenceType() ? cg.getRefSize() : pSymbol.getType().getSize());
 						// Создаем CGScope для параметра
-						CGVarScope pScope = cg.enterLocal(cgScope, pSymbol.getType(), size, false, pSymbol.getName());
+						CGVarScope pScope = cg.enterLocal(cgScope, sp, pSymbol.getType(), size, false, pSymbol.getName());
 						pScope.setCells(new CGCells(CGCells.Type.ARGS, size, offset));
 						offset+=size;
 						// Устанавливаем CGScope для символа параметра
@@ -574,7 +579,7 @@ public class MethodNode extends AstNode {
 			blockNode.codeOptimization(methodScope, cg);
 		}
 	}
-
+	
 	public void firstCodeGen(CodeGenerator cg, CGExcs excs) throws CompileException {
 		if(cgDone || disabled) return;
 		cgDone = true;

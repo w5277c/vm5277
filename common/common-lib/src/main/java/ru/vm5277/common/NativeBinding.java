@@ -17,6 +17,7 @@ package ru.vm5277.common;
 
 import ru.vm5277.common.enums.RtosFeature;
 import java.io.File;
+import java.nio.file.Path;
 import java.text.ParseException;
 import java.util.Arrays;
 
@@ -42,6 +43,9 @@ public class NativeBinding {
 	}
 	
 	public NativeBinding(String line) throws ParseException {
+		this(line, null);
+	}
+	public NativeBinding(String line, Path localPath) throws ParseException {
 		String parts[] = line.trim().split("\\s+");
 		if(0x02!=parts.length &&  0x03!=parts.length) {
 			throw new ParseException("Expected 2 or 3 blocks in native binding raw, got [" + parts.length + "] in: " + line, 0);
@@ -104,8 +108,12 @@ public class NativeBinding {
 			rtosFilePath = rtosParts[0x00].trim();
 
 			int pos = rtosFilePath.lastIndexOf(".");
-			if(-1 != pos) {
+			if(-1!=pos) {
 				rtosFilePath = rtosFilePath.substring(0, pos).replace(".", File.separator) + rtosFilePath.substring(pos);
+			}
+
+			if(null!=localPath) {
+				rtosFilePath = localPath.toString() + File.separator + rtosFilePath;
 			}
 
 			rtosFunction = rtosParts[0x01].toLowerCase().trim();

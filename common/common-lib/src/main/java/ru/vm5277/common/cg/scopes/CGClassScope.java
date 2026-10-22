@@ -30,6 +30,7 @@ import ru.vm5277.common.VarType;
 import ru.vm5277.common.cg.items.CGIAsmLdLabel;
 import ru.vm5277.common.enums.InstanceType;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.lexer.SourcePosition;
 
 public class CGClassScope extends CGScope {
 	private	final	CodeGenerator				cg;
@@ -46,13 +47,14 @@ public class CGClassScope extends CGScope {
 	private			CGIContainer				statFieldsInitCont	= new CGIContainer();
 	private			CGLabelScope				instInitlabel;
 	private			CGIContainer				instInitCont		= new CGIContainer();
+	private			CGLabelScope				instInitExitLabel;
 	private			CGIContainer				postfixCont			= new CGIContainer();
 	private			boolean						firstBuild			= true; // Выполняется множественный вход в build(не все поля сформированы при первом входе)
 																			// поэтому необходимо исключать повторную генерацию заголовка 
 	private			CGIContainer				newInstCont;
 	
-	public CGClassScope(CodeGenerator cg, CGScope parent, int id, VarType type, String name, List<ImplementInfo> impl, InstanceType instType) {
-		super(parent, id, name);
+	public CGClassScope(CodeGenerator cg, CGScope parent, SourcePosition sp, int id, VarType type, String name, List<ImplementInfo> impl, InstanceType instType) {
+		super(parent, sp, id, name);
 		
 		this.cg = cg;
 		this.type = type;
@@ -81,6 +83,7 @@ public class CGClassScope extends CGScope {
 		// адрес HEAP, счетчик ссылок, адрес блока реализаций класса и интерфейсов
 		
 		instInitlabel = new CGLabelScope(null, CGScope.genId(), "j8b_" + getLName() + "_instinit", true);
+		instInitExitLabel = new CGLabelScope(null, CGScope.genId(), "j8b_" + getLName() + "_instinitend", true);
 	}
 
 	public void addField(CGFieldScope field) {
@@ -117,21 +120,32 @@ public class CGClassScope extends CGScope {
 		
 		if(!isLaunchPoint) {
 //			CGLabelScope runLabel = null;
-			boolean haveConstr = false;
+			int constrCntr = 0;
+			CGMethodScope lastConstr = null;
 			//Не вызываем создание инстанса если конструкторов нет, иначе будут лишние включения фич типа OS_FT_DRAM
 			for(CGMethodScope mScope : methods.values()) {
 				if(null==mScope.getType()) {
-					haveConstr = true;
+					lastConstr = mScope;
+					constrCntr++;
 				}
 //				else if(mScope.getSignature().equals("run()")) {
 //					runLabel = mScope.getCILabel();
 //				}
 			}
-			if(haveConstr) {
+			if(0!=constrCntr) {
 				if(null!=newInstCont) {
 					instInitCont.remove(newInstCont);
 				}
 				postfixCont.clear(); // Возможен множественный вход в этот метод
+
+				// Необходимо корректно задать точку выхода из блока инициализации.
+				// Если конструктор один, то код инициализации лежит прямо в конструкторе, а точка должна быть расположена в конце конструктора
+				// Если конструткоров несколько, то код инийиализации лежит отдельным блоком и мы точно знаем его точку выхода
+				if(1!=constrCntr) {
+					instInitCont.append(instInitExitLabel);
+				}
+
+				excs.setMethodEndLabel(instInitExitLabel);
 				newInstCont = cg.eNewInstance(null, fieldsOffset+heapExpandSize, lbIIDSScope, type, instType, postfixCont, excs);
 				instInitCont.prepend(newInstCont);
 			}
@@ -230,7 +244,7 @@ public class CGClassScope extends CGScope {
 					CGMethodScope mScope = methods.get(mehodId);
 					// Метод может не использоваться в кодогенерации
 					if(null!=mScope && mScope.isUsed()) { //TODO похоже isUsed = рудимент
-						methodsAddrSB.append(mScope.getLabel().getName()).append(",");
+						methodsAddrSB.append(mScope.getStartLabel().getName()).append(",");
 						implementedCntr++;
 					}
 					else {
@@ -259,8 +273,8 @@ public class CGClassScope extends CGScope {
 					if(null!=postfixCont && !postfixCont.isEMpty() && isThread && null!=mScope && mScope.getSignature().equals("run()")) {
 						//TODO костыль. Не менять порядок, см Generator.eNewInstance
 						//Не получилось получить доступ к методу run в build, его адрес нужен для создания нового инстанса Thread
-						((CGIAsmLdLabel)postfixCont.getItems().get(0x00)).setPostfix("low(" + mScope.getLabel().getLName() + ")");
-						((CGIAsmLdLabel)postfixCont.getItems().get(0x02)).setPostfix("high(" + mScope.getLabel().getLName() + ")");
+						((CGIAsmLdLabel)postfixCont.getItems().get(0x00)).setPostfix("low(" + mScope.getStartLabel().getLName() + ")");
+						((CGIAsmLdLabel)postfixCont.getItems().get(0x02)).setPostfix("high(" + mScope.getStartLabel().getLName() + ")");
 					}
 
 					if(null==mScope.getType()) {
@@ -268,6 +282,7 @@ public class CGClassScope extends CGScope {
 					}
 				}
 
+				// Если один констурктор в классе - добавляем инициализацию прямо в конструктор
 				if(0x01==constCntr) {
 					for(CGMethodScope mScope : methods.values()) {
 						if(null==mScope.getType()) {
@@ -275,6 +290,7 @@ public class CGClassScope extends CGScope {
 						}
 					}
 				}
+				// Если больше одного конструктора, то формируем отдельную процедуру и помещаем во все конструкторы ее вызов
 				else if(0x01<constCntr) {
 					instInitCont.prepend(instInitlabel);
 
@@ -300,5 +316,9 @@ public class CGClassScope extends CGScope {
 		}
 	
 		return super.getSource();
+	}
+	
+	public CGLabelScope getInstInitEndLabel() {
+		return instInitExitLabel;
 	}
 }

@@ -84,11 +84,11 @@ public class Primitive {
 
 	public static void printByte(OutputStream os, byte val, byte minSize) {
 		byte v1 = val/100;
-		val -= v1*100;
-		if(minSize>2 || 0!=v1) os.write(0x30+v1);
+		val -= (byte)(v1*100);
+		if(minSize>2 || 0!=v1) os.write((byte)(0x30+v1));
 		byte v2 = val/10;
-		val -= v2*10;
-		if(minSize>1 || 0!=v1 || 0!=v2) os.write(0x30+v2);
-		os.write(0x30+val);
+		val -= (byte)(v2*10);
+		if(minSize>1 || 0!=v1 || 0!=v2) os.write((byte)(0x30+v2));
+		os.write((byte)(0x30+val));
 	}
 }

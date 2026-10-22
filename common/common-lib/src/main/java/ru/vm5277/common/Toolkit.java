@@ -24,31 +24,23 @@ public class Toolkit {
 	private	static	final	int		HTTP_CONNECTION_TIMEOUT = 3000;
     private	static	final	int		HTTP_READ_TIMEOUT		= 3000;
 
-	public static boolean checkToolkit(Logger log, Path toolkitPath, String downloadUrl, boolean canDownload) {
-		if(null==toolkitPath || toolkitPath.toString().trim().isEmpty()) {
-			toolkitPath = FSUtils.getToolkitPath();
-		}
+	public static boolean checkToolkit(Logger log, String downloadUrl, boolean canDownload) {
+		Path toolkitPath = FSUtils.getToolkitPath();
+
 		if(!toolkitPath.toFile().exists()) {
-			String env = System.getenv("vm5277");
-			if(null!=env) {
-				toolkitPath = FSUtils.resolveWithEnv(env);
-			}
-			if(!toolkitPath.toFile().exists()) {
-				if(canDownload) {
-					if(null!=log) log.info("Toolkit not found, downloading...");
-					if(!downloadAndUnpack(log, toolkitPath, downloadUrl)) {
-						return false;
-					}
-				}
-				else {
-					if(null!=log) log.error("Toolkit not found at: " + toolkitPath.toString() + "\n" +
-											"Possible solutions:\n"	+
-											"1. Set autoDownload=true in plugin configuration\n" +
-											"2. Manually download from: " + downloadUrl + "\n" +
-											"3. Set toolkit path via j8b.toolkitPath parameter (if used Maven)\n" +
-											"4. Set vm5277 environment variable");
+			if(canDownload) {
+				if(null!=log) log.info("Toolkit not found, downloading...");
+				if(!downloadAndUnpack(log, toolkitPath, downloadUrl)) {
 					return false;
 				}
+			}
+			else {
+				if(null!=log) log.error("Toolkit not found at: " + toolkitPath.toString() + "\n" +
+										"Possible solutions:\n"	+
+										"1. Set autoDownload=true in plugin configuration\n" +
+										"2. Manually download from: " + downloadUrl + "\n" +
+										"3. Set vm5277 environment variable");
+				return false;
 			}
 		}
 

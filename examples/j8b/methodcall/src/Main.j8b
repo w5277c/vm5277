@@ -20,18 +20,25 @@ class Main {
 		byte b = 2;
 		byte c = 3;
 		System.out("\nВызов метода add(a+b, add(c, 8)):");
-		byte result = add(a+b, add(c, 8));
+		byte result = add((byte)(a+b), add(c, 8));
 		System.out("\nВышли из метода, получили значение:");
 		System.out(result);
 
-		System.out("\n\nРекурсия, факториал из 12[479001600]:");
+		System.out("\n\n");
+		System.showMaxStackUsage();
+
+		System.out("Рекурсия, факториал из 12[479001600]:");
 		System.out(factorial(12));
+
+		System.out("\n");
+		System.showMaxStackUsage();
+
 		System.out("\ndone");
 	}
 
 	private static byte add(byte b1, byte b2) {
 		System.out("\nВошли в метод add, арг1:" + b1 + ", арг2:" + b2);
-		byte methodResult = b1+b2;
+		byte methodResult = (byte)(b1+b2);
 		System.out("\nВыходим из метода, результат:" + methodResult);
 		return methodResult;
 	}

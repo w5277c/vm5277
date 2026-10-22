@@ -19,7 +19,6 @@ import org.apache.maven.plugin.testing.resources.TestResources;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-
 import java.io.File;
 import java.lang.reflect.Field;
 import java.util.Arrays;
@@ -27,7 +26,6 @@ import org.apache.maven.execution.MavenExecutionRequest;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Build;
 import org.apache.maven.project.MavenProject;
-
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -91,9 +89,6 @@ public class J8bMojoTest {
 		rule.setVariableValueToObject(mojo, "downloadUrl", "https://vm5277.ru/release.zip");
 		rule.setVariableValueToObject(mojo, "softReset", false);
 		rule.setVariableValueToObject(mojo, "bldrApiReuse", false);
-		String userHome = System.getProperty("user.home");
-		String expectedPath = userHome + File.separator + "vm5277";
-		rule.setVariableValueToObject(mojo, "toolkitPath", expectedPath);
 
 		// Запускаем выполнение
 		mojo.execute();

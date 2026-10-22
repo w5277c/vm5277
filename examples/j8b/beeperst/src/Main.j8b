@@ -1,0 +1,35 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import boards.ArduinoUno;
+import drivers.sound.BeeperStatic;
+
+class Main {
+	@Melody("/32-c4-p-c4-p-c4-p-d#4-p-c#4-p-c4-p-b3-p-c4")
+	private static final FlashData DATA;
+
+	public static void main() {
+		System.out("Необходимо подключение динамика на GND и порт D7 (Arduino-uno)\n");
+		System.out("Проигрывание мелодии в статическом методе...");
+		try {
+			BeeperStatic.play(ArduinoUno.PIN_D7, DATA);
+		}
+		catch(Exception ex) {
+			System.out(ex);
+		}
+		System.out("завершено.\n");
+	}
+}

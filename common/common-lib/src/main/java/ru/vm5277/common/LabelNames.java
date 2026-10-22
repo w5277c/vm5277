@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.common;
 
 public class LabelNames {
 	public	static	String	PREFIX				= "_j8b_";
 	public	static	String	MAIN				= "j8b_CMainMmain";
+	public	static	String	ENDPOINT			= "j8b_endpoint";
 	public	static	String	RET_POINT			= PREFIX + "rp";
 	public	static	String	MULTIBYTE_CP_END	= PREFIX + "mcpe";
 	public	static	String	LOOP				= PREFIX + "loop";
@@ -25,6 +27,7 @@ public class LabelNames {
 	public	static	String	LOOP_ELSE			= PREFIX + "loopelse";
 	public	static	String	LOOP_END			= PREFIX + "eol";
 	public	static	String	BLOCK_END			= PREFIX + "eob";
+	public	static	String	METHOD_END			= PREFIX + "eom";
 	public	static	String	COMPARE_THEN		= PREFIX + "eoct";
 	public	static	String	COMPARE_ELSE		= PREFIX + "eoce";
 	public	static	String	COMPARE_END			= PREFIX + "eoc";

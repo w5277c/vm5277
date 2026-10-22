@@ -18,6 +18,7 @@ public class FlashData {
 	 // Помещает в массив данные из Flash
 	public static native void toBuffer(FlashData data, short dataOffset, byte[] buffer) throws NativeException;
 
+	public static native short getSize(FlashData data); // Размер в байтах
 	public static native byte readByte(FlashData data, short dataOffset) throws NativeException;
 	public static native short readShort(FlashData data, short dataOffset) throws NativeException;
 	public static native int readInt(FlashData data, short dataOffset) throws NativeException;

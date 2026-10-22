@@ -20,10 +20,11 @@ import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.lexer.SourcePosition;
 
 public class CGMethodCallExpressionScope extends CGExpressionScope {
-	public CGMethodCallExpressionScope(CGScope parent, CGScope oldScope, String name) {
-		super(parent, oldScope, name);
+	public CGMethodCallExpressionScope(CGScope parent, SourcePosition sp, CGScope oldScope, String name) {
+		super(parent, sp, oldScope, name);
 	}
 
 	public void releaseRef(CodeGenerator cg, CGScope cgScope, VarType type, CGCells cells) throws CompileException {

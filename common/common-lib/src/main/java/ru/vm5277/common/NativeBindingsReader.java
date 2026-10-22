@@ -28,6 +28,9 @@ public class NativeBindingsReader {
 	private					Map<String, NativeBinding>				map		= new HashMap<>();
 	
 	public NativeBindingsReader(Path rtosPath) throws CompileException {
+		this(rtosPath, null);
+	}
+	public NativeBindingsReader(Path rtosPath, Path localPath) throws CompileException {
 		try(BufferedReader br = new BufferedReader(new FileReader(rtosPath.resolve("binding.cfg").normalize().toFile()))) {
 			while(true) {
 				String line = br.readLine();
@@ -39,7 +42,7 @@ public class NativeBindingsReader {
 				line = line.trim();
 				if(!line.isEmpty()) {
 					try {
-						NativeBinding nb = new NativeBinding(line);
+						NativeBinding nb = new NativeBinding(line, localPath);
 						map.put(nb.getSignature(), nb);
 					}
 					catch(Exception e) {

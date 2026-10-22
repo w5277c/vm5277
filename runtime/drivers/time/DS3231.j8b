@@ -225,7 +225,7 @@ System.outHex(buffer);
 		}
 		byte hour = Primitive.bcdToByte(octet & 0x1f);
 		if(0!=(octet&0x20)) { //12H PM
-			return 12==hour ? 12 : hour+12;
+			return 12==hour ? 12 : (byte)(hour+12);
 		}
 		return 12==hour ? 0 : hour; //12H AM
 	}
@@ -244,7 +244,7 @@ System.outHex(buffer);
 
 	@Override public short getYear() { //TODO Centurity
 		boolean century = 0!=(buffer[5] & 0x80);
-		return Primitive.bcdToByte(buffer[6]) + (century ? 2000 : (short)0);
+		return (short)(Primitive.bcdToByte(buffer[6]) + (century ? 2000 : (short)0));
 	}
 
 	public void printDate(OutputStream os) {

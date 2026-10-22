@@ -15,11 +15,13 @@
  */
 package ru.vm5277.common.cg.scopes;
 
+import ru.vm5277.common.lexer.SourcePosition;
+
 public class CGExpressionScope extends CGScope {
 	private	int	nestCntr = 0;
 	
-	public CGExpressionScope(CGScope parent, CGScope oldScope, String name) {
-		super(parent, -1, oldScope, name);
+	public CGExpressionScope(CGScope parent, SourcePosition sp, CGScope oldScope, String name) {
+		super(parent, sp, -1, oldScope, name);
 	}
 	
 	public void enter() {

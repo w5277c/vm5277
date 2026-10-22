@@ -26,9 +26,7 @@
 	.EQU _OS_BLDR_UID_DATA							= BOOT_512W_ADDR+0x09
 .ENDIF
 
-.IF OS_FT_IR_TABLE == 0x01 || OS_FT_DIAG == 0x01 || OS_FT_STDIN == 0x01
-	.include "mem/ram_fill16.asm"
-.ENDIF
+.include "mem/ram_fill16.asm"
 .IF OS_FT_TIMER == 0x01 || OS_STAT_POOL_SIZE != 0x0000 || OS_FT_DRAM == 0x01 || OS_FT_IR_TABLE == 0x01
 	.include "mem/ram_clear16.asm"
 .ENDIF
@@ -51,16 +49,21 @@
 	.include "core/pcint.asm"
 .ENDIF
 
+.IF OS_FT_DIAG == 0x01
+	.include "stdio/out_stack.asm"
+	.include "stdio/out_hex16.asm"
+.ENDIF
+
 ;---TEXT-CONSTANTS------------------------------------------
 .IF OS_FT_WELCOME == 0x01
 CSTR_OSNAME:
-	.db	"vm5277.avr v0.1",0x0d,0x0a,0x00
+	.db	"vm5277.avr v0.2",0x0a,0x00,0x00
 CSTR_OSMSG1:
-	.db	0x0d,0x0a,"Powered by ",0x00
+	.db	0x0a,"Powered by ",0x00,0x00
 .ENDIF
 .IF OS_FT_DIAG == 0x01
 CSTR_OSMSG2:
-	.db	" [",0x00,0x00
+	.db	"[",0x00
 CSTR_MCUSR_NO:
 	.db	"NO ",0x00
 CSTR_MCUSR_WD:
@@ -72,7 +75,11 @@ CSTR_MCUSR_EX:
 CSTR_MCUSR_PO:
 	.db	"PO ",0x00
 CSTR_MCUSR_RESET:
-	.db	"reset]",0x0d,0x0a,0x00,0x00
+	.db	"reset]",0x0a,0x00
+CSTR_INVALID_IRQ:
+	.db	0x0a,"!Invalid IRQ!",0x0a,0x00
+CSTR_SP:
+	.db	"SP:",0x00
 .ENDIF
 
 .IF OS_FT_STIMER==0x01
@@ -198,6 +205,11 @@ CSTR_MCUSR_RESET:
 	.ELSE
 		.WARNING "No available RAM for DRAM"
 	.ENDIF
+.ELSE
+.IF OS_FT_DIAG == 0x01
+	.EQU _RAM_USAGE = OS_STACK_SIZE + 0x01 + _OS_ROTO - SRAM_START
+	.MESSAGE "RAM usage:", _RAM_USAGE
+.ENDIF
 .ENDIF
 
 .IF OS_FT_MULTITHREADING == 0x01
@@ -207,11 +219,17 @@ CSTR_MCUSR_RESET:
 	.ENDIF
 .ENDIF
 
-	.SET	STACK_BORDER				= _OS_ROTO			;1B-байт изменение значения которого указывает на переполнение стека
-	.SET	STACK_TOP					= STACK_BORDER+0x01
+	.SET	STACK_TOP					= SRAM_START+SRAM_SIZE-OS_STACK_SIZE
+	.SET	STACK_BORDER				= STACK_TOP-1		;1B-байт изменение значения которого указывает на переполнение стека
 
 _OS_INIT:
 	CLI
+.IF OS_FT_DIAG == 0x01
+	LDS _SPL,SPL
+.IFDEF SPH
+	LDS _SPH,SPH
+.ENDIF
+.ENDIF
 	;Инициализация стека
 .IFDEF SPH
 	LDI TEMP_L,high(SRAM_START+SRAM_SIZE-1)
@@ -227,6 +245,10 @@ _OS_INIT:
 	MOV C0xff,TEMP_L
 	LDI TEMP_L,0x02
 	MOV C0x02,TEMP_L
+
+.IF OS_FT_STDOUT==0x01 || OS_FT_STDIN==0x01
+	MCALL OS_STDIO_INIT_NR
+.ENDIF
 
 .IF OS_FT_DIAG == 0x01
 	LDS FLAGS,MCUSR
@@ -246,39 +268,6 @@ _OS_INIT:
 	STS WDTCR,TEMP_L
 .ENDIF
 
-	;Устаналиваем значение для определения переполнения стека
-	LDI TEMP_L,STACK_GUARD_VALUE
-	STS STACK_BORDER,TEMP_L
-
-.IF OS_FT_DIAG == 0x01
-	;Заполнение всей памяти 0x52 значением (для диагностики)
-	LDI ACCUM_L,0x52
-	LDI_X SRAM_START
-	LDI TEMP_L,low(SRAM_SIZE-0x0f)
-	LDI TEMP_H,high(SRAM_SIZE-0x0f)
-	MCALL OS_RAM_FILL16_NR
-.ENDIF
-
-.IF _OS_IRQ_RAM_TABLE_SIZE > 0
-	;Чистка RAM таблицы прерываний
-	LDI_X _OS_IRQ_RAM_TABLE
-	LDI TEMP_L,low(_OS_IRQ_RAM_TABLE_SIZE)
-	LDI TEMP_H,high(_OS_IRQ_RAM_TABLE_SIZE)
-	MCALL OS_RAM_CLEAR16_NR									;0x0000 в адрес обработчика = обработчик отсутствует
-.ENDIF
-
-.IF OS_FT_STIMER==0x01
-	;Чистка таблицы прерываний
-	LDI_X _OS_STIMER_TABLE
-	LDI TEMP_L,low(OS_STIMER_QNT*8)
-	LDI TEMP_H,high(OS_STIMER_QNT*8)
-	MCALL OS_RAM_CLEAR16_NR									;0x0000 в адрес обработчика = обработчик отсутствует
-.ENDIF
-
-.IF OS_FT_STDOUT==0x01 || OS_FT_STDIN==0x01
-	MCALL OS_STDIO_INIT_NR
-.ENDIF
-
 .IF OS_FT_WELCOME == 0x01
 	LDI_A16 CSTR_OSMSG1*2
 	MCALL OS_OUT_CSTR
@@ -286,6 +275,15 @@ _OS_INIT:
 	MCALL OS_OUT_CSTR
 .ENDIF
 .IF OS_FT_DIAG == 0x01
+	LDI_A16 CSTR_SP*2
+	MCALL OS_OUT_CSTR
+	MOV ACCUM_L,_SPL
+.IFDEF SPH
+	MOV ACCUM_H,_SPH
+.ELSE
+	LDI ACCUM_H,0x00
+.ENDIF
+	MCALL OS_OUT_HEX16
 	LDI_A16 CSTR_OSMSG2*2
 	MCALL OS_OUT_CSTR
 	SBRS FLAGS,WDRF
@@ -314,6 +312,53 @@ _OS_INIT:
 
 	;Сбрасываем флаги причины сброса
 	STS MCUSR,C0x00
+
+	MCALL OS_OUT_STACK_NR
+.ENDIF
+
+	;Устаналиваем значение для определения переполнения стека
+	LDI TEMP_L,STACK_GUARD_VALUE
+	STS STACK_BORDER,TEMP_L
+
+.IF OS_FT_DIAG == 0x01 || -1==OS_STACK_SIZE
+	;Заполнение всей памяти STACK_GUARD_VALUE значением (для диагностики)
+	LDI ACCUM_L,STACK_GUARD_VALUE
+	LDI_X SRAM_START
+	LDI TEMP_L,low(SRAM_SIZE-0x0f) ;TODO почему 0x0f?
+	LDI TEMP_H,high(SRAM_SIZE-0x0f)
+	MCALL OS_RAM_FILL16_NR
+.ELSE
+	;Заполнение всей памяти STACK_GUARD_VALUE значением (для определения глубины использования стека)
+	LDI ACCUM_L,STACK_GUARD_VALUE
+	LDI_X SRAM_START+SRAM_SIZE-OS_STACK_SIZE
+	LDI TEMP_L,low(OS_STACK_SIZE-0x02)
+	LDI TEMP_H,high(OS_STACK_SIZE-0x02)
+	MCALL OS_RAM_FILL16_NR
+.ENDIF
+
+.IF _OS_IRQ_RAM_TABLE_SIZE > 0
+	;Чистка RAM таблицы прерываний
+	LDI_X _OS_IRQ_RAM_TABLE
+	LDI TEMP_L,low(_OS_IRQ_RAM_TABLE_SIZE)
+	LDI TEMP_H,high(_OS_IRQ_RAM_TABLE_SIZE)
+	MCALL OS_RAM_CLEAR16_NR									;0x0000 в адрес обработчика = обработчик отсутствует
+.ENDIF
+
+.IF OS_FT_STIMER==0x01
+	;Чистка таблицы прерываний
+	LDI_X _OS_STIMER_TABLE
+	LDI TEMP_L,low(OS_STIMER_QNT*8)
+	LDI TEMP_H,high(OS_STIMER_QNT*8)
+	MCALL OS_RAM_CLEAR16_NR									;0x0000 в адрес обработчика = обработчик отсутствует
+.ENDIF
+
+.IF OS_FT_IRQ_PCINT_BLOCK == 1
+	;Устанавливаем PCINT состояния
+	LDI ACCUM_L,0xff
+	LDI_X _OS_PCINT_STATES
+	LDI TEMP_L,low(OS_PCINT_PORTS_QNT)
+	LDI TEMP_H,high(OS_PCINT_PORTS_QNT)
+	MCALL OS_RAM_FILL16_NR
 .ENDIF
 
 .IF OS_STAT_POOL_SIZE != 0x0000
@@ -402,13 +447,23 @@ _OS_INIT:
 .ENDIF
 	JMP MAIN
 
-.IF OS_FT_IR_TABLE == 0x01
+;-----------------------------------------------------------
+_OS_INVALID_IRQ_HANDLER:
+;-----------------------------------------------------------
+;Обработчик не поддерживаемого прерывания (случайный сбой)
+;-----------------------------------------------------------
+.IF OS_FT_DIAG == 0x01
+	LDI_A16 CSTR_INVALID_IRQ*2
+	MCALL OS_OUT_CSTR
+.ENDIF
+RJMP PC
+
+.IF _OS_IRQ_RAM_TABLE_SIZE>0x00
 ;-----------------------------------------------------------
 _OS_IRQ_HANDLER:
 ;-----------------------------------------------------------
 ;Общий обработчик прерываний
 ;-----------------------------------------------------------
-
 ;TODO нужно запретить прерывания INT но разрешить глобальные!
 ;TODO похоже нужно делать разные обработчики прерываний, так как есть необходимость разрешать глобальные прерывания,
 ;потому что многие из них будут обработаны на верхнем уровне.
@@ -419,8 +474,8 @@ _OS_IRQ_HANDLER:
 	POP ATOM_L
 	POP ATOM_L
 
-	LDS ATOM_H,SREG
-	PUSH ATOM_H
+	LDS ATOM_EH,SREG
+	PUSH ATOM_EH
 .IF _MCALL_SIZE == 0x02
 	LSL ATOM_L												;Умножаем на 2, если переходы размерностью в 2 слова
 .ENDIF
@@ -435,8 +490,8 @@ _OS_IRQ_HANDLER:
 
 	POP_Z
 	POP_Y
-	POP ATOM_H
-	STS SREG,ATOM_H
+	POP ATOM_EH
+	STS SREG,ATOM_EH
 	RETI
 
 _OS_IRQ_HANDLER__SUBROUTINE:
@@ -444,34 +499,52 @@ _OS_IRQ_HANDLER__SUBROUTINE:
 	SBCI YH,high(-_OS_IRQ_RAM_TABLE)
 	LDD ATOM_L,Y+_OS_IRQ_RAM_TABLE__OFFSET_HANDLER_ADDR+0x00
 	LDD ATOM_H,Y+_OS_IRQ_RAM_TABLE__OFFSET_HANDLER_ADDR+0x01
+/*PUSH_A16
+PUSH_T16
+PUSH_Z
+LDI ACCUM_L,'('
+MCALL OS_OUT_CHAR
+LDI TEMP_H,0x00
+LDI TEMP_L,0x08
+LDI_Z 0x0100
+MCALL OS_OUT_RAMBYTES_NR
+LDI ACCUM_L,')'
+MCALL OS_OUT_CHAR
+POP_Z
+POP_T16
+POP_A16
+*/
 	CP ATOM_L,C0x00
 	CPC ATOM_H,C0x00
 	BREQ _OS_IRQ_HANDLER__SKIP
 
 	PUSH J8B_ATOM											;Верхний уровень может использовать ACC и J8B_ATOM - остальные регистры он должне сам восстановить
 	PUSH_A32
-
-	LDD ZL,Y+_OS_IRQ_RAM_TABLE__OFFSET_RES_ID
-	PUSH ZL
-
-	LDI_Z _OS_IRQ_HANDLER__RETPOINT
-	PUSH ZL
-	PUSH ZH
-	PUSH ATOM_L
-	PUSH ATOM_H
+	LDD ACCUM_L,Y+_OS_IRQ_RAM_TABLE__OFFSET_RES_ID
 	LDD ZL,Y+_OS_IRQ_RAM_TABLE__OFFSET_HEAP_ADDR+0x00
 	LDD ZH,Y+_OS_IRQ_RAM_TABLE__OFFSET_HEAP_ADDR+0x01
+	CP ZL,C0xff
+	CPC ZH,C0xff
+	BREQ _OS_IRQ_HANDLER__SUBROUTINE__SKIP_STACKHEADER
+	PUSH ZL													;Сохраняем в стек Z для совместимости с логикой j8b
+	PUSH ZH
+	PUSH ACCUM_L											;Помещаем в стек аргумент
+_OS_IRQ_HANDLER__SUBROUTINE__SKIP_STACKHEADER:
+
+	LDI ACCUM_EL,low(_OS_IRQ_HANDLER__RETPOINT)				;Сохраняем в стек адрес возврата
+	PUSH ACCUM_EL
+	LDI ACCUM_EL,high(_OS_IRQ_HANDLER__RETPOINT)
+	PUSH ACCUM_EL
+	PUSH ATOM_L												;Сохраняем в стек адрес для перехода
+	PUSH ATOM_H
 	RET
-_OS_IRQ_HANDLER__RETPOINT:
+_OS_IRQ_HANDLER__RETPOINT:									;Аргумент и Z восстанаавливает процедура выхода из метода
 	CLI														;Важно запрещать глобальные прерывания поскольку дальше в коде могут быть
-	POP ZL													;разрешены INT, PCINT и прочие - при этом существенно раньше, чем произойдет освобождение стека и RETI
-	POP_A32
+	POP_A32													;разрешены INT, PCINT и прочие - при этом существенно раньше, чем произойдет освобождение стека и RETI
 	POP J8B_ATOM
 _OS_IRQ_HANDLER__SKIP:
 	RET
 .ENDIF
-
-
 
 .IF OS_FT_TIMER == 0x01
 ;-----------------------------------------------------------
@@ -517,7 +590,8 @@ _OS_SYSTIMER_HANDLER__STIMER_LOOP:
 	STD Y+_OS_STIMER_TABLE__OFFSET_HEAP_ADDR+0x01,C0x00
 	PUSH ACCUM_EL
 	PUSH_Y
-	PUSH_Z
+	PUSH ZL
+	PUSH ZH
 	LDD ACCUM_L,Y+_OS_STIMER_TABLE__OFFSET_RES_ID
 	PUSH ACCUM_L
 	LDI ACCUM_L,low(_OS_SYSTIMER_HANDLER__STIMER_RETPOINT)
@@ -531,8 +605,6 @@ _OS_SYSTIMER_HANDLER__STIMER_LOOP:
 	RET														;Выполняем обработчик и запрещаем прерывания на случай если обработчик их разрешал
 _OS_SYSTIMER_HANDLER__STIMER_RETPOINT:
 	CLI
-	POP ACCUM_EL
-	POP_Z
 	POP_Y
 	POP ACCUM_EL
 	STD Y+_OS_STIMER_TABLE__OFFSET_HEAP_ADDR+0x00,ZL		;Восстанавливаем адрес HEAP

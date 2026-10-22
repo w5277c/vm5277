@@ -32,7 +32,7 @@ public class TDelimiter extends Token {
 	}
 
 	public static TDelimiter parse(SourceBuffer sb, LexerType lexerType) {
-		SourcePosition sp = sb.snapSP();
+		SourcePosition sp = sb.snap();
 		Delimiter delimiter = Delimiter.matchDelimiter(sb, lexerType);
 		if (null!=delimiter) {
 			return new TDelimiter(sb, sp, delimiter);

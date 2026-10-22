@@ -17,6 +17,7 @@
 package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import ru.vm5277.common.Pair;
 import ru.vm5277.common.lexer.SourcePosition;
@@ -29,13 +30,10 @@ import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.compiler.nodes.TokenBuffer;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.cg.CGArrCells;
+import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.scopes.CGScope;
-import ru.vm5277.common.lexer.SourceBuffer;
-import ru.vm5277.common.lexer.tokens.TAnnotation;
-import ru.vm5277.common.lexer.tokens.TNote;
 import ru.vm5277.compiler.Instance;
-import ru.vm5277.compiler.nodes.AnnotationParamNode;
 import ru.vm5277.compiler.semantic.CIScope;
 
 public class ArrayInitExpression extends ExpressionNode {
@@ -118,7 +116,7 @@ public class ArrayInitExpression extends ExpressionNode {
 
 		this.valueExprs = new ArrayList<>();
 		for(byte b : data) {
-			this.valueExprs.add(new LiteralExpression(inst, null, b&0xff, VarType.BYTE));
+			this.valueExprs.add(new LiteralExpression(inst, null, sp, b&0xff, VarType.BYTE));
 		}
 
 		// Устанавливаем размеры
@@ -159,7 +157,7 @@ public class ArrayInitExpression extends ExpressionNode {
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
-		cgScope = cg.enterExpression(parent, null, toString()); //TODO
+		cgScope = cg.enterExpression(parent, sp, null, toString()); //TODO
 		
 		List<Object> consts = null;
 		int pos=-1;
@@ -182,7 +180,7 @@ public class ArrayInitExpression extends ExpressionNode {
 				VarType valueType = valueExpr.getType();
 				if(valueType.isClassType() && basedType.isClassType()) {
 					if(valueType != basedType) {
-						CIScope cis = scope.getThis().resolveCI(null, valueType.getClassName(), false);
+						CIScope cis = scope.getThis().resolveCI(null, valueType.getClassName(), false, new HashSet<>());
 						if(!cis.isImplements(basedType)) {
 							markError("Type mismatch: cannot assign " + valueType + " to " + basedType);
 							result = false;
@@ -329,7 +327,7 @@ public class ArrayInitExpression extends ExpressionNode {
 			}
 		}
 	}
-
+	
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone || disabled) return null;
@@ -359,7 +357,8 @@ public class ArrayInitExpression extends ExpressionNode {
 			if(expr instanceof LiteralExpression) {
 				LiteralExpression le = (LiteralExpression)expr;
 				boolean isFixed = le.getType().isFixedPoint()|| VarType.FIXED == basedType;
-				expr.getCGScope().append(cg.constToCells(expr.getCGScope(), isFixed ? le.getFixedValue() : le.getNumValue(), arrCells, isFixed));
+				cg.cellsToCells(cgScope, arrCells, null, new CGCells(isFixed ? le.getFixedValue() : le.getNumValue()), null, null);
+				//expr.getCGScope().append(cg.constToCells(expr.getCGScope(), isFixed ? le.getFixedValue() : le.getNumValue(), arrCells, isFixed));
 			}
 			else {
 				expr.codeGen(cg, true, excs);

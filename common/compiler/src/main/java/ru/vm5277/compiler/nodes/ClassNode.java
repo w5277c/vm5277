@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -175,7 +176,7 @@ public class ClassNode extends ObjectTypeNode {
 
 			List<VarType> implTypes = new ArrayList<>();
 			for(String ifaceName : impl) {
-				if(null==ciScope.resolveCI(null, ifaceName, false)) {
+				if(null==ciScope.resolveCI(null, ifaceName, false, new HashSet<>())) {
 					markError("Interface not found: " + ifaceName);
 					result = false;
 				}
@@ -287,16 +288,16 @@ public class ClassNode extends ObjectTypeNode {
 				instType = InstanceType.THREAD;
 			}
 			else {
-				VarType callbackType = VarType.fromClassName(VarType.CLASSNAME_RTOS_CALLBACK);
+				VarType callbackType = VarType.fromClassName(VarType.CLASSNAME_NATIVE_CALLBACK);
 				if(null!=callbackType && ciScope.isImplements(callbackType)) {
-					instType = InstanceType.RTOS_CALLBACK;
+					instType = InstanceType.NATIVE_CALLBACK;
 				}
 			}
 		}
 
-		cgScope = cg.enterClass(parent, VarType.fromClassName(name), name, implInfos, instType);
+		cgScope = cg.enterClass(parent, sp, VarType.fromClassName(name), name, implInfos, instType);
 
-		blockNode.postAnalyze(ciScope, cg, cgScope);
+		result &= blockNode.postAnalyze(ciScope, cg, cgScope);
 
 		debugAST(this, POST, false, result, getFullInfo());
 		return result;
@@ -312,9 +313,9 @@ public class ClassNode extends ObjectTypeNode {
 		
 		blockNode.codeOptimization(ciScope, cg);
 	}
-	
+
 	private void fillInterfaces(CIScope scope, List<InterfaceScope> iScopes, String ifaceName) {
-		CIScope cis = scope.resolveCI(null, ifaceName, false);
+		CIScope cis = scope.resolveCI(null, ifaceName, false, new HashSet<>());
 		if(null==cis || !(cis instanceof InterfaceScope)) {
 			markError("Interface not found: " + ifaceName);
 		}
@@ -387,7 +388,7 @@ public class ClassNode extends ObjectTypeNode {
 
 		}
 	}
-	
+
 	public void firstCodeGen(CodeGenerator cg, MethodNode methodNode, CGExcs excs) throws CompileException {
 		cgDone = true;
 		CGScope.launchPointActivate();
@@ -406,6 +407,7 @@ public class ClassNode extends ObjectTypeNode {
 		cgDone = true;
 		
 		fieldsCodeGen(cg, excs);
+		
 		AnnotationParamNode apn = annotations.get(TAnnotation.EXPAND_HEAP);
 		((CGClassScope)cgScope).build(cg, false, (null==apn ? 0 : apn.getNumValue(0)), excs);
 /*		if(null != importedClasses) {

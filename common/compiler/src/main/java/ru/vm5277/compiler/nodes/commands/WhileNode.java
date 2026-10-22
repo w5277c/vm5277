@@ -122,7 +122,7 @@ public class WhileNode extends CommandNode {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
 		
-		cgScope = cg.enterLoopBlock(parent, "while");
+		cgScope = cg.enterLoopBlock(parent, sp, "while");
 
 		cgScope.append(((CGLoopBlockScope)cgScope).getStartLbScope());
 
@@ -186,7 +186,7 @@ public class WhileNode extends CommandNode {
 			blockNode.codeOptimization(scope, cg);
 		}
 	}
-
+	
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone || disabled) return null;

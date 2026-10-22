@@ -23,7 +23,7 @@ J8BPROC_NEW_CLASS:
 ;инициализирует HEAP для класса
 ;IN: ACCUM_L/H-размер блока
 ;MOD: ACCUM_L/H
-;OUT: Z-адрес на выделенный блок, флаг С-OUT OF RAM
+;OUT: Z-адрес на выделенный блок, флаг C true=OutOfMemory
 ;-----------------------------------------------------------
 	SET
 	MCALL OS_DRAM_ALLOC

@@ -34,13 +34,11 @@ public class AvrdudeFlashTool implements FlashTool {
 	public	static			String					DOWNLOAD_URL			= "https://vm5277.ru/tools/";
 	public	static	final	String					NAME					= "avrdude";
 	private					Logger					log						= null;
-	private					Path					toolkitPath				= null;
 	private					Path					path					= null;
 	private					List<FlashToolParam>	params					= null;
 	
-	public AvrdudeFlashTool(Logger log, Path toolkitPath) {
+	public AvrdudeFlashTool(Logger log) {
 		this.log = log;
-		this.toolkitPath = toolkitPath;
 	}
 	
 	@Override
@@ -55,8 +53,7 @@ public class AvrdudeFlashTool implements FlashTool {
 	
 	@Override
 	public Path resolveTool(boolean canDownload) {
-		if(null==toolkitPath) return null;
-		Path _path = getAvrdudePath(log, toolkitPath, canDownload);
+		Path _path = getAvrdudePath(log, canDownload);
 		if(null==path && null!=_path) {
 			path = _path;
 			params = null;
@@ -96,7 +93,7 @@ public class AvrdudeFlashTool implements FlashTool {
 		return deviceId;
 	}
 	
-	public static Path getAvrdudePath(Logger log, Path toolkitPath, boolean canDownload) {
+	public static Path getAvrdudePath(Logger log, boolean canDownload) {
 		String result = null;
 		
 		String avrdudeFolderName = getAvrdudeFolderName();
@@ -104,6 +101,7 @@ public class AvrdudeFlashTool implements FlashTool {
 		
 		String filename = "avrdude" + (System.getProperty("os.name").toLowerCase().contains("win") ? ".exe" : "");
 
+		Path toolkitPath = FSUtils.getToolkitPath();
 		File toolsDir = toolkitPath.resolve(TOOLS_DIRNAME).toFile();
 		boolean exist = false;
 

@@ -34,10 +34,12 @@ import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.enums.OptimizationType;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.lexer.SourcePosition;
 
 public class CGMethodScope extends CGCellsScope {
 	private			CodeGenerator				cg;
-	private			CGLabelScope				lbScope;
+	private			CGLabelScope				startLbScope;
+	private			CGLabelScope				endLbScope;
 	private			CGLabelScope				lbCIScope;
 	private	final	List<CGBlockScope>			blockScopes			= new ArrayList<>();
 	private	final	Map<Integer, CGVarScope>	args				= new HashMap<>();
@@ -50,13 +52,13 @@ public class CGMethodScope extends CGCellsScope {
 	private			boolean						isUsed;
 	private			CGIContainer				fieldsInitCallCont	= new CGIContainer("instance init caller");
 	private			CGCells						cells;
-
+	private			CGIContainer				header				= new CGIContainer();
 	private			CGIContainer				initContainer		= new CGIContainer();
-	
 	private			Set<Integer>				exceptionIds		= new HashSet<>();
+	private			boolean						stackUsage			= false;
 	
-	public CGMethodScope(CodeGenerator cg, CGScope parent, int resId, VarType type, int size, String name) {
-		super(parent, resId, type, size, name);
+	public CGMethodScope(CodeGenerator cg, CGScope parent, SourcePosition sp, int resId, VarType type, int size, String name) {
+		super(parent, sp, resId, type, size, name);
 		
 		this.cg = cg;
 		this.regsPool = cg.buildRegsPool();
@@ -67,7 +69,9 @@ public class CGMethodScope extends CGCellsScope {
 		
 	//	cg.addLabel(lbScope);
 		
-		if(null == type) {
+		append(header);
+		
+		if(null==type) {
 			lbCIScope = new CGLabelScope(null, null, LabelNames.CONSTR_INIT, true);
 	//		cg.addLabel(lbCIScope);
 		}
@@ -96,14 +100,15 @@ public class CGMethodScope extends CGCellsScope {
 		signature = sb.toString();
 		
 		if((null == types || 0==types.length) && "main".equals(name) && "CMain".equals(parent.getLName())) {
-			lbScope = new CGLabelScope(null, -1, LabelNames.MAIN, true);
+			startLbScope = new CGLabelScope(null, -1, LabelNames.MAIN, true);
 		}
 		else {
-			lbScope = new CGLabelScope(this, null, null, true);
+			startLbScope = new CGLabelScope(this, null, null, true);
 		}
 		// Похоже полезно для любого метода - что за метод без точки входа?
 		// Изначально задавалось только для persist методов в NewExpression.codeGen
-		lbScope.setPersist();
+		startLbScope.setPersist();
+		endLbScope = new CGLabelScope(null, null, LabelNames.METHOD_END, true);
 	}
 	
 	public CGIContainer getInitContainer() {
@@ -113,9 +118,13 @@ public class CGMethodScope extends CGCellsScope {
 	public void build(CodeGenerator cg, CGExcs excs) throws CompileException {
 		isUsed = true;
 		
+		if(VERBOSE_LO<=verbose) {
+			header.append(new CGIText(";build " + toString()));
+		}
+		
 		CGIContainer cont = new CGIContainer();
 		cont.append(new CGIText(""));
-		cont.append(lbScope);
+		cont.append(startLbScope);
 
 		cg.normalizeIRegConst(this);
 		
@@ -130,7 +139,6 @@ public class CGMethodScope extends CGCellsScope {
 		}
 
 		prepend(cont);
-		if(VERBOSE_LO <= verbose) prepend(new CGIText(";build " + toString()));
 		
 //		append(cg.eReturn(null, null == type ? 0x00 : type.getSize(), stackOffset));
 		if(OptimizationType.FRONT.getId()<cg.getDevice().getOptimizationType().getId()) {
@@ -145,7 +153,7 @@ public class CGMethodScope extends CGCellsScope {
 		
 		//append(cg.eReturn(null, stackOffset, -1, type));
 
-		if(VERBOSE_LO <= verbose) append(new CGIText(";method end"));
+		if(VERBOSE_LO<=verbose) append(new CGIText(";end of " + toString()));
 	}
 	
 	//Выделение ячеек для переданных параметров (только стек)
@@ -251,11 +259,14 @@ public class CGMethodScope extends CGCellsScope {
 		regsPool.get(regId).setFree(true);	// Помечаем, что регистр освобожден
 	}
 
-	public CGLabelScope getLabel() {
-		return lbScope;
+	public CGLabelScope getStartLabel() {
+		return startLbScope;
 	}
 	public CGLabelScope getCILabel() {
 		return lbCIScope;
+	}
+	public CGLabelScope getEndLabel() {
+		return endLbScope;
 	}
 	
 	public String getSignature() {
@@ -280,6 +291,13 @@ public class CGMethodScope extends CGCellsScope {
 	
 	public int getArgsStackSize() {
 		return argsStackSize;
+	}
+	
+	public void markStackUsed() {
+		stackUsage = true;
+	}
+	public boolean hasStackUsage() {
+		return stackUsage;
 	}
 	
 	@Override

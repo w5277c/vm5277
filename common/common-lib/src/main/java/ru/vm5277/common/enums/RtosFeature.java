@@ -55,5 +55,7 @@ public enum RtosFeature {
 	// Фичи отключающие проверки (оптимизация в релизе)
 	OS_FT_GPIO_PIN_NOCHECK,
 	OS_FT_ARRAY_INDEX_NOCHECK,
-	OS_FT_MATH_OVF_NOCHECK;
+	OS_FT_MATH_OVF_NOCHECK,
+	
+	OS_FT_DISPATCHER_DEBUG;
 }

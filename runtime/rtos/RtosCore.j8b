@@ -18,7 +18,7 @@ public interface RtosCore {
 	public static native void delayUs(byte us);
 	public static native byte getUptimeB0();
 
-	public static native void startSoftTimer(RtosCallback callback, byte sn, byte resId, short period);
+	public static native void startSoftTimer(NativeCallback callback, byte sn, byte resId, short period);
 	public static native void stopSoftTimer(byte resId);
 
 	public static native short getIORegDirection(byte gpioPort);

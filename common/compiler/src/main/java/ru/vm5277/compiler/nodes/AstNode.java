@@ -62,10 +62,7 @@ import ru.vm5277.common.lexer.Keyword;
 import ru.vm5277.common.lexer.tokens.TAnnotation;
 import ru.vm5277.common.lexer.tokens.Token;
 import ru.vm5277.compiler.Instance;
-import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
 import ru.vm5277.compiler.semantic.BlockScope;
-import ru.vm5277.compiler.semantic.FieldSymbol;
-import ru.vm5277.compiler.semantic.VarSymbol;
 
 public abstract class AstNode extends SemanticAnalyzer {
     private				static	int						globalCntr	= 0;
@@ -78,10 +75,11 @@ public abstract class AstNode extends SemanticAnalyzer {
 	protected					boolean					cgDone;
 	protected					boolean					disabled;
 	protected					CGScope					cgScope;
-	protected			static	HashMap<AstNode, Scope>	declarationPendingNodes	= new HashMap<>();
+	protected			static	HashMap<AstNode, Scope>	declarationPendingNodes	= new HashMap<>(); //TODO рудимент
 	
 	protected AstNode() {
 		sn = globalCntr++;
+		sp = new SourcePosition(null);
 	}
 	
 	protected AstNode(Instance inst, TokenBuffer tb) {
@@ -89,7 +87,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		
 		this.inst = inst;
 		this.tb = tb;
-		this.sp = (null==tb ? null : tb.current().getSP());
+		this.sp = (null==tb ? new SourcePosition(null) : tb.current().getSP());
     }
 
 	protected AstNode(Instance inst, TokenBuffer tb, SourcePosition sp) {
@@ -97,7 +95,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		
 		this.inst = inst;
 		this.tb = tb;
-		this.sp = sp;
+		this.sp = null!=sp ? sp : (null==tb ? new SourcePosition(null) : tb.current().getSP());
     }
 
 	protected AstNode parseCommand(Instance inst) throws CompileException {
@@ -147,7 +145,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		Token token = consumeToken(tb, TokenType.IDENTIFIER);
 		typeName.append(token.getValue().toString());
 
-		while (tb.match(Delimiter.DOT)) {
+		while(tb.match(Delimiter.DOT)) {
 			consumeToken(tb); // Пропускаем точку
 			token = consumeToken(tb, TokenType.IDENTIFIER);
 			typeName.append(".").append(token.getValue().toString());
@@ -362,13 +360,19 @@ public abstract class AstNode extends SemanticAnalyzer {
 			if(tb.match(Delimiter.LEFT_PAREN)) {
 				path.addSegment(new QualifiedPathExpression.MethodSegment(parseArguments(tb)));
 			}
-			else if (tb.match(Delimiter.LEFT_BRACKET)) {
+			else if(tb.match(Delimiter.LEFT_BRACKET)) {
 				path.addSegment(new QualifiedPathExpression.ArraySegment(parseIndices(tb)));
 			}
-			else if (tb.match(Delimiter.DOT)) {
+			else if(tb.match(Delimiter.DOT)) {
 				consumeToken(tb, Delimiter.DOT);
 				String nextName = consumeToken(tb, TokenType.IDENTIFIER).getStringValue();
 				path.addSegment(new QualifiedPathExpression.QualifiedSegment(nextName));
+			}
+			else if(tb.match(Operator.METHOD_REFERENCE)) {
+				consumeToken(tb, Operator.METHOD_REFERENCE);
+				String name = consumeToken(tb, TokenType.IDENTIFIER).getStringValue();
+				path.addSegment(new QualifiedPathExpression.MethodReference(name));
+				break;
 			}
 			else {
 				break;
@@ -512,7 +516,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 		if (source.isClassType() && target.isClassType()) {
 			if(null == source.getClassName()) return false;
 			if(source.getClassName().equals(target.getClassName())) return true;
-			CIScope cis = scope.getThis().resolveCI(null, target.getName(), false);
+			CIScope cis = scope.getThis().resolveCI(null, target.getName(), false, new HashSet<>());
 			return null!=cis && cis instanceof InterfaceScope;
 		}
 
@@ -567,7 +571,7 @@ public abstract class AstNode extends SemanticAnalyzer {
 			if(left.getClassName().equals(right.getClassName())) {
 				return true;
 			}
-			CIScope cis = scope.getThis().resolveCI(null, left.getName(), false);
+			CIScope cis = scope.getThis().resolveCI(null, left.getName(), false, new HashSet<>());
 			return null!=cis && cis instanceof InterfaceScope;
 		}
 		

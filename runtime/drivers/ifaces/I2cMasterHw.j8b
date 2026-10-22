@@ -42,9 +42,9 @@ public class I2cMasterHw implements I2cMaster {
 
 	@Override public short comm(byte[] sendBuff, short sendLen, byte[] recvBuff, short recvLen, short timeout) {
 		this.sendBuff = sendBuff;
-		this.sendLen = (null==sendBuff ? (short)0 : sendLen);
+		this.sendLen = (null==sendBuff ? 0 : sendLen);
 		this.recvBuff = recvBuff;
-		this.recvLen = (null==recvBuff ? (short)0 : recvLen);
+		this.recvLen = (null==recvBuff ? 0 : recvLen);
 		this.timeout = timeout;
 
 		comm();

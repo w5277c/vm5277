@@ -15,7 +15,7 @@
  */
 
 @RegisterSoftTimer(timerId)
-public class Buzzer implements RtosCallback, RtosDriver {
+public class Buzzer implements NativeCallback, RtosDriver {
 	private byte port;
 	private short ioReg;
 	private	short delay;

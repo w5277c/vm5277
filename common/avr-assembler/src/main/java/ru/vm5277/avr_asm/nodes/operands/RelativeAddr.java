@@ -19,6 +19,7 @@ import ru.vm5277.avr_asm.scope.Scope;
 import ru.vm5277.avr_asm.semantic.Expression;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.messages.ErrorMessage;
 import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 
@@ -34,7 +35,7 @@ public class RelativeAddr extends Const {
 		value = _value - addr;
 		
 		if(min>value || max<value) {
-			mc.add(new WarningMessage("Value " + value + " out of valid range [" + min + ".." + max + "]", sp));
+			mc.add(new ErrorMessage("Value " + value + " out of valid range [" + min + ".." + max + "]", sp));
 			value = 0;
 //throw new ParseException("Value " + value + " out of valid range [" + min + ".." + max + "]", sp);
 		}

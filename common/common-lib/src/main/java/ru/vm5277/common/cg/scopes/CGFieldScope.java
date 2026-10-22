@@ -19,21 +19,37 @@ import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.lexer.SourcePosition;
 
 public class CGFieldScope extends CGCellsScope {
 	private			boolean		isStatic;
+	private			boolean		isConstant;
 	private			CGCells		cells;
 			
-	public CGFieldScope(CGScope cgScope, int resId, VarType type, int size, boolean isStatic, String name) {
-		super(cgScope, resId, type, size, name);
+	public CGFieldScope(CGScope cgScope, SourcePosition sp, int resId, VarType type, int size, boolean isStatic, boolean isConstant, String name) {
+		super(cgScope, sp, resId, type, size, name);
 		
 		this.isStatic = isStatic;
+		this.isConstant = isConstant;
 	}
 	
 	public void build() throws CompileException {
-		cells = ((CGClassScope)parent).memAllocate(size, isStatic);
+		if(isConstant) return;
+		
+		if(parent instanceof CGClassScope) {
+			cells = ((CGClassScope)parent).memAllocate(size, isStatic);
+		}
+		else if(parent instanceof CGInterfaceScope && isStatic) {
+			cells = ((CGInterfaceScope)parent).memAllocate(size);
+		}
+		else {
+			throw new CompileException("Unexpected parent type for fields scope building:" + parent);
+		}
+
 		if(VERBOSE_LO <= verbose) prepend(new CGIText(";build " + toString() + ", allocated " + cells));
-		((CGClassScope)parent).addField(this);
+		if(parent instanceof CGClassScope) {
+			((CGClassScope)parent).addField(this);
+		}
 	}
 	
 	@Override

@@ -20,15 +20,23 @@ import drivers.ifaces.I2cMasterHw;
 class Main {
 	public static void main() {
 		System.setParam(RtosParam.SHOW_WELCOME, 1);
+		byte width=20;
+		byte height=4;
 
 		try {
-			TextDisplay td = new HD44780(new Pcf8574Layer(new I2cMasterHw(0x27, I2cMaster.I2cFreq.F400kHz)), 16, 02); //TODO должна быть ошибка так как Pcf8574 - вложенный класс
+			TextDisplay td = new HD44780(new Pcf8574Layer(new I2cMasterHw(0x27, I2cMaster.I2cFreq.F400kHz)), width, height); //TODO должна быть ошибка так как Pcf8574 - вложенный класс
 			//TextDisplay td = new HD44780(new HD44780.Pcf8574Layer(new I2cMasterHw(0x27, I2cMaster.I2cFreq.F400kHz)), 16, 02); //TODO правильный синтаксис
-			while(true) {
-				td.setCursor(System.random()&0x0f,System.random()&0x01);
-				td.putChar(0x20+(System.random()&0x7f));
-				Thread.sleep(10);
-			}
+			td.setCursor(0,0);
+			td.putChar('H');
+			td.putChar('e');
+			td.putChar('l');
+			td.putChar('l');
+			td.putChar('o');
+			td.setCursor(width-4,height-1);
+			td.putChar('g');
+			td.putChar('u');
+			td.putChar('y');
+			td.putChar('s');
 		}
 		catch(DriverException ex) {
 			System.out("Сбой HD44780, код:" + ex.code());

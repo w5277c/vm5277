@@ -23,9 +23,9 @@ public static class VT100 implements RtosDriver {
 		System.out(((char)0x1b) + "[H");
 	}
 	public static void setCursor(short x, short y) {
-		System.out(((char)0x1b) + '[' + (x+1) + ';' + (y+1) + 'H');
+		System.out(((char)0x1b) + '[' + (short)(x+1) + ';' + (short)(y+1) + 'H');
 	}
 	public static void setColor(byte ink, byte paper) {
-		System.out(((char)0x1b) + '[' + (30+ink) + ';' + (40+paper) + 'm');
+		System.out(((char)0x1b) + '[' + (byte)(30+ink) + ';' + (byte)(40+paper) + 'm');
 	}
 }

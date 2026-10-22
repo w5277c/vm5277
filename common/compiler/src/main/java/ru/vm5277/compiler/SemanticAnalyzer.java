@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import ru.vm5277.common.cg.CGExcs;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
@@ -34,13 +35,13 @@ import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.Scope;
 import ru.vm5277.common.lexer.Keyword;
 
-public class SemanticAnalyzer {
+public abstract class SemanticAnalyzer {
 	protected SemanticAnalyzer() {
 	}
 
 	public static void analyze(Instance inst, ObjectTypeNode clazz, CodeGenerator cg, CGScope parent, List<ObjectTypeNode> autoImported) {
 		GlobalScope gScope = new GlobalScope();
-
+		
 		if(null!=autoImported) {
 			for(ObjectTypeNode node : autoImported) {
 				if(node.preAnalyze()) {

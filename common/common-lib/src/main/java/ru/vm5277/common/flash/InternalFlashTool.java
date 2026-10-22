@@ -20,8 +20,6 @@ import java.io.File;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
 import java.util.List;
 import ru.vm5277.common.Device;
 import ru.vm5277.common.FSUtils;
@@ -35,13 +33,11 @@ public class InternalFlashTool implements FlashTool {
 	public	final	static	String			NAME							= "internal";
 	
 	private					Logger			log								= null;
-	private			final	Path			toolkitPath;
 	private			final	Device			device;
 	private			final	boolean			supported;
 	
-	public InternalFlashTool(Logger log, Path toolkitPath, Device device) {
+	public InternalFlashTool(Logger log, Device device) {
 		this.log = log;
-		this.toolkitPath = toolkitPath;
 		this.device = device;
 		
 		Long flashSize = device.getDefNum("FLASH_SIZE");
@@ -50,8 +46,8 @@ public class InternalFlashTool implements FlashTool {
 	
 	@Override
 	public Path resolveTool(boolean canDownload) {
-		if(null==toolkitPath) return null;
-		File toolFile = toolkitPath.resolve(BIN_DIR).resolve(FILENAME + (FSUtils.isWindows() ? ".exe" : ".sh")).normalize().toFile();
+		Path toolkitPath = FSUtils.getToolkitPath();
+		File toolFile = toolkitPath.resolve(BIN_DIR).resolve(FILENAME).normalize().toFile();
 		if(toolFile.exists()) return Paths.get(toolFile.getAbsolutePath());
 		return null;
 	}

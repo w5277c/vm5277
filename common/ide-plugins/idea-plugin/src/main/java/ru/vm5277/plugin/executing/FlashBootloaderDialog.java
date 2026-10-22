@@ -253,7 +253,7 @@ public class FlashBootloaderDialog extends DialogWrapper {
 
 								flashToolCombo.removeItemListener(flashToolItemListener);
 								flashToolCombo.removeAllItems();
-								for (FlashTool flashTool : FlashToolProvider.getTools(null, toolkitPath, (PlatformType) platformCombo.getSelectedItem(), (String)deviceCombo.getSelectedItem())) {
+								for (FlashTool flashTool : FlashToolProvider.getTools(null, (PlatformType) platformCombo.getSelectedItem(), (String)deviceCombo.getSelectedItem())) {
 									if(!(flashTool instanceof InternalFlashTool)) {
 										flashToolCombo.addItem(flashTool);
 									}
@@ -284,11 +284,11 @@ public class FlashBootloaderDialog extends DialogWrapper {
 					device = null;
 					String deviceId = (String) e.getItem();
 					try {
-						device = new Device(toolkitPath, (PlatformType) platformCombo.getSelectedItem(), deviceId);
+						device = new Device((PlatformType) platformCombo.getSelectedItem(), deviceId);
 						if(device.allowsBootloader()) {
 							deviceCombo.setForeground(null);
 
-							for (FlashTool flashTool : FlashToolProvider.getTools(null, toolkitPath, (PlatformType) platformCombo.getSelectedItem(), deviceId)) {
+							for (FlashTool flashTool : FlashToolProvider.getTools(null, (PlatformType) platformCombo.getSelectedItem(), deviceId)) {
 								if(!(flashTool instanceof InternalFlashTool)) {
 									flashToolCombo.addItem(flashTool);
 								}

@@ -30,7 +30,6 @@ import ru.vm5277.common.cg.scopes.CGTryBlockScope;
 import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.compiler.Instance;
 import ru.vm5277.compiler.nodes.expressions.ExpressionNode;
 import ru.vm5277.compiler.nodes.expressions.TypeReferenceExpression;
@@ -115,7 +114,7 @@ public class CatchBlock extends BlockNode {
 		boolean result = true;
 
 		parent.append(cgHeader);
-		cgScope = new CGBlockScope(cg, parent, cgScope.genId(), "catch");
+		cgScope = new CGBlockScope(cg, parent, sp, cgScope.genId(), "catch");
 		
 		this.tryBlockNode = tryBlockNode;
 
@@ -193,7 +192,7 @@ public class CatchBlock extends BlockNode {
 			}
 		}
 		
-		CGVarScope vScope = new CGVarScope(cgScope, CodeGenerator.genId(), VarType.SHORT, 0x02, true, varName);
+		CGVarScope vScope = new CGVarScope(cgScope, sp, CodeGenerator.genId(), VarType.SHORT, 0x02, true, varName);
 		vScope.setCells(new CGCells(CGCells.Type.ACC));
 		((VarSymbol)symbol).setCGScope(vScope);
 		

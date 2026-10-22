@@ -15,12 +15,21 @@
  */
 
 .IFNDEF MCU_BLINK_FOREVER
+.IF OS_FT_WELCOME == 0x01
+.include "stdio/out_cstr.asm"
+.include "resources/txt_mcu_done.asm"
+.ENDIF
 ;-----------------------------------------------------------
 MCU_BLINK_FOREVER:
 ;-----------------------------------------------------------
 ;Бесконечное мигание светодиодом
 ;-----------------------------------------------------------
 	CLI
+.IF OS_FT_WELCOME == 0x01
+	LDI ACCUM_L,low(_OS_MCU_DONE_TXT*2)
+	LDI ACCUM_H,high(_OS_MCU_DONE_TXT*2)
+	MCALL OS_OUT_CSTR
+.ENDIF
 _MCU_BLINK_FOREVER__LOOP:
 	; TODO проверить наличие значения в ACTLED_PORT (не равное 0xff) через IFDEF
 	; TODO инвертировать порт светодиода

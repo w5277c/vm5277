@@ -1,0 +1,64 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import hal.HwTimerManager;
+
+public class BeeperStatic implements BeeperCommon {
+	private static short ioReg;
+
+	public static void play(byte port, FlashData data) throws DriverException, NativeException {
+		ioReg = RtosCore.getIORegOutput(port);
+		byte timerId = 0xff;
+		try {
+			short delay = QUARTER_MS;
+			timerId = HwTimerManager.register(FlashData.readShort(PERIODS, 0), HwTimerManager.Resolution.RES_16BIT, BeeperStatic::callback, 0x00);
+			short length = FlashData.getSize(data);
+			Gpio.modeOut(port);
+			for(short i=0; i<length && Thread.isAlive(); i++) {
+				byte b = FlashData.readByte(data, i);
+				if(0!=(b&0x80)) {
+					delay = (short)(QUARTER_MS*2)/(b&0x3f);
+					if(0!=(b&0x40)) {
+						HwTimerManager.stop(timerId);
+					}
+					Thread.sleep(delay);
+				}
+				else {
+					try {
+						short period = FlashData.readShort(PERIODS,(short)((b&0x0f)*2))>>((b>>4)&0x07);
+						if(0==period) period = 1;
+						HwTimerManager.restart(timerId, period);
+						Thread.sleep(delay);
+					}
+					catch(NativeException ex) {
+						break;
+					}
+				}
+			}
+		}
+		finally {
+			if(0xff!=timerId) {
+				HwTimerManager.unregister(timerId);
+			}
+			Gpio.modeIn(port);
+			Gpio.setLow(port);
+		}
+	}
+
+	private static void callback(byte resId) {
+		RtosCore.invertIOReg(ioReg);
+	}
+}

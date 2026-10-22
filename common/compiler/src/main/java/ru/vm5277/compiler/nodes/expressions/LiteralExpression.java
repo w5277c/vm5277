@@ -33,8 +33,10 @@ import static ru.vm5277.common.VarType.FIXED_MAX;
 import static ru.vm5277.common.VarType.FIXED_MIN;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.CGExcs;
+import ru.vm5277.common.enums.J8BException;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.NEW;
 import ru.vm5277.common.enums.StrictLevel;
+import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.compiler.Instance;
 
 //TODO RTOS умеет округлять? Проверить и выполнять округление по среднему
@@ -42,10 +44,10 @@ import ru.vm5277.compiler.Instance;
 public class LiteralExpression extends ExpressionNode {
     private Object	value;
 	private	boolean	fromVarField	= false; // Получен из переменной или свойства т.е. имеет фиксированный тип не зависимый от значения
-	private	boolean	isOverflow		= false; // Включен если при вычислении с final VarField значение превысило диапазон типа переменной или свойства
+	private	boolean	hasOverflow		= false; // Включен если при вычислении с final VarField значение превысило диапазон типа переменной или свойства
 	
-	public LiteralExpression(Instance inst, TokenBuffer tb, Object value) {
-        super(inst, tb);
+	public LiteralExpression(Instance inst, TokenBuffer tb, SourcePosition sp, Object value) {
+        super(inst, tb, sp);
 
 		debugAST(this, NEW, true, getFullInfo());
 
@@ -78,17 +80,18 @@ public class LiteralExpression extends ExpressionNode {
 		}
     }
 
-	public LiteralExpression(Instance inst, TokenBuffer tb, Number value, VarType type) {
-        super(inst, tb);
+	public LiteralExpression(Instance inst, TokenBuffer tb, SourcePosition sp, Number value, VarType type) {
+        super(inst, tb, sp);
 
+		
 		debugAST(this, NEW, true, getFullInfo());
 		
 		this.value = value;
 		this.type = type;
 		this.fromVarField = true;
-		this.isOverflow = false; //TODO overflow должен быть посчитан в самом конце всех операций
+		this.hasOverflow = false; //TODO overflow должен быть посчитан в самом конце всех операций
 	}
-	
+
 	void setVarFieldType(VarType type) {
 		this.type = type;
 		fromVarField = true;
@@ -119,6 +122,13 @@ public class LiteralExpression extends ExpressionNode {
 	
 	public boolean isNull() {
 		return null == value;
+	}
+	
+	public boolean isOverflow() {
+		return hasOverflow;
+	}
+	public void clearOverflow() {
+		hasOverflow = false;
 	}
 	
 	public long getNumValue() {
@@ -183,7 +193,7 @@ public class LiteralExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterExpression(parent, cgScope, toString());
+		cgScope = cg.enterExpression(parent, sp, cgScope, toString());
 		
 		if(value instanceof Number) {
 			if(VarType.UNKNOWN==type) {
@@ -196,6 +206,8 @@ public class LiteralExpression extends ExpressionNode {
 					if(value instanceof Double) {
 						Double d = ((Double)value);
 						if(0>d) {
+							hasOverflow = true;
+							
 							l = 0;
 							if(StrictLevel.NONE==inst.getStrictLevel()) {
 							}
@@ -208,6 +220,8 @@ public class LiteralExpression extends ExpressionNode {
 							}
 						}
 						else if((d - Math.floor(d)) >= 0.01d) {
+							hasOverflow = true;
+							
 							if(StrictLevel.NONE==inst.getStrictLevel()) {
 							}
 							else if(StrictLevel.STRONG==inst.getStrictLevel()) {
@@ -220,8 +234,10 @@ public class LiteralExpression extends ExpressionNode {
 						}
 						value = l;
 					}
-
+		
 					if(VarType.INT==type && (l<0 || l> 0xffffffffl)) {
+						hasOverflow = true;
+						
 						long newValue = l & 0xffffffffl;
 						if(StrictLevel.NONE==inst.getStrictLevel()) {
 						}
@@ -238,9 +254,11 @@ public class LiteralExpression extends ExpressionNode {
 				else if(VarType.FIXED==type) {
 					double d = (value instanceof Double ? ((Double)value) : (((Number)value).doubleValue()));
 					if(d<FIXED_MIN || d>FIXED_MAX) {
+						hasOverflow = true;
+						
 						int tmp = (int)(d * 256d);
 						Double newValue = ((short)((tmp & 0x7FFF) | (tmp & 0x8000))) / 256d;
-
+		
 						if(StrictLevel.NONE==inst.getStrictLevel()) {
 						}
 						else if(StrictLevel.STRONG==inst.getStrictLevel()) {
@@ -285,24 +303,20 @@ public class LiteralExpression extends ExpressionNode {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 
-		//cg.setDataSymbol(cg.defineData(vScope.getResId(), -1, (String)le.getValue()));
-		//TODO попыка вынести запись в аккумулятор на свое место
+		if(hasOverflow) {
+			Integer exceptionId = cg.getExcsChecker().getHandled(excs, J8BException.MathOverflowException.name());
+			if(null!=exceptionId) {
+				cg.getExcsChecker().makeException(cg, cgScope, excs, exceptionId);
+			}
+		}
+		
 		if(toAccum) {
-			//cg.constToAcc(cgScope, returnType.getSize(), isFixed() ? getFixedValue() : getNumValue(), isFixed());
 			if(type.isString()) {
-				cg.cellsToAcc(cgScope, new CGCells(cg.defineData(cg.genId(), -1, value).getLabel()), false);
+				cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ACC), VarType.SHORT, new CGCells(cg.defineData(cg.genId(), -1, value).getLabel()), null, null);
 			}
 			else {
 				long v = type.isFixedPoint() ? getFixedValue() : getNumValue();
-				// LiteralExpression не должен задавать размер аккумулятору! А кто должен? - не актуально
-				// Меняем логику - было ошибкой ограничивать размер аккумулятора по типу назначения, теперь размер аккумулятора должне соотвествовать значению
-				cg.constToAcc(cgScope, 0, v, type.isFixedPoint());
-				if(isOverflow) {
-					Integer exceptionId = cg.getExcsChecker().getHandled(excs, "MathOverflowException");
-					if(null!=exceptionId) {
-						cg.getExcsChecker().makeException(cg, cgScope, excs, exceptionId);
-					}
-				}
+				cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ACC), type, new CGCells(v), type, null);
 			}
 			
 			releaseVars(cg);

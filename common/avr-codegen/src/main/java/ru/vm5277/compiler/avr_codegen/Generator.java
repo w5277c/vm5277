@@ -5,7 +5,7 @@
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
  *
- *     http://www.apache.org/licenses/LICENSE-2.0eunary
+ *     http://www.apache.org/licenses/LICENSE-2.0
  *
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
@@ -40,7 +40,7 @@ import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.enums.RtosFeature;
 import ru.vm5277.common.enums.RTOSHaltMode;
 import ru.vm5277.common.StrUtils;
-import ru.vm5277.common.enums.RTOSParam;
+import ru.vm5277.common.enums.RtosParam;
 import ru.vm5277.common.cg.CGActionHandler;
 import ru.vm5277.common.cg.CGArrCells;
 import ru.vm5277.common.cg.items.CGIAsm;
@@ -108,6 +108,16 @@ import static ru.vm5277.common.lexer.Operator.ROL;
 
 public class Generator extends CodeGenerator {
 	private	final	static	String				VERSION				= StrUtils.readVersion(Generator.class);
+	public	final	static	byte				REG_J8B_ATOM_MOVF	= 14;
+	public	final	static	byte				REG_J8B_ATOM		= 15;
+	public	final	static	byte				REG_ACCUM_L			= 16;
+	public	final	static	byte				REG_ACCUM_H			= 17;
+	public	final	static	byte				REG_ACCUM_EL		= 18;
+	public	final	static	byte				REG_ACCUM_EH		= 19;
+	public	final	static	byte				REG_TEMP_L			= 24;
+	public	final	static	byte				REG_TEMP_H			= 25;
+	public	final	static	byte				REG_TEMP_EL			= 22;
+	public	final	static	byte				REG_TEMP_EH			= 23;
 	private	final	static	byte[]				usableRegs			= new byte[]{20,21,22,23,24,25}; //Свободные регистры дял переменных
 	private			static	boolean				defSph				= true;
 	private			static	boolean				defJmp				= true;
@@ -163,7 +173,7 @@ public class Generator extends CodeGenerator {
 
 		//TODO проверять используются ли вообще параметры в методе, и игнорировать работу с Y если не используются и нет переменных
 		if(firstBlock && (0!=argsSize || 0!=varsSize)) {
-			if(!asCallback) { // Метод как RtosCallback или run в Timer или Thread - Y уже сохранен (а выход быдет по ret)
+			if(!asCallback) { // Метод как NativeCallback или run в Timer или Thread - Y уже сохранен (а выход будет по ret)
 				scope.append(new CGIAsm("push", "r28")); //TODO проверить адрес ячейки
 				scope.append(new CGIAsm("push", "r29")); // Если SPH отсутствует, то yh всегда должен быть равен 0
 			}
@@ -242,7 +252,7 @@ public class Generator extends CodeGenerator {
 	}
 	
 	@Override
-	public CGIContainer finMethod(VarType type, int argsSize, int varsSize) throws CompileException {
+	public CGIContainer finMethod(VarType type, int argsSize, int varsSize, boolean stackUsage) throws CompileException {
 		/* Структура данных в стеке
 		/  2Б	-регистровая пара Z
 		/  XБ	-аргументы
@@ -252,14 +262,15 @@ public class Generator extends CodeGenerator {
 		*/
 		
 		CGIContainer cont = new CGIContainer();
-		if(VERBOSE_LO <= verbose) cont.append(new CGIText(	";finish method, type:" + type + ", args size:" + argsSize + ", vars size:" + varsSize));
+		if(VERBOSE_LO <= verbose) cont.append(new CGIText(	";finish method, type:" + type + ", args size:" + argsSize + ", vars size:" + varsSize +
+															", stackUsage:" + stackUsage));
 		//Не требуется, более того, никто не сбрасывает флаг T
 		//if(RTOSFeatures.contains(RTOSFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("set"));
 		
 		if(null==type) {
 			cont.append(new CGIAsmMv("movw", "r16", "r30")); // Конструктор, помещаем this в accum
 		}
-		if(0!=varsSize || 0!=argsSize) {
+		if(stackUsage) {
 			// Передаю размер аргументов
 			if(128>argsSize) {
 				cont.append(new CGIAsmLd("ldi", "r30", Integer.toString(argsSize)));
@@ -275,6 +286,23 @@ public class Generator extends CodeGenerator {
 			RTOSLibs.METHOD_FIN_SF.setRequired();
 			//Перехожу на процедуру завершения метода(с учетом Y в стеке)
 			cont.append(new CGIAsmJump(JUMP_INSTR, "j8bproc_mfin_sf", true));
+		}
+		else if(0!=argsSize) {
+			// Передаю размер аргументов
+			if(128>argsSize) {
+				cont.append(new CGIAsmLd("ldi", "r30", Integer.toString(argsSize)));
+			}
+			else if(32768>argsSize) {
+				int octet = (argsSize&0x7f) + 0x80;
+				cont.append(new CGIAsmLd("ldi", "r30", Integer.toString(octet)));
+				cont.append(new CGIAsmLd("ldi", "r31", Integer.toString(argsSize>>0x07)));
+			}
+			else {
+				throw new CompileException("Too big args size:" + argsSize);
+			}
+			RTOSLibs.METHOD_FIN_ARGS.setRequired();
+			//Перехожу на процедуру завершения метода(с учетом аргументов в стеке, без использования Y)
+			cont.append(new CGIAsmJump(JUMP_INSTR, "j8bproc_mfin_args", true));
 		}
 		else {
 			RTOSLibs.METHOD_FIN.setRequired();
@@ -351,12 +379,21 @@ public class Generator extends CodeGenerator {
 	}
 	
 	@Override
+	public void pushMethodReference(CGScope cgScope, CGLabelScope label) throws CompileException {
+		//TODO упростить - объединить с pushLabel (более нигде не используется)
+		label.setUsed();
+		pushLabel(cgScope, label.getName(), getCallbackTypeBitPos());
+	}
+	
+	@Override
 	public void thisToAcc(CGScope scope) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";This to acc"));
 		scope.append(new CGIAsmMv("mov", "r16", "r30"));
 		scope.append(new CGIAsmMv("mov", "r17", "r31"));
 		acc.setBytes(0x02);
 	}
+	
+	//TODO заменить на pushCells
 	
 	/**
 	 * pushConst используетя для вызова метода(передачи констант)
@@ -402,22 +439,28 @@ public class Generator extends CodeGenerator {
 		return cont;
 	}
 
+	
+	//TODO заменить на pushCells
 	/**
 	 *
 	 * @param scope - область видимости для генерации кода
 	 * @param label - метка объекта
+	 * @param callbackTypeBitPos - номер бита (необходимо включить, если не 0) для определения передачи адреса метода от ссылки
 	 * @throws ru.vm5277.common.exceptions.CompileException
 	 */
-	@Override
-	public void pushLabel(CGScope scope, String label) throws CompileException {
-		scope.append(new CGIAsmLdLabel("ldi", "zl", "low(" + label + "*2)"));
+	@Override 
+	public void pushLabel(CGScope scope, String label, int callbackTypeBitPos) throws CompileException {
+		scope.append(new CGIAsmLdLabel("ldi", "zl", "low(" + label + "*2)" + (0!=callbackTypeBitPos ? "|" + ((1<<callbackTypeBitPos)&0xff) : "")));
 		scope.append(new CGIAsm("push", "zl"));
-		if(0x02==getRefSize()) {
-			scope.append(new CGIAsmLdLabel("ldi", "zl", "high(" + label + "*2)"));
+		if(0x02==getRefSize() || callbackTypeBitPos>7) {
+			scope.append(new CGIAsmLdLabel("ldi", "zl", "high(" + label + "*2)" + (0!=callbackTypeBitPos ? "|" + ((1<<(callbackTypeBitPos-8))&0xff) : "")));
+			scope.append(new CGIAsm("push", "zl"));
+		}
+		if(callbackTypeBitPos>15) {
+			scope.append(new CGIAsmLdLabel("ldi", "zl", "" + ((1<<(callbackTypeBitPos-16))&0xff)));
 			scope.append(new CGIAsm("push", "zl"));
 		}
 	}
-	
 	
 	/**
 	 * pushCells используетя для вызова метода(передачи параметров)
@@ -431,38 +474,56 @@ public class Generator extends CodeGenerator {
 	public CGIContainer pushCells(CGScope scope, int size, CGCells cells) throws CompileException {
 		CGIContainer cont = new CGIContainer();
 		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";push cells: " + cells));
-		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("set")); //Можем свободно использовать j8b_atom
+
+		CGIContainer dispLockCont = new CGIContainer();
+		cont.append(dispLockCont);
+		boolean threadSafe = true;
 		
-		//Не верно size = (size - cells.getSize());
-		if(0!=cells.getSize()) {
+		String tmpReg = "r19";
+		if(0x04==acc.getBytes()) {
+			tmpReg = "j8b_atom";
+			threadSafe = false;
+		}
+		
+		int cellSize = (CGCells.Type.LABEL==cells.getType() ? 0x02 : cells.getSize());
+		if(0!=cellSize) {
 			switch(cells.getType()) {
 				case ARRAY:
-					for(int i=0; i<cells.getSize(); i++) { // Порядок в цикле не имеет значения
-						cont.append(new CGIAsmLd("ld", "j8b_atom", "x+"));
-						cont.append(new CGIAsm("push", "j8b_atom"));
+					for(int i=0; i<cellSize; i++) { // Порядок в цикле не имеет значения
+						cont.append(new CGIAsmLd("ld", tmpReg, "x+"));
+						cont.append(new CGIAsm("push", tmpReg));
 					}
+					threadSafe = false;
 					break;
 				case REG:
-					for(int i=0; i<cells.getSize(); i++) cont.append(new CGIAsm("push", "r" + cells.getId(i)));
+					for(int i=0; i<cellSize; i++) cont.append(new CGIAsm("push", "r" + cells.getId(i)));
 					break;
 				case ARGS:
 				case STACK_FRAME:
-					for(int i=0; i<cells.getSize(); i++) {
-						cont.append(new CGIAsmIReg(	'y', true, "j8b_atom", cells.getId(i), getCurBlockScope(scope), (CGBlockScope)cells.getObject(),
+					for(int i=0; i<cellSize; i++) {
+						cont.append(new CGIAsmIReg(	'y', true, tmpReg, cells.getId(i), getCurBlockScope(scope), (CGBlockScope)cells.getObject(),
 													CGCells.Type.ARGS == cells.getType()));
-						cont.append(new CGIAsm("push", "j8b_atom"));
+						cont.append(new CGIAsm("push", tmpReg));
 					}
 					break;
 				case HEAP:
-					for(int i=0; i<cells.getSize(); i++) {
-						cont.append(new CGIAsmIReg('z', true, "j8b_atom", cells.getId(i)));
-						cont.append(new CGIAsm("push", "j8b_atom"));
+					for(int i=0; i<cellSize; i++) {
+						cont.append(new CGIAsmIReg('z', true, tmpReg, cells.getId(i)));
+						cont.append(new CGIAsm("push", tmpReg));
 					}
 					break;
+				case LABEL:
+					//TODO ldi не может быть выполнена для j8b_atom, при этом мы не имеем ни одного гарантированно свободного регистра, что делать?
+					//* этот метод используется в разных местах кодогенерации, кроме вызова не нативного метода - в процедурах работы с массивами
+					cont.append(new CGIAsmLdLabel("ldi", tmpReg, "low(" + (String)cells.getObject() + "*2)"));
+					cont.append(new CGIAsm("push", tmpReg));
+					cont.append(new CGIAsmLdLabel("ldi", tmpReg, "high(" + (String)cells.getObject() + "*2)"));
+					cont.append(new CGIAsm("push", tmpReg));
+					break;
 				case STAT:
-					for(int i=0; i<cells.getSize(); i++) {
-						cont.append(new CGIAsmLd("lds", "j8b_atom", "_OS_STAT_POOL+" + cells.getId(i)));
-						cont.append(new CGIAsm("push", "j8b_atom"));
+					for(int i=0; i<cellSize; i++) {
+						cont.append(new CGIAsmLd("lds", tmpReg, "_OS_STAT_POOL+" + cells.getId(i)));
+						cont.append(new CGIAsm("push", tmpReg));
 					}
 					break;
 				default:
@@ -471,67 +532,19 @@ public class Generator extends CodeGenerator {
 		}
 		
 		// Сохраняем старшие байты (так как LE)
-		for(int i=cells.getSize(); i<size; i++) {
+		for(int i=cellSize; i<size; i++) {
 			cont.append(new CGIAsm("push", "c0x00"));
 		}
 
-		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("clt"));
+		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING) && !threadSafe) {
+			dispLockCont.append(new CGIAsmCall(CALL_INSTR, RTOSLibs.DISPATCHER_PROCS.OS_DISPATCHER_LOCK.name().toLowerCase(), true));
+			cont.append(new CGIAsmCall(CALL_INSTR, RTOSLibs.DISPATCHER_PROCS.OS_DISPATCHER_UNLOCK.name().toLowerCase(), true));
+		}
+
 		if(null!=scope) scope.append(cont);
 		return cont;
 	}
 
-	@Override
-	public void constToAcc(CGScope scope, int sizeInBytes, long value, boolean isFixed) throws CompileException {
-		int constBits = NumUtils.getBytesRequired(value)*8;
-		if(0!=sizeInBytes) {
-			if(isFixed) acc.setFixed();
-			else acc.setBytes(-1==sizeInBytes ? refSize : sizeInBytes);
-			if(constBits>acc.getBits()) throw new CompileException("COMPILER BUG: " + acc + " overflow by const:" + value);
-		}
-		else if(0==sizeInBytes) {
-			if(isFixed) acc.setFixed();
-			else acc.setBytes(NumUtils.getBytesRequired(value));
-			if(constBits>acc.getBits()) throw new CompileException("COMPILER BUG: " + acc + " overflow by const:" + value);
-		}
-		else {
-			if(isFixed) acc.setFixed();
-			else acc.setBytes(sizeInBytes);
-		}
-
-		scope.append(new CGIAsmLd("ldi", "r16", Long.toString(value&0xff))); value >>= 0x08;
-		if(acc.getBytes()>1) scope.append(new CGIAsmLd("ldi", "r17", Long.toString(value&0xff))); value >>= 0x08;
-		if(acc.getBytes()>2) scope.append(new CGIAsmLd("ldi", "r18", Long.toString(value&0xff))); value >>= 0x08;
-		if(acc.getBytes()>3) scope.append(new CGIAsmLd("ldi", "r19", Long.toString(value&0xff)));
-	}
-
-	@Override
-	public void accToCells(CGScope scope, VarType varType, CGCellsScope cScope) throws CompileException { //Записываем acc в переменную
-		// Этот метод вызывается при инициализации переменной, поля. И похоже, что легче разместить запись размера аккумулятора здесь, чем разрешать
-		// работу с размером аккумуятора в FRONTEND в блоках кодогенерации init выражения
-		acc.setSize(varType);
-		
-		scope.append(accResize()); // Необходимо при приведении типа, когда аккумулятор меньше назначения
-		
-		if(cScope instanceof CGVarScope) {
-			CGVarScope vScope = (CGVarScope)cScope;
-			if(VERBOSE_LO <= verbose) scope.append(new CGIText(";" + acc + "->var '" + vScope.getName() + "' cells size:" + cScope.getSize()));
-		
-			if(!vScope.isConstant()) {
-				regsToVar(scope, getAccRegs(0x04), acc.getBytes(), vScope.getCells());
-			}
-		}
-		else if(cScope instanceof CGFieldScope) {
-			CGFieldScope fScope = (CGFieldScope)cScope;
-			if(VERBOSE_LO <= verbose) scope.append(new CGIText(";accum->field '" + fScope.getName() + "' size:" + cScope.getSize()));
-			accToField(scope, acc.getBytes(), fScope.getCells());
-		}
-		else if(cScope.getCells() instanceof CGArrCells) {
-			if(VERBOSE_LO <= verbose) scope.append(new CGIText(";accum->arr " + cScope.getCells()));
-			accToArr(scope, (CGArrCells)cScope.getCells());
-		}
-		else throw new CompileException("Unsupported scope:" + cScope);
-	}
-	
 	@Override
 	public void accToArrReg(CGScope scope) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";" + acc + "->arrReg"));
@@ -646,33 +659,13 @@ public class Generator extends CodeGenerator {
 		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
 	}
 
-	
-	// Адрес уже должен быть в X(см. computeArrAddr)
-	@Override
-	public void arrToAcc(CGScope scope, CGArrCells arrCells, boolean isFixed) throws CompileException {
-		int size = accumStack.isEmpty() ? arrCells.getSize() : (-1==accumStack.peek().getK().getSize() ? getRefSize() : accumStack.peek().getK().getSize());
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";arr '" + arrCells + "'->" + acc + ", size:" + size));
-		byte[] accRegs = getAccRegs(size);
-		//TODO почему был обратный цикл? Точно ошибка?
-		for(int i=0; i<size; i++) {
-			if(i<arrCells.getSize()) {
-				scope.append(new CGIAsmLd("ld", "r" + accRegs[i], "x+"));
-			}
-			else {
-				scope.append(new CGIAsmLd("ldi", "r" + accRegs[i], "0"));
-			}
-		}
-		if(isFixed) acc.setFixed();
-		else acc.setBytes(size);
-	}
-	
 	@Override
 	public void accToArr(CGScope scope, CGArrCells arrCells) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";" + acc + "->arr'" + arrCells + "'"));
 		int size = arrCells.getSize();
 		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING) && 1!=size) scope.append(new CGIAsm("set"));
 		
-		byte[] accRegs = getAccRegs(size);
+		byte[] accRegs = Utils.getAccRegs(size);
 		//TODO почему был обратный цикл? Точно ошибка?
 		for(int i=0; i<size; i++) {
 			scope.append(new CGIAsm("st", "x+,r" + accRegs[i]));
@@ -683,1322 +676,13 @@ public class Generator extends CodeGenerator {
 	@Override
 	public void setHeapReg(CGScope scope, CGCells cells) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";setHeap " + cells));
-		cellsToRegs(scope, cells, getTempRegs(getCallSize()), false, false);
+		cellsToRegs(scope, cells, Utils.getTempRegs(getCallSize()), false, false);
 		//cellsActionAsm(scope, offset, cells, (int sn, String rOp) -> new CGIAsm("mov " + (0==sn ? "zl" : "zh") + "," + rOp));
 	}
 
 	@Override
-	public void cellsToCells(CGScope scope, CGCells leftCells, VarType leftType, CGCells rightCells, VarType rightType) throws CompileException {
-		//TODO Последние акутальные изменения  cellTocells STACK_FRAME[0,1][short]=STACK[x0][short]
-		CGIContainer cont = new CGIContainer();
-				
-		String info = leftCells + "[" + leftType + "]" + "=" + rightCells + "[" + rightType + "]";
-		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";cells " + info));
-
-		if(CGCells.Type.ACC==leftCells.getType() && null==leftType)  {
-			leftType = accumStack.peek().getK();
-		}
-
-		int leftSize = null==leftType ? leftCells.getSize() : (-1==leftType.getSize() ? refSize : leftType.getSize());		
-		int rightSize = null==rightType ? rightCells.getSize() : (-1==rightType.getSize() ? refSize : rightType.getSize());
-		int size = Math.max(leftSize, rightSize);
-		
-		boolean leftIsFixed = null!=leftType && leftType.isFixedPoint();
-		boolean rightIsFixed = null!=rightType && rightType.isFixedPoint();
-
-		CGIContainer dispLockCont = new CGIContainer();
-		cont.append(dispLockCont);
-
-		if(leftSize<rightSize) {
-			if(CGCells.Type.ACC==leftCells.getType()) {
-				// Аккумулятор можно расширить
-				if(leftIsFixed) {
-					acc.setFixed();
-				}
-				else {
-					acc.setBytes(size);
-				}
-				cont.append(accResize());
-			}
-			else {
-				throw new CompileException("cellTocells " + info + " left operand size < right operand size");
-			}
-		}
-		if(CGCells.Type.ACC==leftCells.getType() && acc.getBytes()<leftSize) { //TODO костыль
-			acc.setBytes(leftSize);
-		}
-		
-		// Потоко не безопасо, если используется j8b_atom, если один из операндов HEAP, ARRAY, STAT или HEAP_ALT и общий размер больше байта
-		boolean threadSafe = true;
-		
-		byte[] accRegs = getAccRegs(0x04);
-		if(CGCells.Type.ACC==leftCells.getType() && null!=leftCells.getIds()) {
-			// Указаны конкретные регистры аккумулятора
-			byte[] newAcRegs = new byte[leftCells.getSize()];
-			for(int i=0; i<leftCells.getSize(); i++) {
-				newAcRegs[i] = accRegs[leftCells.getId(i)];
-			}
-			accRegs = newAcRegs;
-		}
-		
-		for(int index=0; index<size; index++) {
-			switch(rightCells.getType()) { //src
-				case ACC:
-					// Если размеры операндов равны, то записываем регистры аккумулятора, но если аккумулятор меньше, то на свободные ячейки пишем c0x00
-					String[] regsStr = new String[size+1]; 
-					for(int i=0; i<=size; i++) { //Специально берем на 1 больше - для преобразований с fixed
-						if(i<rightSize) {
-							regsStr[i] = "r" + accRegs[i];
-						}
-						else  {
-							regsStr[i] = "c0x00";
-						}
-					}
-					// Теперь размеры одинаковые
-					switch(leftCells.getType()) {
-						case ARRAY:
-							if(1<size) threadSafe = false;
-							
-							if(leftIsFixed && !rightIsFixed) {
-								cont.append(new CGIAsm("st", "x+," + (0==index ? "c0x00" : regsStr[index-1])));
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								cont.append(new CGIAsm("st", "x+," + regsStr[index+1]));
-							}
-							else {
-								cont.append(new CGIAsm("st", "x+," + regsStr[index]));
-							}
-							break;
-						case HEAP:
-							if(1<size) threadSafe = false;
-							
-							if(leftIsFixed && !rightIsFixed) {
-								cont.append(new CGIAsmIReg('z', false, (0==index ? "c0x00" : regsStr[index-1]), leftCells.getId(index)));
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								cont.append(new CGIAsmIReg('z', false, regsStr[index+1], leftCells.getId(index)));
-							}
-							else {
-								cont.append(new CGIAsmIReg('z', false, regsStr[index], leftCells.getId(index)));
-							}
-							break;
-						case REG:
-							if(leftIsFixed && !rightIsFixed) {
-								if(0==index) {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-								else {
-									cont.append(new CGIAsmMv("mov", "r"+leftCells.getId(index), regsStr[index-1]));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightSize) {
-									cont.append(new CGIAsmMv("mov", "r"+leftCells.getId(index), regsStr[index+1]));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIAsmMv("mov", "r"+leftCells.getId(index), regsStr[index]));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							break;
-						case ARGS:
-						case STACK_FRAME:
-							if(leftIsFixed && !rightIsFixed) {
-								cont.append(new CGIAsmIReg(	'y', false, (0==index ? "c0x00" : regsStr[index-1]), leftCells.getId(index),
-															getCurBlockScope(scope), (CGBlockScope)leftCells.getObject(),
-															CGCells.Type.ARGS == leftCells.getType()));
-
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								cont.append(new CGIAsmIReg(	'y', false, regsStr[index+1], leftCells.getId(index), getCurBlockScope(scope),
-															(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
-
-							}
-							else {
-								cont.append(new CGIAsmIReg(	'y', false, regsStr[index], leftCells.getId(index), getCurBlockScope(scope),
-															(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
-
-							}
-							break;
-						case STAT:
-							if(1<size) threadSafe = false;
-							
-							if(leftIsFixed && !rightIsFixed) {
-								if(0==index) {
-									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",0"));
-								}
-								else {
-									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + "," + regsStr[index-1]));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightSize) {
-									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + "," + regsStr[index+1]));
-								}
-								else {
-									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",0"));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + "," + regsStr[index]));
-								}
-								else {
-									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",0"));
-								}
-							}
-							break;
-						default:
-							throw new CompileException("cellTocells " + info + " unsupported yet");
-					}
-					break;
-				case ARGS:
-					//TODO проверить порядок - процедура вызова кладет в стек старший затем младший, т.е. процедура чтения должна поступать стандартно (LE)
-					//Но! Учитываем что normalizeIRegConst меняет порядок для инструкций работы со стеком
-					//Соответственно на этом уровне мы работаем со стеком как с обычной памятью, а процедура вызова должна клась в стек стандартно - сначала младший
-				case STACK_FRAME:
-					switch(leftCells.getType()) {
-						case ARRAY:
-							if(1<size) threadSafe = false;
-							
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIAsmIReg(	'y', true, "r16", rightCells.getId(index-1), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-									cont.append(new CGIAsm("st", "x+,r16"));
-								}
-								else {
-									cont.append(new CGIAsm("st", "x+,c0x00"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightSize) {
-									cont.append(new CGIAsmIReg(	'y', true, "r16", rightCells.getId(index+1), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-									cont.append(new CGIAsm("st", "x+,r16"));
-								}
-								else {
-									cont.append(new CGIAsm("st", "x+,c0x00"));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIAsmIReg(	'y', true, "r16", rightCells.getId(index), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-									cont.append(new CGIAsm("st", "x+,r16"));
-								}
-								else {
-									cont.append(new CGIAsm("st", "x+,c0x00"));
-								}
-							}
-							break;
-						case HEAP:
-							if(1<size) threadSafe = false;
-							
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIAsmIReg(	'y', true, "r16", rightCells.getId(index-1), getCurBlockScope(scope),
-																(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-									cont.append(new CGIAsmIReg('z', false, "r16", leftCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIAsmIReg('z', false, "c0x00", leftCells.getId(index)));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightSize) {
-									cont.append(new CGIAsmIReg(	'y', true, "r16", rightCells.getId(index+1), getCurBlockScope(scope),
-																(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-									cont.append(new CGIAsmIReg('z', false, "r16", leftCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIAsmIReg('z', false, "c0x00", leftCells.getId(index)));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIAsmIReg(	'y', true, "r16", rightCells.getId(index), getCurBlockScope(scope),
-																(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-									cont.append(new CGIAsmIReg('z', false, "r16", leftCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIAsmIReg('z', false, "c0x00", leftCells.getId(index)));
-								}
-							}
-							break;
-						case REG:
-							boolean sameRegs = (2<=size && 28==leftCells.getId(0) && 29==leftCells.getId(1)); // Определяет запись в эту же регистровую пару
-							
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIAsmIReg(	'y', true, "r"+leftCells.getId(index), rightCells.getId(index-1), getCurBlockScope(scope),
-																(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-									if(sameRegs) {
-										cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(0), "0"));
-									}
-								}
-								else {
-									if(!sameRegs) cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightSize) {
-									cont.append(new CGIAsmIReg(	'y', true, "r"+leftCells.getId(index), rightCells.getId(index+1), getCurBlockScope(scope),
-																(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							else {
-								if(!sameRegs) {
-									if(index<rightSize) {
-										cont.append(new CGIAsmIReg(	'y', true, "r"+leftCells.getId(index), rightCells.getId(index), getCurBlockScope(scope),
-																	(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-									}
-									else {
-										cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-									}
-								}
-								else if(0==index) {
-									threadSafe = false;
-									
-									cont.append(new CGIAsmIReg(	'y', true, "j8b_atom", rightCells.getId(0), getCurBlockScope(scope),
-																(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-									cont.append(new CGIAsmIReg(	'y', true, "r"+leftCells.getId(1), rightCells.getId(1), getCurBlockScope(scope),
-																(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-									cont.append(new CGIAsmMv("mov", "r"+leftCells.getId(0), "j8b_atom"));
-								}
-							}
-							break;
-						case ARGS:
-						case STACK_FRAME:
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIAsmIReg(	'y', true, "j8b_atom", rightCells.getId(index-1), getCurBlockScope(scope),
-																(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-									cont.append(new CGIAsmIReg(	'y', false, "j8b_atom", leftCells.getId(index), getCurBlockScope(scope),
-																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
-									threadSafe=false;
-								}
-								else {
-									cont.append(new CGIAsmIReg(	'y', false, "c0x00", leftCells.getId(index), getCurBlockScope(scope),
-																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightSize) {
-									cont.append(new CGIAsmIReg(	'y', true, "j8b_atom", rightCells.getId(index+1), getCurBlockScope(scope),
-																(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-									cont.append(new CGIAsmIReg(	'y', false, "j8b_atom", leftCells.getId(index), getCurBlockScope(scope),
-																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
-									threadSafe=false;
-								}
-								else {
-									cont.append(new CGIAsmIReg(	'y', false, "c0x00", leftCells.getId(index), getCurBlockScope(scope),
-																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIAsmIReg(	'y', true, "j8b_atom", rightCells.getId(index), getCurBlockScope(scope),
-																(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-									cont.append(new CGIAsmIReg(	'y', false, "j8b_atom", leftCells.getId(index), getCurBlockScope(scope),
-																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
-									threadSafe=false;
-								}
-								else {
-									cont.append(new CGIAsmIReg(	'y', false, "c0x00", leftCells.getId(index), getCurBlockScope(scope),
-																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
-								}
-							}
-							break;
-						default:
-							throw new CompileException("cellTocells " + info + " unsupported yet");
-					}
-					break;
-				case ARRAY:
-					if(1<size) threadSafe = false;
-					
-					switch(leftCells.getType()) {
-						case ACC:
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIRAsm("ld", "r"+accRegs[index], "x+"));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+accRegs[index], "0"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if(0==index) {
-									cont.append(new CGIRAsm("adiw", "xl,1"));
-								}
-								if((index+1)<rightSize) {
-									cont.append(new CGIRAsm("ld", "r"+accRegs[index], "x+"));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+accRegs[index], "0"));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIAsmLd("ld", "r"+accRegs[index], "x+"));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+accRegs[index], "0"));
-								}
-							}
-							break;
-						case HEAP:
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIAsmIReg('z', false, "x+", leftCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIAsmIReg('z', false, "C0x00", leftCells.getId(index)));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if(0==index) {
-									cont.append(new CGIRAsm("adiw", "xl,1"));
-								}
-								if((index+1)<rightSize) {
-									cont.append(new CGIAsmIReg('z', false, "x+", leftCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIAsmIReg('z', false, "C0x00", leftCells.getId(index)));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIAsmIReg('z', false, "x+", leftCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIAsmIReg('z', false, "C0x00", leftCells.getId(index)));
-								}
-							}
-							break;
-						case REG:
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIRAsm("ld", "r" + leftCells.getId(index), "x+"));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if(0==index) {
-									cont.append(new CGIRAsm("adiw", "xl,1"));
-								}
-								if((index+1)<rightSize) {
-									cont.append(new CGIRAsm("ld", "r" + leftCells.getId(index), "x+"));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIRAsm("ld", "r" + leftCells.getId(index), "x+"));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							break;
-						case ARGS:
-						case STACK_FRAME:
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIRAsm("ld", "r19", "x+"));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r19", "0"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if(0==index) {
-									cont.append(new CGIRAsm("adiw", "xl,1"));
-								}
-								if((index+1)<rightSize) {
-									cont.append(new CGIRAsm("ld", "r19", "x+"));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r19", "0"));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIRAsm("ld", "r19", "x+"));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r19", "0"));
-								}
-							}
-							cont.append(new CGIAsmIReg(	'y', false, "r19", leftCells.getId(index), getCurBlockScope(scope),
-														(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
-							break;
-						default:
-							throw new CompileException("cellTocells " + info + " unsupported yet");
-					}
-					break;
-				case CONST:
-					switch(leftCells.getType()) {
-						case ACC:
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIAsmMv("ldi", "r"+accRegs[index], ""+rightCells.getId(index-1)));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+accRegs[index], "0"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightSize) {
-									cont.append(new CGIAsmMv("ldi", "r"+accRegs[index], ""+rightCells.getId(index+1)));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+accRegs[index], "0"));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIAsmMv("ldi", "r"+accRegs[index], ""+rightCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+accRegs[index], "0"));
-								}
-							}
-							break;
-						case ARRAY:
-							if(1<size) threadSafe = false;
-							
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<=rightCells.getSize()) {
-									cont.append(new CGIAsm("st", "x+," + getConstReg(cont, (byte)19, rightCells.getId(index-1))));
-								}
-								else {
-									cont.append(new CGIAsm("st", "x+,c0x00"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightCells.getSize()) {
-									cont.append(new CGIAsm("st", "x+," + getConstReg(cont, (byte)19, rightCells.getId(index+1))));
-								}
-								else {
-									cont.append(new CGIAsm("st", "x+,c0x00"));
-								}
-							}
-							else {
-								if(index<rightCells.getSize()) {
-									cont.append(new CGIAsm("st", "x+," + getConstReg(cont, (byte)19, rightCells.getId(index))));
-								}
-								else {
-									cont.append(new CGIAsm("st", "x+,c0x00"));
-								}
-							}
-							break;
-						case HEAP:
-							if(1<size) threadSafe = false;
-							
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<=rightCells.getSize()) {
-									String reg = getConstReg(cont, (byte)19, rightCells.getId(index-1));
-									cont.append(new CGIAsmIReg('z', false, reg, leftCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIAsmIReg('z', false, "c0x00", leftCells.getId(index)));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightCells.getSize()) {
-									String reg = getConstReg(cont, (byte)19, rightCells.getId(index+1));
-									cont.append(new CGIAsmIReg('z', false, reg, leftCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIAsmIReg('z', false, "c0x00", leftCells.getId(index)));
-								}
-							}
-							else {
-								if(index<rightCells.getSize()) {
-									String reg = getConstReg(cont, (byte)19, rightCells.getId(index));
-									cont.append(new CGIAsmIReg('z', false, reg, leftCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIAsmIReg('z', false, "c0x00", leftCells.getId(index)));
-								}
-							}
-							break;
-						case HEAP_ALT:
-							if(1<size) threadSafe = false;
-							
-							if(0==index && 0!=leftCells.getId(0)) {
-								cont.append(new CGIAsm("subi", "r26,low(-" + leftCells.getId(0) + ")"));
-								cont.append(new CGIAsm("sbci", "r27,high(-" + leftCells.getId(0) + ")"));
-							}
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<=rightCells.getSize()) {
-									cont.append(new CGIAsm("st", "x+," + getConstReg(cont, (byte)19, rightCells.getId(index-1))));
-								}
-								else {
-									cont.append(new CGIAsm("st", "x+,c0x00"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightCells.getSize()) {
-									cont.append(new CGIAsm("st", "x+," + getConstReg(cont, (byte)19, rightCells.getId(index+1))));
-								}
-								else {
-									cont.append(new CGIAsm("st", "x+,c0x00"));
-								}
-							}
-							else {
-								if(index<rightCells.getSize()) {
-									cont.append(new CGIAsm("st", "x+," + getConstReg(cont, (byte)19, rightCells.getId(index))));
-								}
-								else {
-									cont.append(new CGIAsm("st", "x+,c0x00"));
-								}
-							}
-							break;
-						case REG:
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<=rightCells.getSize()) {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), Integer.toString(rightCells.getId(index-1))));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightCells.getSize()) {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), Integer.toString(rightCells.getId(index+1))));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							else {
-								if(index<rightCells.getSize()) {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), Integer.toString(rightCells.getId(index))));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							break;
-						case STAT:
-							if(1<size) threadSafe = false;
-							
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<=rightCells.getSize()) {
-									String reg = getConstReg(cont, (byte)19, rightCells.getId(index-1));
-									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + "," + reg));
-								}
-								else {
-									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",C0x00"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightCells.getSize()) {
-									String reg = getConstReg(cont, (byte)19, rightCells.getId(index+1));
-									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + "," + reg));
-								}
-								else {
-									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",C0x00"));
-								}
-							}
-							else {
-								if(index<rightCells.getSize()) {
-									String reg = getConstReg(cont, (byte)19, rightCells.getId(index));
-									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + "," + reg));
-								}
-								else {
-									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",C0x00"));
-								}
-							}
-							break;
-						case ARGS:
-						case STACK_FRAME:
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<=rightCells.getSize()) {
-									cont.append(new CGIAsmIReg(	'y', false, getConstReg(cont, (byte)19, rightCells.getId(index-1)), leftCells.getId(index),
-																getCurBlockScope(scope), (CGBlockScope)leftCells.getObject(),
-																CGCells.Type.ARGS == leftCells.getType()));
-								}
-								else {
-									cont.append(new CGIAsmIReg(	'y', false, "c0x00", leftCells.getId(index),
-																getCurBlockScope(scope), (CGBlockScope)leftCells.getObject(),
-																CGCells.Type.ARGS == leftCells.getType()));
-								}
-
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightCells.getSize()) {
-									cont.append(new CGIAsmIReg(	'y', false, getConstReg(cont, (byte)19, rightCells.getId(index+1)), leftCells.getId(index),
-																getCurBlockScope(scope), (CGBlockScope)leftCells.getObject(),
-																CGCells.Type.ARGS == leftCells.getType()));
-								}
-								else {
-									cont.append(new CGIAsmIReg(	'y', false, "c0x00", leftCells.getId(index),
-																getCurBlockScope(scope), (CGBlockScope)leftCells.getObject(),
-																CGCells.Type.ARGS == leftCells.getType()));
-								}
-							}
-							else {
-								if(index<rightCells.getSize()) {
-									cont.append(new CGIAsmIReg(	'y', false, getConstReg(cont, (byte)19, rightCells.getId(index)), leftCells.getId(index),
-																getCurBlockScope(scope), (CGBlockScope)leftCells.getObject(),
-																CGCells.Type.ARGS == leftCells.getType()));
-								}
-								else {
-									cont.append(new CGIAsmIReg(	'y', false, "c0x00", leftCells.getId(index),
-																getCurBlockScope(scope), (CGBlockScope)leftCells.getObject(),
-																CGCells.Type.ARGS == leftCells.getType()));
-								}
-							}
-							break;
-						default:
-							throw new CompileException("cellTocells " + info + " unsupported yet");
-					}
-					break;
-				case FLAG:
-					switch(leftCells.getType()) {
-						case REG:
-							cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-							if((!leftIsFixed && 0==index) || (leftIsFixed && 1==index)) {
-								cont.append(new CGIAsm("adc", "r"+leftCells.getId(index) + ",c0x00"));
-							}
-							break;
-						case ARGS:
-						case STACK_FRAME:
-							cont.append(new CGIAsmMv("mov", "j8b_atom", "c0x00"));
-							if((!leftIsFixed && 0==index) || (leftIsFixed && 1==index)) {
-								cont.append(new CGIAsm("adc", "j8b_atom" + ",c0x00"));
-							}
-							cont.append(new CGIAsmIReg(	'y', false, "j8b_atom", leftCells.getId(index),
-														getCurBlockScope(scope), (CGBlockScope)leftCells.getObject(),
-														CGCells.Type.ARGS == leftCells.getType()));
-							threadSafe=false;
-							break;
-						default:
-							throw new CompileException("cellTocells " + info + " unsupported yet");
-					}
-					break;
-				case LABEL:
-					if(leftIsFixed || 0x02!=leftSize) throw new CompileException("COMPILER ERROR: Can't set label addr to not short var");
-					
-					switch(leftCells.getType()) {
-						case REG:
-							if(0==index) cont.append(new CGIAsmLdLabel("ldi", "r" + leftCells.getId(0), "low(" + (String)rightCells.getObject() + "*2)"));
-							if(1==index) cont.append(new CGIAsmLdLabel("ldi", "r" + leftCells.getId(1), "high(" + (String)rightCells.getObject() + "*2)"));
-							break;
-						default:
-							throw new CompileException("cellTocells " + info + " unsupported yet");
-					}
-					break;
-				case REG:
-					switch(leftCells.getType()) {
-						case ACC:
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIAsmMv("mov", "r"+accRegs[index], "r"+rightCells.getId(index-1)));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+accRegs[index], "0"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightSize) {
-									cont.append(new CGIAsmMv("mov", "r"+accRegs[index], "r"+rightCells.getId(index+1)));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+accRegs[index], "0"));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIAsmMv("mov", "r"+accRegs[index], "r"+rightCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+accRegs[index], "0"));
-								}
-							}
-							break;
-						case ARGS:
-						case STACK_FRAME:
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIAsmIReg(	'y', false, "r"+rightCells.getId(index-1), leftCells.getId(index), getCurBlockScope(scope),
-																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
-								}
-								else {
-									cont.append(new CGIAsmIReg(	'y', false, "c0x00", leftCells.getId(index),
-																getCurBlockScope(scope), (CGBlockScope)leftCells.getObject(),
-																CGCells.Type.ARGS == leftCells.getType()));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightSize) {
-									cont.append(new CGIAsmIReg(	'y', false, "r"+rightCells.getId(index+1), leftCells.getId(index), getCurBlockScope(scope),
-																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
-								}
-								else {
-									cont.append(new CGIAsmIReg(	'y', false, "c0x00", leftCells.getId(index),
-																getCurBlockScope(scope), (CGBlockScope)leftCells.getObject(),
-																CGCells.Type.ARGS == leftCells.getType()));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIAsmIReg(	'y', false, "r"+rightCells.getId(index), leftCells.getId(index), getCurBlockScope(scope),
-																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
-								}
-								else {
-									cont.append(new CGIAsmIReg(	'y', false, "c0x00", leftCells.getId(index),
-																getCurBlockScope(scope), (CGBlockScope)leftCells.getObject(),
-																CGCells.Type.ARGS == leftCells.getType()));
-								}
-							}
-							break;
-						case ARRAY:
-							if(1<size) threadSafe = false;
-							
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIRAsm("st", "x+", "r" + rightCells.getId(index-1)));
-								}
-								else {
-									cont.append(new CGIRAsm("st", "x+,c0x00"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightSize) {
-									cont.append(new CGIRAsm("st", "x+", "r" + rightCells.getId(index+1)));
-								}
-								else {
-									cont.append(new CGIRAsm("st", "x+,c0x00"));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIRAsm("st", "x+", "r" + rightCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIRAsm("st", "x+,c0x00"));
-								}
-							}
-							break;
-						case HEAP:
-							if(1<size) threadSafe = false;
-							
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<=rightCells.getSize()) {
-									cont.append(new CGIAsmIReg('z', false, "r"+rightCells.getId(index-1), leftCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIAsmIReg('z', false, "c0x00", leftCells.getId(index)));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightCells.getSize()) {
-									cont.append(new CGIAsmIReg('z', false, "r"+rightCells.getId(index+1), leftCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIAsmIReg('z', false, "c0x00", leftCells.getId(index)));
-								}
-							}
-							else {
-								if(index<rightCells.getSize()) {
-									cont.append(new CGIAsmIReg('z', false, "r"+rightCells.getId(index), leftCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIAsmIReg('z', false, "c0x00", leftCells.getId(index)));
-								}
-							}
-							break;
-						case REG:
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIAsmMv("mov", "r"+leftCells.getId(index), "r"+rightCells.getId(index-1)));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightSize) {
-									cont.append(new CGIAsmMv("mov", "r"+leftCells.getId(index), "r"+rightCells.getId(index+1)));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIAsmMv("mov", "r"+leftCells.getId(index), "r"+rightCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							break;
-						default:
-							throw new CompileException("cellTocells " + info + " unsupported yet");
-					}
-					break;
-				case STACK:
-					switch(leftCells.getType()) {
-						case ARGS:
-						case STACK_FRAME:
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));
-									cont.append(new CGIAsmIReg(	'y', false, "j8b_atom", leftCells.getId(index), getCurBlockScope(scope),
-																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
-									threadSafe=false;
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+rightCells.getId(index), "0"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if(0==index) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));
-									threadSafe=false;
-								}
-								else if((index+1)<rightSize) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));
-									cont.append(new CGIAsmIReg(	'y', false, "j8b_atom", leftCells.getId(index), getCurBlockScope(scope),
-																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
-									threadSafe=false;
-								}
-								else {
-									cont.append(new CGIAsmIReg(	'y', false, "c0x00", leftCells.getId(index), getCurBlockScope(scope),
-																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));
-									cont.append(new CGIAsmIReg(	'y', false, "j8b_atom", leftCells.getId(index), getCurBlockScope(scope),
-																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
-									threadSafe=false;
-								}
-								else {
-									cont.append(new CGIAsmIReg(	'y', false, "c0x00", leftCells.getId(index), getCurBlockScope(scope),
-																(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS == leftCells.getType()));
-								}
-							}
-							break;
-						case ARRAY:
-							if(1<size) threadSafe = false;
-						
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));
-									cont.append(new CGIRAsm("st", "x+", "j8b_atom"));
-									threadSafe=false;
-								}
-								else {
-									cont.append(new CGIRAsm("st", "x+,c0x00"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if(0==index) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));									
-								}
-								else if((index+1)<rightSize) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));
-									cont.append(new CGIRAsm("st", "x+", "j8b_atom"));
-									threadSafe=false;
-								}
-								else {
-									cont.append(new CGIRAsm("st", "x+,c0x00"));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));
-									cont.append(new CGIRAsm("st", "x+", "j8b_atom"));
-									threadSafe=false;
-								}
-								else {
-									cont.append(new CGIRAsm("st", "x+,c0x00"));
-								}
-							}
-							break;
-						case HEAP:
-							if(1<size) threadSafe = false;
-							
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));
-									cont.append(new CGIAsmIReg('z', false, "j8b_atom", leftCells.getId(index)));
-									threadSafe=false;
-								}
-								else {
-									cont.append(new CGIAsmMv("mov", "j8b_atom", "C0x00"));
-									cont.append(new CGIAsmIReg('z', false, "j8b_atom", leftCells.getId(index)));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if(0==index) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));
-									threadSafe=false;
-								}
-								else if((index+1)<rightSize) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));
-									cont.append(new CGIAsmIReg('z', false, "j8b_atom", leftCells.getId(index)));
-									threadSafe=false;
-								}
-								else {
-									cont.append(new CGIAsmMv("mov", "j8b_atom", "C0x00"));
-									cont.append(new CGIAsmIReg('z', false, "j8b_atom", leftCells.getId(index)));
-									threadSafe=false;
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));
-									cont.append(new CGIAsmIReg('z', false, "j8b_atom", leftCells.getId(index)));
-									threadSafe=false;
-								}
-								else {
-									cont.append(new CGIAsmMv("mov", "j8b_atom", "C0x00"));
-									cont.append(new CGIAsmIReg('z', false, "j8b_atom", leftCells.getId(index)));
-									threadSafe=false;
-								}
-							}
-							break;
-						case REG:
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));
-									cont.append(new CGIAsmMv("mov", "r"+leftCells.getId(index), "j8b_atom"));
-									threadSafe=false;
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0x00"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if(0==index) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));									
-								}
-								else if((index+1)<rightSize) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));
-									cont.append(new CGIAsmMv("mov", "r"+leftCells.getId(index), "j8b_atom"));
-									threadSafe=false;
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0x00"));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));
-									cont.append(new CGIAsmMv("mov", "r"+leftCells.getId(index), "j8b_atom"));
-									threadSafe=false;
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0x00"));
-								}
-							}
-							break;
-						case STAT:
-							if(1<size) threadSafe = false;
-							
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<=rightCells.getSize()) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));
-									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",j8b_atom"));
-								}
-								else {
-									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",c0x00"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if(0==index) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));
-								}
-								else if((index+1)<rightCells.getSize()) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));
-									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",j8b_atom"));
-								}
-								else {
-									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",c0x00"));
-								}
-							}
-							else {
-								if(index<rightCells.getSize()) {
-									cont.append(new CGIRAsm("pop", "j8b_atom"));
-									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",j8b_atom"));
-								}
-								else {
-									cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + leftCells.getId(index) + ",c0x00"));
-								}
-							}
-							break;
-						default:
-							throw new CompileException("cellTocells " + info + " unsupported yet");
-					}
-					break;
-				case STAT:
-					if(1<size) threadSafe = false;
-					
-					switch(leftCells.getType()) {
-						case REG:
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIAsmLd("lds", "r"+leftCells.getId(index), "_OS_STAT_POOL+" + rightCells.getId(index-1)));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightSize) {
-									cont.append(new CGIAsmLd("lds", "r"+leftCells.getId(index), "_OS_STAT_POOL+" + rightCells.getId(index+1)));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIAsmLd("lds", "r"+leftCells.getId(index), "_OS_STAT_POOL+" + rightCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							break;
-						default:
-							throw new CompileException("cellTocells " + info + " unsupported yet");
-					}
-					break;
-				case HEAP_ALT:
-					if(1<size) threadSafe = false;
-					
-					switch(leftCells.getType()) {
-						case REG:
-							if(0==index) {
-								if(leftIsFixed && !rightIsFixed) {
-									cont.append(new CGIAsm("subi", "r26,low(-" + (rightCells.getId(0)+1) + ")"));
-									cont.append(new CGIAsm("sbci", "r27,high(-" + (rightCells.getId(0)+1) + ")"));
-								}
-								else if(0!=rightCells.getId(0)) {
-									cont.append(new CGIAsm("subi", "r26,low(-" + rightCells.getId(0) + ")"));
-									cont.append(new CGIAsm("sbci", "r27,high(-" + rightCells.getId(0) + ")"));
-								}
-							}
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIRAsm("ld", "r" + leftCells.getId(index), "x+"));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightSize) {
-									cont.append(new CGIRAsm("ld", "r" + leftCells.getId(index), "x+"));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIRAsm("ld", "r"+leftCells.getId(index), "x+"));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							break;
-						default:
-							throw new CompileException("cellTocells " + info + " unsupported yet");
-					}
-					break;
-				case HEAP:
-					if(1<size) threadSafe = false;
-					
-					switch(leftCells.getType()) {
-						case ACC:
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIAsmIReg('z', true, "r"+accRegs[index], rightCells.getId(index-1)));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+accRegs[index], "0"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightSize) {
-									cont.append(new CGIAsmIReg('z', true, "r"+accRegs[index], rightCells.getId(index+1)));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+accRegs[index], "0"));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIAsmIReg('z', true, "r"+accRegs[index], rightCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+accRegs[index], "0"));
-								}
-							}
-							break;
-						case HEAP:
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIAsmIReg('z', true, "j8b_atom", rightCells.getId(index-1)));
-								}
-								else {
-									cont.append(new CGIAsmMv("mov", "j8b_atom", "C0x00"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightSize) {
-									cont.append(new CGIAsmIReg('z', true, "j8b_atom", rightCells.getId(index+1)));
-								}
-								else {
-									cont.append(new CGIAsmMv("mov", "j8b_atom", "C0x00"));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIAsmIReg('z', true, "j8b_atom", rightCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIAsmMv("mov", "j8b_atom", "C0x00"));
-								}
-							}
-							cont.append(new CGIAsmIReg('z', false, "j8b_atom", leftCells.getId(index)));
-							threadSafe=false;
-						break;
-						case REG:
-							if(leftIsFixed && !rightIsFixed) {
-								if(0!=index && index<rightSize) {
-									cont.append(new CGIAsmIReg('z', true, "r"+leftCells.getId(index), rightCells.getId(index-1)));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							else if(!leftIsFixed && rightIsFixed) {
-								if((index+1)<rightSize) {
-									cont.append(new CGIAsmIReg('z', true, "r"+leftCells.getId(index), rightCells.getId(index+1)));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							else {
-								if(index<rightSize) {
-									cont.append(new CGIAsmIReg('z', true, "r"+leftCells.getId(index), rightCells.getId(index)));
-								}
-								else {
-									cont.append(new CGIAsmLd("ldi", "r"+leftCells.getId(index), "0"));
-								}
-							}
-							break;
-							
-						default:
-							throw new CompileException("cellTocells " + info + " unsupported yet");
-					}
-					break;
-				default:
-					throw new CompileException("cellTocells " + info + " unsupported yet");
-			}
-		}
-		
-		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING) && !threadSafe) {
-			dispLockCont.append(new CGIAsmCall(CALL_INSTR, RTOSLibs.DISPATCHER_PROCS.OS_DISPATCHER_LOCK.name().toLowerCase(), true));
-			cont.append(new CGIAsmCall(CALL_INSTR, RTOSLibs.DISPATCHER_PROCS.OS_DISPATCHER_UNLOCK.name().toLowerCase(), true));
-		}
-		scope.append(cont);
-	}
-	
-	@Override
-	public void cellsToAcc(CGScope scope, CGCellsScope cScope) throws CompileException {
-		if(CGCells.Type.LABEL==cScope.getCells().getType()) cScope.getCells().setSize(0x02);
-		
-		if(cScope instanceof CGVarScope) {
-			CGVarScope vScope = (CGVarScope)cScope;
-//			if(!vScope.isConstant()) {
-				// При жесткой блокировке аккумулятора устанавливаем размер указанный при блокировке, даже если размер переменной больше
-				if(!accumStack.isEmpty() && accumStack.peek().getV()) {
-					if(accumStack.peek().getK().isFixedPoint()) {
-						acc.setFixed();
-					}
-					else {
-						acc.setSize(accumStack.peek().getK());
-					}
-				}
-				else {
-					if(vScope.getType().isFixedPoint()) {
-						acc.setFixed();
-					}
-					else {
-						acc.setBytes(vScope.getCells().getSize());
-					}
-				}
-				if(VERBOSE_LO <= verbose) scope.append(new CGIText(	";var '" + vScope.getName() + "->" + acc + ", cells size:" + vScope.getCells().getSize()));
-//				//TODO расширение аккумулятора. Не уверен что на своем месте
-//				if(accum.getSize()<vScope.getCells().getSize()) accum.setSize(vScope.getCells().getSize());
-				//cellsToRegs(scope, vScope.getCells(), getAccRegs(accum.getSize()));
-				// Более того, сама запись значения задает размер аккумулятора
-				cellsToRegs(scope, vScope.getCells(), getAccRegs(acc.getBytes()), vScope.getType().isFixedPoint(), acc.getFixed());
-//			}
-		}
-		else if(cScope instanceof CGFieldScope) {
-			CGFieldScope fScope = (CGFieldScope)cScope;
-			// При жесткой блокировке аккумулятора устанавливаем размер указанный при блокировке, даже если размер поля больше
-			if(!accumStack.isEmpty() && accumStack.peek().getV()) {
-				if(accumStack.peek().getK().isFixedPoint()) {
-					acc.setFixed();
-				}
-				else {
-					acc.setSize(accumStack.peek().getK());
-				}
-			}
-			else {
-				if(fScope.getType().isFixedPoint()) {
-					acc.setFixed();
-				}
-				else {
-					acc.setBytes(fScope.getCells().getSize());
-				}
-			}
-			if(VERBOSE_LO <= verbose) scope.append(new CGIText(";field '" + fScope.getName() + "'->" + acc + " , cells size:" + fScope.getCells().getSize()));
-//			//TODO расширение аккумулятора. Не уверен что на своем месте
-//			if(accum.getSize()<fScope.getCells().getSize()) accum.setSize(fScope.getCells().getSize());
-			// Более того, сама запись значения задает размер аккумулятора
-			cellsToRegs(scope, fScope.getCells(), getAccRegs(acc.getBytes()), fScope.getType().isFixedPoint(), acc.getFixed());
-		}
-		else throw new CompileException("Unsupported scope:" + cScope);
-	}
-	
-	@Override
-	public void cellsToAcc(CGScope scope, CGCells cells, boolean isFixed) throws CompileException {
-		if(CGCells.Type.LABEL==cells.getType()) cells.setSize(0x02);
-		if(isFixed) acc.setFixed();
-		else acc.setBytes(cells.getSize());
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";cells '" + cells + "'->" + acc));
-		cellsToRegs(scope, cells, getAccRegs(cells.getSize()), acc.getFixed(), acc.getFixed());
+	public void cellsToCells(CGScope scope, CGCells leftCells, VarType leftType, CGCells rightCells, VarType rightType, VarType castType) throws CompileException {
+		Assignment.exec(scope, leftCells, leftType, rightCells, rightType, castType, refSize, acc, rtosFeatures, verbose);
 	}
 	
 	@Override
@@ -2040,70 +724,6 @@ public class Generator extends CodeGenerator {
 		return result;
 	}
 
-/*	@Override
-	public CGIContainer accCast(VarType accType, VarType opType) throws CompileException {
-		CGIContainer cont = new CGIContainer();
-		int accSize = null == accType ? acc.getSize() : (-1==accType.getSize() ? getRefSize() : accType.getSize());
-		int opSize = (-1==opType.getSize() ? getRefSize() : opType.getSize());
-		if(VERBOSE_LO <= verbose) {
-			if(accSize != opSize || VarType.FIXED == accType && VarType.FIXED != opType || VarType.FIXED != accType && VarType.FIXED == opType) {
-				cont.append(new CGIText(";acc cast " + accType + "[" + accSize + "]->" + opType + "[" + opSize + "]"));
-			}
-		}
-		
-		if(null != accType) {
-			if(VarType.FIXED == accType && VarType.FIXED != opType) {
-				cont.append(new CGIAsmMv("mov", "r16", "r17"));
-				cont.append(new CGIAsmLd("ldi", "r17", "0x00"));
-				cont.append(new CGIAsm("sbrc", "r16,0x07"));
-				cont.append(new CGIAsm("inc", "r16"));
-				accSize = 0x02;
-			}
-			else if(VarType.FIXED != accType && VarType.FIXED == opType) {
-				cont.append(new CGIAsmMv("mov", "r17" , "r16"));
-				cont.append(new CGIAsmLd("ldi", "r16", "0x00"));
-				accSize = 0x02;
-			}
-		}
-		cont.append(accgrow(accSize, opSize, VarType.FIXED==opType));
-		return cont;
-	}*/
-	
-	private CGIContainer accResize() throws CompileException {
-		CGIContainer cont = new CGIContainer();
-		if(acc.isChanged()) {
-			if(VERBOSE_LO <= verbose) {
-				cont.append(new CGIText(";acc cast " + acc.oldToString() + "->" + acc.toString()));
-			}
-		
-			if(acc.getOldFixed() && !acc.getFixed()) {
-				cont.append(new CGIAsmMv("mov", "r16", "r17"));
-				cont.append(new CGIAsmLd("ldi", "r17", "0x00"));
-				cont.append(new CGIAsm("sbrc", "r16,0x07"));
-				cont.append(new CGIAsm("inc", "r16"));
-			}
-			else if(!acc.getOldFixed() && acc.getFixed()) {
-				cont.append(new CGIAsmMv("mov", "r17" , "r16"));
-				cont.append(new CGIAsmLd("ldi", "r16", "0x00"));
-			}
-		}
-
-		if(!acc.getFixed()) {
-			accGrow(cont, acc.getOldBytes(), acc.getBytes());
-		}
-		return cont;
-	}
-	
-	private void accGrow(CGIContainer cont, int oldSize, int newSize) throws CompileException {
-		if(oldSize<newSize) {
-			byte[] accRegs = getAccRegs(4);
-			for(int i=oldSize; i<newSize; i++) {
-				cont.append(new CGIAsmLd("ldi", "r" + accRegs[i], "0"));
-			}
-			acc.setBytes(newSize);
-		}
-	}
-
 	public void cellsToRegs(CGScope scope, CGCells cells, byte[] registers, boolean leftIsFixed, boolean rightIsFixed) throws CompileException {
 		//Нет необходимости блокировать диспетчер
 		
@@ -2143,7 +763,7 @@ public class Generator extends CodeGenerator {
 				scope.append(new CGIAsmLdLabel("ldi", "r" + registers[0x01], "high(" + (String)cells.getObject() + "*2)"));
 				break;
 			case ACC:
-				byte [] accRegs = getAccRegs(registers.length);
+				byte [] accRegs = Utils.getAccRegs(registers.length);
 				for(int i=0; i<size; i++) {
 					if(accRegs[leftIndex+i]!=registers[rightIndex+i]) {
 						scope.append(new CGIAsmMv("mov", "r" + registers[rightIndex+i], "r" + accRegs[leftIndex+i]));
@@ -2218,71 +838,6 @@ public class Generator extends CodeGenerator {
 		}
 	}
 
-	@Override
-	public CGIContainer constToCells(CGScope scope, long value, CGCells cells, boolean isFixed) throws CompileException {
-		CGIContainer cont = new CGIContainer();
-		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";const '" + (isFixed ? value/256.0 : value) + "'->cells " + cells));
-		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("set"));
-
-		byte tmpReg=19;
-		if(0x04==acc.getBytes() && CGCells.Type.REG!=cells.getType()) {
-			tmpReg = (CGCells.Type.HEAP == cells.getType() ? (byte)28 : (byte)30);
-			if(19!=tmpReg) cont.append(new CGIAsmMv("mov", "j8b_atom", "r"+tmpReg));
-		}
-
-		switch(cells.getType()) {
-			case REG: //TODO при cells.getSize()==1 атомарность не нужна
-				for(int i=0; i<cells.getSize(); i++) cont.append(new CGIAsmLd("ldi", "r" + cells.getId(i), Long.toString(value>>(i*8)&0xff)));
-				break;
-			case ARGS:
-			case STACK_FRAME:
-				for(int i=0; i<cells.getSize(); i++) {
-					String cReg = getConstReg(cont, tmpReg, i, value);
-					cont.append(new CGIAsmIReg('y', false, cReg, cells.getId(i), getCurBlockScope(scope), (CGBlockScope)cells.getObject(),
-												CGCells.Type.ARGS == cells.getType()));
-				}
-				break;
-			case HEAP:
-				for(int i=0; i<cells.getSize(); i++) {
-					String cReg = getConstReg(cont, tmpReg, i, value);
-					cont.append(new CGIAsmIReg('z', false, cReg, cells.getId(i)));
-				}
-				break;
-			case HEAP_ALT:
-				if(0!=cells.getId(0)) {
-					cont.append(new CGIAsm("subi", "r26,low(-" + cells.getId(0) + ")"));
-					cont.append(new CGIAsm("sbci", "r27,high(-" + cells.getId(0) + ")"));
-				}
-				for(int i=0; i<cells.getSize(); i++) {
-					String cReg = getConstReg(cont, tmpReg, i, value);
-					cont.append(new CGIAsm("st", "x+,"+cReg)); //TODO вероятно нужно поменять порядок в цикле (аналогично ARRAY)
-				}
-				break;
-			case ARRAY:
-				CGArrCells arrCells = (CGArrCells)cells;
-				int size = arrCells.getSize();
-				//TODO почему был обратный порядок? 
-				for(int i=0; i<size; i++) {
-					String cReg = getConstReg(cont, tmpReg, i, value);
-					cont.append(new CGIAsm("st", "x+,"+cReg));
-				}
-				break;
-			case STAT:
-				for(int i=0; i<cells.getSize(); i++) {
-					String cReg = getConstReg(cont, tmpReg, i, value);
-					cont.append(new CGIAsm("sts", "_OS_STAT_POOL+" + cells.getId(i) + ","+cReg));
-				}
-				break;
-			default:
-				throw new CompileException("Unsupported cell type:" + cells.getType());
-		}
-
-		if(19!=tmpReg) cont.append(new CGIAsmMv("mov", "r"+tmpReg, "j8b_atom"));
-		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) cont.append(new CGIAsm("clt"));
-		return cont;
-	}
-
-	
 	private void regsMv(CGScope scope, byte[] srcRegs, byte[] dstRegs) throws CompileException {
 		LinkedList<Byte> popRegs = new LinkedList<>();
 		for(int i=0; i<Math.min(srcRegs.length, dstRegs.length); i++) {
@@ -2319,77 +874,6 @@ public class Generator extends CodeGenerator {
 		return result;
 	}
 	
-	/**
-	 * regsToVar записывает регистры в ячейки локальной переменной 
-	 * @param scope - область видимости для генерации кода
-	 * @param regs - полный набор регистров переменной/поля/аккумулятора
-	 * @param usedRegsQnt - количество действительно используемых регистров, в не используемые будет записан 0x00
-	 * @param cells - ячейки указывающие источник данных
-	 * @throws CompileException
-	 */
-	
-	/**
-	 * regsToVar записывает регистры в ячейки локальной переменной 
-	 * @param scope - область видимости для генерации кода
-	 * @param regs - полный набор регистров переменной/поля/аккумулятора
-	 * @param usedRegsQnt - количество действительно используемых регистров, в не используемые будет записан 0x00
-	 * @param cells - ячейки указывающие источник данных
-	 * @throws CompileException
-	 */
-	public void regsToVar(CGScope scope, byte[] regs, int usedRegsQnt, CGCells cells) throws CompileException {
-		CGIContainer dispLockCont = new CGIContainer();
-		scope.append(dispLockCont);
-
-		boolean threadSafe = true;
-
-		switch(cells.getType()) {
-			case REG:
-				regsMv(scope, regs, cellsToRegs(cells));
-/*				LinkedList<Byte> popRegs = new LinkedList<>();
-				for(int i=0; i<cells.getSize(); i++) {
-					byte srcReg = regs[i];
-					byte dstReg = (byte)cells.getId(i);
-					if(srcReg == dstReg) continue; // регистры совпались, ничего не делаем
-					if(!popRegs.contains(dstReg)) {
-						int pos = getRegPos(regs, i, dstReg);
-						if(pos>i) {
-							scope.append(new CGIAsm("push", "r" + dstReg));
-							popRegs.addFirst(srcReg);
-							//continue; //TODO проверить
-						}
-						scope.append(new CGIAsmMv("mov", "r" + dstReg, "r" + srcReg));
-					}
-				}
-				for(Byte reg : popRegs) scope.append(new CGIAsm("pop", "r" + reg));*/
-				break;
-			case ARGS:
-			case STACK_FRAME:
-				if(1<cells.getSize() || 1<usedRegsQnt) threadSafe = false;
-				for(int i=0; i<cells.getSize(); i++) {
-					scope.append(new CGIAsmIReg('y', false, "r" + regs[i], cells.getId(i), getCurBlockScope(scope),
-												(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
-				}
-				break;
-			case STAT:
-				if(1<cells.getSize() || 1<usedRegsQnt) threadSafe = false;
-				for(int i=0; i<cells.getSize(); i++) {
-					scope.append(new CGIAsm("sts", "_OS_STAT_POOL+" + cells.getId(i) + ",r" + regs[i]));
-				}
-				break;
-			default:
-				throw new CompileException("Unsupported cell type:" + cells.getType());
-		}
-		
-		for(int i=cells.getSize(); i<usedRegsQnt; i++) {
-			scope.append(new CGIAsmLd("ldi", "r" + cells.getId(i), "0x00"));
-		}
-		
-		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING) && !threadSafe) {
-			dispLockCont.append(new CGIAsmCall(CALL_INSTR, RTOSLibs.DISPATCHER_PROCS.OS_DISPATCHER_LOCK.name().toLowerCase(), true));
-			scope.append(new CGIAsmCall(CALL_INSTR, RTOSLibs.DISPATCHER_PROCS.OS_DISPATCHER_UNLOCK.name().toLowerCase(), true));
-		}
-	}
-
 	public int getRegPos(byte[] regs, int offset, byte reg) {
 		for(int i=offset; i<regs.length; i++) {
 			if(regs[i]==reg) return i;
@@ -2402,28 +886,6 @@ public class Generator extends CodeGenerator {
 			if(cells.getId(pos)==reg) return pos;
 		}
 		return -1;
-	}
-
-	public void accToField(CGScope scope, int size, CGCells cells) throws CompileException {
-		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING) && 1!=size) scope.append(new CGIAsm("set"));
-		
-		if(CGCells.Type.STAT==cells.getType()) {
-			scope.append(new CGIAsm("sts", "_OS_STAT_POOL+" + cells.getId(0) + ",r16"));
-			if(size>1) scope.append(new CGIAsm("sts", "_OS_STAT_POOL+" + cells.getId(1) + ",r17"));
-			if(size>2) scope.append(new CGIAsm("sts", "_OS_STAT_POOL+" + cells.getId(2) + ",r18"));
-			if(size>3) scope.append(new CGIAsm("sts", "_OS_STAT_POOL+" + cells.getId(3) + ",r19"));
-		}
-		else if(CGCells.Type.HEAP==cells.getType()) {
-			scope.append(new CGIAsmIReg('z', false, "r16", cells.getId(0)));
-			if(size>1) scope.append(new CGIAsmIReg('z', false, "r17", cells.getId(1)));
-			if(size>2) scope.append(new CGIAsmIReg('z', false, "r18", cells.getId(2)));
-			if(size>3) scope.append(new CGIAsmIReg('z', false, "r19", cells.getId(3)));
-		}
-		else {
-			throw new CompileException("Unsupported cell type:" + cells.getType());
-		}
-		
-		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING) && 1!=size) scope.append(new CGIAsm("clt"));
 	}
 
 	@Override
@@ -2443,12 +905,12 @@ public class Generator extends CodeGenerator {
 			result.append(new CGIAsm("push", "c0x00"));
 		}
 		
-		byte[] regs = getAccRegs(acc.getBytes());
+		byte[] regs = Utils.getAccRegs(acc.getBytes());
 		for(int i=regs.length-1; i>=0; i--) {
 			result.append(new CGIAsm("push", "r" + regs[i]));
 		}*/
 		
-		byte[] regs = getAccRegs(size);
+		byte[] regs = Utils.getAccRegs(size);
 		for(int i=(regs.length-1); i>=0; i--) {
 			if(!strong && i>(acc.getBytes()-0x01)) {
 				result.append(new CGIAsm("push", "C0x00"));
@@ -2466,7 +928,7 @@ public class Generator extends CodeGenerator {
 	public CGIContainer pushAccLE(CGScope scope, int size) throws CompileException {
 		CGIContainer result = new CGIContainer();
 		if(VERBOSE_LO <= verbose) result.append(new CGIText(";push accum(LE), size:" + size));
-		byte[] regs = getAccRegs(size);
+		byte[] regs = Utils.getAccRegs(size);
 		for(int i=0; i<regs.length; i++) {
 			if(i>(acc.getBytes()-0x01)) {
 				result.append(new CGIAsm("push", "C0x00"));
@@ -2482,20 +944,20 @@ public class Generator extends CodeGenerator {
 	@Override
 	public void popAccBE(CGScope scope, int size) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";pop accum(BE)"));
-		byte[] regs = getAccRegs(size);
+		byte[] regs = Utils.getAccRegs(size);
 		for(int i=0; i<regs.length; i++) scope.append(new CGIAsm("pop", "r" + regs[i]));
 	}
 
 	//TODO актуализировать
 	@Override
-	public void eUnary(CGScope scope, Operator op, CGCells cells, boolean toAccum, boolean isFixed, CGExcs excs) throws CompileException {
+	public void eUnary(CGScope scope, Operator op, CGCells cells, boolean toAccum, boolean isFixed, VarType castType, CGExcs excs) throws CompileException {
 		//3 блока: 1 считывает значение, 2 выполняет опреацию, 3 записывает значение
 		//для регистров все просто, для аккумулятора не доступны POST* и PRE*
 		//POST и PRE влияют на аккумулятор, возвращая перед операцией значение или после операции.
 
-		int accMaxBits = (null==codeExcsChecker.getHandled(excs, J8BException.MathOverflowException.name()) ? 
-							(-1==accumStack.peek().getK().getSize() ? refSize : accumStack.peek().getK().getSize())*0x08 : 0x20);
-		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";eUnary " + op + " cells " + cells + (toAccum ? "->" + acc + "/" + accMaxBits : "")));
+		int castBitsSize = (null==castType ? 4 : castType.isReferenceType() ? refSize : castType.getSize())*8;
+
+		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";eUnary " + op + " cells " + cells + (toAccum ? "->" + acc + "/" + castBitsSize : "")));
 
 		if(	CGCells.Type.REG!=cells.getType() && CGCells.Type.ARGS!=cells.getType() && CGCells.Type.STACK_FRAME!=cells.getType() &&
 			CGCells.Type.HEAP!=cells.getType() && CGCells.Type.ARRAY!=cells.getType() && CGCells.Type.STAT!=cells.getType() &&
@@ -2510,27 +972,37 @@ public class Generator extends CodeGenerator {
 			scope.append(new CGIAsm("push", "r" + tmpReg));
 		}
 		
-		byte[] accRegs = getAccRegs(cells.getSize());
+		int size = cells.getSize();
+		if(size>(castBitsSize/8)) {
+			size = castBitsSize/8;
+		}
+		if(toAccum && acc.getBytes()<size) {
+			acc.setBytes(size); // Устанавливаем размер (не требует расширения так как точно будут записано значение данного размера)
+		}
+		
+		byte[] accRegs = Utils.getAccRegs(size);
 		if(Operator.PRE_INC == op || Operator.PRE_DEC == op || Operator.POST_INC == op || Operator.POST_DEC == op) {
-			if(Operator.PRE_INC == op || Operator.POST_INC == op) {
+/*	инкремент не должен расширять тип переменной
+			if(toAccum && (Operator.PRE_INC == op || Operator.POST_INC == op)) {
 				if(!acc.getFixed()) {
 					int requiredBits = acc.getBits()+1;
-					acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-					scope.append(accResize());
+					acc.setBits(requiredBits>castBitsSize ? castBitsSize : requiredBits); // Еще раз записываем, и если размер изменился
+					scope.append(Utils.accResize(acc, verbose)); // То бует выполнено расширение
 				}
-			}
+			}*/
+
 			switch(cells.getType()) {
 				case ACC:
 					break;
 				case ARRAY:
-					for(int i=0; i<cells.getSize(); i++) {
+					for(int i=0; i<size; i++) {
 						scope.append(new CGIAsmLd("ld", "r" + tmpReg, "x"));
 						if(toAccum && (Operator.POST_INC == op || Operator.POST_DEC == op)) {
 							scope.append(new CGIAsmMv("mov", "r" + accRegs[i], "r" + tmpReg));
 						}
 						if(0==i) scope.append(new CGIAsm((Operator.PRE_INC==op || Operator.POST_INC==op ? "add" : "sub"), "r" + tmpReg + ",C0x01"));
 						else scope.append(new CGIAsm((Operator.PRE_INC==op || Operator.POST_INC==op ? "adc" : "sbc"), "r" + tmpReg + ",C0x00"));
-						codeExcsChecker.mathOverflow(this, scope, excs, op, null, false, false);
+						codeExcsChecker.mathOverflow(this, scope, excs, null, false, false);
 						if(toAccum && (Operator.PRE_INC == op || Operator.PRE_DEC == op)) {
 							scope.append(new CGIAsmMv("mov", "r" + accRegs[i], "r" + tmpReg));
 						}
@@ -2538,14 +1010,14 @@ public class Generator extends CodeGenerator {
 					}
 					break;
 				case STAT:
-					for(int i=0; i<cells.getSize(); i++) {
+					for(int i=0; i<size; i++) {
 						scope.append(new CGIAsmLd("lds", "r" + tmpReg, "_OS_STAT_POOL+" + cells.getId(i)));
 						if(toAccum && (Operator.POST_INC == op || Operator.POST_DEC == op)) {
 							scope.append(new CGIAsmMv("mov", "r" + accRegs[i], "r" + tmpReg));
 						}
 						if(0==i) scope.append(new CGIAsm((Operator.PRE_INC==op || Operator.POST_INC==op ? "add" : "sub"), "r" + tmpReg + ",C0x01"));
 						else scope.append(new CGIAsm((Operator.PRE_INC==op || Operator.POST_INC==op ? "adc" : "sbc"), "r" + tmpReg + ",C0x00"));
-						codeExcsChecker.mathOverflow(this, scope, excs, op, null, false, false);
+						codeExcsChecker.mathOverflow(this, scope, excs, null, false, false);
 						if(toAccum && (Operator.PRE_INC == op || Operator.PRE_DEC == op)) {
 							scope.append(new CGIAsmMv("mov", "r" + accRegs[i], "r" + tmpReg));
 						}
@@ -2554,20 +1026,20 @@ public class Generator extends CodeGenerator {
 					break;
 				case REG:
 					if(toAccum && (Operator.POST_INC == op || Operator.POST_DEC == op)) {
-						for(int i=0; i<cells.getSize(); i++) scope.append(new CGIAsmMv("mov", "r" + accRegs[i], "r" + cells.getId(i)));
+						for(int i=0; i<size; i++) scope.append(new CGIAsmMv("mov", "r" + accRegs[i], "r" + cells.getId(i)));
 					}
 					scope.append(new CGIAsm((Operator.PRE_INC==op || Operator.POST_INC==op ? "add" : "sub"), "r" + cells.getId(0) + ",C0x01"));
-					for(int i=1; i<cells.getSize(); i++) {
+					for(int i=1; i<size; i++) {
 						scope.append(new CGIAsm((Operator.PRE_INC==op || Operator.POST_INC==op ? "adc" : "sbc"), "r" + cells.getId(i) + ",C0x00"));
 					}
-					codeExcsChecker.mathOverflow(this, scope, excs, op, null, false, false);
+					codeExcsChecker.mathOverflow(this, scope, excs, null, false, false);
 					if(toAccum && (Operator.PRE_INC == op || Operator.PRE_DEC == op)) {
-						for(int i=0; i<cells.getSize(); i++) scope.append(new CGIAsmMv("mov", "r" + accRegs[i], "r" + cells.getId(i)));
+						for(int i=0; i<size; i++) scope.append(new CGIAsmMv("mov", "r" + accRegs[i], "r" + cells.getId(i)));
 					}
 					break;
 				case ARGS:
 				case STACK_FRAME:
-					for(int i=0; i<cells.getSize(); i++) {
+					for(int i=0; i<size; i++) {
 						scope.append(new CGIAsmIReg('y', true, "r" + tmpReg, cells.getId(i), getCurBlockScope(scope),
 													(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
 						if(toAccum && (Operator.POST_INC == op || Operator.POST_DEC == op)) {
@@ -2575,7 +1047,7 @@ public class Generator extends CodeGenerator {
 						}
 						if(0==i) scope.append(new CGIAsm((Operator.PRE_INC==op || Operator.POST_INC==op ? "add" : "sub"), "r" + tmpReg + ",C0x01"));
 						else scope.append(new CGIAsm((Operator.PRE_INC==op || Operator.POST_INC==op ? "adc" : "sbc"), "r" + tmpReg + ",C0x00"));
-						codeExcsChecker.mathOverflow(this, scope, excs, op, null, false, false);
+						codeExcsChecker.mathOverflow(this, scope, excs, null, false, false);
 						if(toAccum && (Operator.PRE_INC == op || Operator.PRE_DEC == op)) {
 							scope.append(new CGIAsmMv("mov", "r" + accRegs[i], "r" + tmpReg));
 						}
@@ -2584,14 +1056,14 @@ public class Generator extends CodeGenerator {
 					}
 					break;
 				case HEAP:
-					for(int i=0; i<cells.getSize(); i++) {
+					for(int i=0; i<size; i++) {
 						scope.append(new CGIAsmIReg('z', true, "r" + tmpReg, cells.getId(i)));
 						if(toAccum && (Operator.POST_INC == op || Operator.POST_DEC == op)) {
 							scope.append(new CGIAsmMv("mov", "r" + accRegs[i], "r" + tmpReg));
 						}
 						if(0==i) scope.append(new CGIAsm((Operator.PRE_INC==op || Operator.POST_INC==op ? "add" : "sub"), "r" + tmpReg + ",C0x01"));
 						else scope.append(new CGIAsm((Operator.PRE_INC==op || Operator.POST_INC==op ? "adc" : "sbc"), "r" + tmpReg + ",C0x00"));
-						codeExcsChecker.mathOverflow(this, scope, excs, op, null, false, false);
+						codeExcsChecker.mathOverflow(this, scope, excs, null, false, false);
 						if(toAccum && (Operator.PRE_INC == op || Operator.PRE_DEC == op)) {
 							scope.append(new CGIAsmMv("mov", "r" + accRegs[i], "r"+tmpReg));
 						}
@@ -2603,7 +1075,7 @@ public class Generator extends CodeGenerator {
 		else if(Operator.NOT==op || Operator.BIT_NOT==op || Operator.MINUS==op) {
 			switch(cells.getType()) {
 				case ARRAY:
-					for(int i=0; i<cells.getSize(); i++) {
+					for(int i=0; i<size; i++) {
 						if(toAccum) {
 							scope.append(new CGIAsmLd("ld", "r" + accRegs[i], "x+"));
 							scope.append(new CGIAsm("com", "r" + accRegs[i]));
@@ -2617,7 +1089,7 @@ public class Generator extends CodeGenerator {
 					}
 					break;
 				case STAT:
-					for(int i=0; i<cells.getSize(); i++) {
+					for(int i=0; i<size; i++) {
 						if(toAccum) {
 							scope.append(new CGIAsmLd("lds", "r" + tmpReg, "_OS_STAT_POOL+" + cells.getId(i)));
 							scope.append(new CGIAsm("com", "r" + accRegs[i]));
@@ -2630,7 +1102,7 @@ public class Generator extends CodeGenerator {
 					}
 					break;
 				case REG:
-					for(int i=0; i<cells.getSize(); i++) {
+					for(int i=0; i<size; i++) {
 						if(toAccum) {
 							scope.append(new CGIAsmMv("mov", "r" + accRegs[i], "r" + cells.getId(i)));
 							scope.append(new CGIAsm("com", "r" + accRegs[i]));
@@ -2642,7 +1114,7 @@ public class Generator extends CodeGenerator {
 					break;
 				case ARGS:
 				case STACK_FRAME:
-					for(int i=0; i<cells.getSize(); i++) {
+					for(int i=0; i<size; i++) {
 						if(toAccum) {
 							scope.append(new CGIAsmIReg('y', true, "r" + accRegs[i], cells.getId(i), getCurBlockScope(scope),
 														(CGBlockScope)cells.getObject(), CGCells.Type.ARGS == cells.getType()));
@@ -2658,7 +1130,7 @@ public class Generator extends CodeGenerator {
 					}
 					break;
 				case HEAP:
-					for(int i=0; i<cells.getSize(); i++) {
+					for(int i=0; i<size; i++) {
 						if(toAccum) {
 							scope.append(new CGIAsmIReg('z', true, "r" + accRegs[i], cells.getId(i)));
 							scope.append(new CGIAsm("com", "r" + accRegs[i]));
@@ -2674,7 +1146,7 @@ public class Generator extends CodeGenerator {
 		}
 		if(Operator.MINUS==op) {
 			scope.append(new CGIAsm("add", "r" + accRegs[0] + ",C0x01"));
-			for(int i=1; i<cells.getSize(); i++) scope.append(new CGIAsm("adc", "r" + accRegs[i] + ",C0x00"));
+			for(int i=1; i<size; i++) scope.append(new CGIAsm("adc", "r" + accRegs[i] + ",C0x00"));
 		}
 		if(isFixed) {
 			acc.setFixed();
@@ -2683,1365 +1155,15 @@ public class Generator extends CodeGenerator {
 	}
 		
 	@Override
-	public void cellsAction(CGScope scope, CGCells leftCells, VarType leftType, Operator op, CGCells rightCells, VarType rightType, CGExcs excs)
-																																	throws CompileException {
-		switch (leftCells.getType()) {
-			case ACC:
-				accAndCellsAction(scope, op, rightCells, rightType.isFixedPoint(), excs);
-				break;
-			case REG:
-				regsAndCellsAction(scope, leftCells, op, rightCells, leftType.isFixedPoint(), rightType.isFixedPoint(), excs);
-				break;
-			default:
-				throw new CompileException("Cells action, left cells type:" + leftCells.getType() + " - unsupported yet");
-		}
-	}
-
-	// Эксперимент
-	public void regsAndCellsAction(CGScope scope, CGCells leftCells, Operator op, CGCells rightCells, boolean leftIsFixed, boolean rightIsFixed, CGExcs excs)
-																																	throws CompileException {
-		CGIContainer cont = new CGIContainer();
-		if(VERBOSE_LO <= verbose) {
-			cont.append(new CGIText(";action " + leftCells + (leftIsFixed ? "[FIXED]" : " ") + op + " " + rightCells + (rightIsFixed ? "[FIXED]" : " ")));
-		}
+	public void cellsAction(CGScope scope, CGCells leftCells, VarType leftType, Operator op, CGCells rightCells, VarType rightType,
+							VarType castType, CGExcs excs) throws CompileException {
 		
-		if(leftCells.getSize()!=rightCells.getSize()) {
-			throw new CompileException("cells action, unsupported different cells size");
+		if(Operator.BIT_AND==op || Operator.BIT_OR==op || Operator.BIT_XOR==op) {
+			Binary.exec(scope, leftCells, leftType, op, rightCells, rightType, castType, excs, refSize, acc, rtosFeatures, verbose);
 		}
-		
-		for(int i=0; i<leftCells.getSize(); i++) {
-			switch(op) {
-				case PLUS:
-					switch(rightCells.getType()) {
-						case REG:
-							cont.append(new CGIRAsm((0==i ? "add" : "adc"), "r" + leftCells.getId(i), "r" + rightCells.getId(i)));
-							break;
-						default:
-							throw new CompileException("cells action, unsupported right cells type:" + rightCells.getType());
-					}
-				case INC:
-					switch(rightCells.getType()) {
-						case REG:
-							cont.append(new CGIRAsm((0==i ? "add" : "adc"), "r" + leftCells.getId(i), (0==i ? "C0x01" : "C0x00")));
-							break;
-						default:
-							throw new CompileException("cells action, unsupported right cells type:" + rightCells.getType());
-					}
-				case MINUS:
-					switch(rightCells.getType()) {
-						case REG:
-							cont.append(new CGIRAsm((0==i ? "sub" : "sbc"), "r" + leftCells.getId(i), "r" + rightCells.getId(i)));
-							break;
-						default:
-							throw new CompileException("cells action, unsupported right cells type:" + rightCells.getType());
-					}
-				case DEC:
-					switch(rightCells.getType()) {
-						case REG:
-							cont.append(new CGIRAsm((0==i ? "subi" : "sbci"), "r" + leftCells.getId(i), (0==i ? "1" : "0")));
-							break;
-						default:
-							throw new CompileException("cells action, unsupported right cells type:" + rightCells.getType());
-					}
-				case BIT_AND:
-					switch(rightCells.getType()) {
-						case REG:
-							cont.append(new CGIRAsm("and", "r" + leftCells.getId(i), "r" + leftCells.getId(i)));
-							break;
-						default:
-							throw new CompileException("cells action, unsupported right cells type:" + rightCells.getType());
-					}
-				case BIT_OR:
-					switch(rightCells.getType()) {
-						case REG:
-							cont.append(new CGIRAsm("or", "r" + leftCells.getId(i), "r" + leftCells.getId(i)));
-							break;
-						default:
-							throw new CompileException("cells action, unsupported right cells type:" + rightCells.getType());
-					}
-				case BIT_XOR:
-					switch(rightCells.getType()) {
-						case REG:
-							cont.append(new CGIRAsm("eor", "r" + leftCells.getId(i), "r" + leftCells.getId(i)));
-							break;
-						case ARGS:
-						case STACK_FRAME:
-							cont.append(new CGIAsmIReg('y', true, "r19", rightCells.getId(0), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							cont.append(new CGIRAsm("eor", "r" + leftCells.getId(i), "r19"));
-							break;
-						default:
-							throw new CompileException("cells action, unsupported right cells type:" + rightCells.getType());
-					}
-					
-					break;
-				case BIT_NOT:
-					switch(rightCells.getType()) {
-						case REG:
-							cont.append(new CGIRAsm("com", "r" + leftCells.getId(i)));
-							break;
-						default:
-							throw new CompileException("cells action, unsupported right cells type:" + rightCells.getType());
-					}
-				default:
-					throw new CompileException("cells action, unsupported operator:" + op);
-			}
+		else {
+			Arithmetic.exec(this, scope, leftCells, leftType, op, rightCells, rightType, castType, codeExcsChecker, excs, refSize, acc, rtosFeatures, verbose);
 		}
-		scope.append(cont);
-	}
-
-	public void accAndCellsAction(CGScope scope, Operator op, CGCells rightCells, boolean rightIsFixed, CGExcs excs) throws CompileException {
-		int accMaxBits = (null==codeExcsChecker.getHandled(excs, J8BException.MathOverflowException.name()) ? 
-				(accumStack.isEmpty() ? acc.getBytes() : -1==accumStack.peek().getK().getSize() ? refSize : accumStack.peek().getK().getSize())*0x08 : 0x20);
-		
-		if(!accumStack.isEmpty() && !accumStack.peek().getV() && acc.getBits()>accMaxBits) {
-			//TODO костыль - иначе мягкие ограничения аккумулятора уменьшают его размер, что должно быть только при жестком ограничении
-			accMaxBits = acc.getBits();
-		}
-		
-		if(VERBOSE_LO <= verbose) {
-			scope.append(new CGIText(";" + acc + "/" + accMaxBits + " " + op + " cells " + rightCells + (rightIsFixed ? "[FIXED]" : "") +  "->acc"));
-		}
-		
-		switch(op) {
-			case PLUS:
-				if(!acc.getFixed()) {
-					int requiredBits = Math.max(acc.getBits(), rightCells.getSize()*8)+1;
-					acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-					scope.append(accResize());
-				}
-
-				// Передаем размер аккумулятора чуть больше
-				cellsActionAsm(scope, rightCells, acc.getBytes(), new CGActionHandler() {
-					String lastReg;
-					@Override
-					public CGItem action(int sn, String reg) throws CompileException {
-						if(null==lastReg) lastReg = reg;
-						if(acc.getFixed() && !rightIsFixed) {
-							return 0x00==sn ? null : new CGIRAsm("add", getRightOp(sn, null), lastReg);
-						}
-						if(null!=reg) {
-							return new CGIRAsm((0 == sn ? "add" : "adc"), getRightOp(sn, null), reg);
-						}
-						return new CGIRAsm("adc", getRightOp(sn, null), "C0x00");
-					}
-				});
-				// Проверка на переполнение полного аккумулятора (4 байта)
-				if(0x20==acc.getBits()) {
-					codeExcsChecker.mathOverflow(this, scope, excs, op, null, false, false);
-				}
-				break;
-			case MINUS:
-				if(!acc.getFixed()) {
-					int requiredBits = Math.max(acc.getBits(), rightCells.getSize()*8);
-					acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-					scope.append(accResize());
-				}
-				cellsActionAsm(scope, rightCells, acc.getBytes(), new CGActionHandler() {
-					String lastReg;
-					@Override
-					public CGItem action(int sn, String reg) throws CompileException {
-						if(null==lastReg) lastReg = reg;
-						if(acc.getFixed() && !rightIsFixed) {
-							return 0x00==sn ? null : new CGIAsm("sub", getRightOp(sn, null) + "," + lastReg);
-						}
-						if(null!=reg) {
-							return new CGIAsm((0 == sn ? "sub" : "sbc"), getRightOp(sn, null) + "," + reg);
-						}
-						return new CGIAsm("sbc", getRightOp(sn, null) + ",C0x00");
-					}
-				});
-				codeExcsChecker.mathOverflow(this, scope, excs, op, null, false, false);
-				break;
-			case MULT:
-				/* не нужно, с этим справится код ниже
-				// Расширяем, если размер аккумулятора оказался меньше аргумента
-				if(!acc.getFixed() && acc.getBytes()<cells.getSize()) {
-					accGrow(scope, acc.getBytes(), cells.getSize());
-					acc.setBytes(cells.getSize());
-				}*/
-				
-				int argSize = (acc.getBytes()>rightCells.getSize() ? acc.getBytes() : rightCells.getSize());
-				if(!acc.getFixed()) {
-					int requiredBits = (acc.getBits()+rightCells.getSize()*0x08);
-					if(requiredBits>=0x18) requiredBits = 0x20;
-					acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-					scope.append(accResize());
-				}
-
-				if(0x01==argSize) {
-					RTOSLibs.MATH_MUL8.setRequired();
-					switch(rightCells.getType()) {
-						case REG:
-							scope.append(new CGIAsmMv("mov", "r17", "r"+rightCells.getId(0)));
-							break;
-						case ARGS:
-						case STACK_FRAME:
-							scope.append(new CGIAsmIReg('y', true, "r17", rightCells.getId(0), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							break;
-						case HEAP:
-							scope.append(new CGIAsmIReg('z', true, "r17", rightCells.getId(0), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), false));
-							break;
-						case STACK:
-							scope.append(new CGIAsm("pop", "r17"));
-							break;
-						default:
-							throw new CompileException("Unsupported cell type:" + rightCells.getType());
-					}
-					scope.append(new CGIAsmCall(CALL_INSTR, "os_mul8", true));
-				}
-				else if(0x02==argSize) {
-					if(rightIsFixed) RTOSLibs.MATH_MULQ7N8.setRequired();
-					else RTOSLibs.MATH_MUL16.setRequired();
-					switch(rightCells.getType()) {
-						case REG:
-							scope.append(new CGIAsmMv("mov", "r18", "r"+rightCells.getId(0)));
-							scope.append(0x01<rightCells.getSize() ? new CGIAsmMv("mov", "r19", "r"+rightCells.getId(1)) : new CGIAsmLd("ldi", "r19", "0"));
-							break;
-						case ARGS:
-						case STACK_FRAME:
-							scope.append(new CGIAsmIReg('y', true, "r18", rightCells.getId(0), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							scope.append(	0x01<rightCells.getSize() ?
-											new CGIAsmIReg('y', true, "r19", rightCells.getId(1), getCurBlockScope(scope),
-											(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType())
-											: new CGIAsmLd("ldi", "r19", "0x00"));
-							break;
-						case HEAP:
-							scope.append(new CGIAsmIReg('z', true, "r18", rightCells.getId(0), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), false));
-							scope.append(	0x01<rightCells.getSize() ?
-											new CGIAsmIReg('z', true, "r19", rightCells.getId(1), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false)
-											: new CGIAsmLd("ldi", "r19", "0x00"));
-							break;
-						case STACK:
-							scope.append(new CGIAsm("pop", "r18"));
-							scope.append(0x01<rightCells.getSize() ? new CGIAsm("pop", "r19") : new CGIAsmLd("ldi", "r19", "0x00"));//TODO проверить порядок
-							break;
-						default:
-							throw new CompileException("Unsupported cell type:" + rightCells.getType());
-					}
-					scope.append(new CGIAsmCall(CALL_INSTR, (rightIsFixed ? "os_mulq7n8" : "os_mul16"), true));
-				}
-				else {
-					RTOSLibs.MATH_MUL32.setRequired();
-					scope.append(new CGIAsm("push", "r24"));
-					scope.append(new CGIAsm("push", "r25"));
-					scope.append(new CGIAsm("push", "r22"));
-					scope.append(new CGIAsm("push", "r23"));
-					switch(rightCells.getType()) {
-						case REG:
-							regsMv(scope, cellsToRegs(rightCells), new byte[]{24,25,22,23});
-							if(rightCells.getSize()<4) {
-								scope.append(new CGIAsm("ldi", "r23,0"));
-								if(rightCells.getSize()<3) {
-									scope.append(new CGIAsm("ldi", "r22,0"));
-									if(rightCells.getSize()<2) {
-										scope.append(new CGIAsm("ldi", "r25,0"));
-									}
-								}
-							}
-
-/*							scope.append(new CGIAsmMv("mov", "r24", "r"+rightCells.getId(0)));
-							scope.append(0x01<rightCells.getSize() ? new CGIAsmMv("mov", "r25", "r"+rightCells.getId(1)) : new CGIAsm("ldi", "r25,0x00"));
-							scope.append(0x02<rightCells.getSize() ? new CGIAsmMv("mov", "r22", "r"+rightCells.getId(2)) : new CGIAsm("ldi", "r22,0x00"));
-							scope.append(0x03<rightCells.getSize() ? new CGIAsmMv("mov", "r23", "r"+rightCells.getId(3)) : new CGIAsm("ldi", "r23,0x00"));
-*/
-							break;
-						//TODO размер ячеек может быть меньше чем 4
-						case ARGS:
-						case STACK_FRAME:
-							scope.append(new CGIAsmIReg('y', true, "r24", rightCells.getId(0), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							scope.append(new CGIAsmIReg('y', true, "r25", rightCells.getId(1), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							if(0x02<rightCells.getSize()) {
-								scope.append(new CGIAsmIReg('y', true, "r22", rightCells.getId(2), getCurBlockScope(scope),
-															(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							}
-							else {
-								scope.append(new CGIAsm("ldi", "r22,0x00"));
-							}
-							if(0x03<rightCells.getSize()) {
-								scope.append(new CGIAsmIReg('y', true, "r23", rightCells.getId(3), getCurBlockScope(scope),
-															(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							}
-							else {
-								scope.append(new CGIAsm("ldi", "r23,0x00"));
-							}
-							break;
-						case HEAP:
-							scope.append(new CGIAsmIReg('z', true, "r24", rightCells.getId(0), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false));
-							scope.append(new CGIAsmIReg('z', true, "r25", rightCells.getId(1), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false));
-							if(0x02<rightCells.getSize()) {
-								scope.append(new CGIAsmIReg('z', true, "r22", rightCells.getId(2), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false));
-							}
-							else {
-								scope.append(new CGIAsm("ldi", "r22,0x00"));
-							}
-							if(0x03<rightCells.getSize()) {
-								scope.append(new CGIAsmIReg('z', true, "r23", rightCells.getId(3), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false));
-							}
-							else {
-								scope.append(new CGIAsm("ldi", "r23,0x00"));
-							}
-							break;
-						case STACK:
-							scope.append(new CGIAsm("push", "r28"));
-							scope.append(new CGIAsm("push", "r29"));
-							scope.append(new CGIAsmLd("lds", "r28", "SPL"));
-							if(defSph)  {
-								scope.append(new CGIAsmLd("lds", "r29", "SPH"));
-							}
-							else {
-								scope.append(new CGIAsmLd("ldi", "r29", "0x00"));
-							}
-
-							scope.append(new CGIAsmLd("ld", "r24", "y+0x06"));
-							scope.append(new CGIAsmLd("ld", "r25", "y+0x07"));
-							scope.append(new CGIAsmLd("ld", "r22", "y+0x08"));
-							scope.append(new CGIAsmLd("ld", "r23", "y+0x09"));
-							break;
-						default:
-							throw new CompileException("Unsupported cell type:" + rightCells.getType());
-					}
-					scope.append(new CGIAsmCall(CALL_INSTR, "os_mul32_nr", true));
-					if(CGCells.Type.STACK==rightCells.getType()) {
-						scope.append(new CGIAsm("adiw", "yl,0x0d")); //TODO проверить смещения
-						scope.append(new CGIAsm("cli"));
-						scope.append(new CGIAsm("sts", "SPL,r28"));
-						if(defSph)  {
-							scope.append(new CGIAsm("sts", "SPH,r29"));
-						}
-						scope.append(new CGIAsm("sei"));
-					}
-					else {
-						scope.append(new CGIAsm("pop", "r23"));
-						scope.append(new CGIAsm("pop", "r22"));
-						scope.append(new CGIAsm("pop", "r25"));
-						scope.append(new CGIAsm("pop", "r24"));
-					}
-					codeExcsChecker.mathOverflow(this, scope, excs, op, null, false, false);
-				}
-				break;
-			case DIV:
-				if(!acc.getFixed()) {
-					int requiredBits = Math.max(acc.getBits(), rightCells.getSize()*8);
-					if(requiredBits>=0x18) requiredBits = 0x20;
-					acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-					scope.append(accResize());
-				}
-
-				CGLabelScope lbEndScope = new CGLabelScope(null, null, LabelNames.DIV_END, true);
-				if(0x01==acc.getBytes()) {
-					RTOSLibs.MATH_DIV8.setRequired();
-					switch(rightCells.getType()) {
-						case REG:
-							scope.append(new CGIAsmMv("mov", "r17", "r"+rightCells.getId(0)));
-							break;
-						case ARGS:
-						case STACK_FRAME:
-							scope.append(new CGIAsmIReg('y', true, "r17", rightCells.getId(0), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							break;
-						case HEAP:
-							scope.append(new CGIAsmIReg('z', true, "r17", rightCells.getId(0), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), false));
-							break;
-						case STACK:
-							scope.append(new CGIAsm("pop", "r17"));
-							break;
-						default:
-							throw new CompileException("Unsupported cell type:" + rightCells.getType());
-					}
-					codeExcsChecker.divByZero(this, scope, excs, new byte[]{17}, false);
-					scope.append(new CGIAsm("push", "r24"));
-					scope.append(new CGIAsmCall(CALL_INSTR, "os_div8", true));
-					scope.append(new CGIAsm("pop", "r24"));
-					scope.append(lbEndScope);
-				}
-				else if(0x02==acc.getBytes()) {
-					if(rightIsFixed) RTOSLibs.MATH_DIVQ7N8.setRequired();
-					else RTOSLibs.MATH_DIV16.setRequired();
-					switch(rightCells.getType()) {
-						case REG:
-							scope.append(new CGIAsmMv("mov", "r18", "r"+rightCells.getId(0)));
-							if(rightCells.getSize()>1) {
-								scope.append(new CGIAsmMv("mov", "r19", "r"+rightCells.getId(1)));
-							}
-							else {
-								scope.append(new CGIAsmLd("ldi", "r19", "0x00"));
-							}
-							break;
-						case ARGS:
-						case STACK_FRAME:
-							scope.append(new CGIAsmIReg('y', true, "r18", rightCells.getId(0), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							if(rightCells.getSize()>1) {
-								scope.append(new CGIAsmIReg('y', true, "r19", rightCells.getId(1), getCurBlockScope(scope),
-															(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							}
-							else {
-								scope.append(new CGIAsmLd("ldi", "r19", "0x00"));
-							}
-							break;
-						case HEAP:
-							scope.append(new CGIAsmIReg('z', true, "r18", rightCells.getId(0), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false));
-							if(rightCells.getSize()>1) {
-								scope.append(new CGIAsmIReg('z', true, "r19", rightCells.getId(1), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false));
-							}
-							else {
-								scope.append(new CGIAsmLd("ldi", "r19", "0x00"));
-							}
-							break;
-						case STACK:
-							scope.append(new CGIAsm("pop", "r18"));
-							if(rightCells.getSize()>1) {
-								scope.append(new CGIAsm("pop", "r19"));//TODO проверить порядок
-							}
-							else {
-								scope.append(new CGIAsmLd("ldi", "r19", "0x00"));
-							}
-							break;
-						default:
-							throw new CompileException("Unsupported cell type:" + rightCells.getType());
-					}
-					codeExcsChecker.divByZero(this, scope, excs, new byte[]{18, 19}, false);
-					if(rightIsFixed) {
-						scope.append(new CGIAsmCall(CALL_INSTR, "os_divq7n8", true));
-					}
-					else {
-						scope.append(new CGIAsm("push", "r24"));
-						scope.append(new CGIAsm("push", "r25"));
-						scope.append(new CGIAsmCall(CALL_INSTR, "os_div16", true));
-						scope.append(new CGIAsm("pop", "r25"));
-						scope.append(new CGIAsm("pop", "r24"));
-					}
-					scope.append(lbEndScope);
-				}
-				else {
-					RTOSLibs.MATH_DIV32.setRequired();
-					scope.append(new CGIAsm("push", "r24"));
-					scope.append(new CGIAsm("push", "r25"));
-					scope.append(new CGIAsm("push", "r22"));
-					scope.append(new CGIAsm("push", "r23"));
-					switch(rightCells.getType()) {
-						case REG:
-							regsMv(scope, cellsToRegs(rightCells), new byte[]{24,25,22,23});
-/*							scope.append(new CGIAsmMv("mov", "r24", "r"+rightCells.getId(0)));
-							scope.append(new CGIAsmMv("mov", "r25", "r"+rightCells.getId(1)));
-							scope.append(new CGIAsmMv("mov", "r22", "r"+rightCells.getId(2)));
-							scope.append(new CGIAsmMv("mov", "r23", "r"+rightCells.getId(3)));*/
-							break;
-						case ARGS:
-						case STACK_FRAME:
-							scope.append(new CGIAsmIReg('y', true, "r24", rightCells.getId(0), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							scope.append(new CGIAsmIReg('y', true, "r25", rightCells.getId(1), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							scope.append(new CGIAsmIReg('y', true, "r22", rightCells.getId(2), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							scope.append(new CGIAsmIReg('y', true, "r23", rightCells.getId(3), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							break;
-						case HEAP:
-							scope.append(new CGIAsmIReg('z', true, "r24", rightCells.getId(0), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false));
-							scope.append(new CGIAsmIReg('z', true, "r25", rightCells.getId(1), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false));
-							scope.append(new CGIAsmIReg('z', true, "r22", rightCells.getId(2), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false));
-							scope.append(new CGIAsmIReg('z', true, "r23", rightCells.getId(3), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false));
-							break;
-						case STACK:
-							scope.append(new CGIAsm("pop", "r24"));
-							scope.append(new CGIAsm("pop", "r25"));
-							scope.append(new CGIAsm("pop", "r22"));
-							scope.append(new CGIAsm("pop", "r23"));//TODO проверить порядок
-							break;
-						default:
-							throw new CompileException("Unsupported cell type:" + rightCells.getType());
-					}
-					codeExcsChecker.divByZero(this, scope, excs, new byte[]{23, 22, 25, 24}, true);
-					scope.append(new CGIAsmCall(CALL_INSTR, "os_div32", true));
-					scope.append(lbEndScope);
-					scope.append(new CGIAsm("pop", "r23"));
-					scope.append(new CGIAsm("pop", "r22"));
-					scope.append(new CGIAsm("pop", "r25"));
-					scope.append(new CGIAsm("pop", "r24"));
-				}
-				break;
-			case MOD:
-				if(rightIsFixed) throw new CompileException("CG:cellsAction: unsupported operator: " + op);
-				int requiredBits = Math.max(acc.getBits(), rightCells.getSize()*8);
-				if(requiredBits>=0x18) requiredBits = 0x20;
-				acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-				scope.append(accResize());
-
-				// Расширяем, если размер аккумулятора оказался меньше аргумента
-				if(acc.getBytes()<rightCells.getSize()) {
-					accGrow(scope, acc.getBytes(), rightCells.getSize());
-					acc.setBytes(rightCells.getSize());
-				}
-
-				lbEndScope = new CGLabelScope(null, null, LabelNames.DIV_END, true);
-				if(0x01==acc.getBytes()) {
-					RTOSLibs.MATH_DIV8.setRequired();
-					switch(rightCells.getType()) {
-						case REG:
-							scope.append(new CGIAsmMv("mov", "r17", "r"+rightCells.getId(0)));
-							break;
-						case ARGS:
-						case STACK_FRAME:
-							scope.append(new CGIAsmIReg('y', true, "r17", rightCells.getId(0), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							break;
-						case HEAP:
-							scope.append(new CGIAsmIReg('z', true, "r17", rightCells.getId(0), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), false));
-							break;
-						case STACK:
-							scope.append(new CGIAsm("pop", "r17"));
-							break;
-						default:
-							throw new CompileException("Unsupported cell type:" + rightCells.getType());
-					}
-					codeExcsChecker.divByZero(this, scope, excs, new byte[]{17}, false);
-					scope.append(new CGIAsm("push", "r24"));
-					scope.append(new CGIAsmCall(CALL_INSTR, "os_div8", true));
-					scope.append(new CGIAsmMv("mov", "r16", "r24"));
-					scope.append(new CGIAsm("pop", "r24"));
-					scope.append(lbEndScope);
-				}
-				else if(0x02==acc.getBytes()) {
-					RTOSLibs.MATH_DIV16.setRequired();
-					switch(rightCells.getType()) {
-						case REG:
-							scope.append(new CGIAsmMv("mov", "r18", "r"+rightCells.getId(0)));
-							scope.append(new CGIAsmMv("mov", "r19", "r"+rightCells.getId(1)));
-							break;
-						case ARGS:
-						case STACK_FRAME:
-							scope.append(new CGIAsmIReg('y', true, "r18", rightCells.getId(0), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							scope.append(new CGIAsmIReg('y', true, "r19", rightCells.getId(1), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							break;
-						case HEAP:
-							scope.append(new CGIAsmIReg('z', true, "r18", rightCells.getId(0), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false));
-							scope.append(new CGIAsmIReg('z', true, "r19", rightCells.getId(1), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false));
-							break;
-						case STACK:
-							scope.append(new CGIAsm("pop", "r18"));
-							scope.append(new CGIAsm("pop", "r19"));//TODO проверить порядок
-							break;
-						default:
-							throw new CompileException("Unsupported cell type:" + rightCells.getType());
-					}
-					codeExcsChecker.divByZero(this, scope, excs, new byte[]{18, 19}, false);
-					scope.append(new CGIAsm("push", "r24"));
-					scope.append(new CGIAsm("push", "r25"));
-					scope.append(new CGIAsmCall(CALL_INSTR, "os_div16", true));
-					scope.append(new CGIAsmMv("mov", "r16", "r24"));
-					scope.append(new CGIAsmMv("mov", "r17", "r25"));
-					scope.append(new CGIAsm("pop", "r25"));
-					scope.append(new CGIAsm("pop", "r24"));
-					scope.append(lbEndScope);
-				}
-				else {
-					RTOSLibs.MATH_DIV32.setRequired();
-					scope.append(new CGIAsm("push", "r24"));
-					scope.append(new CGIAsm("push", "r25"));
-					scope.append(new CGIAsm("push", "r22"));
-					scope.append(new CGIAsm("push", "r23"));
-					switch(rightCells.getType()) {
-						case REG:
-							scope.append(new CGIAsmMv("mov", "r24", "r"+rightCells.getId(0)));
-							scope.append(new CGIAsmMv("mov", "r25", "r"+rightCells.getId(1)));
-							scope.append(new CGIAsmMv("mov", "r22", "r"+rightCells.getId(2)));
-							scope.append(new CGIAsmMv("mov", "r23", "r"+rightCells.getId(3)));
-							break;
-						case ARGS:
-						case STACK_FRAME:
-							scope.append(new CGIAsmIReg('y', true, "r24", rightCells.getId(0), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							scope.append(new CGIAsmIReg('y', true, "r25", rightCells.getId(1), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							scope.append(new CGIAsmIReg('y', true, "r22", rightCells.getId(2), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							scope.append(new CGIAsmIReg('y', true, "r23", rightCells.getId(3), getCurBlockScope(scope),
-														(CGBlockScope)rightCells.getObject(), CGCells.Type.ARGS == rightCells.getType()));
-							break;
-						case HEAP:
-							scope.append(new CGIAsmIReg('z', true, "r24", rightCells.getId(0), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false));
-							scope.append(new CGIAsmIReg('z', true, "r25", rightCells.getId(1), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false));
-							scope.append(new CGIAsmIReg('z', true, "r22", rightCells.getId(2), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false));
-							scope.append(new CGIAsmIReg('z', true, "r23", rightCells.getId(3), getCurBlockScope(scope), (CGBlockScope)rightCells.getObject(), false));
-							break;
-						case STACK:
-							scope.append(new CGIAsm("pop", "r24"));
-							scope.append(new CGIAsm("pop", "r25"));
-							scope.append(new CGIAsm("pop", "r22"));
-							scope.append(new CGIAsm("pop", "r23"));//TODO проверить порядок
-							break;
-						default:
-							throw new CompileException("Unsupported cell type:" + rightCells.getType());
-					}
-					codeExcsChecker.divByZero(this, scope, excs, new byte[]{23, 22, 25, 24}, true);
-					scope.append(new CGIAsmCall(CALL_INSTR, "os_div32", true));
-					scope.append(new CGIAsmMv("mov", "r16", "r24"));
-					scope.append(new CGIAsmMv("mov", "r17", "r25"));
-					scope.append(new CGIAsmMv("mov", "r18", "r22"));
-					scope.append(new CGIAsmMv("mov", "r19", "r23"));
-					scope.append(new CGIAsm("pop", "r23"));
-					scope.append(new CGIAsm("pop", "r22"));
-					scope.append(new CGIAsm("pop", "r25"));
-					scope.append(new CGIAsm("pop", "r24"));
-					scope.append(lbEndScope);
-				}
-				break;
-			case AND:
-			case BIT_AND:
-				if(!acc.getFixed() && !rightIsFixed) {
-					requiredBits = Math.max(acc.getBits(), rightCells.getSize()*8);
-					acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-					scope.append(accResize());
-	
-					cellsActionAsm(scope,  rightCells, acc.getBytes(), new CGActionHandler() {
-						@Override
-						public CGItem action(int sn, String reg) throws CompileException {
-							if(null!=reg) {
-								return new CGIAsm("and", getRightOp(sn, null) + "," + reg);
-							}
-							return new CGIAsm("and", getRightOp(sn, null) + ",C0x00");
-						}
-					});
-				}
-				else {
-					throw new CompileException("CG:cellsAction: unsupported operator: " + op);
-				}
-				break;
-			case OR:
-			case BIT_OR:
-				if(!acc.getFixed() && !rightIsFixed) {
-					requiredBits = Math.max(acc.getBits(), rightCells.getSize()*8);
-					acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-					scope.append(accResize());
-
-					cellsActionAsm(scope,  rightCells, acc.getBytes(), new CGActionHandler() {
-						@Override
-						public CGItem action(int sn, String reg) throws CompileException {
-							if(null!=reg) {
-								return new CGIAsm("or", getRightOp(sn, null) + "," + reg);
-							}
-							return null;
-						}
-					});
-				}
-				else {
-					throw new CompileException("CG:cellsAction: unsupported operator: " + op);
-				}
-				break;
-			case BIT_XOR:
-				if(!acc.getFixed() && !rightIsFixed) {
-					requiredBits = Math.max(acc.getBits(), rightCells.getSize()*8);
-					acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-					scope.append(accResize());
-
-					cellsActionAsm(scope,  rightCells, acc.getBytes(), new CGActionHandler() {
-						@Override
-						public CGItem action(int sn, String reg) throws CompileException {
-							if(null!=reg) {
-								return new CGIAsm("eor", getRightOp(sn, null) + "," + reg);
-							}
-							return new CGIAsm("eor", getRightOp(sn, null) + ",C0x00");
-						}
-					});
-				}
-				else {
-					throw new CompileException("CG:cellsAction: unsupported operator: " + op);
-				}
-				break;
-			case SHR:
-				if(!rightIsFixed) {
-					if(!acc.getFixed()) {
-						requiredBits = acc.getBits()>=0x18 ? 0x20 : acc.getBits();
-						acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-						scope.append(accResize());
-					}
-
-					cellsActionAsm(scope,  rightCells, acc.getBytes(), new CGActionHandler() {
-						@Override
-						public CGItem action(int sn, String reg) throws CompileException {
-							if(null!=reg && 0==sn) {
-								CGIContainer cont = new CGIContainer();
-								if(0x01==acc.getBytes()) {
-									cont.append(new CGIAsmMv("mov", "r17", reg));
-									RTOSLibs.MATH_SHR8.setRequired();
-									cont.append(new CGIAsmCall(CALL_INSTR, "os_shr8", true));
-								}
-								else if(0x02==acc.getBytes()) {
-									cont.append(new CGIAsmMv("mov", "r18", reg));
-									RTOSLibs.MATH_SHR16.setRequired();
-									cont.append(new CGIAsmCall(CALL_INSTR, "os_shr16", true));
-								}
-								else {
-									cont.append(new CGIAsm("push", "r22"));
-									RTOSLibs.MATH_SHR32.setRequired();
-									scope.append(new CGIAsmCall(CALL_INSTR, "os_shr32", true));
-									cont.append(new CGIAsm("pop", "r22"));
-								}
-								return cont;
-							}
-							return null;
-						}
-					});
-				}
-				else {
-					throw new CompileException("CG:cellsAction: unsupported operator: " + op);
-				}
-				break;
-			case SHL:
-				if(!rightIsFixed) {
-					if(!acc.getFixed()) {
-						requiredBits = 0x20;
-						acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-						scope.append(accResize());
-					}
-
-					cellsActionAsm(scope,  rightCells, acc.getBytes(), new CGActionHandler() {
-						@Override
-						public CGItem action(int sn, String reg) throws CompileException {
-							if(null!=reg && 0==sn) {
-								CGIContainer cont = new CGIContainer();
-								if(0x01==acc.getBytes()) {
-									//cont.append(new CGIAsmMv("mov", "r17", "r16")); //TODO костыль
-									cont.append(new CGIAsmMv("mov", "r17", reg));
-									RTOSLibs.MATH_SHL8.setRequired();
-									cont.append(new CGIAsmCall(CALL_INSTR, "os_shl8", true));
-								}
-								else if(0x02==acc.getBytes()) {
-									cont.append(new CGIAsmMv("mov", "r18", reg));
-									RTOSLibs.MATH_SHL16.setRequired();
-									cont.append(new CGIAsmCall(CALL_INSTR, "os_shl16", true));
-								}
-								else {
-									cont.append(new CGIAsm("push", "r22"));
-									RTOSLibs.MATH_SHL32.setRequired();
-									scope.append(new CGIAsmCall(CALL_INSTR, "os_shl32", true));
-									cont.append(new CGIAsm("pop", "r22"));
-								}
-								return cont;
-							}
-							return null;
-						}
-					});
-				}
-				else {
-					throw new CompileException("CG:cellsAction: unsupported operator: " + op);
-				}
-				break;
-			default:
-				throw new CompileException("CG:cellsAction: unsupported operator: " + op);
-		}
-	}
-
-	@Override
-	public void constAction(CGScope scope, CGCells leftCells, Operator op, long k, boolean rightIsFixed, CGExcs excs) throws CompileException {
-		switch (leftCells.getType()) {
-			case ACC:
-				accAndConstAction(scope, op, k, rightIsFixed, excs);
-				break;
-			case REG:
-				regsAndConstAction(scope, leftCells, op, k, rightIsFixed, excs);
-				break;
-			default:
-				throw new CompileException("Unsupported constAction, leftCells type:" + leftCells.getType());
-		}
-	}
-	
-	// Эксперимент	
-	private void regsAndConstAction(CGScope scope, CGCells leftCells, Operator op, long k, boolean rightIsFixed, CGExcs excs) throws CompileException {
-		CGIContainer cont = new CGIContainer();
-		if(VERBOSE_LO <= verbose) {
-			cont.append(new CGIText(";action [???] " + op + " " + + (rightIsFixed ? k/256.0 : k)));
-		}
-
-		for(int i=0; i<leftCells.getSize(); i++) {
-			int octet = (int)(k>>(i*8)) & 0xff;
-			
-			switch(op) {
-//				case PLUS:
-//					cont.append(new CGIRAsm((0==i ? "add" : "adc"), "r" + leftCells.getId(i), "r" + rightCells.getId(i)));
-//					break;
-				case INC:
-					cont.append(new CGIRAsm((0==i ? "add" : "adc"), "r" + leftCells.getId(i), (0==i ? "C0x01" : "C0x00")));
-					break;
-//				case MINUS:
-//					cont.append(new CGIRAsm((0==i ? "sub" : "sbc"), "r" + leftCells.getId(i), "r" + rightCells.getId(i)));
-//					break;
-				case DEC:
-					cont.append(new CGIRAsm((0==i ? "subi" : "sbci"), "r" + leftCells.getId(i), (0==i ? "1" : "0")));
-				case BIT_AND:
-					cont.append(new CGIRAsm("and", "r" + leftCells.getId(i), "r" + leftCells.getId(i)));
-					break;
-				case BIT_OR:
-					cont.append(new CGIRAsm("or", "r" + leftCells.getId(i), "r" + leftCells.getId(i)));
-					break;
-				case BIT_XOR:
-					cont.append(new CGIRAsm("eor", "r" + leftCells.getId(i), "r" + leftCells.getId(i)));
-					break;
-				case BIT_NOT:
-					cont.append(new CGIRAsm("com", "r" + leftCells.getId(i)));
-					break;
-				//TODO учесть направление
-				case SHL:
-					if(1==k) {
-						cont.append(new CGIRAsm((0==1 ? "lsl" : "rol"), "r" + leftCells.getId(i)));
-					}
-					else {
-						throw new CompileException("Operator " + op + " and const !=1 in cellsConstAction - unsupported yet");
-					}
-					break;
-				//TODO учесть направление
-				case SHR:
-					if(1==k) {
-						cont.append(new CGIRAsm((0==1 ? "lsr" : "ror"), "r" + leftCells.getId(i)));
-					}
-					else {
-						throw new CompileException("Operator " + op + " and const !=1 in cellsConstAction - unsupported yet");
-					}
-					break;
-				default:
-					throw new CompileException("Operator " + op + " in cellsConstAction - unsupported yet");
-			}
-		}
-		scope.append(cont);
-	}
-	
-	private void accAndConstAction(CGScope scope, Operator op, long k, boolean rightIsFixed, CGExcs excs) throws CompileException {
-		int accMaxBits =	(!accumStack.isEmpty() && null==codeExcsChecker.getHandled(excs, J8BException.MathOverflowException.name()) ? 
-							(-1==accumStack.peek().getK().getSize() ? refSize : accumStack.peek().getK().getSize())*0x08 : 0x20);
-		if(VERBOSE_LO <= verbose) {
-			scope.append(new CGIText(";" + acc + "/" + accMaxBits + " " + op + " " + (rightIsFixed ? k/256.0 : k) + "->acc"));
-		}
-
-		if(!acc.getFixed() && rightIsFixed) {
-			acc.setFixed();
-			scope.append(accResize());
-		}
-		
-		int constSize = NumUtils.getBytesRequired(k);
-		
-		switch(op) {
-			case PLUS:
-				if(!acc.getFixed()) {
-					int requiredBits = Math.max(acc.getBits(), constSize*8)+1;
-					acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-					scope.append(accResize());
-				}
-
-				boolean isMathOverflow = null!=codeExcsChecker.getHandled(excs, "MathOverflowException");
-				boolean cUsed = false;
-				for(int i=0; i<acc.getBytes(); i++) {
-					if(isMathOverflow) {
-						int octet = (int)((k>>(i*8))&0xff);
-						if(0x00==octet) {
-							scope.append(new CGIRAsm(i==0 ? "add" : "adc", getRightOp(i, null), "C0x00"));
-						}
-						else if(0x01==octet) {
-							scope.append(new CGIRAsm(i==0 ? "add" : "adc", getRightOp(i, null), "C0x01"));
-						}
-						else if(0xff==octet) {
-							scope.append(new CGIRAsm(i==0 ? "add" : "adc", getRightOp(i, null), "C0xff"));
-						}
-						else {
-							if(0x04!=acc.getBytes()) {
-								scope.append(new CGIAsmLd("ldi", "r19", Integer.toString(octet)));
-								scope.append(new CGIRAsm(i==0 ? "add" : "adc", getRightOp(i, null), "r19"));
-							}
-							else {
-								scope.append(new CGIAsm("push", "r31"));
-								scope.append(new CGIAsmLd("ldi", "r31", Integer.toString(octet)));
-								scope.append(new CGIRAsm(i==0 ? "add" : "adc", getRightOp(i, null), "r31"));
-								scope.append(new CGIAsm("pop", "r31"));
-							}
-						}
-					}
-					else {
-						int octet = (int)(((0==k?0:~k+1)>>(i*8))&0xff);
-						if(!cUsed) {
-							if(0!=octet) {
-								scope.append(new CGIAsm("subi", getRightOp(i, null) + "," + Integer.toString(octet)));
-								cUsed = true;
-							}
-						}
-						else {
-							scope.append(new CGIAsm("sbci", getRightOp(i, null) + "," + Integer.toString(octet)));
-						}
-					}
-				}
-				// Проверка на переполнение полного аккумулятора (4 байта)
-				if(0x20==acc.getBits()) {
-					codeExcsChecker.mathOverflow(this, scope, excs, op, null, false, false);
-				}
-				break;
-			case MINUS:
-				if(!acc.getFixed()) {
-					int requiredBits = Math.max(acc.getBits(), constSize*8);
-					acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-					scope.append(accResize());
-				}
-
-				for(int i=0; i<acc.getBytes(); i++) {
-					scope.append(new CGIAsm(i==0 ? "subi" : "sbci", getRightOp(i, null) + "," + Long.toString((k>>(i*8))&0xff)));
-				}
-				codeExcsChecker.mathOverflow(this, scope, excs, op, null, false, false);
-				break;
-			case SHL:
-				if(rightIsFixed) throw new CompileException("CG:constAction: unsupported operator: " + op);
-				
-				if(!acc.getFixed()) {
-					int requiredBits = acc.getBits() + (int)k;
-					if(requiredBits>=0x18) requiredBits = 0x20;
-					acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-					scope.append(accResize());
-				}
-
-				int octetOffset = (int)k/8;
-				
-				// Проверка переполнения для сдвигов НЕ выполняется.
-				// Причины:
-				// 1. Сдвиг вправо (>>) не может вызвать переполнение — значение уменьшается.
-				// 2. Проверка для сдвига влево (<<) замедлила бы быструю битовую операцию.
-				// 3. Асимметрия проверок (<< проверяем, >> нет) неочевидна для пользователя.
-				// 4. Сдвиги часто используются как быстрый аналог */^, а не как арифметика.
-				// 
-				// TODO реализовать решение: FRONTEND предупреждает, если сдвиг находится внутри try-catch.
-				/*
-				if(null!=codeExcsChecker.getHandled(excs, J8BException.MathOverflowException.name()) && 0x20==acc.getBits()) {
-					byte[] ovfRegs = getOverflowCheckRegs(acc.getBytes(), octetOffset);
-					if(0!=ovfRegs.length) {
-						codeExcsChecker.mathOverflow(this, scope, excs, op, ovfRegs, false, true);
-					}
-				}
-				*/
-				
-				if(0<octetOffset) {
-					byte[] accRegs = getAccRegs(0x04);
-					for(int i=acc.getBytes()-1; i>=0; i--) {
-						int srcIdx = i-octetOffset;
-						if(0<=srcIdx) {
-							scope.append(new CGIAsmMv("mov", "r" + accRegs[i], "r" + accRegs[srcIdx]));
-						}
-						else {
-							scope.append(new CGIAsmLd("ldi", "r" + accRegs[i], "0"));
-						}
-					}
-				}
-				
-				k=k-(octetOffset*8);
-				if(0!=k) {
-					if(0x01==acc.getBytes()) {
-						if(1==k) {
-							scope.append(new CGIAsm("lsl", "r16"));
-						}
-						else {
-							RTOSLibs.MATH_MUL8P2.setRequired();
-							scope.append(new CGIAsmCall(CALL_INSTR, "os_mul8p2_x" + (1<<k), true));
-						}
-					}
-					else if(0x02==acc.getBytes()) {
-						RTOSLibs.MATH_MUL16P2.setRequired();
-						//TODO пока не актуально, к томуже не сохраняю регистр scope.append(new CGIAsmLd("ldi", "r18", "0x00"));
-						scope.append(new CGIAsmCall(CALL_INSTR, "os_mul16p2_x" + (1<<k), true));
-					}
-					else {
-						RTOSLibs.MATH_MUL32P2.setRequired();
-						//TODO пока не актуально, к томуже не сохраняю регистр scope.append(new CGIAsmLd("ldi", "r20", "0x00")); //result
-						scope.append(new CGIAsmCall(CALL_INSTR, "os_mul32p2_x" + (1<<k), true));
-					}
-				}
-				break;
-			case SHR:
-
-/* Не верно, мы отбрасываем левую часть которая может после сдвигов попасть в используемую правую часть
-				if(!acc.getFixed()) {
-					int requiredBits = acc.getBits();
-					if(requiredBits>=0x18) requiredBits = 0x20;
-					acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-					scope.append(accResize());
-				}
-*/
-				octetOffset = (int)k / 8;
-
-				if(0<octetOffset) {
-					byte[] accRegs = getAccRegs(0x04);
-					for(int i=0; i<acc.getBytes(); i++) {
-						int srcIdx = i + octetOffset;
-						if(srcIdx<acc.getBytes()) {
-							scope.append(new CGIAsmMv("mov", "r" + accRegs[i], "r" + accRegs[srcIdx]));
-						}
-						else {
-							scope.append(new CGIAsmLd("ldi", "r" + accRegs[i], "0"));
-						}
-					}
-				}				
-
-				k=k-(octetOffset*8);
-				if(0!=k) {
-					if(0x01==acc.getBytes()) {
-						if(0x01==k) {
-							scope.append(new CGIAsm("lsr", "r16"));
-						}
-						else {
-							RTOSLibs.MATH_DIV8P2.setRequired();
-							scope.append(new CGIAsmCall(CALL_INSTR, "os_div8p2_x" + (1<<k), true));
-						}
-					}
-					else if(0x02==acc.getBytes()) {
-						RTOSLibs.MATH_DIV16P2.setRequired();
-						scope.append(new CGIAsmCall(CALL_INSTR, "os_div16p2_x" + (1<<k), true));
-					}
-					else {
-						RTOSLibs.MATH_DIV32P2.setRequired();
-						scope.append(new CGIAsmCall(CALL_INSTR, "os_div32p2_x" + (1<<k), true));
-					}
-				}
-				break;
-			case MULT:
-				int argSize = (acc.getBytes()>constSize ? acc.getBytes() : constSize);
-				if(!acc.getFixed()) {
-					int requiredBits = (acc.getBits()+constSize*0x08);
-					if(requiredBits>=0x18) requiredBits = 0x20;
-					acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-					scope.append(accResize());
-				}
-
-				if(0x01==argSize) {
-					RTOSLibs.MATH_MUL8.setRequired();
-					scope.append(new CGIAsmLd("ldi", "r17", Long.toString(k&0xff)));
-					scope.append(new CGIAsmCall(CALL_INSTR, "os_mul8", true));
-				}
-				else if(0x02==argSize) {
-					if(rightIsFixed) RTOSLibs.MATH_MULQ7N8.setRequired();
-					else RTOSLibs.MATH_MUL16.setRequired();
-					scope.append(new CGIAsmLd("ldi", "r18", Long.toString(k&0xff)));
-					scope.append(new CGIAsmLd("ldi", "r19", Long.toString((k>>8)&0xff)));
-					scope.append(new CGIAsmCall(CALL_INSTR, (rightIsFixed ? "os_mulq7n8" : "os_mul16"), true));
-				}
-				else {
-					RTOSLibs.MATH_MUL32.setRequired();
-					scope.append(new CGIAsm("push", "r24"));//TODO добавить проверку на занятось регистров
-					scope.append(new CGIAsm("push", "r25"));
-					scope.append(new CGIAsm("push", "r22"));
-					scope.append(new CGIAsm("push", "r23"));
-					scope.append(new CGIAsmLd("ldi", "r24", Long.toString(k&0xff)));
-					scope.append(new CGIAsmLd("ldi", "r25", Long.toString((k>>8)&0xff)));
-					scope.append(new CGIAsmLd("ldi", "r22", Long.toString((k>>16)&0xff)));
-					scope.append(new CGIAsmLd("ldi", "r23", Long.toString((k>>24)&0xff)));
-					scope.append(new CGIAsmCall(CALL_INSTR, "os_mul32_nr", true));
-					scope.append(new CGIAsm("pop", "r23"));
-					scope.append(new CGIAsm("pop", "r22"));
-					scope.append(new CGIAsm("pop", "r25"));
-					scope.append(new CGIAsm("pop", "r24"));
-					codeExcsChecker.mathOverflow(this, scope, excs, op, null, false, false);
-				}
-				break;
-			case DIV:
-				if(!acc.getFixed()) {
-					int requiredBits = Math.max(acc.getBits(), constSize*8);
-					acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-					scope.append(accResize());
-				}
-
-				// Проверка на 0 уже должна была быть выполнена в frontend компилятора
-
-				// TODO Это должно быть в FRONTEND оптимизации
-				if(acc.getBits()<(constSize*8)) {
-					byte[] accRegs = getAccRegs(acc.getBytes());
-					for(byte reg : accRegs) {
-						scope.append(new CGIAsmLd("ldi", "r" + reg, "0x00"));
-					}
-				}
-				else {
-					if(!acc.getFixed()) {
-						int requiredBits = Math.max(acc.getBits(), constSize*8);
-						if(requiredBits>=0x18) requiredBits = 0x20;
-						acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-						scope.append(accResize());
-					}
-
-					if(0x01==acc.getBytes()) {
-						RTOSLibs.MATH_DIV8.setRequired();
-						scope.append(new CGIAsm("push", "r24"));
-						scope.append(new CGIAsmLd("ldi", "r17", Long.toString(k&0xff)));
-						scope.append(new CGIAsmCall(CALL_INSTR, "os_div8", true));
-						scope.append(new CGIAsm("pop", "r24"));
-					}
-					else if(0x02==acc.getBytes()) {
-						if(rightIsFixed) RTOSLibs.MATH_DIVQ7N8.setRequired();
-						else RTOSLibs.MATH_DIV16.setRequired();
-						if(rightIsFixed) {
-							scope.append(new CGIAsmLd("ldi", "r18", Long.toString(k&0xff)));
-							scope.append(new CGIAsmLd("ldi", "r19", Long.toString((k>>8)&0xff)));
-							scope.append(new CGIAsmCall(CALL_INSTR, "os_divq7n8", true));
-						}
-						else {
-							scope.append(new CGIAsm("push", "r24"));
-							scope.append(new CGIAsm("push", "r25"));
-							scope.append(new CGIAsmLd("ldi", "r18", Long.toString(k&0xff)));
-							scope.append(new CGIAsmLd("ldi", "r19", Long.toString((k>>8)&0xff)));
-							scope.append(new CGIAsmCall(CALL_INSTR, "os_div16", true));
-							scope.append(new CGIAsm("pop", "r25"));
-							scope.append(new CGIAsm("pop", "r24"));
-						}
-					}
-					else {
-						RTOSLibs.MATH_DIV32.setRequired();
-						scope.append(new CGIAsm("push", "r24"));//TODO добавить проверку на занятось регистров
-						scope.append(new CGIAsm("push", "r25"));
-						scope.append(new CGIAsm("push", "r22"));
-						scope.append(new CGIAsm("push", "r23"));
-						scope.append(new CGIAsmLd("ldi", "r24", Long.toString(k&0xff)));
-						scope.append(new CGIAsmLd("ldi", "r25", Long.toString((k>>8)&0xff)));
-						scope.append(new CGIAsmLd("ldi", "r22", Long.toString((k>>16)&0xff)));
-						scope.append(new CGIAsmLd("ldi", "r23", Long.toString((k>>24)&0xff)));
-						scope.append(new CGIAsmCall(CALL_INSTR, "os_div32", true));
-						scope.append(new CGIAsm("pop", "r23"));
-						scope.append(new CGIAsm("pop", "r22"));
-						scope.append(new CGIAsm("pop", "r25"));
-						scope.append(new CGIAsm("pop", "r24"));
-					}
-				}
-				break;
-			// Проверка на 0 уже должна была быть выполнена в frontend компилятора
-			case MOD:
-				if(!acc.getFixed()) {
-					int requiredBits = Math.max(acc.getBits(), constSize*8);
-					acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-					scope.append(accResize());
-				}
-
-				if(rightIsFixed) throw new CompileException("CG:constAction: unsupported operator: " + op);
-				
-				if(acc.getBits()>=(constSize*8)) {	// TODO Это должно быть в FRONTEND оптимизации
-					if(!acc.getFixed()) {
-						int requiredBits = Math.max(acc.getBits(), constSize*8);
-						if(requiredBits>=0x18) requiredBits = 0x20;
-						acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-						scope.append(accResize());
-					}
-
-					if(0x01==acc.getBytes()) {
-						RTOSLibs.MATH_DIV8.setRequired();
-						scope.append(new CGIAsm("push", "r24"));
-						scope.append(new CGIAsmLd("ldi", "r17", Long.toString(k&0xff)));
-						scope.append(new CGIAsmCall(CALL_INSTR, "os_div8", true));
-						scope.append(new CGIAsmMv("mov", "r16", "r24"));
-						scope.append(new CGIAsm("pop", "r24"));
-					}
-					else if(0x02==acc.getBytes()) {
-						RTOSLibs.MATH_DIV16.setRequired();
-						scope.append(new CGIAsm("push", "r24"));
-						scope.append(new CGIAsm("push", "r25"));
-						scope.append(new CGIAsmLd("ldi", "r18", Long.toString(k&0xff)));
-						scope.append(new CGIAsmLd("ldi", "r19", Long.toString((k>>8)&0xff)));
-						scope.append(new CGIAsmCall(CALL_INSTR, "os_div16", true));
-						scope.append(new CGIAsmMv("mov", "r16", "r24"));
-						scope.append(new CGIAsmMv("mov", "r17", "r25"));
-						scope.append(new CGIAsm("pop", "r25"));
-						scope.append(new CGIAsm("pop", "r24"));
-					}
-					else {
-						RTOSLibs.MATH_DIV32.setRequired();
-						scope.append(new CGIAsm("push", "r24"));//TODO добавить проверку на занятось регистров
-						scope.append(new CGIAsm("push", "r25"));
-						scope.append(new CGIAsm("push", "r22"));
-						scope.append(new CGIAsm("push", "r23"));
-						scope.append(new CGIAsmLd("ldi", "r24", Long.toString(k&0xff)));
-						scope.append(new CGIAsmLd("ldi", "r25", Long.toString((k>>8)&0xff)));
-						scope.append(new CGIAsmLd("ldi", "r22", Long.toString((k>>16)&0xff)));
-						scope.append(new CGIAsmLd("ldi", "r23", Long.toString((k>>24)&0xff)));
-						scope.append(new CGIAsmCall(CALL_INSTR, "os_div32", true));
-						scope.append(new CGIAsmMv("mov", "r16", "r24"));
-						scope.append(new CGIAsmMv("mov", "r17", "r25"));
-						scope.append(new CGIAsmMv("mov", "r18", "r22"));
-						scope.append(new CGIAsmMv("mov", "r19", "r23"));
-						scope.append(new CGIAsm("pop", "r23"));
-						scope.append(new CGIAsm("pop", "r22"));
-						scope.append(new CGIAsm("pop", "r25"));
-						scope.append(new CGIAsm("pop", "r24"));
-					}
-				}
-				break;
-			case BIT_AND:
-				if(!rightIsFixed) {
-					int requiredBits = Math.max(acc.getBits(), constSize*8);
-					acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-					scope.append(accResize());
-
-					for(int i=0; i<acc.getBytes(); i++) {
-						scope.append(new CGIAsm("andi", getRightOp(i, null) + "," + Long.toString((k>>(i*8))&0xff)));
-					}
-				}
-				else {
-					throw new CompileException("CG:constAction: unsupported operator: " + op);
-				}
-				break;
-			case BIT_OR:
-				if(!rightIsFixed) {
-					int requiredBits = Math.max(acc.getBits(), constSize*8);
-					acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-					scope.append(accResize());
-
-					for(int i=0; i<acc.getBytes(); i++) {
-						scope.append(new CGIAsm("ori", getRightOp(i, null) + "," + Long.toString((k>>(i*8))&0xff)));
-					}
-				}
-				else {
-					throw new CompileException("CG:constAction: unsupported operator: " + op);
-				}
-				break;
-			case BIT_XOR:
-				if(!rightIsFixed) {
-					int requiredBits = Math.max(acc.getBits(), constSize*8);
-					acc.setBits(requiredBits>accMaxBits ? accMaxBits : requiredBits);
-					scope.append(accResize());
-
-					for(int i=0; i<acc.getBytes(); i++) {
-						int octet = (int)((k>>(i*8))&0xff);
-						if(0x00==octet) {
-							scope.append(new CGIAsm("eor", getRightOp(i, null) + ",C0x00"));
-						}
-						else if(0x01==octet) {
-							scope.append(new CGIAsm("eor", getRightOp(i, null) + ",C0x01"));
-						}
-						else if(0xff==octet) {
-							scope.append(new CGIAsm("eor", getRightOp(i, null) + ",C0xff"));
-						}
-						else {
-							if(0x04!=acc.getBytes()) {
-								scope.append(new CGIAsmLd("ldi", "r19", Integer.toString(octet)));
-								scope.append(new CGIAsm("eor", getRightOp(i, null) + ",r19"));
-							}
-							else {
-								scope.append(new CGIAsm("push", "r31"));
-								scope.append(new CGIAsmLd("ldi", "r31", Integer.toString(octet)));
-								scope.append(new CGIAsm("eor", getRightOp(i, null) + ",r31"));
-								scope.append(new CGIAsm("pop", "r31"));
-							}
-						}
-					}
-				}
-				else {
-					throw new CompileException("CG:constAction: unsupported operator: " + op);
-				}
-				break;
-			default:
-				throw new CompileException("CG:constAction: unsupported operator: " + op);
-		}
-	}
-	
-/*	РУДИМЕНТ
-	private byte[] getOverflowCheckRegs(int accBytes, int octetOffset) {
-		// Вытесняются старшие octetOffset байт
-		int checkCount = Math.min(octetOffset, accBytes);
-
-		if(checkCount <= 0) {
-			return new byte[0];
-		}
-
-		byte[] regs = new byte[checkCount];
-		byte[] accRegs = getAccRegs(4);  // [r16, r17, r18, r19]
-
-		// Старшие байты: от accBytes-1 вниз до accBytes-octetOffset
-		for(int i = 0; i < checkCount; i++) {
-			regs[i] = accRegs[accBytes - 1 - i];
-		}
-
-		return regs;
-	}*/
-	
-//Пытаемся оптимизировать, пока просто набросок
-	@Override
-	public void cellsOpCells(CGScope scope, CGCells leftCells, VarType leftType, Operator op, CGCells rightCells, VarType rightType)
-																																	throws CompileException {
-		CGIContainer cont = new CGIContainer();
-		String info =	leftCells + "[" + leftType + "] " + op + " " + rightCells + "[" + rightType + "])";
-		if(VERBOSE_LO <= verbose) cont.append(new CGIText(";cells cp " + info));
-
-		int leftSize = null==leftType ? leftCells.getSize() : (-1==leftType.getSize() ? refSize : leftType.getSize());
-		int rightSize = null==rightType ? rightCells.getSize() : (-1==rightType.getSize() ? refSize : rightType.getSize());
-		int size = Math.max(leftSize, rightSize);
-
-		byte[] accRegs = getAccRegs(size);
-		switch(op) {
-			case PLUS:
-				switch(leftCells.getType()) {
-					case REG:
-						switch(rightCells.getType()) {
-							case CONST:
-								if(leftSize<rightSize) throw new CompileException("cellOpCells " + info + " left operand size < const size");
-								if(leftType.isFixedPoint() && !rightType.isFixedPoint()) {
-									if(0x01!=rightSize) throw new CompileException("cellOpCells " + info + " const size!=1");
-									cont.append(new CGIRAsm("subi", "r"+leftCells.getId(0x01), "-"+rightCells.getId(0)));
-								}
-								else {
-									for(int index=0; index<size; index++) {
-										if(index<rightSize) {
-											cont.append(new CGIRAsm(0==index ? "subi" : "sbci", "r"+leftCells.getId(index), "-"+rightCells.getId(index)));
-										}
-										else {
-											cont.append(new CGIRAsm("sbci", "r"+leftCells.getId(index), "0x00"));
-										}
-									}
-								}
-								break;
-							default:
-								throw new CompileException("cellOpCells " + info + " unsupported yet");
-						}
-						break;
-					default:
-						throw new CompileException("cellOpCells " + info + " unsupported yet");
-				}
-				break;
-			case ROL:
-				switch(leftCells.getType()) {
-					case REG:
-						switch(rightCells.getType()) {
-							case FLAG:
-								if(1!=size) throw new CompileException("cellOpCells " + info + " unsupported yet");
-								cont.append(new CGIRAsm("rol", "r"+leftCells.getId(0)));
-								break;
-							default:
-								throw new CompileException("cellOpCells " + info + " unsupported yet");
-						}
-						break;
-					default:
-						throw new CompileException("cellOpCells " + info + " unsupported yet");
-				}
-				break;
-			case ROR:
-				switch(leftCells.getType()) {
-					case REG:
-						switch(rightCells.getType()) {
-							case FLAG:
-								if(1!=size) throw new CompileException("cellOpCells " + info + " unsupported yet");
-								cont.append(new CGIRAsm("ror", "r"+leftCells.getId(0)));
-								break;
-							default:
-								throw new CompileException("cellOpCells " + info + " unsupported yet");
-						}
-						break;
-					default:
-						throw new CompileException("cellOpCells " + info + " unsupported yet");
-				}
-				break;
-			default:
-				throw new CompileException("cellOpCells " + info + " unsupported yet");
-		}
-		
-		scope.append(cont);
 	}
 
 	@Override
@@ -4072,8 +1194,8 @@ public class Generator extends CodeGenerator {
 		
 		// Для сравнения не имеет значения какие ограничения установлены аккумулятору - приводим к общему размеру
 		if(CGCells.Type.ACC==leftCells.getType() && acc.getBytes()<size) {
-			accGrow(cont, acc.getBytes(), size);
-			cont.append(accResize());
+			Utils.accGrow(cont, acc, acc.getBytes(), size);
+			cont.append(Utils.accResize(acc, verbose));
 		}
 		
 		if(CGCells.Type.STACK==leftCells.getType() && CGCells.Type.STACK==rightCells.getType()) {
@@ -4114,25 +1236,29 @@ public class Generator extends CodeGenerator {
 		boolean leftIsFixed = (null==leftType ? false : leftType.isFixedPoint());
 		boolean rightIsFixed = (null==rightType ? false : rightType.isFixedPoint());
 		
-		byte[] accRegs = getAccRegs(size);
 		for(int index=0; index<size; index++) {
 			switch(leftCells.getType()) { //src
 				case ACC:
 					if(!leftIsFixed && rightIsFixed) {
 						leftReg = (0==index ? "C0x00" : "r"+accRegs[index-1]);
-						leftIsFixed = true;
+						if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, true, rightIsFixed)) {
+							throw new CompileException("cellCpcells " + info + " unsupported yet");
+						}
 					}
 					else {
 						leftReg = (index<accRegs.length ? "r" + accRegs[index] : "C0x00");
-					}
-					if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, leftIsFixed, rightIsFixed)) {
-						throw new CompileException("cellCpcells " + info + " unsupported yet");
+						if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, leftIsFixed, rightIsFixed)) {
+							throw new CompileException("cellCpcells " + info + " unsupported yet");
+						}
 					}
 					break;
 				case ARGS:
 				case STACK_FRAME:
 					if(index>=leftSize) {
 						leftReg = "C0x00";
+						if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, leftIsFixed, rightIsFixed)) {
+							throw new CompileException("cellCpcells " + info + " unsupported yet");
+						}
 					}
 					else {
 						if(!leftIsFixed && rightIsFixed) {
@@ -4144,16 +1270,18 @@ public class Generator extends CodeGenerator {
 								cont.append(new CGIAsmIReg( 'y', true, leftReg, leftCells.getId(index-1), getCurBlockScope(scope),
 															(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS==leftCells.getType()));
 							}
-							leftIsFixed = true;
+							if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, true, rightIsFixed)) {
+								throw new CompileException("cellCpcells " + info + " unsupported yet");
+							}
 						}
 						else {
 							if(leftReg.isEmpty()) leftReg = "zl";
 							cont.append(new CGIAsmIReg( 'y', true, leftReg, leftCells.getId(index), getCurBlockScope(scope),
 														(CGBlockScope)leftCells.getObject(), CGCells.Type.ARGS==leftCells.getType()));
+							if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, leftIsFixed, rightIsFixed)) {
+								throw new CompileException("cellCpcells " + info + " unsupported yet");
+							}
 						}
-					}
-					if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, leftIsFixed, rightIsFixed)) {
-						throw new CompileException("cellCpcells " + info + " unsupported yet");
 					}
 					break;
 				case ARRAY:
@@ -4165,14 +1293,16 @@ public class Generator extends CodeGenerator {
 							if(leftReg.isEmpty()) leftReg = "zl";
 							cont.append(new CGIRAsm("ld", leftReg, "x+"));
 						}
-						leftIsFixed = true;
+						if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, true, rightIsFixed)) {
+							throw new CompileException("cellCpcells " + info + " unsupported yet");
+						}
 					}
 					else {
 						if(leftReg.isEmpty()) leftReg = "zl";
 						cont.append(new CGIRAsm("ld", leftReg, "x+"));
-					}
-					if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, leftIsFixed, rightIsFixed)) {
-						throw new CompileException("cellCpcells " + info + " unsupported yet");
+						if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, leftIsFixed, rightIsFixed)) {
+							throw new CompileException("cellCpcells " + info + " unsupported yet");
+						}
 					}
 					break;
 				case HEAP:
@@ -4184,14 +1314,16 @@ public class Generator extends CodeGenerator {
 							if(leftReg.isEmpty()) leftReg = "yl";
 							cont.append(new CGIAsmIReg('z', true, leftReg, leftCells.getId(index-1)));
 						}
-						leftIsFixed = true;
+						if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, true, rightIsFixed)) {
+							throw new CompileException("cellCpcells " + info + " unsupported yet");
+						}	
 					}
 					else {
 						if(leftReg.isEmpty()) leftReg = "yl";
 						cont.append(new CGIAsmIReg('z', true, leftReg, leftCells.getId(index)));
-					}
-					if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, leftIsFixed, rightIsFixed)) {
-						throw new CompileException("cellCpcells " + info + " unsupported yet");
+						if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, leftIsFixed, rightIsFixed)) {
+							throw new CompileException("cellCpcells " + info + " unsupported yet");
+						}
 					}
 					break;
 				case HEAP_ALT:
@@ -4206,7 +1338,9 @@ public class Generator extends CodeGenerator {
 							}
 							cont.append(new CGIRAsm("ld", leftReg, "x+"));
 						}
-						leftIsFixed = true;
+						if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, true, rightIsFixed)) {
+							throw new CompileException("cellCpcells " + info + " unsupported yet");
+						}
 					}
 					else {
 						if(leftReg.isEmpty()) leftReg = "zl";
@@ -4215,21 +1349,23 @@ public class Generator extends CodeGenerator {
 							scope.append(new CGIAsm("sbci", "r27,high(-" + (leftCells.getId(1)) + ")"));
 						}
 						cont.append(new CGIRAsm("ld", leftReg, "x+"));
-					}
-					if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, leftIsFixed, rightIsFixed)) {
-						throw new CompileException("cellCpcells " + info + " unsupported yet");
+						if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, leftIsFixed, rightIsFixed)) {
+							throw new CompileException("cellCpcells " + info + " unsupported yet");
+						}
 					}
 					break;
 				case REG:
 					if(!leftIsFixed && rightIsFixed) {
 						leftReg = (0==index ? "C0x00" : "r"+leftCells.getId(index-1));
-						leftIsFixed = true;
+						if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, true, rightIsFixed)) {
+							throw new CompileException("cellCpcells " + info + " unsupported yet");
+						}
 					}
 					else {
 						leftReg = (index<leftCells.getSize() ? "r"+leftCells.getId(index) : "C0x00");
-					}
-					if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, leftIsFixed, rightIsFixed)) {
-						throw new CompileException("cellCpcells " + info + " unsupported yet");
+						if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, leftIsFixed, rightIsFixed)) {
+							throw new CompileException("cellCpcells " + info + " unsupported yet");
+						}
 					}
 					break;
 				case STACK:
@@ -4241,14 +1377,16 @@ public class Generator extends CodeGenerator {
 							if(leftReg.isEmpty()) leftReg = "j8b_atom";
 							cont.append(new CGIRAsm("pop", leftReg));
 						}
-						leftIsFixed = true;
+						if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, true, rightIsFixed)) {
+							throw new CompileException("cellCpcells " + info + " unsupported yet");
+						}
 					}
 					else {
 						if(leftReg.isEmpty()) leftReg = "j8b_atom";
 						cont.append(new CGIRAsm("pop", leftReg));
-					}
-					if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, leftIsFixed, rightIsFixed)) {
-						throw new CompileException("cellCpcells " + info + " unsupported yet");
+						if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, leftIsFixed, rightIsFixed)) {
+							throw new CompileException("cellCpcells " + info + " unsupported yet");
+						}
 					}
 					break;
 				case STAT:
@@ -4260,14 +1398,16 @@ public class Generator extends CodeGenerator {
 							if(leftReg.isEmpty()) leftReg = "zl";
 							cont.append(new CGIRAsm("lds", leftReg, "_OS_STAT_POOL+" + rightCells.getId(index-1)));
 						}
-						leftIsFixed = true;
+						if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, true, rightIsFixed)) {
+							throw new CompileException("cellCpcells " + info + " unsupported yet");
+						}
 					}
 					else {
 						if(leftReg.isEmpty()) leftReg = "zl";
 						cont.append(new CGIRAsm("lds", leftReg, "_OS_STAT_POOL+" + rightCells.getId(index)));
-					}
-					if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, leftIsFixed, rightIsFixed)) {
-						throw new CompileException("cellCpcells " + info + " unsupported yet");
+						if(!cellsCpCellsCommon(scope, cont, leftReg, index, rightCells, size, pushRegs, leftIsFixed, rightIsFixed)) {
+							throw new CompileException("cellCpcells " + info + " unsupported yet");
+						}
 					}
 					break;
 				default:
@@ -4398,7 +1538,7 @@ public class Generator extends CodeGenerator {
 		if(!leftReg.equals("r19") && 0x03>=acc.getBytes()) rightReg = "r19";
 		else if(!leftReg.equals("r18") && 0x02>=acc.getBytes()) rightReg = "r18";
 		
-		byte[] accRegs = getAccRegs(acc.getBytes());
+		byte[] accRegs = Utils.getAccRegs(acc.getBytes());
 		switch(rightCells.getType()) {
 			case ACC:
 				if(leftIsFixed && !rightIsFixed) {
@@ -4614,107 +1754,6 @@ public class Generator extends CodeGenerator {
 		scope.append(new CGIAsmCondJump(inverted ? "brcs" : "brcc", branchScope.getEnd()));
 	}
 
-	String getRightOp(int sn, Long constant) { //возвращает либо байт константы, либо регистр аккумуляора, если constant is null
-		if(null == constant) {
-			switch(sn) {
-				case 0: return "r16";
-				case 1: return "r17";
-				case 2: return "r18";
-				default: return "r19";
-			}
-		}
-		return Long.toString((constant>>(sn*8))&0xff);
-	}
-	
-	// Атомарность должна быть обеспечена вызывающей стороной
-	public void cellsActionAsm(CGScope scope, CGCells cells, int size, CGActionHandler handler) throws CompileException {
-		switch(cells.getType()) {
-			case REG:
-				for(int i=0; i<size; i++) {
-					if(cells.getSize()>i) {
-						scope.append(handler.action(i, "r" + cells.getId(i)));
-					}
-					else {
-						scope.append(handler.action(i, null));
-					}
-				}
-				break;
-			case ARGS:
-			case STACK_FRAME:
-				for(int i=0; i<size; i++) {
-					if(cells.getSize()>i) {
-						scope.append(new CGIAsmIReg('y', true, "j8b_atom", cells.getId(i), getCurBlockScope(scope), (CGBlockScope)cells.getObject(),
-													CGCells.Type.ARGS == cells.getType()));
-						scope.append(handler.action(i, "j8b_atom"));
-					}
-					else {
-						scope.append(handler.action(i, null));
-					}
-				}
-				break;
-			case HEAP:
-				for(int i=0; i<size; i++) {
-					if(cells.getSize()>i) {
-						scope.append(new CGIAsmIReg('z', true, "j8b_atom", cells.getId(i)));
-						scope.append(handler.action(i, "j8b_atom"));
-					}
-					else {
-						scope.append(handler.action(i, null));
-					}
-				}
-				break;
-			case STACK:
-				//Значение лежит на вершине стека(BigEndian)
-				for(int i=0; i<size; i++) {
-					if(cells.getSize()>i) {
-						scope.append(new CGIAsm("pop", "j8b_atom"));
-						scope.append(handler.action(i, "j8b_atom"));//TODO не могу использовать tmpReg так как он влияет на stack!!!
-					}
-					else {
-						scope.append(handler.action(i, null));
-					}
-				}
-				break;
-			case ARRAY:
-				for(int i=0; i<size; i++) {
-					if(cells.getSize()>i) {
-						scope.append(new CGIAsmLd("ld", "j8b_atom", "x" + (i!=(size-1) ? "+" : "")));
-						scope.append(handler.action(i, "j8b_atom"));
-					}
-					else {
-						scope.append(handler.action(i, null));
-					}
-				}
-				break;
-			case STAT:
-				for(int i=0; i<size; i++) {
-					if(cells.getSize()>i) {
-						scope.append(new CGIAsmLd("lds", "j8b_atom", "_OS_STAT_POOL+" + cells.getId(i)));
-						scope.append(handler.action(i, "j8b_atom"));
-					}
-					else {
-						scope.append(handler.action(i, null));
-					}
-				}
-				break;
-			default:
-				throw new CompileException("Unsupported cell type:" + cells.getType());
-		}
-	};
-	
-	public void constActionAsm(CGScope scope, Object k, CGConstActionHandler handler) throws CompileException {
-		if(k instanceof byte[]) {
-			for(int i=0; i<acc.getBytes(); i++) {
-				scope.append(handler.action(i, ((byte[])k)[i]&0xff));
-			}
-		}
-		else {
-			for(int i=0; i<acc.getBytes(); i++) {
-				scope.append(handler.action(i, (int)(((long)k)>>(i*8))&0xff));
-			}
-		}
-	};
-
 	@Override
 	public CGIContainer eNewInstance(	CGScope scope, int heapSize, CGLabelScope metaLabel, VarType type, InstanceType instType,  CGIContainer postfixCont,
 										CGExcs excs) throws CompileException {
@@ -4783,7 +1822,7 @@ public class Generator extends CodeGenerator {
 			cont.append(new CGIAsmLdLabel("ldi", "r19", "high(" + metaLabel.getName()+ "*2)"));
 			cont.append(new CGIAsm("std", "z+0x04,r19"));
 		}
-		else if(InstanceType.CLASS==instType || InstanceType.RTOS_CALLBACK==instType) {
+		else if(InstanceType.CLASS==instType || InstanceType.NATIVE_CALLBACK==instType) {
 			RTOSLibs.NEW_CLASS.setRequired();
 			cont.append(new CGIAsmLd("ldi", "r16", "low(" + heapSize + ")"));
 			cont.append(new CGIAsmLd("ldi", "r17", "high(" + heapSize + ")"));
@@ -5053,7 +2092,13 @@ public class Generator extends CodeGenerator {
 	@Override
 	public NativeBinding nativeMethodInit(CGScope scope, String signature) throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";Native method " + signature));
-		NativeBinding nb = device.getPlatform().getNativeBinding(signature);
+		NativeBinding nb = null;
+		if(null!=device.getLocalNbMap()) {
+			nb = device.getLocalNbMap().get(signature);
+		}
+		if(null==nb) {
+			nb = device.getPlatform().getNativeBinding(signature);
+		}
 		
 		Set<Byte> uniqueSet = new HashSet<>();
 		byte[][] regs = null;
@@ -5092,7 +2137,7 @@ public class Generator extends CodeGenerator {
 			}
 			if(isFixed) acc.setFixed();
 			else acc.setBytes(regs.length);
-			scope.append(accResize());
+			scope.append(Utils.accResize(acc, verbose));
 
 //			Аккумулятор может быть больше, это ни о чем не говорит
 //			if(accum.getSize()>regs.length) {
@@ -5109,7 +2154,7 @@ public class Generator extends CodeGenerator {
 				boolean dstIsUsedAcc = false;
 				//int accSize = (accumStack.isEmpty() ? acc.getBytes() : (-1==accumStack.peek().getK().getSize() ? refSize : accumStack.peek().getK().getSize()));
 				// Не понятно ограничение, проверяем на все регистры акумулятора
-				for(byte accReg : getAccRegs(0x04)) {//accSize)) {
+				for(byte accReg : Utils.getAccRegs(0x04)) {//accSize)) {
 					if(dstReg==accReg) {
 						dstIsUsedAcc = true;
 						break;
@@ -5122,7 +2167,7 @@ public class Generator extends CodeGenerator {
 			}
 
 			//TODO не учитываем что регистр может уже использоваться!
-			byte[] accRegs = getAccRegs(acc.getBytes());
+			byte[] accRegs = Utils.getAccRegs(acc.getBytes());
 			for(int i=0; i<regs.length; i++) {
 				byte dstReg = regs[i];
 				if(acc.getBytes()>i) {
@@ -5136,116 +2181,6 @@ public class Generator extends CodeGenerator {
 		}
 	}
 
-/*рудимент, нативный код сам знает где массив и сам выполняет проверки и смещения
-	@Override
-	public void nativeMethodArrArgPrepare(CGScope scope, String signature, List<Byte> storedRegs, int index, boolean checkedByCompiler, CGLabelScope lbScope) throws CompileException {
-		// Здесь оказываемся сразу после подготовленных регистров передающих адрес массива и длину обрабатываемых данных
-		// Необходимо сместить адрес на начало данных - сейчас установлен на начало заголовка (в котором есть длина массива)
-		// А также необходимо проверить выход за пределы массива (если checkedByCompiler=false)
-
-		byte[] arrAddrRegs = nativeMethodRegs.peek()[index-1];
-
-		if(checkedByCompiler) {
-			// Если индекс проверен, то достаточно просто задать адрес начал данных
-			scope.append(new CGIRAsm("subi", "r"+arrAddrRegs[0], "low(-5)"));
-			scope.append(new CGIRAsm("sbci", "r"+arrAddrRegs[1], "high(-5)"));
-		}
-		else {
-			byte[] lengthRegs = nativeMethodRegs.peek()[index];
-			
-			// Включаем для генерации исключения
-			scope.append(new CGIAsm("set"));
-
-			Set<Byte> usedRegs = new HashSet<>();
-			if(2<nativeMethodRegs.peek().length) {
-				for(int i=0; i<index-1; i++) {
-					byte[] regs = nativeMethodRegs.peek()[i];
-					for(Byte reg : regs) {
-						usedRegs.add(reg);
-					}
-				}
-			}
-
-			// Необходимо убедиться что arrAddrRegs находится в паре индексных регистров или есть пара индексных регистров не задейстованных в arrAddrRegs и
-			// lengthRegs
-
-			char indexReg = (char)-1;
-			char tmpReg = (char)-1;
-			if(26==arrAddrRegs[0] && 27==arrAddrRegs[1]) {
-				indexReg = 'x';
-			}
-			else if(28==arrAddrRegs[0] && 29==arrAddrRegs[1]) {
-				indexReg = 'y';
-			}
-			else if(30==arrAddrRegs[0] && 31==arrAddrRegs[1]) {
-				indexReg = 'z';
-			}
-			else if(26!=arrAddrRegs[0] && 26!=arrAddrRegs[1] && 27!=arrAddrRegs[0] && 27!=arrAddrRegs[1] &&
-					26!=lengthRegs[0] && 26!=lengthRegs[1] && 27!=lengthRegs[0] && 27!=lengthRegs[1]) {
-				tmpReg = 'x';
-			}
-			else if(28!=arrAddrRegs[0] && 28!=arrAddrRegs[1] && 29!=arrAddrRegs[0] && 29!=arrAddrRegs[1] &&
-					28!=lengthRegs[0] && 28!=lengthRegs[1] && 29!=lengthRegs[0] && 29!=lengthRegs[1]) {
-				tmpReg = 'y';
-			}
-			else if(30!=arrAddrRegs[0] && 30!=arrAddrRegs[1] && 31!=arrAddrRegs[0] && 31!=arrAddrRegs[1] &&
-					30!=lengthRegs[0] && 30!=lengthRegs[1] && 31!=lengthRegs[0] && 31!=lengthRegs[1]) {
-				tmpReg = 'z';
-			}
-			if(-1==indexReg && -1==tmpReg) throw new CompileException("Bounds check impossible: index pairs occupied by arguments (suboptimal register allocation).");
-
-
-			if(-1==indexReg) {
-				scope.append(new CGIRAsm("push", tmpReg+"l"));
-				scope.append(new CGIAsmMv("mov", tmpReg+"l", "r"+arrAddrRegs[0]));
-				scope.append(new CGIRAsm("push", tmpReg+"h"));
-				scope.append(new CGIAsmMv("mov", tmpReg+"h", "r"+arrAddrRegs[1]));
-			}
-
-			if('x'==indexReg) {
-				scope.append(new CGIRAsm("adiw", "xl", "0x03"));
-				scope.append(new CGIAsmLd("ld", "j8b_atom", "x+"));
-				scope.append(new CGIRAsm("cp", "j8b_atom", "r"+lengthRegs[0]));
-				scope.append(new CGIAsmLd("ld", "j8b_atom", "x+"));
-			}
-			else if(-1!=indexReg) {
-				scope.append(new CGIAsmLd("ld", "j8b_atom", indexReg+"+0x03"));
-				scope.append(new CGIRAsm("cp", "j8b_atom", "r"+lengthRegs[0]));
-				scope.append(new CGIAsmLd("ld", "j8b_atom", indexReg+"+0x04"));
-			}
-			else if('x'==tmpReg) {
-				scope.append(new CGIRAsm("sbiw", "xl", "0x02"));
-				scope.append(new CGIAsmLd("ld", "j8b_atom", "x+"));
-				scope.append(new CGIRAsm("cp", "j8b_atom", "r"+lengthRegs[0]));
-				scope.append(new CGIAsmLd("ld", "j8b_atom", "x+"));
-			}
-			else {
-				scope.append(new CGIAsmLd("ld", "j8b_atom", tmpReg+"+0x03"));
-				scope.append(new CGIRAsm("cp", "j8b_atom", "r"+lengthRegs[0]));
-				scope.append(new CGIAsmLd("ld", "j8b_atom", tmpReg+"+0x04"));
-			}
-			scope.append(new CGIRAsm("cpc", "j8b_atom", "r"+lengthRegs[1]));
-
-			if(-1==indexReg) {
-				scope.append(new CGIRAsm("pop", tmpReg+"h"));
-				scope.append(new CGIRAsm("pop", tmpReg+"l"));
-			}
-
-			scope.append(new CGIAsmCondJump("brcs", lbScope)); // При обнаружении выхода за границы прыгаем на код после call не выключая флаг T
-
-			// Выключаем для отключения генерации исключения
-			scope.append(new CGIAsm("clt"));
-
-			if('x'!=indexReg && -1!=indexReg) {
-				scope.append(new CGIRAsm("adiw", ""+indexReg+"l", "5"));
-			}
-			else if(-1==indexReg) {
-				scope.append(new CGIRAsm("subi", "r"+arrAddrRegs[0], "low(-5)"));
-				scope.append(new CGIRAsm("sbci", "r"+arrAddrRegs[1], "high(-5)"));
-			}
-		}
-	}
-*/
 	@Override
 	public void nativeMethodInvoke(CGScope scope, NativeBinding nb, String signature, List<Byte> storedRegs, VarType type, boolean sendThis)
 																																	throws CompileException {
@@ -5395,6 +2330,7 @@ public class Generator extends CodeGenerator {
 				if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
 				break;
 			case "uptime_b0":
+				acc.setBytes(0x01);
 				scope.append(new CGIRAsm("lds", "r16" ,"_OS_UPTIME+0x00"));
 				break;
 			default:
@@ -5409,7 +2345,7 @@ public class Generator extends CodeGenerator {
 		
 		switch(cells.getType()) {
 			case REG:
-				regsMv(scope, cellsToRegs(cells), getAccRegs(0x02));
+				regsMv(scope, cellsToRegs(cells), Utils.getAccRegs(0x02));
 				break;
 			case ARGS:
 			case STACK_FRAME:
@@ -5472,7 +2408,8 @@ public class Generator extends CodeGenerator {
 						scope.append(new CGIAsmLd("ldi", "r27", "0x00"));
 					}
 					else {
-						scope.append(new CGIAsmIReg('y', true, "r27", cells.getId(1)));
+						scope.append(new CGIAsmIReg('y', true, "r27", cells.getId(1), getCurBlockScope(scope), (CGBlockScope)cells.getObject(),
+													CGCells.Type.ARGS == cells.getType()));
 					}
 					break;
 				case HEAP:
@@ -5561,7 +2498,7 @@ public class Generator extends CodeGenerator {
 			else {
 				acc.setBytes(size);
 			}
-			result.append(accResize());
+			result.append(Utils.accResize(acc, verbose));
 		}
 		
 		if(null==lScope) {
@@ -5605,8 +2542,8 @@ public class Generator extends CodeGenerator {
 	}
 	
 	@Override
-	public void throwCheck(	CGScope scope, List<Pair<CGLabelScope, Set<Integer>>> exceptionHandlers, CGLabelScope methodEndLbScope,
-							ExcsThrowPoint point)																					throws CompileException {
+	public void throwCheck(CGScope scope, List<Pair<CGLabelScope, Set<Integer>>> exceptionHandlers, CGLabelScope endLbScope, ExcsThrowPoint point)
+																																	throws CompileException {
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";throwsCheck"));
 		
 		setFeature(RtosFeature.OS_FT_ETRACE);
@@ -5649,7 +2586,7 @@ public class Generator extends CodeGenerator {
 			cont15b.append(new CGIAsm("ldi", "r19,high(" + (point.getId()&0x7fff) + ")"));
 			scope.append(point.makeContainer(cont7b, cont15b));
 			scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_etrace_add", true));*/
-			jump(scope, methodEndLbScope);
+			jump(scope, endLbScope);
 		}
 		scope.append(lbSkipThrow);
 		if(VERBOSE_LO <= verbose) scope.append(new CGIText(";throwsCheck end"));
@@ -5699,26 +2636,10 @@ public class Generator extends CodeGenerator {
 	}
 
 	@Override
-	public void terminate(CGScope scope, boolean systemStop, boolean excsCheck) throws CompileException {
-		Object obj = device.getParam(RTOSParam.HALT_OK_MODE);
-		RTOSHaltMode okMode = (null==obj ? RTOSHaltMode.HALT : RTOSHaltMode.values()[(Integer)obj]);
-		obj = device.getParam(RTOSParam.HALT_ERR_MODE);
-		RTOSHaltMode errMode = (null==obj ? RTOSHaltMode.HALT : RTOSHaltMode.values()[(Integer)obj]);
+	public void terminate(CGScope scope, RTOSHaltMode okMode, RTOSHaltMode errMode, boolean excsCheck) throws CompileException {
+		scope.append(new CGLabelScope(null, -1, LabelNames.ENDPOINT, true));
 
-		if(RTOSHaltMode.HALT==okMode || RTOSHaltMode.HALT==errMode) {
-			RTOSLibs.MCU_HALT.setRequired();
-		}
-		if(RTOSHaltMode.BLINK==okMode || RTOSHaltMode.BLINK==errMode) {
-			RTOSLibs.MCU_BLINK_FOREVER.setRequired();
-		}
-		if(RTOSHaltMode.RESET==okMode || RTOSHaltMode.RESET==errMode) {
-			RTOSLibs.MCU_RESET.setRequired();
-		}
-		if(RTOSHaltMode.BLINK_AND_RESET==okMode || RTOSHaltMode.BLINK_AND_RESET==errMode) {
-			RTOSLibs.MCU_BLINK_N_RESET.setRequired();
-		}
-
-		if(systemStop && !excsCheck) {
+		if(!excsCheck) {
 			if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) {
 				// При многопоточности мы должны завершить поток, если нет ошибок
 				//TODO Вероятно потом стоит добавить переход на процедуру останова в диспетчере, когда все нити будут завершены
@@ -5734,7 +2655,7 @@ public class Generator extends CodeGenerator {
 			scope.append(new CGIAsmJump(JUMP_INSTR, okMode.getProcName(), true));
 			scope.append(lbScope);
 //TODO Нужна STDOUT FEATURE
-			if(device.containsParam(RTOSParam.STDIO_PORT)) {
+			if(device.containsParam(RtosParam.STDIO_PORT)) {
 				RTOSLibs.ETRACE_OUT.setRequired();
 				scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_etrace_out", true));
 			}
@@ -5770,24 +2691,6 @@ public class Generator extends CodeGenerator {
 		return result;
 	}
 	
-	public byte[] getAccRegs(int size) {
-		switch(size) {
-			case 1: return new byte[]{16};
-			case 2: return new byte[]{16,17};
-			case 3: return new byte[]{16,17,18};
-			default: return new byte[]{16,17,18,19};
-		}
-	}
-
-	public byte[] getTempRegs(int size) {
-		switch(size) {
-			case 1: return new byte[]{30};
-			case 2: return new byte[]{30,31};
-			case 3: return new byte[]{16,17,18};
-			default: return new byte[]{30,31,28,29};
-		}
-	}
-
 	@Override
 	public String getVersion() {
 		return VERSION;
@@ -5826,43 +2729,6 @@ public class Generator extends CodeGenerator {
 			}
 		}
 		
-		// Идея сырая - не учитываем условные переходы. Нечно подобное нужно сделать в оптимизаторе.
-		// А пока делаем примитивно adiw + instr + sbiw
-/*		for(CGItem item : list) {
-			if(item instanceof CGIAsmIReg) {
-				CGIAsmIReg instr = (CGIAsmIReg)item;
-				if('y'==iReg && 'y'==instr.getIreg()) {
-					int delta = yOffset-instr.getOffset();
-					if(MIN_IREG_OFFSET>delta) {
-						moveIReg(instr.getPrefCont(), instr.getIreg(), delta-32);
-						yOffset -= (delta-32); 
-					}
-					if(MAX_IREG_OFFSET<delta) {
-						moveIReg(instr.getPrefCont(), instr.getIreg(), delta-32);
-						yOffset -= (delta-32); 
-					}
-					instr.setOffset(yOffset-instr.getOffset());
-				}
-				else if('z'==iReg) {
-					int delta = (null==instr.getReg() ? -zOffset : instr.getOffset()-zOffset);
-					if(MIN_IREG_OFFSET>delta) {
-						moveIReg(instr.getPrefCont(), instr.getIreg(), delta-32);
-						yOffset += (delta-32);
-						heapIRegModified = true;
-					}
-					if(MAX_IREG_OFFSET<delta) {
-						moveIReg(instr.getPrefCont(), instr.getIreg(), delta+32);
-						yOffset += (delta+32);
-						heapIRegModified = true;
-					}
-					instr.setOffset(instr.getOffset()-zOffset);
-				}
-			}
-		}
-
-		lastOffset.set('y'==iReg ? yOffset : zOffset);
-*/	
-
 		for(CGItem item : list) {
 			if(item instanceof CGIAsmIReg) {
 				CGIAsmIReg instr = (CGIAsmIReg)item;
@@ -5886,41 +2752,7 @@ public class Generator extends CodeGenerator {
 				//TODO сделать для Z
 			}
 		}
-
-/*
-
-		for(CGItem item : list) {
-			if(item instanceof CGIAsmIReg) {
-				CGIAsmIReg instr = (CGIAsmIReg)item;
-				int offset = (null==instr.getReg() ? 0 : instr.getOffset());
-				if(MIN_IREG_OFFSET>offset) {
-					instr.getPrefCont().append(new CGIRAsm("sbiw", iReg + "l", "" + (offset*(-1))));
-					instr.setOffset(0);
-					instr.getPrefCont().append(new CGIRAsm("adiw", iReg + "l", "" + (offset*(-1))));
-					heapIRegModified = true;
-				}
-				else if(MAX_IREG_OFFSET<offset) {
-					instr.getPrefCont().append(new CGIRAsm("adiw", iReg + "l", "" + offset));
-					instr.setOffset(0);
-					instr.getPrefCont().append(new CGIRAsm("sbiw", iReg + "l", "" + offset));
-					heapIRegModified = true;
-				}
-			}
-		}*/
 	}
-/*	private void moveIReg(CGIContainer cont, char iReg, int offset) throws CompileException {
-		if(0==offset) return;
-		if(0<offset && offset<=MAX_IREG_OFFSET) {
-			cont.append(new CGIRAsm("adiw", iReg + "l", "" + offset));
-		}
-		else if(0>offset && (offset*(-1))<=MAX_IREG_OFFSET) {
-			cont.append(new CGIRAsm("sbiw", iReg + "l", "" + offset*(-1)));
-		}
-		else {
-			cont.append(new CGIRAsm("subi", iReg + "l", "low(" + offset*(-1) + ")"));
-			cont.append(new CGIRAsm("sbci", iReg + "h", "high(" + offset*(-1) + ")"));
-		}
-	}*/
 
 	@Override
 	public void flashDataToArr(CGScope scope, DataSymbol symbol, int offset) throws CompileException {
@@ -5938,22 +2770,6 @@ public class Generator extends CodeGenerator {
 		if(rtosFeatures.contains(RtosFeature.OS_FT_MULTITHREADING)) scope.append(new CGIAsm("clt"));
 	}
 
-	private String getConstReg(CGIContainer cont, byte reg, int index, long value) throws CompileException {
-		return getConstReg(cont, reg, (int)(value>>(index*8)&0xff));
-	}
-	private String getConstReg(CGIContainer cont, byte reg, int octet) throws CompileException {
-		switch(octet) {
-			case 0x00: return "c0x00";
-			case 0x01: return "c0x01";
-			case 0x02: return "c0x02";
-			case 0xff: return "c0xff";
-			default: {
-				cont.append(new CGIAsmLd("ldi", "r"+reg, Integer.toString(octet)));
-				return "r"+reg;
-			}
-		}
-	}
-	
 	@Override
 	public int getThreadHeaderSize() {
 		// Стандартный заголовок + блок для нити + блок для сохранения 16 старших регистров + SREG + ret point + timestamp + resource id
@@ -5964,5 +2780,17 @@ public class Generator extends CodeGenerator {
 	public int getTimerHeaderSize() {
 		 // Стандартный заголовок + блок для нити + блок для сохранения 16 старших регистров + SREG + ret point + timestamp + period
 		return CLASS_HEADER_SIZE + 0x07 + 0x10 + 0x01 + 0x02 + 0x02 + 0x02;
+	}
+	
+	@Override
+	public int getCallbackTypeBitPos() {
+		// Для маленьких чипов (RAM и Flash <= 32КБ) адреса укладываются в 15 бит.
+		// Старший (15-й) бит short-указателя становится признаком адреса статического метода во Flash.
+		if(device.getRamSize()<=0x8000 && device.getFlashSize()<=0x8000) return 15;
+		// Для средних чипов (до 8МБ) расширяем указатель до 3 байт, маркер - в 23-й бит.
+		if(device.getRamSize()<=0x800000 && device.getFlashSize()<=0x800000) return 23;
+		// Для "жирных" чипов используем 4-байтовый указатель с маркером в 31-м бите.
+		return 31;
+		//Для других платформ - при общем адресном пространстве возвращаем 0 - рантайм сам определит тип адреса
 	}
 }

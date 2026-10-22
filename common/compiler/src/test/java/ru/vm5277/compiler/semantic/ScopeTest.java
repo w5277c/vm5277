@@ -16,6 +16,7 @@
 
 package ru.vm5277.compiler.semantic;
 
+import java.util.HashSet;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -38,7 +39,7 @@ public class ScopeTest {
     @Test
     void resolveFieldFromParentScope() throws CompileException {
         globalScope.addField(new Symbol("x", VarType.INT, false, false));
-        Symbol resolved = childScope.resolveField("x", false);
+        Symbol resolved = childScope.resolveField("x", false, new HashSet<>());
         assertNotNull(resolved);
         assertEquals(VarType.INT, resolved.getType());
     }

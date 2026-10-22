@@ -91,10 +91,10 @@ public class Dht11 implements HumiditySensor, TemperatureSensor {
 	}
 
 	@Override public fixed getCelsius() {
-		return Primitive.rawToFixed(buffer[2], buffer[3]*26);
+		return Primitive.rawToFixed(buffer[2], (byte)(buffer[3]*26));
 	}
 
 	@Override public fixed getPercents() {
-		return Primitive.rawToFixed(buffer[0], buffer[1]*26);
+		return Primitive.rawToFixed(buffer[0], (byte)(buffer[1]*26));
 	}
 }

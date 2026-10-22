@@ -27,12 +27,12 @@ class Main {
 		try {
 			GraphicsDisplay gd = new LedMatrixMax7219(ArduinoUno.PIN_D7, ArduinoUno.PIN_D6, ArduinoUno.PIN_D5, 8, 8);
 			for(short index=0x20; index<0x80; index++) {
-				FlashData.toBuffer(Ascii8x8.DATA, (index-0x20)*Ascii8x8.CHAR_SIZE, buffer);
+				FlashData.toBuffer(Ascii8x8.DATA, (short)((index-0x20)*Ascii8x8.CHAR_SIZE), buffer);
 				gd.drawImage(buffer, 0, 0, 8, 8);
 				Thread.sleep(100);
 			}
 			for(short index=0x80; index<=0xff; index++) {
-				FlashData.toBuffer(Koi8r8x8.DATA, (index-0x80)*Koi8r8x8.CHAR_SIZE, buffer);
+				FlashData.toBuffer(Koi8r8x8.DATA, (short)((index-0x80)*Koi8r8x8.CHAR_SIZE), buffer);
 				gd.drawImage(buffer, 0, 0, 8, 8);
 				Thread.sleep(100);
 			}

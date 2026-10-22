@@ -20,10 +20,10 @@ OS_RAM_POPBLK16:
 ;-----------------------------------------------------------
 ;Извлечение блока из стека и запись в DST
 ;IN: X-DST адрес ACCUM_L/H-длина
-;MOD: XL/H,ZL/H,ACCUM_L/H/EL
+;MOD: XL/H,ACCUM_L/H/EL
 ;-----------------------------------------------------------
-	POP ZH
-	POP ZL
+	POP ATOM_H
+	POP ATOM_L
 
 	CP ACCUM_L,C0x00
 	CPC ACCUM_H,C0x00
@@ -35,5 +35,7 @@ OS_RAM_POPBLK16__LOOP:
 	SBCI ACCUM_H,0x00
 	BRNE OS_RAM_POPBLK16__LOOP
 OS_RAM_POPBLK16__RET:
-	IJMP
+	PUSH ATOM_L
+	PUSH ATOM_H
+	RET
 .ENDIF

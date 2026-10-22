@@ -22,5 +22,6 @@ public enum J8BException {
 	BoundsException,
 	DriverException,
 	NativeException,
-	NullPointerException;
+	NullPointerException,
+	DivByZeroException;
 }

@@ -21,7 +21,7 @@ import java.util.Map;
 
 // При изменение учитывать runtime/rtos/RTOSParam.j8b!
 
-public enum RTOSParam { 
+public enum RtosParam { 
 	// Частота в КГц процессора, содержит переданное значение из параметра запуска компилятора - int
 	CORE_FREQ(0, true, "CPU core frequency in KHz (e.g., 8000, 16000). Set automatically from -F compiler argument"),
 	
@@ -71,11 +71,15 @@ public enum RTOSParam {
 	ARRAY_INDEX_NOCHECK(16, false, "Disable array index bounds checking"),
 	
 	// Отключение проверки переполнения переменной в математических вычислениях
-	MATH_OVF_NOCHECK(17, false, "Disable arithmetic overflow detection");
+	MATH_OVF_NOCHECK(17, false, "Disable arithmetic overflow detection"),
 
-	private static final Map<Integer, RTOSParam> ids = new HashMap<>();
+	// Отладочное логирование диспетчера многопоточности
+	DISPATCHER_DEBUG(18, false, "Dispatcher debug logging");
+
+
+	private static final Map<Integer, RtosParam> ids = new HashMap<>();
 	static {
-		for (RTOSParam type : RTOSParam.values()) {
+		for (RtosParam type : RtosParam.values()) {
 			ids.put(type.getId(), type);
 		}
 	}
@@ -84,7 +88,7 @@ public enum RTOSParam {
 	private	boolean	hidden;
 	private	String	description;
 
-	private RTOSParam(int id, boolean hiden, String description) {
+	private RtosParam(int id, boolean hiden, String description) {
 		this.id = id;
 		this.hidden = hiden;
 		this.description = description;
@@ -98,11 +102,11 @@ public enum RTOSParam {
 		return hidden;
 	}
 
-	public static RTOSParam fromInt(int id) {
+	public static RtosParam fromInt(int id) {
 		return ids.get(id);
 	}
 	
-	public static RTOSParam fromName(String name) {
+	public static RtosParam fromName(String name) {
 		try {
 			return valueOf(name.toUpperCase());
 		}

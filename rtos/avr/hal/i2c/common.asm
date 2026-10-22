@@ -17,6 +17,13 @@
 .IFNDEF _OS_DRV_I2C_FREQ
 ; Таблица частот I2C для AVR (TWBR)
 
+.IF (CORE_FREQ/1)*9<50
+    .warning "I2C driver, CORE_FREQ to low for 1KHz I2C"
+    .SET __TWBR_1 = 240
+.ELSE
+    .SET __TWBR_1 = ((CORE_FREQ/1)-16)/128
+.ENDIF
+
 .IF (CORE_FREQ/10)*9<50
     .warning "I2C driver, CORE_FREQ to low for 10KHz I2C"
     .SET __TWBR_10 = 240
@@ -46,5 +53,5 @@
 .ENDIF
 
 _OS_DRV_I2C_FREQ:
-    .db __TWBR_10, 1, __TWBR_50, 1, __TWBR_100, 0, __TWBR_400, 0
+    .db __TWBR_1, 3, __TWBR_10, 1, __TWBR_50, 1, __TWBR_100, 0, __TWBR_400, 0
 .ENDIF

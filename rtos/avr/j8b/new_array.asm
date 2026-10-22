@@ -25,12 +25,13 @@ J8BPROC_NEW_ARRAY:
 ;Вынесен блок кода для оптимизации - выделяет и очищает блок
 ;памяти
 ;IN: ACCUM_H/L-размер блока
-;OUT: X и ACCUM_H/L-адрес на выделенный блок
+;OUT: X и ACCUM_H/L-адрес на выделенный блок,
+;флаг C true=OutOfMemory
 ;-----------------------------------------------------------
 	PUSH ZL
 	PUSH ZH
 	MCALL OS_DRAM_ALLOC
-
+	BRCS J8BPROC_NEW_ARRAY__END
 	MOVW XL,ZL
 _J8BPROC_ARR_CLEAR__LOOP:
 	ST Z+,C0x00
@@ -38,6 +39,8 @@ _J8BPROC_ARR_CLEAR__LOOP:
 	SBCI ACCUM_H,0x00
 	BRNE _J8BPROC_ARR_CLEAR__LOOP
 	MOVW ACCUM_L,XL
+	CLC
+J8BPROC_NEW_ARRAY__END:
 	POP ZH
 	POP ZL
 	RET

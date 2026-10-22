@@ -31,7 +31,9 @@ import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.enums.J8BException;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.CODEGEN;
+import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.compiler.Instance;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
@@ -42,8 +44,12 @@ import ru.vm5277.compiler.nodes.expressions.VarFieldExpression;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class ArithmeticExpression extends BinaryExpression {
-    ArithmeticExpression(Instance inst, TokenBuffer tb, SourcePosition sp, ExpressionNode left, Operator op, ExpressionNode right) {
+	private boolean partOfAssignment;
+    private boolean hasDivisionByZero;
+	
+	ArithmeticExpression(Instance inst, TokenBuffer tb, SourcePosition sp, ExpressionNode left, Operator op, ExpressionNode right, boolean partOfAssignment) {
         super(inst, tb, sp, left, op, right);
+		this.partOfAssignment = partOfAssignment;
     }
     
 	@Override
@@ -51,7 +57,7 @@ public class ArithmeticExpression extends BinaryExpression {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 		this.scope = scope;
-		cgScope = cg.enterExpression(parent, cgScope, toString());
+		cgScope = cg.enterExpression(parent, sp, cgScope, toString());
 
 		// Анализ операндов
 		result&=leftExpr.postAnalyze(scope, cg, cgScope);
@@ -123,20 +129,26 @@ public class ArithmeticExpression extends BinaryExpression {
 					boolean isZero = false;
 
 					if(val instanceof Double) {
-						isZero = ((Double)val==0.0);
+						hasDivisionByZero = ((Double)val==0.0);
 					}
 					else if(val instanceof Number) {
-						isZero = (((Number)val).longValue()==0L);
+						hasDivisionByZero = (((Number)val).longValue()==0L);
 					}
 
-					if(isZero) {
-						markError("Division by zero");
-						result = false;
+					if(hasDivisionByZero) {
+						if(StrictLevel.NONE==inst.getStrictLevel()) {
+						}
+						else if(StrictLevel.STRONG==inst.getStrictLevel()) {
+							markError("Division by zero");
+							result = false;
+						}
+						else {
+							markWarning("Division by zero");
+						}
 					}
 				}
 			}
 		}
-
 		
 		if(result) {
 			// Если один из операндов FIXED, результат FIXED
@@ -147,8 +159,54 @@ public class ArithmeticExpression extends BinaryExpression {
 				type = VarType.CSTR;
 			}
 			else {
-				// Для арифметических операций возвращаем более широкий тип
-				type = leftType.getSize()>=rightType.getSize() ? leftType : rightType;
+				int maxOperandSize = Math.max(leftType.getSize(), rightType.getSize());
+				if(partOfAssignment) {
+					type = leftType;
+				}
+				else {
+					switch (operator) {
+						case PLUS:
+						case MULT:
+						case INC:
+						case PRE_INC:
+						case POST_INC:
+							if(0x01==maxOperandSize) {
+								type = VarType.SHORT;
+							}
+							else {
+								type = VarType.INT;
+							}
+							break;
+						case MINUS:
+						case DEC:
+						case PRE_DEC:
+						case POST_DEC:
+						case DIV:
+						case MOD:
+							if(0x01==maxOperandSize) {
+								type = VarType.BYTE;
+							}
+							else if(0x02==maxOperandSize) {
+								type = VarType.SHORT;
+							}
+							else {
+								type = VarType.INT;
+							}
+							break;
+						case SHR:
+							type = leftType;
+							break;
+						case BIT_AND:
+							type = (leftType.getSize()<rightType.getSize() ? leftType : rightType);
+							break;
+						case BIT_OR:
+						case BIT_XOR:
+							type = (leftType.getSize()>rightType.getSize() ? leftType : rightType);
+							break;
+						default:
+							type = VarType.INT;
+					}
+				}
 			}
 		}
 
@@ -215,7 +273,20 @@ public class ArithmeticExpression extends BinaryExpression {
 		cgDone = true;
 
 		debugAST(this, CODEGEN, true, getFullInfo());
+
+		if(hasDivisionByZero) {
+			Integer exceptionId = cg.getExcsChecker().getHandled(excs, J8BException.DivByZeroException.name());
+			if(null!=exceptionId) {
+				cg.getExcsChecker().makeException(cg, cgScope, excs, exceptionId);
+			}
+		}
 		
+		VarType cast = cg._getAcc().pullCast();
+		// Выражения типа octet <<= 1; (где octet-byte) раскрываются в блок octet = (byte)(octet<<1);
+		// Здесь мы добавляем cast, иначе кодогенератор будет использовать аккумулятор большего размера
+		if(null==cast && partOfAssignment) {
+			cast = leftType;
+		}
 		excs.setSourcePosition(sp);
 		
 		Object result = CodegenResult.RESULT_IN_ACCUM;
@@ -229,6 +300,9 @@ public class ArithmeticExpression extends BinaryExpression {
 		// Похоже для всех выражений должны быть удовлетворены зависимости
 		depCodeGen(cg, expr1.getSymbol(), scope, excs);
 		depCodeGen(cg, expr2.getSymbol(), scope, excs);
+		
+		// Похоже для каждого выражения с двумя операторами должен быть сброшен размер аккумулятора
+		cg._getAcc().setBytes(0); // Сброс размера аккумулятора
 		
 		// Оптимизация порядка для коммутативных операций
 		if(operator.isCommutative()) {
@@ -323,55 +397,24 @@ public class ArithmeticExpression extends BinaryExpression {
 
 		//================ VarFieldExpression ================================
 		if(expr2 instanceof VarFieldExpression) {
-//			CGCellsScope cScope2 = (CGCellsScope)expr2.getSymbol().getCGScope();
-			//================ VarFieldExpression ==== LITERAL ================================
-/*			if(expr1 instanceof LiteralExpression) {
-			// Чушь собачья, я не могу просто взять и загрузить первым операндом expr2 (ломает деление и вычитание!)
-			LiteralExpression le = (LiteralExpression)expr1;
-			if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, cgs, true, excs)) {
-			throw new CompileException("Accum not used for operand:" + expr1);
+			if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, true, excs)) {
+				throw new CompileException("Accum not used for operand:" + expr1);
 			}
-			//TODO!!! похоже ошибочная логика во многих местах - нужны тесты fixed с не fixed значениями
-			boolean isFixed = expr1.getType().isFixedPoint() || expr2.getType().isFixedPoint();
-			if(isFixed && !expr2.getType().isFixedPoint()) {
-			cgs.append(cg.accCast(expr2.getType(), expr1.getType()));
-			}
-			cg.constAction(cgs, operator, le.isFixed() ? le.getFixedValue() : le.getNumValue(), le.isFixed(), excs);
-			}*/
-			//================ VarFieldExpression ==== ARRAY ================================
-/*TODO вроде как попаадает под универсальный случай, надо проверить
-			else if(expr1 instanceof ArrayExpression) {
-			expr1.codeGen(cg, cgs, true);
-			if(expr1.getType().isFixedPoint() ^ expr2.getType().isFixedPoint()) {
-			cgs.append(cg.accCast(expr1.getType(), expr2.getType()));
-			}
-			cg.cellsAction(cgs, cScope2.getCells(), operator, VarType.FIXED == expr2.getType());
-			}
-			 */
-			//================ VarFieldExpression ==== OTHER ================================
-//			else {
-				if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, true, excs)) {
-					throw new CompileException("Accum not used for operand:" + expr1);
-				}
-				boolean isFixed = expr1.getType().isFixedPoint() || expr2.getType().isFixedPoint();
-				if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumLock(VarType.FIXED);
-				cg.cellsAction(	cgScope, new CGCells(CGCells.Type.ACC), expr1.getType(), operator, ((CGCellsScope)expr2.getSymbol().getCGScope()).getCells(),
-								expr2.getType(), excs);
-				if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumUnlock();
-//			}
+			expr2.codeGen(cg, false, excs);
+			cg.cellsAction(	cgScope, new CGCells(CGCells.Type.ACC), expr1.getType(), operator, ((CGCellsScope)expr2.getSymbol().getCGScope()).getCells(),
+							expr2.getType(), cast, excs);
 		}
 		//================ LiteralExpression ================================
 		else if(expr2 instanceof LiteralExpression) {
-			LiteralExpression leConst = (LiteralExpression)expr2;
+			LiteralExpression le = (LiteralExpression)expr2;
 			//================ LiteralExpression ==== OTHER ================================
 			if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, true, excs)) {
 				throw new CompileException("Accum not used for operand:" + expr1);
 			}
-			// Проверка на необходимость преобразования аккумулятора в тип fixed
-			boolean isFixed = expr1.getType().isFixedPoint() || expr2.getType().isFixedPoint();
-			if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumLock(VarType.FIXED);
-			cg.constAction(cgScope, new CGCells(CGCells.Type.ACC), operator, isFixed ? leConst.getFixedValue() : leConst.getNumValue(), isFixed, excs);
-			if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumUnlock();
+			expr2.codeGen(cg, false, excs);			
+			cg.cellsAction(	cgScope, new CGCells(CGCells.Type.ACC), expr1.getType(), operator,
+							new CGCells(le.getType().isFixedPoint() ? le.getFixedValue() : le.getNumValue()), expr2.getType(), cast, excs);
+			//cg.constAction(cgScope, new CGCells(CGCells.Type.ACC), operator, isFixed ? leConst.getFixedValue() : leConst.getNumValue(), isFixed, excs); //TODO cast
 		}
 		//================ ArrayExpression ================================
 		else if(expr2 instanceof ArrayExpression) {
@@ -382,10 +425,11 @@ public class ArithmeticExpression extends BinaryExpression {
 				if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + expr2);
 				}
-				if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumLock(VarType.FIXED);
-				cg.constAction(	cgScope, new CGCells(CGCells.Type.ACC), operator, le.getType().isFixedPoint() ? le.getFixedValue() : le.getNumValue(),
-								le.getType().isFixedPoint(), excs);
-				if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumUnlock();
+				expr1.codeGen(cg, false, excs);
+				cg.cellsAction(	cgScope, new CGCells(CGCells.Type.ACC), expr2.getType(), operator,
+								new CGCells(le.getType().isFixedPoint() ? le.getFixedValue() : le.getNumValue()), expr1.getType(), cast, excs);
+//				cg.constAction(	cgScope, new CGCells(CGCells.Type.ACC), operator, le.getType().isFixedPoint() ? le.getFixedValue() : le.getNumValue(),
+//								le.getType().isFixedPoint(), excs); //TODO CAST
 			}
 			//================ ArrayExpression ==== OTHER ================================
 			else {
@@ -394,15 +438,13 @@ public class ArithmeticExpression extends BinaryExpression {
 				}					
 
 				// Определяем максмальный размер операнда
-				int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
+				int size = (null !=cast ? cast.getSize() : leftType.getSize() > rightType.getSize() ? leftType.getSize() : rightType.getSize());
 				cg.pushAccBE(leftExpr.getCGScope(), size, false);
 				if(CodegenResult.RESULT_IN_ACCUM != rightExpr.codeGen(cg, true, excs)) {
 					throw new CompileException("Accum not used for operand:" + rightExpr);
 				}
-				if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumLock(VarType.FIXED);
 				cg.cellsAction(	cgScope, new CGCells(CGCells.Type.ACC), rightExpr.getType(), operator, new CGCells(CGCells.Type.STACK, size),
-								leftExpr.getType(), excs);
-				if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumUnlock();
+								leftExpr.getType(), cast, excs);
 			}
 		}
 		else if(!operator.isCommutative() && leftExpr instanceof LiteralExpression) {
@@ -411,14 +453,12 @@ public class ArithmeticExpression extends BinaryExpression {
 			// Нужно изменить порядок обработки аргументов, что бы первым выполнялся правыйй аргумент
 			cgScope.swap(expr1.getCGScope(), expr2.getCGScope());
 			
-			LiteralExpression leConst = (LiteralExpression)expr1;
-
 			// Вычисляем правый опреанд в аккумулятор
 			if(CodegenResult.RESULT_IN_ACCUM!=rightExpr.codeGen(cg, true, excs)) {
 				throw new CompileException("Accum not used for operand:" + rightExpr);
 			}
 			// Определяем максмальный размер операнда
-			int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
+			int size = (null !=cast ? cast.getSize() : leftType.getSize() > rightType.getSize() ? leftType.getSize() : rightType.getSize());
 			//Помещаем значение правого операнда из аккумулятора в стек
 			cg.pushAccBE(rightExpr.getCGScope(), size, false);
 
@@ -426,11 +466,9 @@ public class ArithmeticExpression extends BinaryExpression {
 			if(CodegenResult.RESULT_IN_ACCUM != leftExpr.codeGen(cg, true, excs)) {
 				throw new CompileException("Accum not used for operand:" + leftExpr);
 			}
-			if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumLock(VarType.FIXED);
 			// Выполняем вычиление
 			cg.cellsAction(	cgScope, new CGCells(CGCells.Type.ACC), leftExpr.getType(), operator, new CGCells(CGCells.Type.STACK, size),
-							rightExpr.getType(), excs);
-			if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumUnlock();
+							rightExpr.getType(), cast, excs);
 		}
 		//================ Other ================================
 		else {
@@ -443,7 +481,7 @@ public class ArithmeticExpression extends BinaryExpression {
 			
 			
 			// Определяем максимальный размер операнда
-			int size = (leftType.getSize() > rightType.getSize() ? leftType.getSize() : rightType.getSize());
+			int size = (null !=cast ? cast.getSize() : leftType.getSize() > rightType.getSize() ? leftType.getSize() : rightType.getSize());
 			// Строим код для expr1(результат в аккумуляторе)
 			if(CodegenResult.RESULT_IN_ACCUM!=expr2.codeGen(cg, true, excs)) {
 				throw new CompileException("Accum not used for operand:" + expr2);
@@ -454,12 +492,10 @@ public class ArithmeticExpression extends BinaryExpression {
 			if(CodegenResult.RESULT_IN_ACCUM!=expr1.codeGen(cg, true, excs)) {
 				throw new CompileException("Accum not used for operand:" + expr1);
 			}					
-
 			// Аккумулятор уже необходимого размера, но нужно проверить на Fixed
-			if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumLock(VarType.FIXED); //TODO артефакт? Мы и так передаем тип, но что если есть вложенные выражения? 
 			// Выполняем операцию, левый операнд - аккумулятор, правый операнд - значение на вершине стека
-			cg.cellsAction(cgScope, new CGCells(CGCells.Type.ACC), expr1.getType(), operator, new CGCells(CGCells.Type.STACK, size), expr2.getType(), excs);
-			if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumUnlock();
+			cg.cellsAction(	cgScope, new CGCells(CGCells.Type.ACC), expr1.getType(), operator,
+							new CGCells(CGCells.Type.STACK, size), expr2.getType(), cast, excs);
 		}
 		
 		releaseVars(cg);

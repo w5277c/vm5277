@@ -117,7 +117,7 @@ public class DS1302 implements TimeDateDevice, RtosDriver {
 		}
 		byte hour = Primitive.bcdToByte(octet & 0x1f);
 		if(0!=(octet&0x20)) { //12H PM
-			return 12==hour ? 12 : hour+12;
+			return 12==hour ? 12 : (byte)(hour+12);
 		}
 		return 12==hour ? 0 : hour; //12H AM
 	}

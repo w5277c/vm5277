@@ -21,6 +21,6 @@ public interface RtosPcint {
 		HI;
 	}
 
-	public static native byte enable(byte gpioPort, TriggerMode triggerMode, RTOSCallback callBack);
+	public static native byte enable(byte gpioPort, TriggerMode triggerMode, NativeCallback callBack);
 	public static native void disable(byte resId);
 }

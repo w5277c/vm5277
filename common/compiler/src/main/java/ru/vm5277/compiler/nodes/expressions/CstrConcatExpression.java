@@ -80,6 +80,13 @@ public class CstrConcatExpression extends ExpressionsContainer {
 		for(int i=1; i<expressions.size(); i++) {
 			ExpressionNode exprNode1 = expressions.get(i-1);
 			ExpressionNode exprNode2 = expressions.get(i);
+			
+			// Мы не должны объединять в строку LiteralExpression с признаком переполнения
+			// Важно - на этом этапе мы ничего не знаем об обертках try-catch.
+			// Можно было бы объединить, если бы были уверены, что блок не обернут в MathOverflowException
+			if(exprNode1 instanceof LiteralExpression && ((LiteralExpression)exprNode1).isOverflow()) continue;
+			if(exprNode2 instanceof LiteralExpression && ((LiteralExpression)exprNode2).isOverflow()) continue;
+			
 			ExpressionNode exprNode = optimizeStringConcat(exprNode1, exprNode2);
 			if(exprNode instanceof LiteralExpression) {
 				expressions.set(i-1, exprNode);

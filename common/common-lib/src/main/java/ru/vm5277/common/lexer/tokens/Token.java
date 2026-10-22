@@ -39,7 +39,7 @@ public class Token {
 
 	public Token(SourceBuffer sb) {
 		this.sb = sb;
-		this.sp = sb.snapSP();
+		this.sp = sb.snap();
 	}
 	public Token(TokenType type) {
 		this.type = type;
@@ -65,7 +65,7 @@ public class Token {
 	
 	public Token(SourceBuffer sb, TokenType type, Object value) {
 		this.sb = sb;
-		this.sp = null == sb ? null : sb.snapSP();
+		this.sp = null == sb ? null : sb.snap();
 		this.type = type;
 		this.value = value;
 	}

@@ -36,7 +36,7 @@ public class ByteArrayList implements List {
 
 	public void add(byte value) {
 		if(size==capacity) {
-        	capacity = size+chunkSize;
+        	capacity = (short)(size+chunkSize);
         	byte[] newData = new byte[capacity];
         	Array.copy(data, 0, newData, 0, size);
         	data = newData;
@@ -67,7 +67,7 @@ public class ByteArrayList implements List {
     @Override public void remove(short index) throws BoundsException {
 		if(index<size) {
         	for(short i=index; i<size-1; i++) {
-            	data[i] = data[i+1];
+            	data[i] = data[(short)(i+1)];
             }
         	size--;
 
@@ -120,7 +120,7 @@ public class ByteArrayList implements List {
 		if(0!=size) {
 			Array.copy(data, 0, result, 0, size);
 		}
-		return result; // здесь не корректный подсчет ссылок
+		return result;
 	}
 
 	@Override public Comparison compare(short i, short j) throws BoundsException {

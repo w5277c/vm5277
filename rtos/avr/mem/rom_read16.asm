@@ -13,7 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-.IFNDEF OS_ROM_READ16
+.IFNDEF OS_ROM_READ16_NR
 ;-----------------------------------------------------------
 OS_ROM_READ16_NR:											;NR-NO_RESTORE - не восстанавливает IN регистры.
 ;-----------------------------------------------------------

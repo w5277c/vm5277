@@ -17,8 +17,6 @@
 package ru.vm5277.maven;
 
 import java.io.File;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.plugins.annotations.Mojo;
@@ -48,7 +46,7 @@ public class J8bRunMojo extends J8bMojo {
 		doClean(log, prebuildDirectory);
 		doClean(log, outputSubDirectory);
 
-		if(!Toolkit.checkToolkit(!Verbosity.MINIMAL.name().equalsIgnoreCase(verbosity) ? log : null, Paths.get(toolkitPath), downloadUrl, true)) {
+		if(!Toolkit.checkToolkit(!Verbosity.MINIMAL.name().equalsIgnoreCase(verbosity) ? log : null, downloadUrl, true)) {
 			throw new MojoExecutionException("Toolkit not found, can't download toolkit from: " + downloadUrl + ", please try later.");
 		}
 		

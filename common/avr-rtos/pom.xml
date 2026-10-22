@@ -4,7 +4,7 @@
 
 	<groupId>ru.vm5277.rtos</groupId>
 	<artifactId>avr</artifactId>
-	<version>1.0-SNAPSHOT</version>
+	<version>0.3.0</version>
 	<packaging>jar</packaging>
 
 	<name>RTOS AVR</name>

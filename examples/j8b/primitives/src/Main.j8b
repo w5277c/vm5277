@@ -19,6 +19,8 @@
 
 class Main {
 	public static void main() {
+		System.setParam(RtosParam.SHOW_WELCOME, 1);
+
 		boolean bTrue; bTrue = true;
 		boolean bFalse; bFalse = false;
 		byte bVal; bVal = 125;
@@ -74,7 +76,7 @@ class Main {
 		System.out(", (short)" + iVal + '=' + (short)iVal);
 		System.out(", (fixed)" + bVal + '=' + (fixed)bVal);
 		System.out(", (byte)" + (-12.34) + "[244]=" + (byte)(-12.34));
-		System.out(", (byte)" + fVal + "[255]=" + (byte)fVal);
+		System.out(", (byte)" + fVal + "[254]=" + (byte)fVal);
 		System.out(", (byte)" + 127.50 + "[127]=" + (byte)127.50);
 
 		System.out("\n7. Смешанные выражения:");
@@ -99,7 +101,5 @@ class Main {
 		System.out("\n10. Сложное условие:");
 		System.out("((bVal>100) && ((fVal+1)>0) || (sVal==32767) && !bFalse)[true]=");
 		System.out((bVal>100) && ((fVal+1)>0) || (sVal==32767) && !bFalse);
-
-		System.out("\ndone");
 	}
 }

@@ -113,7 +113,7 @@ public class UartHwFd implements InputStream, OutputStream, UartCommon, Closeabl
     	short index = 0;
     	//TODO synchronized(RtosDispatcher.LOCK) { // Нельзя спать, иначе может образоваться пауза при передаче
     	while(index<len) {
-			short sent = OutputStream.write(sendBuff, buff, off+index, len-index);
+			short sent = OutputStream.write(sendBuff, buff, (short)(off+index), len-index);
 			if(0!=sent) {
 				txEvent();
 				index+=sent;

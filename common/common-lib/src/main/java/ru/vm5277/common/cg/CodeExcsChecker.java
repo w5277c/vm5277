@@ -19,13 +19,12 @@ package ru.vm5277.common.cg;
 import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.lexer.Operator;
 
 public abstract class CodeExcsChecker {
 	public abstract Integer getHandled(CGExcs excs, String exceptionName);
 	public abstract void stackOverflow(CodeGenerator cg, CGIContainer scope, CGExcs excs, int size, byte[] popRegIds) throws CompileException;
-	public abstract void mathOverflow(CodeGenerator cg, CGScope scope, CGExcs excs, Operator op, byte[] regIds, boolean popRequired, boolean byZero) throws CompileException;
-	public abstract void divByZero(CodeGenerator cg, CGScope scope, CGExcs excs, byte[] regIds, boolean popRequired) throws CompileException;
+	public abstract CGIContainer mathOverflow(CodeGenerator cg, CGScope scope, CGExcs excs, byte[] regIds, boolean popRequired, boolean byZero) throws CompileException;
+	public abstract CGIContainer divByZero(CodeGenerator cg, CGScope scope, CGExcs excs, byte[] regIds, boolean popRequired) throws CompileException;
 	public abstract void outOfMemory(CodeGenerator cg, CGIContainer cont, CGExcs excs) throws CompileException;
 	public abstract void arrMathOverflow(CodeGenerator cg, CGScope scope, CGExcs excs, byte[] popRegIds) throws CompileException;
 	public abstract void arrOutOfMemory(CodeGenerator cg, CGScope scope, CGExcs excs, byte[] popRegIds) throws CompileException;

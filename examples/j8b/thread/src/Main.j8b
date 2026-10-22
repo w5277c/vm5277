@@ -25,7 +25,7 @@ class Main {
 
 		@Override public void run() {
 			while(isAlive()) {
-			    System.out(b);
+			    System.out(b + "_");
 			    Thread.sleep(100);
 			    b++;
 			    if(0==b) Gpio.invert(Gpio.PB5);
@@ -34,8 +34,9 @@ class Main {
 	}
 
 	public static void main() {
-		//System.setParam(RtosParam.SHOW_WELCOME,0x01);
-		//System.setParam(RtosParam.DIAG_MODE,0x01);
+		System.setParam(RtosParam.SHOW_WELCOME,0x01);
+		System.setParam(RtosParam.DISPATCHER_DEBUG,0x00);
+
 
 		Gpio.modeOut(Gpio.PB5);
 

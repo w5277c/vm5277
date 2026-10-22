@@ -25,14 +25,17 @@ import java.util.Set;
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.lexer.SourcePosition;
 
 public class CGTryBlockScope extends CGBlockScope {
 	private			Set<Integer>					exceptionIds	= new HashSet<>();
 	private			List<CGLabelScope>				catchLabels		= new ArrayList<>();
 	private			Map<CGLabelScope, Set<Integer>>	catches			= new HashMap<>();
+	private			boolean							hasFinally;
 	
-	public CGTryBlockScope(CodeGenerator cg, CGScope parent, int id, String comment) {
-		super(cg, parent, id, comment);
+	public CGTryBlockScope(CodeGenerator cg, CGScope parent, SourcePosition sp, int id, boolean hasFinally, String comment) {
+		super(cg, parent, sp, id, comment);
+		this.hasFinally = hasFinally;
 	}
 
 	public void addCatchExceptions(Set<Integer> ids) {
@@ -71,5 +74,9 @@ public class CGTryBlockScope extends CGBlockScope {
 			if(ids.contains(id)) return lbScope;
 		}
 		throw new CompileException("COMPILER ERROR: Can't find label scope for exception id:" + id);
+	}
+	
+	public boolean hasFinally() {
+		return hasFinally;
 	}
 }

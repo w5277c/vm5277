@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import ru.vm5277.common.exceptions.CompileException;
 
 public abstract class Scope {
@@ -41,10 +42,10 @@ public abstract class Scope {
 		return new ArrayList<>(internal.values());
 	}
 
-	public abstract CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess);	
-	public abstract Symbol resolveField(Scope caller, String name, boolean isQualifiedAccess) throws CompileException;
-	public Symbol resolveField(String name, boolean isQualifiedAccess) throws CompileException {
-		return resolveField(null, name, isQualifiedAccess);
+	public abstract CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess, Set<CIScope> checked);	
+	public abstract Symbol resolveField(Scope caller, String name, boolean isQualifiedAccess, Set<CIScope> checked) throws CompileException;
+	public Symbol resolveField(String name, boolean isQualifiedAccess, Set<CIScope> checked) throws CompileException {
+		return resolveField(null, name, isQualifiedAccess, checked);
 	}
 	public abstract Symbol resolveVar(String name) throws CompileException;
 

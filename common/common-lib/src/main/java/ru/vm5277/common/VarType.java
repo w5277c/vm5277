@@ -25,12 +25,12 @@ import java.util.Set;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class VarType {
-	public	static	final	String					CLASSNAME_MAIN			= "Main";
-	public	static	final	String					CLASSNAME_THREAD		= "Thread";
-	public	static	final	String					CLASSNAME_TIMER			= "Timer";
-	public	static	final	String					CLASSNAME_RTOS_DRIVER	= "RtosDriver";
-	public	static	final	String					CLASSNAME_RTOS_CALLBACK	= "RtosCallback";
-	public	static	final	String					CLASSNAME_FLASH_DATA		= "FlashData";
+	public	static	final	String					CLASSNAME_MAIN				= "Main";
+	public	static	final	String					CLASSNAME_THREAD			= "Thread";
+	public	static	final	String					CLASSNAME_TIMER				= "Timer";
+	public	static	final	String					CLASSNAME_RTOS_DRIVER		= "RtosDriver";
+	public	static	final	String					CLASSNAME_NATIVE_CALLBACK	= "NativeCallback";
+	public	static	final	String					CLASSNAME_FLASH_DATA			= "FlashData";
 	
 	public	static	final	double					FIXED_MIN			= -128.0d;
 	public	static	final	double					FIXED_MAX			= 127.99609375d;

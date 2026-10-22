@@ -56,7 +56,7 @@ public class MavenStartup implements ProjectActivity {
 		}
 		projectsDir = LocalFileSystem.getInstance().findFileByPath(projectsDirPath.toString());
 
-		if(Toolkit.checkToolkit(null, FSUtils.getToolkitPath(), Toolkit.DONWLOAD_URL, false)) {
+		if(Toolkit.checkToolkit(null, Toolkit.DONWLOAD_URL, false)) {
 			toolkitPath = FSUtils.getToolkitPath();
 			if(null!=toolkitPath && toolkitPath.toString().trim().isEmpty()) toolkitPath = null;
 			mavenPath = MavenUtils.getPath(null, toolkitPath, false);

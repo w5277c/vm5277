@@ -1,0 +1,57 @@
+/*
+ * Copyright 2026 konstantin@5277.ru
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import hal.HwTimerManager;
+
+public class Beeper implements RtosDriver {
+	@FlashData({0x75,0x77, 0xC4,0x70, 0x6F,0x6A, 0x6A,0x64, 0xCF,0x5E, 0x78,0x59, 0x70,0x54, 0xB8,0x4F, 0x3C,0x4B, 0x05,0x47, 0x06,0x43, 0x44,0x3F})
+	private static final FlashData PERIODS;
+	private static final short QUARTER_MS = 500;
+	private static short statIoReg;
+
+	public static void play(byte port, FlashData data) throws DriverException {
+		statIoReg = RtosCore.getIORegOutput(port);
+		short delay = QUARTER_MS;
+		byte timerId = HwTimerManager.register(FlashData.readShort(PERIODS, 0), HwTimerManager.Resolution.RES_16BIT, Beeper::callback, 0x00);
+		short length = FlashData.getSize(data);
+		Gpio.modeOut(port);
+		for(short i=0; i<length && Thread.isAlive(); i++) {
+			byte b = FlashData.readByte(data,i);
+			if(0!=(b&0x80)) {
+				delay = QUARTER_MS*2/(b&0x3f);
+				if(0!=(b&0x40)) {
+					HwTimerManager.stop(timerId);
+					Gpio.modeIn(port);
+					Thread.sleep(delay);
+					Gpio.modeOut(port);
+				}
+			}
+			else {
+				short period = FlashData.readShort(PERIODS,(b&0x0f)*2)>>((b>>4)&0x07);
+				if(0==period) period = 1;
+				HwTimerManager.restart(timerId, period);
+				Thread.sleep(delay);
+			}
+		}
+		HwTimerManager.unregister(timerId);
+		Gpio.modeIn(port);
+		Gpio.setLow(port);
+	}
+
+	private static void callback(byte resId) {
+		RtosCore.invertIOReg(statIoReg);
+	}
+}

@@ -61,6 +61,7 @@ public enum RTOSLibs {
 	ROM_READ16("mem/rom_read16.asm"),
 	METHOD_FIN("j8b/mfin.asm"), //Без STACKFRAME IReg в стеке
 	METHOD_FIN_SF("j8b/mfin_sf.asm"), //С STACKFRAME IReg в стеке
+	METHOD_FIN_ARGS("j8b/mfin_args.asm"), //С неиспользуемым STACKFRAME(сохранены только HeapReg и аргументы)
 	MEM_RAMCLEAR("mem/ram_clear.asm"),
 	NEW_THREAD("j8b/new_thread.asm"),
 	NEW_CLASS("j8b/new_class.asm"),

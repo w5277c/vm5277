@@ -15,6 +15,13 @@
  */
 package ru.vm5277.compiler.avr_codegen;
 
+import ru.vm5277.common.cg.CGAccum;
+import ru.vm5277.common.cg.items.CGIAsm;
+import ru.vm5277.common.cg.items.CGIAsmLd;
+import ru.vm5277.common.cg.items.CGIAsmMv;
+import ru.vm5277.common.cg.items.CGIContainer;
+import ru.vm5277.common.cg.items.CGIText;
+import static ru.vm5277.common.cg.scopes.CGScope.VERBOSE_LO;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class Utils {
@@ -24,7 +31,7 @@ public class Utils {
 	 * @param branchInstr - оригинальная br инструкция
 	 * @return - инвертированная br инструкция, null если инструкции нет
 	 */
-	public static String brInstrInvert(String branchInstr) throws CompileException {
+	static String brInstrInvert(String branchInstr) throws CompileException {
 		switch(branchInstr) {
 			case "brbc": return "brbs";
 			case "brbs": return "brbc";
@@ -48,6 +55,87 @@ public class Utils {
 			case "brvs": return "brvc";
 			default: 
 				throw new CompileException("Unknown branch instruction: " + branchInstr);
+		}
+	}
+	
+	static byte[] getAccRegs(int size) {
+		switch(size) {
+			case 1: return new byte[]{16};
+			case 2: return new byte[]{16,17};
+			case 3: return new byte[]{16,17,18};
+			default: return new byte[]{16,17,18,19};
+		}
+	}
+
+	static byte[] getTempRegs(int size) {
+		switch(size) {
+			case 1: return new byte[]{30};
+			case 2: return new byte[]{30,31};
+			case 3: return new byte[]{16,17,18};
+			default: return new byte[]{30,31,28,29};
+		}
+	}
+
+	static CGIContainer accResize(CGAccum acc, int verbose) throws CompileException {
+		CGIContainer cont = new CGIContainer();
+		if(acc.isChanged()) {
+			if(VERBOSE_LO <= verbose) {
+				cont.append(new CGIText(";acc cast " + acc.oldToString() + "->" + acc.toString()));
+			}
+		
+			if(acc.getOldFixed() && !acc.getFixed()) {
+				cont.append(new CGIAsmMv("mov", "r16", "r17"));
+				cont.append(new CGIAsmLd("ldi", "r17", "0x00"));
+				cont.append(new CGIAsm("sbrc", "r16,0x07"));
+				cont.append(new CGIAsm("inc", "r16"));
+			}
+			else if(!acc.getOldFixed() && acc.getFixed()) {
+				cont.append(new CGIAsmMv("mov", "r17" , "r16"));
+				cont.append(new CGIAsmLd("ldi", "r16", "0x00"));
+			}
+		}
+
+		if(!acc.getFixed()) {
+			accGrow(cont, acc, acc.getOldBytes(), acc.getBytes());
+		}
+		return cont;
+	}
+
+	static void accGrow(CGIContainer cont, CGAccum acc, int oldSize, int newSize) throws CompileException {
+		if(oldSize<newSize) {
+			byte[] accRegs = Utils.getAccRegs(4);
+			for(int i=oldSize; i<newSize; i++) {
+				cont.append(new CGIAsmLd("ldi", "r" + accRegs[i], "0"));
+			}
+			acc.setBytes(newSize);
+		}
+	}
+	
+	static String getRightOp(int sn, Long constant) { //возвращает либо байт константы, либо регистр аккумуляора, если constant is null
+		if(null == constant) {
+			switch(sn) {
+				case 0: return "r16";
+				case 1: return "r17";
+				case 2: return "r18";
+				default: return "r19";
+			}
+		}
+		return Long.toString((constant>>(sn*8))&0xff);
+	}
+	
+	public static String getConstReg(CGIContainer cont, byte reg, int index, long value) throws CompileException {
+		return getConstReg(cont, reg, (int)(value>>(index*8)&0xff));
+	}
+	public static String getConstReg(CGIContainer cont, byte reg, int octet) throws CompileException {
+		switch(octet) {
+			case 0x00: return "c0x00";
+			case 0x01: return "c0x01";
+			case 0x02: return "c0x02";
+			case 0xff: return "c0xff";
+			default: {
+				cont.append(new CGIAsmLd("ldi", "r"+reg, Integer.toString(octet)));
+				return "r"+reg;
+			}
 		}
 	}
 }

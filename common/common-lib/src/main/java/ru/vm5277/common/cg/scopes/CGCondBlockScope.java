@@ -17,10 +17,11 @@
 package ru.vm5277.common.cg.scopes;
 
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.lexer.SourcePosition;
 
 public class CGCondBlockScope extends CGBlockScope {
 	
-	public CGCondBlockScope(CodeGenerator cg, CGScope parent, int id, String comment) {
-		super(cg, parent, id, comment);
+	public CGCondBlockScope(CodeGenerator cg, CGScope parent, SourcePosition sp, int id, String comment) {
+		super(cg, parent, sp, id, comment);
 	}
 }

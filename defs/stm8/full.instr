@@ -1,0 +1,181 @@
+#/*
+# * Copyright 2026 konstantin@5277.ru
+# *
+# * Licensed under the Apache License, Version 2.0 (the "License");
+# * you may not use this file except in compliance with the License.
+# * You may obtain a copy of the License at
+# *
+# *     http://www.apache.org/licenses/LICENSE-2.0
+# *
+# * Unless required by applicable law or agreed to in writing, software
+# * distributed under the License is distributed on an "AS IS" BASIS,
+# * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# * See the License for the specific language governing permissions and
+# * limitations under the License.
+# */
+
+#---DRAFT---
+
+# ============================================================
+# STM8 INSTRUCTION SET
+# ============================================================
+#
+# Register conventions:
+#   R   - any register (A, X, Y, SP, or memory)
+#   RA  - accumulator A (8-bit)
+#   RX  - index register X (16-bit)
+#   RY  - index register Y (16-bit)
+#   RSP - stack pointer (16-bit)
+#   Rm  - memory location (indirect)
+#
+# Operand types:
+#   k3   - 3-bit constant
+#   k5   - 5-bit constant
+#   k8   - 8-bit constant
+#   k16  - 16-bit constant
+#   k8s  - signed 8-bit constant
+#   k16s - signed 16-bit constant
+#   addr - 8/16-bit address
+#
+# Flags: Z, C, N, V, H, I
+# ============================================================
+
+# ============ ARITHMETIC INSTRUCTIONS ============
+ADD   add   zcnvh   1    1    0x90    R,R        # Add (Rd ← Rd + Rr)
+ADDW  addw  zcnv    1    1    0x90    R,R        # Add word (Rd ← Rd + Rr)
+ADC   adc   zcnvh   1    1    0x90    R,R        # Add with carry
+ADCW  adcw  zcnv    1    1    0x90    R,R        # Add word with carry
+SUB   sub   zcnvh   1    1    0x90    R,R        # Subtract (Rd ← Rd - Rr)
+SUBW  subw  zcnv    1    1    0x90    R,R        # Subtract word (Rd ← Rd - Rr)
+SBC   sbc   zcnvh   1    1    0x90    R,R        # Subtract with carry
+SBCW  sbcw  zcnv    1    1    0x90    R,R        # Subtract word with carry
+MUL   mul   zc      2    1    0x90    R,R        # Multiply unsigned (A ← A × R)
+MULW  mulw  zc      2    1    0x90    R,R        # Multiply word (X ← X × Y)
+DIV   div   zc      2-4  1    0x90    R,R        # Divide unsigned (A ← A / R)
+DIVW  divw  zc      2-4  1    0x90    R,R        # Divide word (X ← X / Y)
+INC   inc   znv     1    1    0x90    R          # Increment
+INCW  incw  znv     1    1    0x90    R          # Increment word
+DEC   dec   znv     1    1    0x90    R          # Decrement
+DECW  decw  znv     1    1    0x90    R          # Decrement word
+NEG   neg   zcnvh   1    1    0x90    R          # Two's complement (Rd ← -Rd)
+NEGW  negw  zcnv    1    1    0x90    R          # Two's complement word
+CP    cp    zcnvh   1    1    0x90    R,R        # Compare (Rd - Rr)
+CPW   cpw   zcnv    1    1    0x90    R,R        # Compare word (Rd - Rr)
+CPL   cpl   zcnvh   1    1    0x90    R          # One's complement (Rd ← ~Rd)
+CPLW  cplw  zcnv    1    1    0x90    R          # One's complement word
+
+# ============ BRANCH INSTRUCTIONS ============
+JRA   jra   none    2    1    0x90    k8s        # Relative jump always
+JRN   jrn   none    2    1    0x90    k8s        # Relative jump never
+JRC   jrc   none    2    1    0x90    k8s        # Relative jump if carry (C=1)
+JRNC  jrnc  none    2    1    0x90    k8s        # Relative jump if not carry (C=0)
+JREQ  jreq  none    2    1    0x90    k8s        # Relative jump if equal (Z=1)
+JRNE  jrne  none    2    1    0x90    k8s        # Relative jump if not equal (Z=0)
+JRMI  jrmi  none    2    1    0x90    k8s        # Relative jump if minus (N=1)
+JRPL  jrpl  none    2    1    0x90    k8s        # Relative jump if plus (N=0)
+JRVS  jrvs  none    2    1    0x90    k8s        # Relative jump if overflow (V=1)
+JRVC  jrvc  none    2    1    0x90    k8s        # Relative jump if not overflow (V=0)
+JRGT  jrgt  none    2    1    0x90    k8s        # Relative jump if greater than (signed)
+JRGE  jrge  none    2    1    0x90    k8s        # Relative jump if greater or equal (signed)
+JRLT  jrlt  none    2    1    0x90    k8s        # Relative jump if less than (signed)
+JRULE jrule none    2    1    0x90    k8s        # Relative jump if less or equal (signed)
+JRULT jrult none    2    1    0x90    k8s        # Relative jump if lower than (unsigned)
+JRULE jrule none    2    1    0x90    k8s        # Relative jump if lower or equal (unsigned)
+JRUGE jruge none    2    1    0x90    k8s        # Relative jump if greater or equal (unsigned)
+JRUGT jrugt none    2    1    0x90    k8s        # Relative jump if greater than (unsigned)
+JP    jp    none    2-3  1    0x90    addr       # Absolute jump
+CALL  call  none    2-3  1    0x90    addr       # Call subroutine
+CALLR callr none    2    1    0x90    k8s        # Relative call
+RET   ret   none    2    1    0x90    none       # Return from subroutine
+RETI  reti  i       2    1    0x90    none       # Return from interrupt
+HALT  halt  none    1    1    0x90    none       # Halt (enter low power mode)
+WFE   wfe   none    1    1    0x90    none       # Wait for event
+WFI   wfi   none    1    1    0x90    none       # Wait for interrupt
+
+# ============ DATA TRANSFER INSTRUCTIONS ============
+LD    ld    none    1    1    0x90    R,R        # Load register/memory
+LDW   ldw   none    1    1    0x90    R,R        # Load word (16-bit)
+LDF   ldf   none    1-2  1    0x90    R,R        # Load from flash
+LDX   ldx   none    1    1    0x90    R,R        # Load X register
+LDY   ldy   none    1    1    0x90    R,R        # Load Y register
+LDA   lda   none    1    1    0x90    R,R        # Load A register
+LDS   lds   none    1    1    0x90    R,R        # Load SP register
+LDWX  ldx   none    1    1    0x90    R,k16      # Load immediate to X
+LDWY  ldy   none    1    1    0x90    R,k16      # Load immediate to Y
+LDAX  lda   none    1    1    0x90    R,k8       # Load immediate to A
+LDP   ldp   none    1-2  1    0x90    R,R        # Load from program memory
+ST    st    none    1    1    0x90    R,R        # Store register/memory
+STW   stw   none    1    1    0x90    R,R        # Store word (16-bit)
+STA   sta   none    1    1    0x90    R,R        # Store A to memory
+STX   stx   none    1    1    0x90    R,R        # Store X to memory
+STY   sty   none    1    1    0x90    R,R        # Store Y to memory
+STS   sts   none    1    1    0x90    R,R        # Store SP to memory
+PUSH  push  none    1    1    0x90    R          # Push register to stack
+POP   pop   none    1    1    0x90    R          # Pop register from stack
+PUSHW pushw none    1    1    0x90    R          # Push word to stack
+POPW  popw  none    1    1    0x90    R          # Pop word from stack
+XCH   xch   none    1    1    0x90    R,R        # Exchange registers/memory
+SWAP  swap  none    1    1    0x90    R          # Swap bytes (16-bit)
+MOV   mov   none    1    1    0x90    R,R        # Move register (synonym for LD)
+
+
+# ============ LOGICAL INSTRUCTIONS ============
+AND   and   znv     1    1    0x90    R,R        # Logical AND (Rd ← Rd & Rr)
+ANDW  andw  znv     1    1    0x90    R,R        # Logical AND word
+OR    or    znv     1    1    0x90    R,R        # Logical OR (Rd ← Rd | Rr)
+ORW   orw   znv     1    1    0x90    R,R        # Logical OR word
+XOR   xor   znv     1    1    0x90    R,R        # Exclusive OR (Rd ← Rd ^ Rr)
+XORW  xorw  znv     1    1    0x90    R,R        # Exclusive OR word
+SLL   sll   zcnv    1    1    0x90    R          # Shift left logical
+SLLW  sllw  zcnv    1    1    0x90    R          # Shift left logical word
+SRL   srl   zcnv    1    1    0x90    R          # Shift right logical
+SRLW  srlw  zcnv    1    1    0x90    R          # Shift right logical word
+SRA   sra   zcnv    1    1    0x90    R          # Shift right arithmetic
+SRAW  sraw  zcnv    1    1    0x90    R          # Shift right arithmetic word
+RLC   rlc   zcnv    1    1    0x90    R          # Rotate left through carry
+RLCW  rlcw  zcnv    1    1    0x90    R          # Rotate left through carry word
+RRC   rrc   zcnv    1    1    0x90    R          # Rotate right through carry
+RRCW  rrcw  zcnv    1    1    0x90    R          # Rotate right through carry word
+SWAPW swapw none    1    1    0x90    R          # Swap bytes in word
+
+# ============ BIT MANIPULATION INSTRUCTIONS ============
+BCP   bcp   zcnv    1    1    0x90    R,k3       # Bit compare (test bit)
+BSET  bset  none    1    1    0x90    R,k3       # Set bit
+BRES  bres  none    1    1    0x90    R,k3       # Reset bit (clear bit)
+BTJT  btjt  none    1-3  1    0x90    R,k3,addr  # Bit test and jump if true
+BTJF  btjf  none    1-3  1    0x90    R,k3,addr  # Bit test and jump if false
+BSETM bsetm none    1    1    0x90    R,k3       # Set memory bit
+BRESM bresm none    1    1    0x90    R,k3       # Reset memory bit
+
+
+# ============ SYSTEM CONTROL INSTRUCTIONS ============
+NOP   nop   none    1    1    0x90    none       # No operation
+TRAP  trap  none    1    1    0x90    none       # Software trap / interrupt
+RIM   rim   none    1    1    0x90    none       # Enable interrupts
+SIM   sim   none    1    1    0x90    none       # Disable interrupts
+RCF   rcf   c       1    1    0x90    none       # Reset carry flag
+SCF   scf   c       1    1    0x90    none       # Set carry flag
+CCF   ccf   c       1    1    0x90    none       # Complement carry flag
+RNF   rnf   n       1    1    0x90    none       # Reset negative flag
+SNF   snf   n       1    1    0x90    none       # Set negative flag
+RZF   rzf   z       1    1    0x90    none       # Reset zero flag
+SZF   szf   z       1    1    0x90    none       # Set zero flag
+RVF   rvf   v       1    1    0x90    none       # Reset overflow flag
+SVF   svf   v       1    1    0x90    none       # Set overflow flag
+RHF   rhf   h       1    1    0x90    none       # Reset half-carry flag
+SHF   shf   h       1    1    0x90    none       # Set half-carry flag
+IAP   iap   none    1    1    0x90    none       # In-application programming enable
+IAPD  iapd  none    1    1    0x90    none       # In-application programming disable
+EXG   exg   none    1    1    0x90    R,R        # Exchange X and Y registers
+EXGW  exgw  none    1    1    0x90    R,R        # Exchange word (X,Y with SP)
+TICK  tick  none    1    1    0x90    none       # Tick (for debug)
+
+# ============ ADDITIONAL / PSEUDO INSTRUCTIONS ============
+CLR   clr   znv     1    1    0x90    R          # Clear register (Rd ← 0)
+CLRW  clrw  znv     1    1    0x90    R          # Clear word (Rd ← 0)
+TST   tst   znv     1    1    0x90    R          # Test register (set flags)
+TSTW  tstw  znv     1    1    0x90    R          # Test word
+CPSE  cpse  none    1-3  1    0x90    R,R        # Compare skip if equal
+SLLX  sllx  zcnv    1    1    0x90    R,R        # Shift left with X count
+SRLX  srlx  zcnv    1    1    0x90    R,R        # Shift right with X count
+SRAX  srax  zcnv    1    1    0x90    R,R        # Shift arithmetic with X count

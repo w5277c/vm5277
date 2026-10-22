@@ -15,7 +15,6 @@
  */
 
 import rtos.RtosDispatcher;
-import rtos.RtosCallback;
 
 public class HwTimerManager implements RtosDriver {
 	public enum Resolution {
@@ -31,18 +30,16 @@ public class HwTimerManager implements RtosDriver {
 
     /**
      * Регистрирует callback на событие таймера.
-     * @param perido - период таймера в микросекундах(us)
+     * @param period - период таймера в микросекундах(us)
      * @param callback - обработчик событий
      * @return ID регистрации (byte)
      * @throws DriverException
      */
-	public static byte register(short maxPeriod, Resolution resolution, RtosCallback callback, byte resId) throws DriverException {
-		if(null==callback) NullPointerException.throw();
-
+	public static byte register(short maxPeriod, Resolution resolution, @Passthrough NativeCallback callback, byte resId) throws DriverException {
 		RtosDispatcher.lock();
 		byte quantity = _quantity();
 		for(byte index=0; index<quantity; index++) {
-			byte result = 1<<index;
+			byte result = (byte)(1<<index);
 			if(0==(usedBitMap&result) && _checkPeriod(index, maxPeriod, resolution)) {
 				_init(index, maxPeriod, callback, resId);
 				usedBitMap |=result;
@@ -60,8 +57,8 @@ public class HwTimerManager implements RtosDriver {
  	* @param id - ID регистрации (полученный от register)
  	* @throws DriverException
  	*/
-	public static void unregister(byte id) throws DriverException {
-		byte bitNum = (1<<id);
+	public static void unregister(byte id) {
+		byte bitNum = (byte)(1<<id);
 
 		RtosDispatcher.lock();
 		if(0!=(usedBitMap&bitNum)) {
@@ -71,7 +68,6 @@ public class HwTimerManager implements RtosDriver {
 		}
 		else {
 			RtosDispatcher.unlock();
-			DriverException.throw(DriverException.INVALID_PARAM);
 		}
 	}
 
@@ -85,7 +81,7 @@ public class HwTimerManager implements RtosDriver {
 	}
 
 	public static void restart(byte id, short period) {
-		if(0!=(usedBitMap&(1<<id))) {
+		if(0!=(usedBitMap&(byte)(1<<id))) {
 			_disable(id);
 			if(!_setPeriod(id, period)) {
 				DriverException.throw(DriverException.NO_AVAILABLE);
@@ -98,17 +94,14 @@ public class HwTimerManager implements RtosDriver {
 	}
 
 	public static void stop(byte id) {
-		if(0!=(usedBitMap&(1<<id))) {
+		if(0!=(usedBitMap&(byte)(1<<id))) {
 			_disable(id);
-		}
-		else {
-			DriverException.throw(DriverException.INVALID_PARAM);
 		}
 	}
 
 	private static native byte _quantity();
 	private static native boolean _checkPeriod(byte timerId, short maxPeriodUs, Resolution resolution);
-	private static native boolean _init(byte timerId, short maxPeriodUs, RtosCallback callback, byte resId);
+	private static native void _init(byte timerId, short maxPeriodUs, NativeCallback callback, byte resId);
 	private static native void _enable(byte timerId);
 	private static native boolean _setPeriod(byte timerId, short periodUs);
 	private static native void _disable(byte timerId);

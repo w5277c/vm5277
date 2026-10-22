@@ -15,9 +15,9 @@
  */
 package ru.vm5277.common.cg;
 
-import ru.vm5277.common.cg.items.CGItem;
+import ru.vm5277.common.cg.items.CGIContainer;
 import ru.vm5277.common.exceptions.CompileException;
 
 public interface CGActionHandler {
-	public CGItem action(int sn, String rOp) throws CompileException;
+	public Long action(CGIContainer cont, int sn, Byte dstReg) throws CompileException;
 }

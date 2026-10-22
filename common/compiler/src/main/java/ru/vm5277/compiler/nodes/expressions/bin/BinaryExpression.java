@@ -72,14 +72,15 @@ public class BinaryExpression extends ExpressionNode {
 				if(null==arithmOp) {
 					return new AssignExpression(inst, tb, sp, left, Operator.ASSIGN, right);
 				}
-				return new AssignExpression(inst, tb, sp, left, Operator.ASSIGN, BinaryExpression.create(inst, tb, sp, left, arithmOp, right));
+				//return new AssignExpression(inst, tb, sp, left, Operator.ASSIGN, BinaryExpression.create(inst, tb, sp, left, arithmOp, right));
+				return new AssignExpression(inst, tb, sp, left, Operator.ASSIGN, new ArithmeticExpression(inst, tb, sp, left, arithmOp, right, true));
 			}
 		}
 		else if(operator.isComparison()) {
 			return new ComparisonExpression(inst, tb, sp, left, operator, right);
 		}
 		else if(operator.isArithmetic() || operator.isBitwise()) {
-			return new ArithmeticExpression(inst, tb, sp, left, operator, right);
+			return new ArithmeticExpression(inst, tb, sp, left, operator, right, false);
 		}
 		return new BinaryExpression(inst, tb, sp, left, operator, right);
 	}
@@ -148,7 +149,7 @@ public class BinaryExpression extends ExpressionNode {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 		this.scope = scope;
-		cgScope = cg.enterExpression(parent, cgScope, toString());
+		cgScope = cg.enterExpression(parent, sp, cgScope, toString());
 		
 		// Анализ операндов
 		result&=leftExpr.postAnalyze(scope, cg, cgScope);
@@ -218,6 +219,8 @@ public class BinaryExpression extends ExpressionNode {
 			ExpressionNode optimizedExpr = leftExpr.optimizeWithScope(scope, cg);
 			if(null != optimizedExpr) {
 				leftExpr = optimizedExpr;
+				// Тип мог измениться после оптимизации (например (int)(short)var
+				leftType = leftExpr.getType();
 			}
 		}
 		catch(CompileException ex) {
@@ -229,6 +232,8 @@ public class BinaryExpression extends ExpressionNode {
 			ExpressionNode optimizedExpr = rightExpr.optimizeWithScope(scope, cg);
 			if(null != optimizedExpr) {
 				rightExpr = optimizedExpr;
+				// Тип мог измениться после оптимизации (например (int)(short)var
+				rightType = rightExpr.getType();
 			}
 		}
 		catch(CompileException ex) {
@@ -248,6 +253,8 @@ public class BinaryExpression extends ExpressionNode {
 		
 		CodegenResult result = CodegenResult.RESULT_IN_ACCUM;
 
+		VarType castType = cg._getAcc().pullCast();
+		
 //		CGScope cgs = null == parent ? cgScope : parent;
 		
 		int leftSize = leftType.getSize();
@@ -295,7 +302,8 @@ public class BinaryExpression extends ExpressionNode {
 					throw new CompileException("Accum not used for operand:" + expr2);
 				}
 				// Выполняем логическую операцию со значением в стеке
-				cg.cellsAction(cgScope, new CGCells(CGCells.Type.ACC), expr2.getType(), operator, new CGCells(CGCells.Type.STACK, 1), expr1.getType(), excs);
+				cg.cellsAction(	cgScope, new CGCells(CGCells.Type.ACC), expr2.getType(), operator,
+								new CGCells(CGCells.Type.STACK, 1), expr1.getType(), castType, excs);
 			}
 			else {
 				//TODO Генерирует не оптимальное количество переходов, оптимизатор решит эту задачу, но лучше оптимизировать сразу
@@ -418,12 +426,14 @@ public class BinaryExpression extends ExpressionNode {
 				throw new CompileException("Accum not used for operand:" + expr1);
 			}
 
-			if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumLock(VarType.FIXED);
-			cg.cellsAction(cgScope, new CGCells(CGCells.Type.ACC), expr1.getType(), operator, new CGCells(CGCells.Type.STACK, size), expr2.getType(), excs);
+//			if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumLock(VarType.FIXED);
+			cg.cellsAction(	cgScope, new CGCells(CGCells.Type.ACC), expr1.getType(), operator,
+							new CGCells(CGCells.Type.STACK, size), expr2.getType(), castType, excs);
 			if(operator.isAssignment()) {
-				cg.accToCells(cgScope, expr1.getType(), (CGCellsScope)expr1.getSymbol().getCGScope());
+				cg.cellsToCells(cgScope, ((CGCellsScope)expr1.getSymbol().getCGScope()).getCells(), expr1.getType(),
+								new CGCells(CGCells.Type.ACC), null, castType);
+				//cg.accToCells(cgScope, expr1.getType(), (CGCellsScope)expr1.getSymbol().getCGScope());
 			}
-			if(!leftType.isFixedPoint() && rightType.isFixedPoint()) cg.accumUnlock();
 		}
 
 		releaseVars(cg);
@@ -440,6 +450,7 @@ public class BinaryExpression extends ExpressionNode {
 		return leftExpr + ", " + operator + ", " + rightExpr;
 	}
 	
+	@Override
 	public String getFullInfo() {
 		return getClass().getSimpleName() + "  " + toString();
 	}

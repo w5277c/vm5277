@@ -1,0 +1,2 @@
+avrasm prebuild/Main.asm -I rtos/avr -o ./Main
+j8bf avr:atmega328p 16 Main_cseg.hex -F -R

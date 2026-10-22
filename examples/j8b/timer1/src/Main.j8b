@@ -24,6 +24,8 @@ class Main {
 	}
 
 	public static void main() {
+		System.setParam(RtosParam.SHOW_WELCOME,1);
+
 		Gpio.modeOut(ArduinoUno.LED_BUILTIN);
 		Timer blink = new Blink();
 

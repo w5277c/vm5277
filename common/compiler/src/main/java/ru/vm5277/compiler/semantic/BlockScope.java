@@ -51,7 +51,7 @@ public class BlockScope extends Scope {
 	}
 	
 	@Override
-	public CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess) {
+	public CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess, Set<CIScope> checked) {
 		// Проверка модфификаторов доступа ненужна, все классы внутри блока доступны
 		if(isQualifiedAccess) {
 			return internal.get(name);
@@ -62,17 +62,17 @@ public class BlockScope extends Scope {
 		if(null!=cis) return cis;
 		
 		if(null!=parent) {
-			return parent.resolveCI(null==caller ? this : caller, name, false);
+			return parent.resolveCI(null==caller ? this : caller, name, false, checked);
 		}
 		return null;
 	}
 	
 	@Override
-	public Symbol resolveField(Scope caller, String name, boolean isQualifiedAccess) throws CompileException {
+	public Symbol resolveField(Scope caller, String name, boolean isQualifiedAccess, Set<CIScope> checked) throws CompileException {
 		if(isQualifiedAccess) {
 			throw new CompileException("Qualified field access in block scope");
 		}
-		return parent.resolveField(null==caller ? this : caller, name, false);
+		return parent.resolveField(null==caller ? this : caller, name, false, checked);
 	}
 	
 	@Override

@@ -23,7 +23,7 @@ J8BPROC_NEW_THREAD:
 ;инициализирует HEAP для потока
 ;IN: ACCUM_L/H-размер блока
 ;MOD: ACCUM_L/H
-;OUT: Z-адрес на выделенный блок, флаг С-OUT OF RAM
+;OUT: Z-адрес на выделенный блок, флаг C true=OutOfMemory
 ;-----------------------------------------------------------
 	SET //TODO перейти на OS_DISPATCHER_LOCK, но мешает использовние флагов, нужно чтобы OS_DISPATCHER_UNLOCK не влиял на флаги
 	MCALL OS_DRAM_ALLOC

@@ -119,7 +119,7 @@ public class BreakNode extends CommandNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
-		cgScope = cg.enterCommand(parent, "break");
+		cgScope = cg.enterCommand(parent, sp, "break");
 		
 		// Базовая проверка - команда break должна быть внутри цикла
 		if(null==cgScope.getScope(CGLoopBlockScope.class)) {

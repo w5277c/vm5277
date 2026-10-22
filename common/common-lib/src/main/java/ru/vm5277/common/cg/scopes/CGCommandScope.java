@@ -16,10 +16,11 @@
 package ru.vm5277.common.cg.scopes;
 
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.lexer.SourcePosition;
 
 public class CGCommandScope extends CGBlockScope {
-	public CGCommandScope(CodeGenerator cg, CGScope parent, String name) {
-		super(cg, parent, -1, name);
+	public CGCommandScope(CodeGenerator cg, CGScope parent, SourcePosition sp, String name) {
+		super(cg, parent, sp, -1, name);
 	}
 	
 	@Override

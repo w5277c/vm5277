@@ -16,7 +16,6 @@
 
 package ru.vm5277.compiler.semantic;
 
-import java.util.HashMap;
 import java.util.Map;
 import ru.vm5277.common.exceptions.CompileException;
 

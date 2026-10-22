@@ -16,6 +16,11 @@
 
 ;Функционал работы с VIEW (также применим для массивов)
 ;VIEW содержит флаг VIEW, адрес массива и 1-2 индекса, которые нужно добавить к индексам массива
+;0x00 1B FLAGS (7-is view, 6-extended(7bytes), 5-4-cell type size(0=1byte,...), 2-0-depth(0-1)
+;0x01 2B ARRAY HEADER ADDR
+;0x03 2B INDEX0
+;0x05 0/2B INDEX1
+
 ;Необходимо загрузить в X адрес массива и обновить интексы в стек
 ;Затем вызвать J8BPROC_ARR_CELLADDR
 
@@ -40,17 +45,16 @@ J8BPROC_ARRVIEW_CELLADDR:									;Портит аккумулятор 32бит�
 	LD ACCUM_EL,X+											;Загружаем адрес массива
 	LD ACCUM_EH,X+
 
-	ADIW XL,0x02											;Дополняем индексы массиву LE
-	LD ACCUM_H,X											;H - перевернутый LE из-за стека
+	 ;TODO возможно сначала должен идти index1 - надо проверить
+	LD ACCUM_H,X+											;index0 L
 	PUSH ACCUM_H
-	SBIW XL,0x01											;L - перевернутый LE из-за стека
-	LD ACCUM_H,X+
+	LD ACCUM_H,X+											;index0 H
 	PUSH ACCUM_H
-	ADIW XL,0x03											;H - перевернутый LE из-за стека
+	
+	LD ACCUM_H,X+											;index1 L
 	SBRC ACCUM_L,0x00
     PUSH ACCUM_H
-	SBIW XL,0x01											;L - перевернутый LE из-за стека
-	LD ACCUM_H,X
+	LD ACCUM_H,X											;index1 H
 	SBRC ACCUM_L,0x00
     PUSH ACCUM_H
     MOVW XL,ACCUM_EL										;Записываем адрес массива в X

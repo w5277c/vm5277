@@ -18,6 +18,7 @@ package ru.vm5277.compiler.semantic;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
 
@@ -57,7 +58,7 @@ public class ClassScope extends CIScope {
 		return constructors;
 	}
 
-	public MethodSymbol resolveConstructor(String methodName, VarType[] argTypes, boolean isQualifiedAccess) throws CompileException {
+	public MethodSymbol resolveConstructor(String methodName, VarType[] argTypes, boolean isQualifiedAccess, Set<CIScope> checked) throws CompileException {
 		// Ищем методы в текущем классе
 		for (MethodSymbol method : constructors) {
 			if (method.getName().equals(methodName) && isApplicable(method, argTypes)) {
@@ -68,13 +69,13 @@ public class ClassScope extends CIScope {
 		if(!isQualifiedAccess) {
 			for(CIScope cis : internal.values()) {
 				if(cis instanceof ClassScope) {
-					MethodSymbol method = ((ClassScope)cis).resolveConstructor(methodName, argTypes, false);
+					MethodSymbol method = ((ClassScope)cis).resolveConstructor(methodName, argTypes, false, checked);
 					if(null!=method) return method;
 				}
 			}
 			for(CIScope cis : imported.values()) {
 				if(cis instanceof ClassScope) {
-					MethodSymbol method = ((ClassScope)cis).resolveMethod(methodName, argTypes, false);
+					MethodSymbol method = ((ClassScope)cis).resolveMethod(methodName, argTypes, false, checked);
 					if(null!=method) return method;
 				}
 			}

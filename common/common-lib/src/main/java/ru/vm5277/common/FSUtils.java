@@ -249,7 +249,8 @@ public class FSUtils {
 		return false;
 	}
 	
-	public static int runJ8BTool(Path toolkitPath, String mainClassName, List<String> args, StringBuilder stdout) throws IOException {
+	public static int runJ8BTool(String mainClassName, List<String> args, StringBuilder stdout) throws IOException {
+		Path toolkitPath = FSUtils.getToolkitPath();
 		Path binPath = toolkitPath.resolve("bin").normalize();
 		if(!binPath.toFile().exists() || !binPath.toFile().isDirectory()) {
 			throw new IOException("Bin directory not found: " + binPath.toString());

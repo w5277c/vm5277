@@ -175,7 +175,7 @@ public class ExceptionNode extends ObjectTypeNode {
 			}
 
 			if(result && !ext.isEmpty()) {
-				extScope = scope.resolveCI(null, ext.get(0), false);
+				extScope = scope.resolveCI(null, ext.get(0), false, new HashSet<>());
 				if(null==extScope) {
 					markError("Exception not found: " + ext.get(0));
 					result = false;
@@ -233,7 +233,6 @@ public class ExceptionNode extends ObjectTypeNode {
 
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
-		
 		releaseVars(cg);
 		return null;
 	}

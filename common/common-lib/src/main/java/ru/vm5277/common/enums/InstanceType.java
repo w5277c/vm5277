@@ -21,5 +21,5 @@ public enum InstanceType {
 	FIRST_THREAD,
 	THREAD,
 	TIMER,
-	RTOS_CALLBACK;
+	NATIVE_CALLBACK;
 }

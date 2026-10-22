@@ -246,7 +246,7 @@ public class VarNode extends AstNode implements InitNodeHolder {
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 
 		try {
-			cgScope = cg.enterLocal(parent, type, (type.isReferenceType() ? cg.getRefSize() : type.getSize()), VarType.CSTR == type, name);
+			cgScope = cg.enterLocal(parent, sp, type, (type.isReferenceType() ? cg.getRefSize() : type.getSize()), VarType.CSTR == type, name);
 			symbol.setCGScope(cgScope);
 			
 			((CGBlockScope)parent).addVar((CGVarScope)cgScope); // Перенесено из CGVarScope.build
@@ -272,9 +272,13 @@ public class VarNode extends AstNode implements InitNodeHolder {
 					((CGCellsScope)cgScope).setArrayView(init instanceof ArrayExpression);
 					// Проверка совместимости типов
 					VarType initType = init.getType();
-					if(initType.isClassType() && type.isClassType()) {
+					if(null==initType) {
+						markError("Type is null");
+						result = false;
+					}
+					if(result && initType.isClassType() && type.isClassType()) {
 						if(initType!=type) {
-							CIScope cis = scope.getThis().resolveCI(null, initType.getClassName(), false);
+							CIScope cis = scope.getThis().resolveCI(null, initType.getClassName(), false, new HashSet<>());
 							if(!cis.isImplements(type)) {
 								markError("Type mismatch: cannot assign " + initType + " to " + type);
 								result = false;
@@ -359,11 +363,11 @@ public class VarNode extends AstNode implements InitNodeHolder {
 		throw new UnsupportedOperationException();
 	}
 	
-	public Object codeGen(CodeGenerator cg, boolean toAccum, BlockScope callerscope, CGExcs excs) throws CompileException {
+	public Object codeGen(CodeGenerator cg, boolean toAccum, BlockScope callerScope, CGExcs excs) throws CompileException {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 
-		if(null==callerscope) { // Позволяет обнаружить недописанную логику - все обращения к кодогенерации переменной должны содержать скоп вызывающего блока
+		if(null==callerScope) { // Позволяет обнаружить недописанную логику - все обращения к кодогенерации переменной должны содержать скоп вызывающего блока
 			throw new CompileException("TODO: " + getFullInfo() + " callerScope is null");
 		}
 		
@@ -372,7 +376,7 @@ public class VarNode extends AstNode implements InitNodeHolder {
 		VarSymbol vSymbol = (VarSymbol)symbol;
 		// Постройка списка участвующих переменных должна осуществляться на уровне первого обращения к переменной, а не на уровне инициализации
 		// Иначе при вложенных блоках мы увидим переменные только первого блока
-		Set<VarSymbol> varsInRange = ((BlockScope)callerscope).getVarsInRange(vSymbol.getNode().getSN(), vSymbol.getLastAccessedSN());
+		Set<VarSymbol> varsInRange = ((BlockScope)callerScope).getVarsInRange(vSymbol.getNode().getSN(), vSymbol.getLastAccessedSN());
 		Set<CGCells> usedRegsCells = new HashSet<>();
 		for(VarSymbol vs : varsInRange) {
 			CGCellsScope cgCellsScope = (CGCellsScope)vs.getCGScope();
@@ -380,6 +384,8 @@ public class VarNode extends AstNode implements InitNodeHolder {
 				usedRegsCells.add(cgCellsScope.getCells());
 			}
 		}
+		
+		VarType castType = cg._getAcc().pullCast();
 		
 		Boolean accUsed = null;
 		vScope.build(usedRegsCells);
@@ -396,21 +402,19 @@ public class VarNode extends AstNode implements InitNodeHolder {
 			// Инициализация(заполнение нулями необходима только регистрам, остальные проинициализированы вместе с HEAP/STACK)
 			if(null==init) {
 				if(CGCells.Type.REG==vScope.getCells().getType()) {
-					cgScope.append(cg.constToCells(cgScope, 0, vScope.getCells(), false));
+					cg.cellsToCells(cgScope, vScope.getCells(), type, new CGCells(0), null, castType);
+					//cgScope.append(cg.constToCells(cgScope, 0, vScope.getCells(), false));
 				}
 			}
 			else if(init instanceof LiteralExpression) { // Не нужно вычислять, можно сразу сохранять не используя аккумулятор
 				LiteralExpression le = (LiteralExpression)init;
-				cg.accumLock(type);
-				boolean isFixed = le.getType().isFixedPoint() || vScope.getType().isFixedPoint();
-				cgScope.append(cg.constToCells(cgScope, isFixed ? le.getFixedValue() : le.getNumValue(), vScope.getCells(), isFixed));
-				cg.accumUnlock();
+				cg.cellsToCells(cgScope, vScope.getCells(), type,
+								new CGCells(le.getType().isFixedPoint() ? le.getFixedValue() : le.getNumValue()), null, castType);
+				//cgScope.append(cg.constToCells(cgScope, isFixed ? le.getFixedValue() : le.getNumValue(), vScope.getCells(), isFixed));
 			}
 			else if(init instanceof NewExpression) {
 				init.codeGen(cg, true, excs);
-				cg.accumLock(VarType.CLASS);
-				cg.accToCells(cgScope, type, vScope);
-				cg.accumUnlock();
+				cg.cellsToCells(cgScope, vScope.getCells(), type, new CGCells(CGCells.Type.ACC), null, castType);
 			}
 			else if(init instanceof NewArrayExpression) {
 				init.codeGen(cg, true, excs);
@@ -418,9 +422,7 @@ public class VarNode extends AstNode implements InitNodeHolder {
 				//cg.updateRefCount(vScope, vScope.getCells(), true);
 				
 				//Перенес в declare //((VarSymbol)symbol).setArrayDimensions(((NewArrayExpression)initializer).getConsDimensions());
-				cg.accumLock(VarType.SHORT);
-				cg.accToCells(cgScope, type, vScope);
-				cg.accumUnlock();
+				cg.cellsToCells(cgScope, vScope.getCells(), type, new CGCells(CGCells.Type.ACC), null, castType);
 			}
 //			else if(init instanceof ArrayExpression) {
 //				init.codeGen(cg, null, true);
@@ -432,7 +434,6 @@ public class VarNode extends AstNode implements InitNodeHolder {
 				CGBranch branch = new CGBranch();
 				cgScope.setBranch(branch);
 				
-				cg.accumLock(type);
 				init.codeGen(cg, true, excs);
 				//TODO проверить на объекты и на массивы(передача ref)
 				VarType initType = init.getType();
@@ -445,30 +446,38 @@ public class VarNode extends AstNode implements InitNodeHolder {
 					cg.updateArrRefCount(cgScope, vScope.getCells(), true);
 				}
 				if(branch.isUsed()) {
-					cg.constToAcc(cgScope, 1, 1, false);
+					//cg.constToAcc(cgScope, 1, 1, false);
+					cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ACC), VarType.BOOLEAN, new CGCells(1), VarType.BOOLEAN, castType);
 					CGLabelScope lbScope = new CGLabelScope(null, null, LabelNames.LOCGIC_END, true);
 					cg.jump(cgScope, lbScope);
 					cgScope.append(((CGBranch)branch).getEnd());
-					cg.constToAcc(cgScope, 1, 0, false);
+					//cg.constToAcc(cgScope, 1, 0, false);
+					cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ACC), VarType.BOOLEAN, new CGCells(0), VarType.BOOLEAN, castType);
 					cgScope.append(lbScope);
-					cg.accToCells(cgScope, type, vScope);
+					cg.cellsToCells(cgScope, vScope.getCells(), type, new CGCells(CGCells.Type.ACC), null, castType);
+					//cg.accToCells(cgScope, type, vScope);
 				}
-				cg.accToCells(cgScope, type, vScope);
-				cg.accumUnlock();
+				cg.cellsToCells(cgScope, vScope.getCells(), type, new CGCells(CGCells.Type.ACC), null, castType);
+				//cg.accToCells(cgScope, type, vScope);
 				accUsed = true;
 //!!!				cg.setScope(oldScope);
 			}
 			else if(init instanceof ArrayExpression) {
-				boolean optimized = false;
 				try {
 					if( null!=init.getSymbol() && null!=init.getSymbol().getCGScope() &&
 						init.getSymbol().getCGScope() instanceof CGCellsScope && null!=((CGCellsScope)init.getSymbol().getCGScope()).getCells()) {
 					
-						
-						if(!type.isArray()) { // для type.isArray() результат будет в аккумуляторе - обработаем блоком ниже
+						if(type.isArray()) {
+							((ArrayExpression)init).codeGen(cg, true, true, excs);
+							// Если назначение - массив, то результат будет в аккумуляторе (byte[] b2 = b1[3];)
+							cg.cellsToCells(cgScope, vScope.getCells(), type, new CGCells(CGCells.Type.ACC), null, castType);
+							accUsed = true;
+						}
+						else {
+							// Иначе назначение это примитив или ссылка на объект (byte octet = data[index];)
 							((ArrayExpression)init).codeGen(cg, false, false, excs);
-							cg.cellsToCells(cgScope, vScope.getCells(), type, ((CGCellsScope)init.getSymbol().getCGScope()).getCells(), init.getType());
-							optimized = true;
+							cg.cellsToCells(cgScope, vScope.getCells(), type,
+											((CGCellsScope)init.getSymbol().getCGScope()).getCells(), init.getType(), castType);
 						}
 					}
 				}
@@ -477,13 +486,27 @@ public class VarNode extends AstNode implements InitNodeHolder {
 					ex.printStackTrace();
 				}
 
-				if(!optimized) {
-					cg.accumLock(type);
-					((ArrayExpression)init).codeGen(cg, true, type.isArray(), excs);
-					cg.accToCells(cgScope, type, vScope);
-					cg.accumUnlock();
-					accUsed = true;
+				// Здесь мы инкрементируем ссылку если в переменную типа CLASS передается элменет массива (а не подмассив)
+				if(!type.isArray() && VarType.CLASS==type) {
+					cg.pushHeapReg(cgScope);
+					cg.updateClassRefCount(cgScope, vScope.getCells(), true);
+					cg.popHeapReg(cgScope);
 				}
+				if(type.isArray()) {
+					// Выполняем инкремент ссылки массива если создается view (byte[] b2 = b1[3];)
+					cg.updateArrRefCount(cgScope, vScope.getCells(), true);
+				}
+			}
+			else if(init instanceof EnumExpression) {
+				cg.cellsToCells(cgScope, vScope.getCells(), type, new CGCells(((EnumExpression)init).getIndex()), null, castType);
+				//cgScope.append(cg.constToCells(cgScope, ((EnumExpression)init).getIndex(), vScope.getCells(), false));
+			}
+			else if(init instanceof VarFieldExpression && null!=init.getSymbol() && null!=init.getSymbol().getCGScope() &&
+					init.getSymbol().getCGScope() instanceof CGCellsScope && null!=((CGCellsScope)init.getSymbol().getCGScope()).getCells()) {
+
+				init.codeGen(cg, false, excs);
+				cg.cellsToCells(cgScope, vScope.getCells(), type, ((CGCellsScope)init.getSymbol().getCGScope()).getCells(), init.getType(), castType);
+
 				if(VarType.CLASS == init.getType()) {
 					cg.pushHeapReg(cgScope);
 					cg.updateClassRefCount(cgScope, vScope.getCells(), true);
@@ -493,51 +516,25 @@ public class VarNode extends AstNode implements InitNodeHolder {
 					cg.updateArrRefCount(cgScope, vScope.getCells(), true);
 				}
 			}
-			else if(init instanceof EnumExpression) {
-				cg.accumLock(type);
-				cgScope.append(cg.constToCells(cgScope, ((EnumExpression)init).getIndex(), vScope.getCells(), false));
-				cg.accumUnlock();
-			}
-			else {
-				boolean optimized = false;
-				if(!(init instanceof PropertyExpression)) {
-					try {
-						if(	init instanceof VarFieldExpression && null!=init.getSymbol() && null!=init.getSymbol().getCGScope() &&
-							init.getSymbol().getCGScope() instanceof CGCellsScope && null!=((CGCellsScope)init.getSymbol().getCGScope()).getCells()) {
-
-							init.codeGen(cg, false, excs);
-							cg.cellsToCells(cgScope, vScope.getCells(), type, ((CGCellsScope)init.getSymbol().getCGScope()).getCells(), init.getType());
-							optimized = true;
-						}
-					}
-					catch(Exception ex) {
-						System.out.println("TODO:" + ex.getMessage());
-						ex.printStackTrace();
-					}
+			else { // Вызом метода, cast и прочее попадающее под общую логику (использующее аккумулятор)
+				Object _result = init.codeGen(cg, true, excs);
+				if(CodegenResult.RESULT_IN_FLAG==_result) {
+					cg.cellsToCells(cgScope, vScope.getCells(), type, new CGCells(CGCells.Type.FLAG), VarType.BOOLEAN, castType);
 				}
-
-				if(!optimized) {
-					cg.accumLock(type);
-					Object _result = init.codeGen(cg, true, excs);
-					if(CodegenResult.RESULT_IN_FLAG==_result) {
-						cg.cellsToCells(cgScope, vScope.getCells(), type, new CGCells(CGCells.Type.FLAG), VarType.BOOLEAN);
-					}
-					else if(CodegenResult.RESULT_IN_ACCUM==_result) {
-						cg.cellsToCells(cgScope, vScope.getCells(), type, new CGCells(CGCells.Type.ACC), init.getType());
-					}
-					else {
-						throw new CompileException("Accum not used for expr:" + init);
-					}
-					cg.accumUnlock();
-					accUsed = true;
+				else if(CodegenResult.RESULT_IN_ACCUM==_result) {
+					cg.cellsToCells(cgScope, vScope.getCells(), type, new CGCells(CGCells.Type.ACC), init.getType(), castType);
 				}
-				VarType initType = init.getType();
-				if(VarType.CLASS == initType) {
+				else {
+					throw new CompileException("Accum not used for expr:" + init);
+				}
+				accUsed = true;
+
+				if(VarType.CLASS == init.getType()) {
 					cg.pushHeapReg(cgScope);
 					cg.updateClassRefCount(cgScope, vScope.getCells(), true);
 					cg.popHeapReg(cgScope);
 				}
-				else if(initType.isArray()) {
+				else if(init.getType().isArray()) {
 					cg.updateArrRefCount(cgScope, vScope.getCells(), true);
 				}
 			}

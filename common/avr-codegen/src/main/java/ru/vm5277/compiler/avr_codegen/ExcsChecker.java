@@ -86,12 +86,12 @@ public class ExcsChecker extends CodeExcsChecker {
 	}
 
 	@Override
-	public void mathOverflow(CodeGenerator cg, CGScope scope, CGExcs excs, Operator op, byte[] regIds, boolean popRequired, boolean byZero)
-																																	throws CompileException {
-		int id = VarType.getExceptionId("MathOverflowException");
-		if(-1==id) return;
+	public CGIContainer mathOverflow(CodeGenerator cg, CGScope scope, CGExcs excs, byte[] regIds, boolean popRequired, boolean byZero) throws CompileException {
+		int id = VarType.getExceptionId(J8BException.MathOverflowException.name());
+		if(-1==id) return null;
 		Integer throwableId = excs.getThrowable(id);
 		if(null!=throwableId) {
+			CGIContainer cont = new CGIContainer("mathOverflow checker");
 			cg.setFeature(RtosFeature.OS_FT_ETRACE);
 			excs.getProduced().add(id);
 			
@@ -99,113 +99,124 @@ public class ExcsChecker extends CodeExcsChecker {
 			CGLabelScope catchLbScope = excs.getRuntimeChecks().get(throwableId);
 			
 			if(null==regIds) {
-				scope.append(new CGIAsmCondJump(byZero ? "breq" : "brcc", skipLbScope));
+				cont.append(new CGIAsmCondJump(byZero ? "breq" : "brcc", skipLbScope));
 			}
 			else {
 				CGLabelScope throwLabel = new CGLabelScope(null, genId(), LabelNames.COMPARE_END, true);
 				for(int i=0; i<regIds.length; i++) {
 					byte regId = regIds[i];
-					scope.append(new CGIRAsm("cpi", "r" + regId, ",0x00"));
+					cont.append(new CGIRAsm("cpi", "r" + regId, ",0x00"));
 					if(i<regIds.length-1) {
-						scope.append(new CGIAsmCondJump("brne", throwLabel));
+						cont.append(new CGIAsmCondJump("brne", throwLabel));
 					}
 					else {
-						scope.append(new CGIAsmCondJump("breq", skipLbScope));
+						cont.append(new CGIAsmCondJump("breq", skipLbScope));
 					}
 				}
 
-				scope.append(throwLabel);
+				cont.append(throwLabel);
 				if(popRequired) {
 					for(byte regId : regIds) {
-						scope.append(new CGIAsm("pop", "r" + regId));
+						cont.append(new CGIAsm("pop", "r" + regId));
 					}
 				}
 			}
 			
-			scope.append(new CGIAsmLd("ldi", "r16", Integer.toString(id)));
-			scope.append(new CGIAsmLd("ldi", "r17", "0x00"));
+			cont.append(new CGIAsmLd("ldi", "r"+Generator.REG_ACCUM_L, Integer.toString(id)));
+			cont.append(new CGIAsmLd("ldi", "r"+Generator.REG_ACCUM_H, "0x00"));
 			
-			doThrow(cg, scope, excs);
+			cont.append(doThrow(cg, scope, excs));
 			if(null==catchLbScope) {
-				scope.append(new CGIAsm("set"));
-				excs.getMeathodEndLabel().setUsed();
-				scope.append(new CGIAsmJump(Generator.JUMP_INSTR, excs.getMeathodEndLabel(), false));
+				cont.append(new CGIAsm("set"));
+				excs.getMethodEndLabel().setUsed();
+				//TODO костыль. Иначе CodeOptimazer.removeUnusedLabels удаляет эту метку, хотя не должен
+				excs.getMethodEndLabel().setPersist();
+				cont.append(new CGIAsmJump(Generator.JUMP_INSTR, excs.getMethodEndLabel(), false));
 			}
 			else {
 				catchLbScope.setUsed();
-				scope.append(new CGIAsmJump(Generator.JUMP_INSTR, catchLbScope, false));
+				cont.append(new CGIAsmJump(Generator.JUMP_INSTR, catchLbScope, false));
 			}
-			scope.append(skipLbScope);
+			cont.append(skipLbScope);
+			return cont;
 		}
+		return null;
 	}
 
 	@Override
-	public void divByZero(CodeGenerator cg, CGScope scope, CGExcs excs, byte[] regIds, boolean popRequired) throws CompileException {
-		int id = VarType.getExceptionId("DivByZeroException");
-		if(-1==id) return;
+	public CGIContainer divByZero(CodeGenerator cg, CGScope scope, CGExcs excs, byte[] regIds, boolean popRequired) throws CompileException {
+		int id = VarType.getExceptionId(J8BException.DivByZeroException.name());
+		if(-1==id) return null;
 		Integer throwableId = excs.getThrowable(id);
 		if(null!=throwableId) {
+			CGIContainer cont = new CGIContainer("divByZero checker");
 			cg.setFeature(RtosFeature.OS_FT_ETRACE);
 			excs.getProduced().add(id);
 			
 			CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, false);
 			CGLabelScope catchLbScope = excs.getRuntimeChecks().get(throwableId);
 			for(byte regId : regIds) {
-				scope.append(new CGIAsm("tst", "r" + regId));
+				cont.append(new CGIAsm("tst", "r" + regId));
 				skipLbScope.setUsed();
-				scope.append(new CGIAsmCondJump("brne", skipLbScope));
+				cont.append(new CGIAsmCondJump("brne", skipLbScope));
 			}
 			if(popRequired) {
 				for(byte regId : regIds) {
-					scope.append(new CGIAsm("pop", "r" + regId));
+					cont.append(new CGIAsm("pop", "r" + regId));
 				}
 			}
-			scope.append(new CGIAsmLd("ldi", "r16", Integer.toString(id)));
-			scope.append(new CGIAsmLd("ldi", "r17", "0x00"));
-			doThrow(cg, scope, excs);
+			cont.append(new CGIAsmLd("ldi", "r16", Integer.toString(id)));
+			cont.append(new CGIAsmLd("ldi", "r17", "0x00"));
+			cont.append(doThrow(cg, scope, excs));
 			if(null==catchLbScope) {
-				scope.append(new CGIAsm("set"));
-				excs.getMeathodEndLabel().setUsed();
-				scope.append(new CGIAsmJump(Generator.JUMP_INSTR, excs.getMeathodEndLabel(), false));
+				cont.append(new CGIAsm("set"));
+				excs.getMethodEndLabel().setUsed();
+				//TODO костыль. Иначе CodeOptimazer.removeUnusedLabels удаляет эту метку, хотя не должен
+				excs.getMethodEndLabel().setPersist();
+				cont.append(new CGIAsmJump(Generator.JUMP_INSTR, excs.getMethodEndLabel(), false));
 			}
 			else {
 				catchLbScope.setUsed();
-				scope.append(new CGIAsmJump(Generator.JUMP_INSTR, catchLbScope, false));
+				cont.append(new CGIAsmJump(Generator.JUMP_INSTR, catchLbScope, false));
 			}
-			scope.append(skipLbScope);
+			cont.append(skipLbScope);
+			return cont;
 		}
+		return null;
 	}
 
 	//UNCHECKED
 	@Override
 	public void outOfMemory(CodeGenerator cg, CGIContainer cont, CGExcs excs) throws CompileException {
-/*
+
 		int id = VarType.getExceptionId(J8BException.OutOfMemoryException.name());
 		if(-1==id) return;
 		
-		cg.setFeature(RTOSFeature.OS_FT_ETRACE);
+		cg.setFeature(RtosFeature.OS_FT_ETRACE);
 		excs.getProduced().add(id);
 		
 		CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, true);
 		CGLabelScope catchLbScope = excs.getRuntimeChecks().get(id);
-		scope.append(new CGIAsmCondJump("brcc", skipLbScope));
-		scope.append(new CGIAsmLd("ldi", "r16", Integer.toString(id)));
-		scope.append(new CGIAsmLd("ldi", "r17", "0x00"));
-		doThrow(cg, scope, excs);
+		cont.append(new CGIAsmCondJump("brcc", skipLbScope));
+		cont.append(new CGIAsmLd("ldi", "r16", Integer.toString(id)));
+		cont.append(new CGIAsmLd("ldi", "r17", "0x00"));
+		doThrow(cg, cont, excs, "...");
 		if(null==catchLbScope) {
-			scope.append(new CGIAsm("set"));
-			if(null==excs.getMeathodEndLabel()) {
-				throw new CompileException("COMPILER ERROR: Method end label is null (OutOgMemory checker)");
+			cont.append(new CGIAsm("set"));
+			if(null==excs.getMethodEndLabel()) {
+				throw new CompileException("COMPILER ERROR: Method end label is null (OutOfMemory checker)");
 			}
-			excs.getMeathodEndLabel().setUsed();
-			scope.append(new CGIAsmJump(Generator.JUMP_INSTR, excs.getMeathodEndLabel(), false));
+			excs.getMethodEndLabel().setUsed();
+			//TODO костыль. Иначе CodeOptimazer.removeUnusedLabels удаляет эту метку, хотя не должен
+			excs.getMethodEndLabel().setPersist();
+			cont.append(new CGIAsmJump(Generator.JUMP_INSTR, excs.getMethodEndLabel(), false));
 		}
 		else {
-			scope.append(new CGIAsm("clt")); // Функции типа eNewInstance могут блокировать работу диспетчера устанавливая флаг T
+			cont.append(new CGIAsm("clt")); // Функции типа eNewInstance могут блокировать работу диспетчера устанавливая флаг T
 			catchLbScope.setUsed();
-			scope.append(new CGIAsmJump(Generator.JUMP_INSTR, catchLbScope, false));
+			cont.append(new CGIAsmJump(Generator.JUMP_INSTR, catchLbScope, false));
 		}
-		scope.append(skipLbScope);*/
+		cont.append(skipLbScope);
 	}
 
 	@Override
@@ -222,7 +233,7 @@ public class ExcsChecker extends CodeExcsChecker {
 			scope.append(new CGIAsmCondJump("brcc", skipLbScope));
 			scope.append(new CGIAsmLd("ldi", "r16", Integer.toString(id)));
 			scope.append(new CGIAsmLd("ldi", "r17", Integer.toString(VarType.getExceptionId("MathOverflowException"))));
-			doThrow(cg, scope, excs);
+			scope.append(doThrow(cg, scope, excs));
 			if(null!=popRegIds) {
 				for(byte popRegId : popRegIds) {
 					scope.append(new CGIAsm("pop", "r" + popRegId));
@@ -230,8 +241,10 @@ public class ExcsChecker extends CodeExcsChecker {
 			}
 			if(null==catchLbScope) {
 				scope.append(new CGIAsm("set"));
-				excs.getMeathodEndLabel().setUsed();
-				scope.append(new CGIAsmJump(Generator.JUMP_INSTR, excs.getMeathodEndLabel(), false));
+				excs.getMethodEndLabel().setUsed();
+				//TODO костыль. Иначе CodeOptimazer.removeUnusedLabels удаляет эту метку, хотя не должен
+				excs.getMethodEndLabel().setPersist();
+				scope.append(new CGIAsmJump(Generator.JUMP_INSTR, excs.getMethodEndLabel(), false));
 			}
 			else {
 				catchLbScope.setUsed();
@@ -244,36 +257,38 @@ public class ExcsChecker extends CodeExcsChecker {
 	//TODO должен быть UNCHECKED, использовать стандартный OutOfMemory и ввести код=array
 	@Override
 	public void arrOutOfMemory(CodeGenerator cg, CGScope scope, CGExcs excs, byte[] popRegIds) throws CompileException {
-		int id = VarType.getExceptionId("ArrayInitException");
+		int id = VarType.getExceptionId(J8BException.OutOfMemoryException.name());
 		if(-1==id) return;
-		Integer throwableId = excs.getThrowable(id);
-		if(null!=throwableId) {
-			cg.setFeature(RtosFeature.OS_FT_ETRACE);
-			excs.getProduced().add(id);
-			
-			CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, true);
-			CGLabelScope catchLbScope = excs.getRuntimeChecks().get(throwableId);
-			scope.append(new CGIAsmCondJump("brcc", skipLbScope));
-			scope.append(new CGIAsmLd("ldi", "r16", Integer.toString(id)));
-			scope.append(new CGIAsmLd("ldi", "r17", Integer.toString(VarType.getExceptionId("OutOfMemoryException"))));
-			doThrow(cg, scope, excs);
-			if(null!=popRegIds) {
-				for(byte popRegId : popRegIds) {
-					scope.append(new CGIAsm("pop", "r" + popRegId));
-				}
+		cg.setFeature(RtosFeature.OS_FT_ETRACE);
+		excs.getProduced().add(id);
+
+		CGLabelScope skipLbScope = new CGLabelScope(null, genId(), LabelNames.THROW_SKIP, true);
+		CGLabelScope catchLbScope = excs.getRuntimeChecks().get(id);
+		scope.append(new CGIAsmCondJump("brcc", skipLbScope));
+		scope.append(new CGIAsmLd("ldi", "r16", Integer.toString(id)));
+		scope.append(new CGIAsmLd("ldi", "r17", "0"));//Integer.toString(VarType.getExceptionId("OutOfMemoryException"))));
+		scope.append(doThrow(cg, scope, excs));
+		if(null!=popRegIds) {
+			for(byte popRegId : popRegIds) {
+				scope.append(new CGIAsm("pop", "r" + popRegId));
 			}
-			if(null==catchLbScope) {
-				scope.append(new CGIAsm("set"));
-				excs.getMeathodEndLabel().setUsed();
-				scope.append(new CGIAsmJump(Generator.JUMP_INSTR, excs.getMeathodEndLabel(), false));
-			}
-			else {
-				scope.append(new CGIAsm("clt")); // Функции типа eNewInstance могут блокировать работу диспетчера устанавливая флаг T
-				catchLbScope.setUsed();
-				scope.append(new CGIAsmJump(Generator.JUMP_INSTR, catchLbScope, false));
-			}
-			scope.append(skipLbScope);
 		}
+		if(null==catchLbScope) {
+			scope.append(new CGIAsm("set"));
+			if(null==excs.getMethodEndLabel()) {
+				throw new CompileException("COMPILER ERROR: Method end label is null (arrOutOfMemory checker)");
+			}
+			excs.getMethodEndLabel().setUsed();
+			//TODO костыль. Иначе CodeOptimazer.removeUnusedLabels удаляет эту метку, хотя не должен
+			excs.getMethodEndLabel().setPersist();
+			scope.append(new CGIAsmJump(Generator.JUMP_INSTR, excs.getMethodEndLabel(), false));
+		}
+		else {
+			scope.append(new CGIAsm("clt")); // Функции типа eNewInstance могут блокировать работу диспетчера устанавливая флаг T
+			catchLbScope.setUsed();
+			scope.append(new CGIAsmJump(Generator.JUMP_INSTR, catchLbScope, false));
+		}
+		scope.append(skipLbScope);
 	}
 
 	@Override
@@ -290,11 +305,13 @@ public class ExcsChecker extends CodeExcsChecker {
 			scope.append(new CGIAsmCondJump("brcc", skipLbScope));
 			scope.append(new CGIAsmLd("ldi", "r16", Integer.toString(id)));
 			scope.append(new CGIAsmLd("ldi", "r17", "0x00"));
-			doThrow(cg, scope, excs);
+			scope.append(doThrow(cg, scope, excs));
 			if(null==catchLbScope) {
 				scope.append(new CGIAsm("set"));
-				excs.getMeathodEndLabel().setUsed();
-				scope.append(new CGIAsmJump(Generator.JUMP_INSTR, excs.getMeathodEndLabel(), false));
+				excs.getMethodEndLabel().setUsed();
+				//TODO костыль. Иначе CodeOptimazer.removeUnusedLabels удаляет эту метку, хотя не должен
+				excs.getMethodEndLabel().setPersist();
+				scope.append(new CGIAsmJump(Generator.JUMP_INSTR, excs.getMethodEndLabel(), false));
 			}
 			else {
 				scope.append(new CGIAsm("clt")); // Функции типа eNewInstance могут блокировать работу диспетчера устанавливая флаг T
@@ -312,12 +329,14 @@ public class ExcsChecker extends CodeExcsChecker {
 		excs.getProduced().add(throwableId);
 		scope.append(new CGIAsmLd("ldi", "r16", Integer.toString(throwableId)));
 		scope.append(new CGIAsmLd("ldi", "r17", "0x00"));
-		doThrow(cg, scope, excs);
+		scope.append(doThrow(cg, scope, excs));
 		CGLabelScope catchLbScope = excs.getRuntimeChecks().get(throwableId);
 		if(null==catchLbScope) {
 			scope.append(new CGIAsm("set"));
-			excs.getMeathodEndLabel().setUsed();
-			scope.append(new CGIAsmJump(Generator.JUMP_INSTR, excs.getMeathodEndLabel(), false));
+			excs.getMethodEndLabel().setUsed();
+			//TODO костыль. Иначе CodeOptimazer.removeUnusedLabels удаляет эту метку, хотя не должен
+			excs.getMethodEndLabel().setPersist();
+			scope.append(new CGIAsmJump(Generator.JUMP_INSTR, excs.getMethodEndLabel(), false));
 		}
 		else {
 			catchLbScope.setUsed();
@@ -325,7 +344,8 @@ public class ExcsChecker extends CodeExcsChecker {
 		}
 	}
 
-	public void doThrow(CodeGenerator cg, CGScope scope, CGExcs excs) throws CompileException {
+	public CGIContainer doThrow(CodeGenerator cg, CGScope scope, CGExcs excs) throws CompileException {
+		CGIContainer cont = new CGIContainer();
 		CGMethodScope mScope = (CGMethodScope)scope.getScope(CGMethodScope.class);
 		ExcsThrowPoint point = cg.getTargetInfoBuilder().addExcsThrowPoint(cg, excs.getSourcePosition(), null==mScope ? "" : mScope.getSignature());
 		RTOSLibs.ETRACE_ADD.setRequired();
@@ -335,7 +355,21 @@ public class ExcsChecker extends CodeExcsChecker {
 		CGIContainer cont15b = new CGIContainer();
 		cont15b.append(new CGIAsm("ldi", "r18,low(" + (point.getId()&0x7fff) + ")"));
 		cont15b.append(new CGIAsm("ldi", "r19,high(" + (point.getId()&0x7fff) + ")"));
-		scope.append(point.makeContainer(cont7b, cont15b));
-		scope.append(new CGIAsmCall(CALL_INSTR, "j8bproc_etrace_addfirst", true));
+		cont.append(point.makeContainer(cont7b, cont15b));
+		cont.append(new CGIAsmCall(CALL_INSTR, "j8bproc_etrace_addfirst", true));
+		return cont;
+	}
+	//TODO
+	public void doThrow(CodeGenerator cg, CGIContainer cont, CGExcs excs, String signature) throws CompileException {
+		ExcsThrowPoint point = cg.getTargetInfoBuilder().addExcsThrowPoint(cg, excs.getSourcePosition(), signature);
+		RTOSLibs.ETRACE_ADD.setRequired();
+		CGIContainer cont7b = new CGIContainer();
+		// Нельзя применять CGAsmLd, иначе оптимизатор вырежет 'лишний' ldi
+		cont7b.append(new CGIAsm("ldi", "r18," + (point.getId()&0x7f)));
+		CGIContainer cont15b = new CGIContainer();
+		cont15b.append(new CGIAsm("ldi", "r18,low(" + (point.getId()&0x7fff) + ")"));
+		cont15b.append(new CGIAsm("ldi", "r19,high(" + (point.getId()&0x7fff) + ")"));
+		cont.append(point.makeContainer(cont7b, cont15b));
+		cont.append(new CGIAsmCall(CALL_INSTR, "j8bproc_etrace_addfirst", true));
 	}
 }

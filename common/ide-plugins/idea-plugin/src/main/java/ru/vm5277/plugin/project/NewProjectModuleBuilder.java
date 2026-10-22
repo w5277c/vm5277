@@ -175,7 +175,7 @@ public class NewProjectModuleBuilder extends ModuleBuilder {
 							return !disposed;
 						}
 					};
-					ru.vm5277.common.Toolkit.checkToolkit(log, MavenStartup.toolkitPath, Toolkit.DONWLOAD_URL, true);
+					ru.vm5277.common.Toolkit.checkToolkit(log, Toolkit.DONWLOAD_URL, true);
 					refresh();
 				}
 			}).start();

@@ -18,6 +18,7 @@ package ru.vm5277.common.cg.scopes;
 
 import ru.vm5277.common.LabelNames;
 import ru.vm5277.common.cg.CodeGenerator;
+import ru.vm5277.common.lexer.SourcePosition;
 
 public class CGLoopBlockScope extends CGBlockScope {
 	private	CGLabelScope	startLbScope;
@@ -25,8 +26,8 @@ public class CGLoopBlockScope extends CGBlockScope {
 	private	CGLabelScope	elseLbScope;
 	private	CGLabelScope	endLbScope;
 	
-	public CGLoopBlockScope(CodeGenerator cg, CGScope parent, int id, String comment) {
-		super(cg, parent, id, comment);
+	public CGLoopBlockScope(CodeGenerator cg, CGScope parent, SourcePosition sp, int id, String comment) {
+		super(cg, parent, sp, id, comment);
 		
 		startLbScope = new CGLabelScope(null, null, LabelNames.LOOP, true);
 		nextLbScope = new CGLabelScope(null, null, LabelNames.LOOP_NEXT, false);

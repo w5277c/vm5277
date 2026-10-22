@@ -68,8 +68,8 @@ public class Test {
     void test2() throws CompileException, IOException, CompileException, Exception {
 		Path toolkitPath = FSUtils.getToolkitPath();
 		File libDir = toolkitPath.resolve("bin").resolve("libs").normalize().toFile();
-		CodeGenerator cg = PlatformLoader.loadGenerator(new Device(null, null, PlatformType.STUB, "stub", null, OptimizationType.SIZE, StrictLevel.LIGHT),
-														libDir);
+		CodeGenerator cg = PlatformLoader.loadGenerator(new Device(	null, PlatformType.STUB, "stub", null, null, OptimizationType.SIZE, StrictLevel.LIGHT),
+																	libDir);
 
 		Lexer lexer = new Lexer(LexerType.J8B, "class Clazz{ void method() { byte b1 = -1; byte b2=0; byte b3=255; byte b4 = 256; byte B5=128; }}",
 								false, 0x04);

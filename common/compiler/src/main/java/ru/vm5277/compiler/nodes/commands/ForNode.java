@@ -270,7 +270,7 @@ public class ForNode extends CommandNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
-		cgScope = cg.enterLoopBlock(parent, "for");
+		cgScope = cg.enterLoopBlock(parent, sp, "for");
 		
 		// Для метка на next блок используется для ForNode 
 		((CGLoopBlockScope)cgScope).getNextLbScope().setUsed();
@@ -424,7 +424,6 @@ public class ForNode extends CommandNode {
 		}
 	}
 
-	
 	@Override
 	public List<AstNode> getChildren() {
 		if(null==elseBlockNode) {

@@ -19,7 +19,7 @@
 import boards.ArduinoUno;
 import hal.PinEventManager;
 
-class Main implements RtosCallback {
+class Main implements NativeCallback {
     private static byte regId;
 
 	public Main() {}

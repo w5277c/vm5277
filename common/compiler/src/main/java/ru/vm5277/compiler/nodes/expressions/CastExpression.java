@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.compiler.nodes.expressions;
 
 import ru.vm5277.common.VarType;
@@ -31,9 +32,7 @@ import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
 import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.cg.CGExcs;
-import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.compiler.Instance;
-import ru.vm5277.compiler.nodes.expressions.bin.BinaryExpression;
 
 public class CastExpression extends ExpressionNode {
 	private			VarType			sourceType;
@@ -72,7 +71,7 @@ public class CastExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterExpression(parent, cgScope, toString());
+		cgScope = cg.enterExpression(parent, sp, cgScope, toString());
 		
 		result &=operand.postAnalyze(scope, cg, cgScope);
 		if(result) {
@@ -128,12 +127,12 @@ public class CastExpression extends ExpressionNode {
 		//Вопрос оптимизации - мы знаем в какой тип будет выполнено преобразование. Поэтому в аккумулятор можно загрузить только полезную часть
 		
 //		if(operand instanceof LiteralExpression || operand instanceof VarFieldExpression) {
-			cg.accumLock(type, !(operand instanceof BinaryExpression) && !(operand instanceof ArrayExpression));
+			//cg.accumLock(type, !(operand instanceof BinaryExpression) && !(operand instanceof ArrayExpression));
+			cg._getAcc().setCast(type); // только последнее выражение (в цепочке выражений operand) должно иметь ограничение по размеру до указанного типа
 			Object result = operand.codeGen(cg, toAccum, excs);
 //			if(sourceType!=type) {
 //				cgScope.append(cg.accCast(sourceType, type));
 //			}
-			cg.accumUnlock();
 			
 			releaseVars(cg);
 			return result;

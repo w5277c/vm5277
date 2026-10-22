@@ -178,11 +178,6 @@ public class SourceBuffer extends SourcePosition implements Closeable {
 		return sb.toString();
 	}
 	
-	// Фиксируем текущую позицию в отдельный SourcePosition 
-	public SourcePosition snapSP() {
-		return new SourcePosition(sourceFile, line, column, pos);
-	}
-
 	public int getLineQnt() {
 		return line;
 	}

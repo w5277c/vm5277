@@ -30,7 +30,7 @@ public interface OutputStream {
    			short free = cBuff.getFree();
    			if(0!=free) {
 	   			for(; index<len && 0!=free; index++) {
-	   				cBuff.write(buff[off+index]);
+	   				cBuff.write(buff[(short)(off+index)]);
 	   		 		free--;
 	   		 	}
 	   		}

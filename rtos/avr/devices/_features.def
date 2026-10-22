@@ -126,5 +126,6 @@
 .IFNDEF OS_FT_MATH_OVF_NOCHECK
     .SET    OS_FT_MATH_OVF_NOCHECK                  = 0x00  ;Отключение проверки переполнения переменной в математических операциях
 .ENDIF
-
-
+.IFNDEF OS_FT_DISPATCHER_DEBUG
+    .SET    OS_FT_DISPATCHER_DEBUG                  = 0x00  ;Отладочная информация диспетчера многопоточности
+.ENDIF

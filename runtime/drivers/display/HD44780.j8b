@@ -40,7 +40,7 @@ public class HD44780 implements TextDisplay {
 		}
 		@Override public void setNibble(byte nibble, boolean isData) {
 			// Упаковка: BL(1) + D7 D6 D5 D4 + EN(0) + RW(0) + RS (RS=1 для данных)
-			state[0] = (0x08|((nibble&0x0f) << 4)|(isData ? 1 : 0));
+			state[0] = (0x08|(byte)((nibble&0x0f)<<4)|(isData ? 1 : 0));
 		}
 
 		@Override public void pulse() {
@@ -199,8 +199,20 @@ public class HD44780 implements TextDisplay {
 	// === Реализация TextDisplay ===
 	@Override void setInkColor(byte c) {}
 	@Override void setPaperColor(byte c) {}
-	@Override void setCursor(short x, short y) {sendCommand((byte)(0x80 + (y*0x40) + x));}
-	@Override public void putChar(char c) {sendData((byte)c);}
+	@Override void setCursor(short x, short y) {
+    	byte rowAddress = 0;
+		switch(y) {
+        	case 0: rowAddress = 0x00;
+        	case 1: rowAddress = 0x40;
+        	case 2: rowAddress = 0x14;
+        	case 3: rowAddress = 0x54;
+        }
+		sendCommand((byte)(0x80+rowAddress+x));
+    }
+    
+	@Override public void putChar(char c) {
+		sendData((byte)c);
+	}
 	@Override public void setBright(byte b) {}
 	@Override public byte getMaxBright() {return 0;}
 	@Override public void setContrast(byte b) {}

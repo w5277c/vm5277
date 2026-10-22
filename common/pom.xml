@@ -4,7 +4,7 @@
 
 	<groupId>ru.vm5277</groupId>
 	<artifactId>vm5277-parent</artifactId>
-	<version>0.4.0</version>
+	<version>0.5.0</version>
 	<packaging>pom</packaging>
 
 	<name>vm5277-parent</name>
@@ -22,15 +22,15 @@
 		<module>flasher</module>
 	</modules>
 	<properties>
-		<vm5277.common.version>0.3.0</vm5277.common.version>
-		<vm5277.stub-codegen.version>0.3.0</vm5277.stub-codegen.version>
-		<vm5277.avr-assembler.version>0.3.2</vm5277.avr-assembler.version>
-		<vm5277.avr-codegen.version>0.5.0</vm5277.avr-codegen.version>
-		<vm5277.compiler.version>0.7.0</vm5277.compiler.version>
+		<vm5277.common.version>0.4.0</vm5277.common.version>
+		<vm5277.stub-codegen.version>0.3.1</vm5277.stub-codegen.version>
+		<vm5277.avr-assembler.version>0.3.3</vm5277.avr-assembler.version>
+		<vm5277.avr-codegen.version>0.6.0</vm5277.avr-codegen.version>
+		<vm5277.compiler.version>0.8.0</vm5277.compiler.version>
 		<vm5277.lsp-server.version>0.3.0</vm5277.lsp-server.version>
-		<vm5277.maven-tools.version>0.2.0</vm5277.maven-tools.version>
-		<vm5277.mkboot.version>0.3.0</vm5277.mkboot.version>
-		<vm5277.flasher.version>0.4.0</vm5277.flasher.version>
+		<vm5277.maven-tools.version>0.2.1</vm5277.maven-tools.version>
+		<vm5277.mkboot.version>0.3.2</vm5277.mkboot.version>
+		<vm5277.flasher.version>0.4.1</vm5277.flasher.version>
 		
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<maven.compiler.release>8</maven.compiler.release>

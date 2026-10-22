@@ -15,7 +15,6 @@
  */
 
 class Main {
-//TODO актуализировать, пофиксить новые баги
 	exception TestException {
 		FIRST,
 		SECOND;
@@ -23,17 +22,14 @@ class Main {
 
 	public static void main() {
 		final byte b1 = 200;
-		//byte b2; b2= = 200; - не выдало ошибки!
 		byte b2; b2=200;
 		byte b3; b3=0;
 		final byte b4=0;
 
-		//TODO необходима доработка компилятора, пока оставляю как есть
-
 		System.out("\nСложение с переполнением" + " вне обработчика искючения" + "(статика): " + (b1+0xffffffff));
 		System.out("\nСложение с переполнением" + " вне обработчика искючения" + "(runtime): " + (b2+0xffffffff));
 		try {
-			System.out("\nСложение с переполнением" + " в обработчике искючения" + "(статика): " + (b1+0xffffffff)); //TODO компилятор не отрабатывает
+			System.out("\nСложение с переполнением" + " в обработчике искючения" + "(статика): " + (b1+0xffffffff));
 		}
 		catch(MathOverflowException ex) {
 			System.out("MathOverflowException");
@@ -45,15 +41,15 @@ class Main {
 			System.out("MathOverflowException");
 		}
 
-//		System.out("\nДеление на 0 вне обработчика искючения(статика): " + (b1/0)); // Не выйдет - компилятор выдает ошибку Division by zero
-//		System.out("\nДеление на 0 вне обработчика искючения(статика): " +(b1/b4)); // Не выйдет - компилятор выдает ошибку Division by zero
+		System.out("\nДеление на 0 вне обработчика искючения(статика): " + (b1/0));
+		System.out("\nДеление на 0 вне обработчика искючения(статика): " + (b1/b4));
 		System.out("\nДеление на 0" + " вне обработчика искючения" + "(runtime): " + (b1/b3));
-//		try {
-//			System.out("\nДеление на 0 в обработчике искючения(статика): " + (b1/0)); // Не выйдет - компилятор выдает ошибку Division by zero или стоит генерировать исключение а вне блока вообще игнорировать ошибку?
-//		}
-//		catch(DivByZeroException ex) {
-//			System.out("DivByZeroException");
-//		}
+		try {
+			System.out("\nДеление на 0 в обработчике искючения(статика): " + (b1/0));
+		}
+		catch(DivByZeroException ex) {
+			System.out("DivByZeroException");
+		}
 
 		try {
 			System.out("\nДеление на 0" + " в обработчике искючения" + "(runtime): " + (b1/b3));
@@ -71,16 +67,17 @@ class Main {
 			System.out("IOException");
 		}
 
-		System.out("\nОбрабчик MathException для for(byte f=5;;f--):");
+		System.out("\nОбрабчик MathException для for(byte f=5;0xfe!=f;f--):");
 		try {
-			for(byte f=5;;f--) {
-				System.out(f + ' '); 
+			for(byte f=5;0xfe!=f;f--) {
+				System.out(f + ' ');
 			}
+			System.out("\nИсключение не сгенерировано (инкремент и декремент не формируют MathException)");
 		}
 		catch(MathException ex) {
-			System.out("MathException, typeId:" + ex.typeId() + ", code:" + ex.code());
+			System.out("\nMathException, typeId:" + ex.typeId() + ", code:" + ex.code());
 		}
-		
+
 		System.out("\nВызов цепочки методов, с сгенерацией TestException с кодом CODE_SECOND: ");		
 		try {
 			method1();
@@ -88,11 +85,9 @@ class Main {
 		catch(TestException ex) {
 			System.out(ex);
 		}
-		
+
 		System.out("\nБросаем Runtime исключение - выход из программы с трассировкой исключения: ");		
 		RuntimeException.throw();
-		
-		System.out("\ndone");
 	}
 
 	public static void method1() throws TestException  {

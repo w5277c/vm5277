@@ -160,24 +160,28 @@ public class InterfaceBodyNode extends AstNode {
 			else if (node instanceof FieldNode) {
 				FieldNode fieldNode = (FieldNode)node;
 
+				result &= fieldNode.postAnalyze(scope, cg, parent);
+				
 				// Проверка инициализации поля
-				if(null==fieldNode.getInitializer()) {
-					markError("Interface field '" + fieldNode.getName() + "' must be initialized");
-				}
-				else {
-					result &= fieldNode.getInitializer().postAnalyze(scope, cg, parent);
-				}
-				if(result) {
-					// Резолвинг QualifiedPathExpression
-					ExpressionNode resolved = resolveQualifiedPathExpr(fieldNode.getInitializer());
-					if(null!=resolved) {
-						fieldNode.setInitializer(resolved);
+				if(null!=fieldNode.getInitializer() || !fieldNode.getType().getClassName().equals(VarType.CLASSNAME_FLASH_DATA)) {
+					if(null==fieldNode.getInitializer()) {
+						markError("Interface field '" + fieldNode.getName() + "' must be initialized");
 					}
+					else {
+						result &= fieldNode.getInitializer().postAnalyze(scope, cg, parent);
+					}
+					if(result && null!=fieldNode.getInitializer()) {
+						// Резолвинг QualifiedPathExpression
+						ExpressionNode resolved = resolveQualifiedPathExpr(fieldNode.getInitializer());
+						if(null!=resolved) {
+							fieldNode.setInitializer(resolved);
+						}
 
 
-					if(fieldNode.getInitializer() instanceof VarFieldExpression) {
-						ExpressionNode en = ((InitNodeHolder)((AstHolder)((VarFieldExpression)fieldNode.getInitializer()).getSymbol()).getNode()).getInitNode();
-						fieldNode.setInitializer(en);
+						if(fieldNode.getInitializer() instanceof VarFieldExpression) {
+							ExpressionNode en = ((InitNodeHolder)((AstHolder)((VarFieldExpression)fieldNode.getInitializer()).getSymbol()).getNode()).getInitNode();
+							fieldNode.setInitializer(en);
+						}
 					}
 				}
 				

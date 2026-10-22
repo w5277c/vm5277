@@ -1,0 +1,14 @@
+#!/bin/bash
+
+"$vm5277/bin/_j8bjc.sh"
+STATUS=$?
+if [ $STATUS -eq 0 ]; then
+    JAVA_EXEC="java"
+elif [ $STATUS -eq 1 ]; then
+    JAVA_EXEC="$vm5277/tools/jre/bin/java"
+else
+    echo [ERROR] Java verification script failed. >&2
+    exit 1
+fi
+
+"$JAVA_EXEC" -cp "$vm5277/bin/libs/*" ru.vm5277.mkboot.Main "$@"

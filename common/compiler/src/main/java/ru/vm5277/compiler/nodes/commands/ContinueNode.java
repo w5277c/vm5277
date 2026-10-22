@@ -105,7 +105,7 @@ public class ContinueNode extends CommandNode {
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
-		cgScope = cg.enterCommand(parent, "continue");
+		cgScope = cg.enterCommand(parent, sp, "continue");
 		
 		// Базовая проверка - команда break должна быть внутри цикла
         if(null==cgScope.getScope(CGLoopBlockScope.class)) {

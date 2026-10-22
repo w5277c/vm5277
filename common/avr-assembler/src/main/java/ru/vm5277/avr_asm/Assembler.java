@@ -100,13 +100,8 @@ public class Assembler implements AssemblerInterface {
 			}
 			
 			if(args.length > i+1) {
-				if(arg.equals("-P") || arg.equals("--path")) {
-					toolkitPath = FSUtils.resolveWithEnv(args[++i]);
-					continue;
-				}
-				else if(arg.equals("-I") || arg.equals("--include")) {
+				if(arg.equals("-I") || arg.equals("--include")) {
 					if(null==toolkitPath) {
-						showInvalidToolkitDir(null);
 						return 1;
 					}
 					sourcePaths.put(FSUtils.resolve(toolkitPath, args[++i]), SourceType.LIB);
@@ -199,7 +194,6 @@ public class Assembler implements AssemblerInterface {
 		if(!quiet) showDisclaimer();
 		
 		if(null==toolkitPath) {
-			showInvalidToolkitDir(null);
 			return 1;
 		}
 
@@ -264,6 +258,8 @@ public class Assembler implements AssemblerInterface {
 		Scope scope = new Scope(sourcePath.toFile(), instrReader, listWriter);
 		Scope.setStrictLevel(stirctLevel);
 		
+		// Задаем дефайн для идентфикации утилиты сборки, чтобы исключать расширенный функционал типа '.RNDB 0x08'
+		scope.setVariable(new VariableSymbol("vm5277asm", 1, true), null);
 		if(null!=defines) {
 			for(String defName : defines.keySet()) {
 				scope.setVariable(new VariableSymbol(defName, defines.get(defName), true), null);
@@ -376,7 +372,6 @@ public class Assembler implements AssemblerInterface {
 		System.out.println("                            hex     - Intel HEX (default)");
 		System.out.println("                            bin     - Raw binary");
 		System.out.println("  -d, --device <mcu>      Target MCU (e.g. atmega328p)");
-		System.out.println("  -P,  --path <dir>       Custom toolkit directory path");
 		System.out.println("  -I, --include <dir>     Additional include path(s)");
 		System.out.println("  -t, --tabsize <num>     Tab size in spaces (default: 4)");
 		System.out.println("  -s, --strict <strong|light|none> Ambiguity handling level");
@@ -408,14 +403,5 @@ public class Assembler implements AssemblerInterface {
 		System.err.println("Detected: '" + invalidParam + "'");
 		System.err.println("Supported platforms and MCUs are listed in the 'platform' directory of the project");
 		System.err.println("Project location: " + Paths.get("").toAbsolutePath().resolve("platform"));
-	}
-	
-	private static void showInvalidToolkitDir(Path toolkitPath) {
-		System.err.println("[ERROR] Toolkit directory not found or empty:" + toolkitPath.toString());
-		System.err.println();
-		System.err.println("Possible solutions:");
-		System.err.println("1. Specify custom path with --path (-P) option");
-		System.err.println("2. Add toolkit directory(vm5277) to system environment variables");
-		System.err.println("3. Check project source or documentation at https://github.com/w5277c/vm5277");
 	}
 }

@@ -15,7 +15,6 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
-import java.util.Objects;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.VarType;
@@ -57,7 +56,7 @@ public class ThisExpression extends TypeReferenceExpression {
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		if(null!=cgScope) cgScope.disable();
-		cgScope = new CGScope(parent, CGScope.genId(), "this");
+		cgScope = new CGScope(parent, sp, CGScope.genId(), "this");
 		return true;
 	}
 	

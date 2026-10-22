@@ -98,4 +98,9 @@ public class SourcePosition implements Cloneable {
 		}
 		return false;
 	}
+	
+	// Фиксируем текущую позицию в отдельный SourcePosition 
+	public SourcePosition snap() {
+		return new SourcePosition(sourceFile, line, column, pos);
+	}
 }

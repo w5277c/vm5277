@@ -26,39 +26,38 @@ import ru.vm5277.common.Logger;
 import ru.vm5277.common.enums.PlatformType;
 
 public class FlashToolProvider {
-	public static List<FlashTool> getTools(Logger log, Path toolkitPath, PlatformType platformType, String deviceId) {
+	public static List<FlashTool> getTools(Logger log, PlatformType platformType, String deviceId) {
 		List<FlashTool> result = new ArrayList<>();
 		
-		if(null!=toolkitPath) {
-			if(null!=deviceId && !deviceId.isEmpty()) {
-				try {
-					Device device = new Device(toolkitPath, platformType, deviceId);
-					InternalFlashTool internalFlashTool = new InternalFlashTool(log, toolkitPath, device);
-					if(internalFlashTool.isSupported()) {
-						result.add(internalFlashTool);
-					}
-				}
-				catch(Exception ex) {
+		if(null!=deviceId && !deviceId.isEmpty()) {
+			try {
+				Device device = new Device(platformType, deviceId);
+				InternalFlashTool internalFlashTool = new InternalFlashTool(log, device);
+				if(internalFlashTool.isSupported()) {
+					result.add(internalFlashTool);
 				}
 			}
-
-			if(PlatformType.AVR==platformType) {
-				result.add(new AvrdudeFlashTool(log, toolkitPath));
+			catch(Exception ex) {
+				ex.printStackTrace();
 			}
-
-			Collections.sort(result, new Comparator<FlashTool>() {
-				@Override
-				public int compare(FlashTool ft1, FlashTool ft2) {
-					return ft1.getName().compareTo(ft2.getName());
-				}
-			});
 		}
+
+		if(PlatformType.AVR==platformType) {
+			result.add(new AvrdudeFlashTool(log));
+		}
+
+		Collections.sort(result, new Comparator<FlashTool>() {
+			@Override
+			public int compare(FlashTool ft1, FlashTool ft2) {
+				return ft1.getName().compareTo(ft2.getName());
+			}
+		});
 		return result;
 	}
 	
-	public static FlashTool getExternalTool(Logger log, Path toolkitPath, String flashToolName) {
+	public static FlashTool getExternalTool(Logger log, String flashToolName) {
 		if(AvrdudeFlashTool.NAME.equalsIgnoreCase(flashToolName)) {
-			return new AvrdudeFlashTool(log, toolkitPath);
+			return new AvrdudeFlashTool(log);
 		}
 		return null;
 	}

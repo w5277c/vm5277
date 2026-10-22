@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -29,15 +30,19 @@ import java.util.Locale;
 import java.util.Map;
 import ru.vm5277.common.Device;
 import ru.vm5277.common.FSUtils;
+import ru.vm5277.common.LabelNames;
+import ru.vm5277.common.NativeBinding;
+import ru.vm5277.common.NativeBindingsReader;
 import ru.vm5277.common.PathPrefixTrimmer;
 import ru.vm5277.common.enums.PlatformType;
 import ru.vm5277.common.enums.SemanticAnalyzePhase;
 import ru.vm5277.common.StrUtils;
-import ru.vm5277.common.enums.RTOSParam;
+import ru.vm5277.common.enums.RtosParam;
 import ru.vm5277.common.cg.CGExcs;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.enums.OptimizationType;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.scopes.CGLabelScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.enums.RTOSHaltMode;
 import ru.vm5277.common.enums.StrictLevel;
@@ -106,7 +111,7 @@ public class Main {
 		boolean dumpIR = false;
 		int tabSize = 0x04;
 		List<Path> includePaths = new ArrayList<>();
-		Map<RTOSParam, Object> params = new HashMap<>();
+		Map<RtosParam, Object> params = new HashMap<>();
 		
 		if(0x02 <= args.length) {
 			String[] parts = args[0x00].split(":");
@@ -128,11 +133,7 @@ public class Main {
 				}
 
 				if(args.length > i+1) {
-					if(arg.equals("-P") || arg.equals("--path")) {
-						toolkitPath = FSUtils.resolveWithEnv(args[++i]);
-						continue;
-					}
-					else if(arg.equals("-o") || arg.equals("--output")) {
+					if(arg.equals("-o") || arg.equals("--output")) {
 						outputPath = FSUtils.resolveWithEnv(args[++i]);
 						continue;
 					}
@@ -160,7 +161,7 @@ public class Main {
 					else if(arg.equals("-D") || arg.equals("--define")) {
 						parts = args[++i].split("=", 2);
 						String name = parts[0x00].trim().toUpperCase();
-						RTOSParam param = RTOSParam.valueOf(name);
+						RtosParam param = RtosParam.valueOf(name);
 						if(null==param) {
 							System.err.println("[ERROR] Unlnown RTOSParam.name: " + name);
 							return 1;
@@ -272,14 +273,24 @@ public class Main {
 		Path runtimePath = toolkitPath.resolve("runtime").normalize();
 		File libDir = toolkitPath.resolve("bin").resolve("libs").normalize().toFile();
 
-		params.put(RTOSParam.MCU, mcu);
+		params.put(RtosParam.MCU, mcu);
 		if(null!=freq) {
-			params.put(RTOSParam.CORE_FREQ, freq);
+			params.put(RtosParam.CORE_FREQ, freq);
 		}
-		
+
 		Path rtosPath = toolkitPath.resolve("rtos").resolve(platformType.name().toLowerCase()).normalize();
+		Path sourcePath = (isAsmView ? null : FSUtils.resolve(toolkitPath, source));		
+		Path projectPath = (null==sourcePath ? null : sourcePath.getParent());
 		try {
-			device = new Device(toolkitPath, rtosPath, platformType, mcu, params, optimizationType, strictLevel);
+			Map<String, NativeBinding> localNbMap = null;
+			if(null!=projectPath) {
+				Path localNativeBindingPath = projectPath.resolve("native").resolve(platformType.name().toLowerCase()).normalize();
+				if(localNativeBindingPath.toFile().exists() && localNativeBindingPath.toFile().isDirectory()) {
+					localNbMap = new NativeBindingsReader(localNativeBindingPath, Paths.get("..", "src", "native",
+																							platformType.name().toLowerCase()).normalize()).getMap();
+				}
+			}
+			device = new Device(rtosPath, platformType, mcu, params, localNbMap, optimizationType, strictLevel);
 			cg = PlatformLoader.loadGenerator(device, libDir);
 		}
 		catch(Exception ex) {
@@ -288,9 +299,6 @@ public class Main {
 		}
 		CodeGenerator.verbose = cgVerbose;
 		
-		Path sourcePath = (isAsmView ? null : FSUtils.resolve(toolkitPath, source));
-		Path projectPath = (null==sourcePath ? null : sourcePath.getParent());
-
 		long timestamp = System.currentTimeMillis();
 		if(!quiet && !isAsmView) System.out.println("Parsing " + (null==sourcePath ? "" : sourcePath.toString())  + " ...");
 		Lexer lexer = null;
@@ -387,10 +395,13 @@ public class Main {
 							if(!quiet && !isAsmView) System.out.println("Codegen...");
 
 							CGExcs excs = new CGExcs();
+							CGLabelScope cgLabelScope = new CGLabelScope(null, -1, LabelNames.ENDPOINT, true);
+							excs.setMethodEndLabel(cgLabelScope);
+
 							clazz.firstCodeGen(cg, launchNode, excs);
 							ReachableAnalyzer.analyze(mc, (ClassNode)parser.getClazz(), cg, excs);
-							cg.getDevice().setParam(RTOSParam.STIMER_QNT, inst.getSoftTimerCntr());
-							cg.build(VarType.fromClassName(clazz.getName()), 0);
+							cg.getDevice().setParam(RtosParam.STIMER_QNT, inst.getSoftTimerCntr());
+							cg.build(VarType.fromClassName(clazz.getName()), 0, excs);
 							//System.out.println("\n" + cg.getAsm());
 
 							if(!isAsmView) {
@@ -512,9 +523,9 @@ public class Main {
 	}
 	
 	private static void showPlatformParams() {
-		for(RTOSParam param : RTOSParam.values()) {
+		for(RtosParam param : RtosParam.values()) {
 			if(!param.isHidden()) {
-				if(RTOSParam.HALT_OK_MODE==param || RTOSParam.HALT_ERR_MODE==param) {
+				if(RtosParam.HALT_OK_MODE==param || RtosParam.HALT_ERR_MODE==param) {
 					System.out.println(param.toString() + ": " + StrUtils.toString(RTOSHaltMode.values()));
 				}
 				else {

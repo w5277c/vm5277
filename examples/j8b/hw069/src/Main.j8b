@@ -57,7 +57,7 @@ class Main {
 		disp.clear();
 		while(true) for(byte i=0; i<6; i++) {
 			disp.setCursor(0,0);
-			disp.putSymbol(1<<i);
+			disp.putSymbol((byte)(1<<i));
 			disp.update();
 			Thread.sleep(50);
 		}

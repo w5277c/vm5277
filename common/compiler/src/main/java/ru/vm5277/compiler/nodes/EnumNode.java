@@ -16,7 +16,6 @@
 
 package ru.vm5277.compiler.nodes;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -246,7 +245,6 @@ public class EnumNode extends ObjectTypeNode {
 
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
-		
 		releaseVars(cg);
 		return null;
 	}

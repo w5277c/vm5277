@@ -17,6 +17,7 @@
 package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import ru.vm5277.common.lexer.Operator;
@@ -54,6 +55,7 @@ public class QualifiedPathExpression extends ExpressionNode {
 		QUALIFIED,		// obj, field, subfield
 		METHOD_CALL,	// method()
 		ARRAY_ACCESS,	// [index]
+		METHOD_REFERENCE// static method reference (Class::staticMethod)
 		
 	}
 	public static abstract class PathSegment {
@@ -125,6 +127,30 @@ public class QualifiedPathExpression extends ExpressionNode {
 		@Override
 		public String toString() {
 			return "(" + StrUtils.toString(arguments) + ")";
+		}
+	}
+	
+	public static class MethodReference extends PathSegment {
+		private String name;
+		
+		public MethodReference(String name) {
+			this.type = SegmentType.METHOD_REFERENCE;
+			this.name = name;
+		}
+
+		public String getName() {
+			return name;
+		}
+		
+		@Override
+		public boolean equals(Object seg2) {
+			if(!(seg2 instanceof MethodReference)) return false;
+			MethodReference ms = (MethodReference)seg2;
+			return Objects.equals(name, ms.getName());
+		}
+		@Override
+		public String toString() {
+			return name;
 		}
 	}
 	public static class ArraySegment extends PathSegment {
@@ -209,8 +235,8 @@ public class QualifiedPathExpression extends ExpressionNode {
 			}
 		}
 
-		// 3. Проверяем базовую структуру сегментов
-		for (int i=0; i<segments.size(); i++) {
+		// Проверяем базовую структуру сегментов
+		for(int i=0; i<segments.size(); i++) {
 			PathSegment segment = segments.get(i);
 			if(0!=i && SegmentType.THIS==segment.getType()) {
 				markError("Qualified path cannot have 'this' in non-initial segment"); 
@@ -225,10 +251,39 @@ public class QualifiedPathExpression extends ExpressionNode {
 					
 					markError("Consecutive operations are not allowed in qualified path");
 					result = false;
+					break;
 				}
 			}
 		}
 
+		// Проверка MethodReference сегмента
+		if(result && 1<segments.size()) {
+			for(int i=0; i<segments.size()-2; i++) {
+				if(segments.get(i) instanceof MethodReference) {
+					markError("Invalid method reference, method name must be after \"::\"");
+					result = false;
+					break;	
+				}
+			}
+
+			if(result && segments.get(segments.size()-1) instanceof MethodReference) {
+				if(2==segments.size()) {
+					if(!(segments.get(0) instanceof ThisSegment) && !(segments.get(0) instanceof PathSegment)) {
+						markError("Invalid method reference, expected this or class/interface type before \"::\"");
+					}
+				}
+				else {
+					for(int i=0; i<segments.size()-2; i++) {
+						if(!(segments.get(i) instanceof PathSegment)) {
+							markError("Invalid method reference, expected class/interface type before \"::\"");
+							result = false;
+							break;	
+						}
+					}
+				}
+			}
+		}
+		
 		// 4. Рекурсивный preAnalyze для вложенных выражений
 		for(PathSegment segment : segments) {
 			if(segment instanceof MethodSegment) {
@@ -424,6 +479,39 @@ public class QualifiedPathExpression extends ExpressionNode {
 							result&=pathExpr.postAnalyze(scope, cg, parent);
 						}
 					}
+					else if(segment instanceof MethodReference) {
+						MethodReference mRef = (MethodReference)segment;
+//						if(pathExpr.getScope().isImplements(VarType.fromClassName(VarType.CLASSNAME_NATIVE_CALLBACK))) { - не обязательно
+							List<MethodSymbol> mSymbols = pathExpr.getScope().getMethods(mRef.getName());
+							MethodSymbol mSymbol = null;
+							for(MethodSymbol _mSymbol : mSymbols) {
+								if(_mSymbol.isStatic() && VarType.VOID==_mSymbol.getType()) {
+									if(_mSymbol.getSignature().equals(mRef.getName() + "(byte)")) {
+										if(null==mSymbol) {
+											mSymbol = _mSymbol;
+											break;
+										}
+									}
+								}
+							}
+							if(null!=mSymbol) {
+								MethodReferenceExpression expr = new MethodReferenceExpression(inst, tb, pathExpr, mRef.getName());
+								resolvedExpr = expr;
+								result&=expr.declare(scope);
+								if(result) {
+									result&=expr.postAnalyze(scope, cg, parent);
+									symbol = expr.getSymbol();
+								}
+								continue;
+							}
+							else {
+								markError("Cannot resolve method reference: '" + mRef.getName() + "' in " + pathExpr.toString());
+							}
+//						}
+//						else {
+//							markError("Invalid method reference: only methods implementing NativeCallback are supported");
+//						}
+					}
 					else if(segment instanceof QualifiedSegment) {
 						QualifiedSegment qSeg = (QualifiedSegment)segment;
 						Property prop = null;
@@ -471,7 +559,8 @@ public class QualifiedPathExpression extends ExpressionNode {
 								}
 							}
 							else {
-								symbol = null==pathExpr ? scope.resolveField(qSeg.getName(), false) : pathExpr.getScope().resolveField(qSeg.getName(), true);
+								symbol = null==pathExpr ?	scope.resolveField(qSeg.getName(), false, new HashSet<>()) :
+															pathExpr.getScope().resolveField(qSeg.getName(), true, new HashSet<>());
 								if(null!=symbol) {
 									ExpressionNode expr = new VarFieldExpression(inst, tb, sp, getSN(), null==resolvedExpr ?pathExpr :
 																															resolvedExpr, qSeg.getName());
@@ -487,8 +576,8 @@ public class QualifiedPathExpression extends ExpressionNode {
 									continue;
 								}
 								else {
-									CIScope cis = null==pathExpr ?	scope.resolveCI(null, qSeg.getName(), false) :
-																	pathExpr.getScope().resolveCI(null, qSeg.getName(), true);
+									CIScope cis = null==pathExpr ?	scope.resolveCI(null, qSeg.getName(), false, new HashSet<>()) :
+																	pathExpr.getScope().resolveCI(null, qSeg.getName(), true, new HashSet<>());
 									if(null!=cis) {
 										pathExpr = new TypeReferenceExpression(inst, tb, pathExpr, qSeg.getName(), cis);
 										result&=pathExpr.declare(scope);

@@ -50,7 +50,7 @@ public class LedMatrixMax7219 implements GraphicsDisplay {
 		if(0!=(width&0x07) || 0!=(height&0x07)) {
 			DriverException.throw(DriverException.INVALID_DATA);
 		}
-		this.qnt = width*height/64;
+		this.qnt = ((short)(width*height))/64;
 
 		Gpio.setLow(clkPort);
 		Gpio.modeOut(clkPort);
@@ -119,10 +119,10 @@ public class LedMatrixMax7219 implements GraphicsDisplay {
     	if(0!=(xPos&0x07) || 0!=(imgWidth&0x07)) DriverException.throw(DriverException.UNSUPPORTED); // Проверка на кратность минимальному графическому объекту
     	if(null==data || xPos>=this.width || yPos>=this.height || 0==imgWidth || 0==imgHeight) return; // Проверка границ и размеров - есть что делать?
 
-		short xEnd = xPos+imgWidth;
+		short xEnd = (short)(xPos+imgWidth);
 		if(xEnd>this.width) xEnd = this.width;
 
-		short yEnd = yPos+imgHeight;
+		short yEnd = (short)(yPos+imgHeight);
 		if(yEnd>this.height) yEnd = this.height;
 
 		if(xEnd==xPos || yEnd==yPos) return;
@@ -131,9 +131,9 @@ public class LedMatrixMax7219 implements GraphicsDisplay {
 		for(short y=0; y<height; y++) {
 			Gpio.setLow(csPort);
         	for(short xChip=xMax; xChip>0; xChip--) {
-            	short x = (xChip-1)*8;
+            	short x = (short)((xChip-1)*8);
 				if(x>=xPos && y>=yPos && x<xEnd && y<yEnd) { // Область картинки
-					short dataOffset = (y-yPos)*(imgWidth/8)+(x-xPos)/8;
+					short dataOffset = (short)(((short)(y-yPos)*(imgWidth/8))+(x-xPos)/8);
 					buffer[0] = (byte)(REG_DIG0 + (y&0x07));
 					buffer[1] = data[dataOffset];
 					iface.comm(buffer, 2, null, 0, 100);

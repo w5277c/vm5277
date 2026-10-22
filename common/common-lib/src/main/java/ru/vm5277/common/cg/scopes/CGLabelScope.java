@@ -51,7 +51,6 @@ public class CGLabelScope extends CGScope {
 		return isPersist;
 	}
 	
-	
 	@Override
 	public String getSource() {
 		return isUsed ? name + ":\n" : "";

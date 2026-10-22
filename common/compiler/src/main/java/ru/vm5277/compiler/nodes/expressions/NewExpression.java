@@ -17,6 +17,7 @@
 package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import ru.vm5277.common.ImplementInfo;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
@@ -33,6 +34,8 @@ import ru.vm5277.common.cg.scopes.CGVarScope;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.cg.scopes.CGClassScope;
 import ru.vm5277.common.enums.CodegenResult;
+import ru.vm5277.common.enums.J8BException;
+import ru.vm5277.common.enums.RtosFeature;
 import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.Instance;
@@ -119,13 +122,13 @@ public class NewExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
-		cgScope = cg.enterExpression(parent, cgScope, toString());
+		cgScope = cg.enterExpression(parent, sp, cgScope, toString());
 
 		try {
 			//if(1<path.size()) {
 				cis = scope.getThis();
 				for(int i=0; i<path.size(); i++) {
-					cis = cis.resolveCI(null, path.get(i), i!=0);
+					cis = cis.resolveCI(null, path.get(i), i!=0, new HashSet<>());
 					if(null==cis || cis instanceof InterfaceScope) {
 						markError("Unresolved class scope '" + path.get(i) + "' in '" + toString() + "'");
 						result = false;
@@ -166,10 +169,10 @@ public class NewExpression extends ExpressionNode {
 			
 			if(result) {
 				if(null==cis) {
-					symbol = ((ClassScope)scope.getThis()).resolveConstructor(methodName, argTypes, false);
+					symbol = ((ClassScope)scope.getThis()).resolveConstructor(methodName, argTypes, false, new HashSet<>());
 				}
 				else {
-					symbol = ((ClassScope)cis).resolveConstructor(methodName, argTypes, true);
+					symbol = ((ClassScope)cis).resolveConstructor(methodName, argTypes, true, new HashSet<>());
 				}
 				if(null==symbol) {
 					markError("Method '" + methodName + "(" + StrUtils.toString(argTypes) + ")' not found");
@@ -208,7 +211,6 @@ public class NewExpression extends ExpressionNode {
 			}
 		}
 	}
-
 
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
@@ -249,7 +251,7 @@ public class NewExpression extends ExpressionNode {
 					for(ImplementInfo imlementInfo : cgClassScope.getImlementInfos()) {
 						if(imlementInfo.getType().isClassType()) {
 							// Разрешаем интерфейс
-							CIScope resolveCI = classNode.getScope().resolveCI(null, imlementInfo.getType().getClassName(), false);
+							CIScope resolveCI = classNode.getScope().resolveCI(null, imlementInfo.getType().getClassName(), false, new HashSet<>());
 							// Проверяем, что это интерфейс с runtime-путём (загружен из runtime директории)
 							if(resolveCI instanceof InterfaceScope && null!=((InterfaceScope)resolveCI).getRuntimePath()) {
 								InterfaceScope iScope = ((InterfaceScope)resolveCI);
@@ -322,7 +324,7 @@ public class NewExpression extends ExpressionNode {
 		}
 */
 		CGMethodScope mScope = (CGMethodScope)((AstHolder)symbol).getNode().getCGScope().getScope(CGMethodScope.class);
-		cg.invokeConstr(cgScope, mScope.getLabel());
+		cg.invokeConstr(cgScope, mScope.getStartLabel());
 		
 		releaseVars(cg);
 		return CodegenResult.RESULT_IN_ACCUM;
@@ -351,7 +353,7 @@ public class NewExpression extends ExpressionNode {
 				// Зачем суммирую с refTypeSize? int varSize = paramVarType.isArray() || paramVarType.isClassType() ? refTypeSize + cg.getRefSize() : exprTypeSize;
 				int varSize = paramVarType.isReferenceType() ? cg.getRefSize() : paramVarType.getSize();
 
-				CGVarScope dstVScope = cg.enterLocal(symbol.getCGScope(CGMethodScope.class), vSymbol.getType(), varSize, false, vSymbol.getName());
+				CGVarScope dstVScope = cg.enterLocal(symbol.getCGScope(CGMethodScope.class), null, vSymbol.getType(), varSize, false, vSymbol.getName());
 				dstVScope.build(null); // Выделяем память в стеке
 
 				vSymbol.setCGScope(dstVScope);

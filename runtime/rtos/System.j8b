@@ -42,6 +42,7 @@ public class System {
 	public static native byte random();
 
 	public static native void showDramUsage();
+	public static native void showMaxStackUsage();
 
 	public static native void halt();
 	public static native void reset();

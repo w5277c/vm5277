@@ -24,6 +24,12 @@ import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.cg.scopes.CGLabelScope;
 
+// Этот класс передается каждому методу генерации кода (codeGen), метод должен при обнаружении throw добавить тип исключения в produced
+// Таким образом у нас всегда есть информация какие исключения могут быть сгенерированы в текущий момент
+// При вызове метода (и вероятно еще в некоторых ситуациях) мы должны создать новый экземпляр этого класса с пустым produced
+// А после генерации вызова метода должны объединить полученные produced со старыми
+// При этом кодогенерация аргументов также должна выполняться с новым produced
+
 public class CGExcs {
 	private	SourcePosition				sp;
 	private	Map<Integer,CGLabelScope>	runtimeChecks	= new HashMap<>();	// Обрабатываемые (наличие try-catch) исключения для runtime проверок
@@ -41,7 +47,7 @@ public class CGExcs {
 		return produced;
 	}
 	
-	public CGLabelScope getMeathodEndLabel() {
+	public CGLabelScope getMethodEndLabel() {
 		return methodEndLabel;
 	}
 	public void setMethodEndLabel(CGLabelScope lbScope) {
@@ -65,5 +71,4 @@ public class CGExcs {
 	public SourcePosition getSourcePosition() {
 		return sp;
 	}
-	
 }

@@ -47,6 +47,11 @@ public class CGCells {
 		this.type = type;
 	}
 
+	public CGCells(long k) {
+		type = Type.CONST;
+		setConst(k);
+	}
+	
 	public CGCells(Type type, int size) {
 		this.type = type;
 		this.size = size;
@@ -116,7 +121,7 @@ public class CGCells {
 		return ids;
 	}
 	
-	public void setConst(long k) {
+	public final void setConst(long k) {
 		size = NumUtils.getBytesRequired(k);
 		ids = new int[size];
 		for(int i=0;i<size; i++) {

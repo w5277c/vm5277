@@ -49,6 +49,6 @@ class Main {
 		System.out("Присваивание arr[0][0] = (fixed)arr2[1]; Результат [25.00]: ");
 		arr[0][0] = (fixed)arr2[1];
 		System.out(arr[0][0]);
-		System.out('\n');		
+		System.out('\n');
 	}
 }

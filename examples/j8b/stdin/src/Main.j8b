@@ -16,6 +16,7 @@
 
 class Main {
 	public static void main() {
+		System.setParam(RtosParam.SHOW_WELCOME, 1);
 		System.out("Ready!\n");
 		while(true) {		
 			char ch = System.in();

@@ -27,8 +27,7 @@ class Main {
 		System.out(",b2=" + b2);
 		System.out(",b3=" + b3);
 		System.out(",b4=" + b4);
-		System.out(":");
-		System.out((b1+b2) + (b3+b4));
-		System.out("\ndone");
+		System.out(':');
+		System.out((byte)(((byte)(b1+b2)) + (byte)(b3+b4)));
     }
 }

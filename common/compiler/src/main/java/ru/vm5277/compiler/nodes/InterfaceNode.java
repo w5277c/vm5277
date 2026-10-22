@@ -18,6 +18,7 @@ package ru.vm5277.compiler.nodes;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -134,7 +135,7 @@ public class InterfaceNode extends ObjectTypeNode {
 
 			List<VarType> implTypes = new ArrayList<>();
 			for(String ifaceName : impl) {
-				if(null==ciScope.resolveCI(null, ifaceName, false)) {
+				if(null==ciScope.resolveCI(null, ifaceName, false, new HashSet<>())) {
 					markError("Interface not found: " + ifaceName);
 					result = false;
 				}
@@ -192,7 +193,7 @@ public class InterfaceNode extends ObjectTypeNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		
-		cgScope = cg.enterInterface(parent, VarType.fromClassName(name), name);
+		cgScope = cg.enterInterface(parent, sp, VarType.fromClassName(name), name);
 
 		VarType driverType = VarType.fromClassName(VarType.CLASSNAME_RTOS_DRIVER);
 		if(null!=driverType && ciScope.isImplements(driverType)) {
@@ -222,18 +223,7 @@ public class InterfaceNode extends ObjectTypeNode {
 		}
 
 		for(AstNode decl : blockIfaceNode.getDeclarations()) {
-			if(decl instanceof FieldNode) { // Проверка что все поля - public static final и инициализированы
-				FieldNode field = (FieldNode)decl;
-
-				if(!field.getModifiers().contains(J8BKeyword.PUBLIC)) markError("Interface field '" + field.getName() + "' must be public");
-				if(!field.getModifiers().contains(J8BKeyword.STATIC)) markError("Interface field '" + field.getName() + "' must be static");
-				if(!field.getModifiers().contains(J8BKeyword.FINAL)) markError("Interface field '" + field.getName() + "' must be final");
-
-				if(null==field.getInitializer()) markError("Interface field '" + field.getName() + "' must be initialized");
-
-//				decl.postAnalyze(ciScope, cg, cgScope);
-			}
-			else if(decl instanceof MethodNode) { // Проверка что методы не имеют реализации
+			if(decl instanceof MethodNode) { // Проверка что методы не имеют реализации
 				MethodNode method = (MethodNode)decl;
 				if(!method.isStatic() && null!=method.getBody()) {
 					markError("Interface method '" + method.getName() + "' cannot have a body");

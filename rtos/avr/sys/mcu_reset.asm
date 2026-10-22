@@ -15,13 +15,21 @@
  */
 
 .IFNDEF MCU_RESET
+.IF OS_FT_WELCOME == 0x01
+.include "stdio/out_cstr.asm"
+.include "resources/txt_mcu_done.asm"
+.ENDIF
 ;-----------------------------------------------------------
 MCU_RESET:
 ;-----------------------------------------------------------
 ;Перезапуск микроконтроллера
 ;-----------------------------------------------------------
 	CLI
-
+.IF OS_FT_WELCOME == 0x01
+	LDI ACCUM_L,low(_OS_MCU_DONE_TXT*2)
+	LDI ACCUM_H,high(_OS_MCU_DONE_TXT*2)
+	MCALL OS_OUT_CSTR
+.ENDIF
 	; TODO реализовать сброс МК через watchdog
 
 	RJMP PC

@@ -70,8 +70,6 @@ class Main {
 		Object num = new Short(0x0102);
 		System.out("\nЭкземпляр создан, помещен в num типа Object");
 		
-		//System.out(((Short)num).toShort()); не работает
-		
 		System.out("\nПроверка if(num instanceof Short as s)");
 		if(num instanceof Short as s) {
 			System.out("\nnum типа Object наследован от Short, вызываем s.toShort()");

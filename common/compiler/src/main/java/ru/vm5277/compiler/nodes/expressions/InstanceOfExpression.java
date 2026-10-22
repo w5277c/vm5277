@@ -17,6 +17,7 @@
 package ru.vm5277.compiler.nodes.expressions;
 
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
@@ -28,7 +29,6 @@ import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
 import ru.vm5277.common.messages.WarningMessage;
 import ru.vm5277.compiler.Instance;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -159,7 +159,7 @@ public class InstanceOfExpression extends ExpressionNode {
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 		
 		this.scope = scope;
-		cgScope = cg.enterExpression(parent, cgScope, toString());
+		cgScope = cg.enterExpression(parent, sp, cgScope, toString());
 
 		result&=leftExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
@@ -206,7 +206,7 @@ public class InstanceOfExpression extends ExpressionNode {
 					fulfillsContract = true;
 				}
 				else {
-					CIScope leftCIS = scope.getThis().resolveCI(null, leftType.getClassName(), false);
+					CIScope leftCIS = scope.getThis().resolveCI(null, leftType.getClassName(), false, new HashSet<>());
 					fulfillsContract = leftCIS.isImplements(rightType);
 				}
 			}
@@ -223,7 +223,21 @@ public class InstanceOfExpression extends ExpressionNode {
 		return result;
 	}
 
-	//TODO codeOptimization
+	@Override
+	public void codeOptimization(Scope scope, CodeGenerator cg) {
+		//TODO переменная помечается как константа, и ломает дальнейшую сборку 
+		//leftExpr.codeOptimization(scope, cg);
+		
+		try {
+			ExpressionNode optimizedExpr = leftExpr.optimizeWithScope(scope, cg);
+			if(null!=optimizedExpr) {
+				leftExpr = optimizedExpr;
+			}
+		}
+		catch(CompileException ex) {
+			markError(ex);
+		}
+	}
 	
 	public VarType getLeftType() {
 		return leftType;

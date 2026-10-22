@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
 package ru.vm5277.common.cg;
 
 import ru.vm5277.common.VarType;
@@ -24,6 +25,7 @@ public class CGAccum {
 //	private	int		resultBytes	= 0;	
 	private	boolean	oldFixed;
 	private	boolean	fixed;
+	private VarType	cast		= null;
 	
 	public CGAccum(int refBytes) {
 		this.refBytes = refBytes;
@@ -43,8 +45,8 @@ public class CGAccum {
 	}
 	
 	public void setBits(int bits) {
-		oldBits = bits;
-		oldFixed = fixed;
+		oldBits = this.bits;
+		oldFixed = this.fixed;
 
 		this.bits = bits;
 		this.fixed = false;
@@ -111,12 +113,22 @@ public class CGAccum {
 		else {
 			result.setBits(bits);
 		}
+		result.setCast(cast);
 		return result;
 	}
 	
+	public VarType pullCast() {
+		VarType result = cast;
+		cast = null;
+		return result;
+	}
+	public void setCast(VarType varType) {
+		cast = varType;
+	}
+
 	@Override
 	public String toString() {
-		return "acc" + (fixed ? "[FIXED]" : "") + " " + bits;
+		return "acc" + (fixed ? "[FIXED]" : "") + " " + bits + (null!=cast ? "[cast:"+cast+"]" : "");
 		//return "acc" + (isFixed ? "[FIXED," : "") + " " + bits + "/" + resultBytes*8 + "] ";
 	}
 }

@@ -31,7 +31,7 @@ public class TOpearator extends Token {
 	}
 
 	public static TOpearator parse(SourceBuffer sb) {
-		SourcePosition sp = sb.snapSP();
+		SourcePosition sp = sb.snap();
 		
 		// Проверяем instanceof
         if(sb.available(10)) {

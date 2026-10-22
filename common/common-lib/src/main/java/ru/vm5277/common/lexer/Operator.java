@@ -32,8 +32,10 @@ public enum Operator {
 	// Присваивание (простое и составное)
 	ASSIGN("="), PLUS_ASSIGN("+="), MINUS_ASSIGN("-="), MULT_ASSIGN("*="), DIV_ASSIGN("/="), MOD_ASSIGN("%="), BIT_AND_ASSIGN("&="), BIT_OR_ASSIGN("|="),
 	BIT_XOR_ASSIGN("^="), BIT_NOT_ASSIGN("~="), SHL_ASSIGN("<<="), SHR_ASSIGN(">>="), ROR(">>["), ROL("]<<"),
-	//Тернарный и instanceof
-	TERNARY("?"), INSTANCEOF("instanceof");
+	// Тернарный и instanceof
+	TERNARY("?"), IS("is"), INSTANCEOF("instanceof"),
+	// Ссылка на метод
+	METHOD_REFERENCE("::");
 
 	
 	public static final Map<Operator, Integer> PRECEDENCE = new HashMap<>();
@@ -68,7 +70,8 @@ public enum Operator {
 	    // 7. Равенство
 		PRECEDENCE.put(Operator.EQ, 7);
 		PRECEDENCE.put(Operator.NEQ, 7);
-	    PRECEDENCE.put(Operator.INSTANCEOF, 7);
+	    PRECEDENCE.put(Operator.IS, 7);
+		PRECEDENCE.put(Operator.INSTANCEOF, 7);
 		// 8. Сравнение
 		PRECEDENCE.put(Operator.LT, 8);
 		PRECEDENCE.put(Operator.GT, 8);
@@ -94,6 +97,7 @@ public enum Operator {
         PRECEDENCE.put(Operator.DEC, 13);
 		PRECEDENCE.put(Operator.POST_INC, 13);
 		PRECEDENCE.put(Operator.POST_DEC, 13);
+		PRECEDENCE.put(Operator.METHOD_REFERENCE, 14); // Высокий приоритет
 
 		// Унарные + и - обрабатываются в parseUnary()
 	};
@@ -110,7 +114,7 @@ public enum Operator {
 
 	public static Operator fromSymbol(String symbol) {
 		for (Operator op : values()) {
-			if (op.symbol.equals(symbol) && Operator.PRE_DEC != op && Operator.PRE_INC != op && Operator.POST_DEC != op && Operator.POST_INC != op) {
+			if(op.symbol.equals(symbol) && Operator.PRE_DEC!=op && Operator.PRE_INC!=op && Operator.POST_DEC!=op && Operator.POST_INC!=op) {
 				return op;
 			}
 		}
@@ -127,7 +131,7 @@ public enum Operator {
 
 	// Проверяет, является ли оператор сравнением
 	public boolean isComparison() {
-		return this == EQ || this == NEQ || this == LT || this == GT || this == LTE || this == GTE || this == INSTANCEOF;
+		return this == EQ || this == NEQ || this == LT || this == GT || this == LTE || this == GTE || this == IS || this == INSTANCEOF;
 	}
 
 	// Проверяет, является ли оператор логическим
@@ -201,6 +205,10 @@ public enum Operator {
 	}
 	
 	public boolean isAlpha() {
-		return Operator.INSTANCEOF == this;
+		return Operator.IS==this || Operator.INSTANCEOF==this;
+	}
+	
+	public boolean isMethodReference() {
+		return this == METHOD_REFERENCE;
 	}
 }

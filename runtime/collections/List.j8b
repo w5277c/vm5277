@@ -14,6 +14,13 @@
  * limitations under the License.
  */
 
-public interface RtosCallback {
-    @EntryPoint private void callback(byte resId);
+//Черновой
+public interface List extends Comparable {
+    public void remove(short index) throws BoundsException;
+	public void clear();
+	public short size();
+	public boolean isEmpty();
+
+	public Comparison compare(short i, short j) throws BoundsException;
+	public void swap(short i, short j)throws BoundsException;
 }

@@ -1,4 +1,6 @@
 /*/prebuild/*.lst
+/*/prebuild/*.dbg
 /*/prebuild/*.map
 /*/prebuild/*.j8bir
 /*/target/
+/*/src/target/

@@ -15,6 +15,7 @@
  */
 package ru.vm5277.compiler.nodes.expressions;
 
+import java.util.HashSet;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.VarType;
@@ -99,11 +100,11 @@ public class TypeReferenceExpression extends ExpressionNode {
 		if(null!=parentExpr) {
 			result&=parentExpr.declare(scope);
 			if(null!=parentExpr.getScope()) {
-				cis = parentExpr.getScope().resolveCI(null, lastId, true);
+				cis = parentExpr.getScope().resolveCI(null, lastId, true, new HashSet<>());
 			}
 		}
 		else {
-			cis = scope.getThis().resolveCI(null, lastId, false);
+			cis = scope.getThis().resolveCI(null, lastId, false, new HashSet<>());
 		}
 
 		if(null==cis) {

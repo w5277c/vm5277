@@ -16,6 +16,7 @@
 
 public interface I2cMaster extends RtosHalfDuplexIface, RtosDriver, Closeable {
 	public enum I2cFreq {
+		F1kHz,
 		F10kHz,
 		F50kHz,
 		F100kHz,

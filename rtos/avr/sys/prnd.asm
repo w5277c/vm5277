@@ -19,7 +19,11 @@
 
 .IF OS_FT_BLDR_API_REUSE == 0x00
 _OS_PRND__RANDDATA:
+.IFDEF vm5277asm
 	.RNDB 0x08
+.ELSE 
+	.DB 0x5A,0x58,0x53,0x70,0x65,0x63,0x63,0x79
+.ENDIF
 .ENDIF
 ;-----------------------------------------------------------
 OS_PRND:

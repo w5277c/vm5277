@@ -72,11 +72,11 @@ public class WS2812B implements BufferedGraphicsDisplay {
 
 		for(byte y=(byte)yPos; y<yEnd; y++) {
 			for (byte x=(byte)xPos; x<xEnd; x++) {
-				short dstOffset = (y*width+x)*3;
-				short srcOffset = ((y-yPos)*imgWidth+(x-xPos))*3;
-				rgbBuffer[dstOffset+0] = data[srcOffset+0];
-				rgbBuffer[dstOffset+1] = data[srcOffset+1];
-				rgbBuffer[dstOffset+2] = data[srcOffset+2];
+				short dstOffset = (short)((short)((short)(y*width)+x)*3);
+				short srcOffset = (short)((short)((short)((y-yPos)*imgWidth)+(x-xPos))*3);
+				rgbBuffer[dstOffset] = data[srcOffset];
+				rgbBuffer[(short)(dstOffset+1)] = data[(short)(srcOffset+1)];
+				rgbBuffer[(short)(dstOffset+2)] = data[(short)(srcOffset+2)];
 			}
 		}
 
@@ -84,10 +84,10 @@ public class WS2812B implements BufferedGraphicsDisplay {
 	}
 
 	@Override public void drawPixel(short xPos, short yPos, int data) {
-		short offset = (yPos*width+xPos)*3;
-		rgbBuffer[offset+0] = Primitive.b2(data);
-		rgbBuffer[offset+1] = Primitive.b1(data);
-		rgbBuffer[offset+2] = Primitive.b0(data);
+		short offset = (short)((short)(((short)(yPos*width)+xPos))*3);
+		rgbBuffer[offset] = Primitive.b2(data);
+		rgbBuffer[(short)(offset+1)] = Primitive.b1(data);
+		rgbBuffer[(short)(offset+2)] = Primitive.b0(data);
 	}
 
 	@Override public short getWidth() {return width;}

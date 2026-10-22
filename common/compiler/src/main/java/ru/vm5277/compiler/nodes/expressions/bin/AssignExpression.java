@@ -55,7 +55,7 @@ public class AssignExpression extends BinaryExpression {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 		this.scope = scope;
-		cgScope = cg.enterExpression(parent, cgScope, toString());
+		cgScope = cg.enterExpression(parent, sp, cgScope, toString());
 
 		result&=rightExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
@@ -186,6 +186,7 @@ public class AssignExpression extends BinaryExpression {
 		return result;
 	}
 
+	//TODO codeGen должен вызываться для обоих операндов
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean isInvert, boolean opOr, boolean toAccum, CGExcs excs) throws CompileException {
 		if(cgDone || disabled) return null;
@@ -201,6 +202,9 @@ public class AssignExpression extends BinaryExpression {
 			// Для всех выражений должны быть удовлетворены зависимости
 			depCodeGen(cg, leftExpr.getSymbol(), scope, excs);
 			depCodeGen(cg, rightExpr.getSymbol(), scope, excs);
+
+			// Похоже для каждого выражения с двумя операторами должен быть сброшен размер аккумулятора
+			cg._getAcc().setBytes(0); // Сброс размера аккумулятора
 
 			if(leftType.isReferenceType() && leftExpr instanceof VarFieldExpression) {
 				boolean saveAccRequired = true;
@@ -224,11 +228,7 @@ public class AssignExpression extends BinaryExpression {
 				}
 			}
 
-
-			// В присваивании размер аккумулятора всегда соответствует левому выражению, устанавливаем фиксированный размер акккумулятора (
-			// TODO не ограничивать если обрабатываем MathOverflowException (проверять результат на выходе)
-			cg.accumLock(leftType);
-
+			VarType castType = cg._getAcc().pullCast();
 			// Сравнение оперирует с условными переходами, а присваивание ждет значение в аккумуляторе - обрабатываем отдельно
 			if(VarType.BOOLEAN==leftType && rightExpr instanceof ComparisonExpression) {
 				CGBranch branch = new CGBranch();
@@ -236,17 +236,10 @@ public class AssignExpression extends BinaryExpression {
 				rightExpr.codeGen(cg, true, excs);
 
 				CGLabelScope endScope = new CGLabelScope(null, CGScope.genId(), LabelNames.COMPARE_END, true);
-
-				CGCells trueCells = new CGCells(CGCells.Type.CONST);
-				trueCells.setConst(1);
-
-				CGCells falseCells = new CGCells(CGCells.Type.CONST);
-				falseCells.setConst(0);
-
-				cg.cellsToCells(cgScope, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType, trueCells, rightType);
+				cg.cellsToCells(cgScope, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType, new CGCells(1), rightType, castType);
 				cg.jump(cgScope, endScope);//cg.jump(cgScope, branch.getEnd());
 				cgScope.append(branch.getEnd());
-				cg.cellsToCells(cgScope, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType, falseCells, rightType);
+				cg.cellsToCells(cgScope, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType, new CGCells(0), rightType, castType);
 				cgScope.append(endScope);
 
 				releaseVars(cg);
@@ -260,10 +253,10 @@ public class AssignExpression extends BinaryExpression {
 					// Левое выражение не возвращает аккумулятор, но в нем могут быть выражения которые могут испортить аккумулятор (arr[i+1] = method();)
 					if(CodegenResult.ACCUM_USED==leftExpr.codeGen(cg, false, excs)) {
 						cg.pushAccBE(rightExpr.getCGScope(), -1==rightType.getSize() ? cg.getRefSize() : rightType.getSize(), false);
-						cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ARRAY), leftType, new CGCells(CGCells.Type.STACK), rightType);
+						cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ARRAY), leftType, new CGCells(CGCells.Type.STACK), rightType, castType);
 					}
 					else {
-						cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ARRAY), leftType, new CGCells(CGCells.Type.ACC), rightType);
+						cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ARRAY), leftType, new CGCells(CGCells.Type.ACC), rightType, castType);
 					}
 					optimized = true;
 				}
@@ -274,7 +267,8 @@ public class AssignExpression extends BinaryExpression {
 					leftExpr.codeGen(cg, false, excs);
 					cg.cellsToCells(cgScope,
 									((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType,
-									((CGCellsScope)rightExpr.getSymbol().getCGScope()).getCells(), rightType);
+									((CGCellsScope)rightExpr.getSymbol().getCGScope()).getCells(), rightType,
+									castType);
 					optimized = true;
 				}
 	/*			else if (rightExpr instanceof MethodCallExpression && rightExpr.getType().isBoolean() && (Operator.ROL==operator || Operator.ROR==operator)) {
@@ -290,21 +284,16 @@ public class AssignExpression extends BinaryExpression {
 				else if(rightExpr instanceof LiteralExpression) {
 					if(VarType.NULL==rightType) { // В левой части reference type (гарантирует postAnalyze)
 						leftExpr.codeGen(cg, false, excs);
-
-						CGCells rightCells = new CGCells(CGCells.Type.CONST);
-						rightCells.setConst(0);
-
+						CGCells rightCells = new CGCells((long)0);
 						if(leftExpr instanceof VarFieldExpression) {
 							// Записываем в ref адрес 0 - при обращении необходимо выдать что-то типа 'null pointer exception'
-							cg.cellsToCells(cgScope, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType, rightCells, null);						
-							//cgScope.append(cg.constToCells(cgScope, 0x00, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), false));
+							cg.cellsToCells(cgScope, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType, rightCells, null, castType);
 						}
 						else if(leftExpr instanceof ArrayExpression) {
 //							// Декремент счетчика ссылок
 //							cg.updateArrRefCount(cgScope, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), false, !isView);
 							// Записываем в ref адрес 0 - при обращении необходимо выдать что-то типа 'null pointer exception'
-							cg.cellsToCells(cgScope, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType, rightCells, null);
-							//cgScope.append(cg.constToCells(cgScope, 0x00, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), false));
+							cg.cellsToCells(cgScope, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType, rightCells, null, castType);
 						}
 						else {
 							throw new CompileException("Unexpected expression:" + leftExpr);
@@ -313,33 +302,42 @@ public class AssignExpression extends BinaryExpression {
 					else {
 						rightExpr.codeGen(cg, false, excs);
 						leftExpr.codeGen(cg, false, excs);
-						// Определяем максмальный размер операнда
-						int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
 
-						CGCells rightCells = new CGCells(CGCells.Type.CONST);
-						rightCells.setConst(rightType.isFixedPoint() ?	((LiteralExpression)rightExpr).getFixedValue() :
-																		((LiteralExpression)rightExpr).getNumValue());
-
-						cg.cellsToCells(cgScope, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType, rightCells, rightType);
+						CGCells rightCells = new CGCells(	rightType.isFixedPoint() ?	((LiteralExpression)rightExpr).getFixedValue() :
+																						((LiteralExpression)rightExpr).getNumValue());
+						cg.cellsToCells(cgScope, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType, rightCells, rightType, castType);
 					}
 					optimized = true;
+				}
+				else if(rightExpr instanceof VarFieldExpression && null!=rightExpr.getSymbol() && null!=rightExpr.getSymbol().getCGScope()) {
+					rightExpr.codeGen(cg, false, excs);
+					if(CodegenResult.ACCUM_USED==leftExpr.codeGen(cg, false, excs) ) {
+						cg.pushAccBE(rightExpr.getCGScope(), -1==rightType.getSize() ? cg.getRefSize() : rightType.getSize(), false);
+						cg.cellsToCells(cgScope, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType, new CGCells(CGCells.Type.STACK),
+										rightType, castType);
+					}
+					else {
+						cg.cellsToCells(cgScope, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType,
+										((CGCellsScope)rightExpr.getSymbol().getCGScope()).getCells(), rightType, castType);
+					}
 				}
 				else {
 					Object genResult = rightExpr.codeGen(cg, true, excs);
 					if((Operator.ROL==operator || Operator.ROR==operator) && CodegenResult.RESULT_IN_FLAG==genResult ) {
 						leftExpr.codeGen(cg, false, excs);
-						cg.cellsOpCells(cgScope, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType, operator, new CGCells(CGCells.Type.FLAG), rightType);
+						cg.cellsAction(cgScope, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType, operator,
+										new CGCells(CGCells.Type.FLAG), rightType, castType, excs);
 						optimized = true;
 					}
 					else if(CodegenResult.RESULT_IN_ACCUM==genResult) {
 						if(CodegenResult.ACCUM_USED==leftExpr.codeGen(cg, false, excs) ) {
 							cg.pushAccBE(rightExpr.getCGScope(), -1==rightType.getSize() ? cg.getRefSize() : rightType.getSize(), false);
 							cg.cellsToCells(cgScope, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType, new CGCells(CGCells.Type.STACK),
-											rightType);
+											rightType, castType);
 						}
 						else {
 							cg.cellsToCells(cgScope, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType, new CGCells(CGCells.Type.ACC),
-											rightType);
+											rightType, castType);
 						}
 						optimized = true;
 					}
@@ -389,28 +387,29 @@ public class AssignExpression extends BinaryExpression {
 						// Восстанавливаем HEAP индексный регистр
 						cg.popHeapReg(cgScope);
 						// Записываем в ref адрес 0 - при обращении необходимо выдать что-то типа 'null pointer exception'
-						cgScope.append(cg.constToCells(cgScope, 0x00, leftCScope.getCells(), false));
+						cg.cellsToCells(cgScope, leftCScope.getCells(), leftType, new CGCells((long)0), null, castType);
 					}
 					//================ VarFieldExpression ==== VAR/FIELD ================================
 					else if(rightExpr instanceof VarFieldExpression) {
 						VarFieldExpression rightVfe = (VarFieldExpression)rightExpr;
 						CGCellsScope rightCScope = (CGCellsScope)rightExpr.getSymbol().getCGScope();				
 						if(CodegenResult.RESULT_IN_ACCUM!=rightVfe.codeGen(cg, true, excs)) {
-							cg.cellsToAcc(cgScope, rightCScope);
+							cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ACC), type, ((CGCellsScope)rightCScope).getCells(), null, castType);
 						}
-						cg.accToCells(cgScope, leftType, leftCScope);
+						cg.cellsToCells(cgScope, leftCScope.getCells(), leftType, new CGCells(CGCells.Type.ACC), null, castType);
 					}
 					//================ VarFieldExpression ==== ARRAY ================================
 					else if(rightExpr instanceof ArrayExpression) {
 						ArrayExpression ae = (ArrayExpression)rightExpr;
 						if(CodegenResult.RESULT_IN_ACCUM!=ae.codeGen(cg, true, excs)) throw new CompileException("Accum not used for operand:" + rightExpr);
-						cg.accToCells(cgScope, leftType, leftCScope);
+						cg.cellsToCells(cgScope, leftCScope.getCells(), leftType, new CGCells(CGCells.Type.ACC), null, castType);
+						//cg.accToCells(cgScope, leftType, leftCScope);
 					}
 					//================ VarFieldExpression ==== LITERAL ================================
 					else if(rightExpr instanceof LiteralExpression) {
 						LiteralExpression le = (LiteralExpression)rightExpr;
-						cgScope.append(cg.constToCells(	cgScope, leftType.isFixedPoint() ? le.getFixedValue() : le.getNumValue(), leftCScope.getCells(),
-														leftType.isFixedPoint()));
+						cg.cellsToCells(cgScope, leftCScope.getCells(), leftType,
+										new CGCells(leftType.isFixedPoint() ? le.getFixedValue() : le.getNumValue()), null, castType);
 					}
 					//================ VarFieldExpression ==== UNARY ================================
 					else if(rightExpr instanceof UnaryExpression) {
@@ -428,7 +427,7 @@ public class AssignExpression extends BinaryExpression {
 						}
 						else {
 							if(CodegenResult.RESULT_IN_ACCUM==rightExpr.codeGen(cg, true, excs)) {
-								cg.accToCells(cgScope, leftType, leftCScope);
+								cg.cellsToCells(cgScope, leftCScope.getCells(), leftType, new CGCells(CGCells.Type.ACC), null, castType);
 							}
 						}
 					}
@@ -438,12 +437,13 @@ public class AssignExpression extends BinaryExpression {
 							throw new CompileException("Accum not used for operand:" + rightExpr);
 						}
 						else {
-							cg.accToCells(cgScope, leftType, leftCScope);
+							cg.cellsToCells(cgScope, leftCScope.getCells(), leftType, new CGCells(CGCells.Type.ACC), null, castType);
 						}
 					}
 				}
 				//================ ArrayExpression ================================
 				else {
+					
 					ArrayExpression leftAe = (ArrayExpression)leftExpr;
 					CGCellsScope leftCScope = (CGCellsScope)leftAe.getSymbol().getCGScope();
 
@@ -453,7 +453,7 @@ public class AssignExpression extends BinaryExpression {
 						// Декремент счетчика ссылок
 						cg.updateArrRefCount(cgScope, leftCScope.getCells(), false);
 						// Записываем в ref адрес 0 - при обращении необходимо выдать что-то типа 'null pointer exception'
-						cgScope.append(cg.constToCells(cgScope, 0x00, leftCScope.getCells(), false));
+						cg.cellsToCells(cgScope, leftCScope.getCells(), leftType, new CGCells(0), null, castType);
 					}
 					//================ ArrayExpression ==== ARRAY ================================
 					else if(rightExpr instanceof ArrayExpression) {
@@ -461,52 +461,31 @@ public class AssignExpression extends BinaryExpression {
 							throw new CompileException("Accum not used for operand:" + rightExpr);
 						}
 						leftExpr.codeGen(cg, false, excs);
-						cg.accToArr(cgScope, (CGArrCells)leftCScope.getCells());
+						cg.accToArr(cgScope, (CGArrCells)leftCScope.getCells()); //TODO castType?
 					}
 					//================ ArrayExpression ==== LITERAL ================================
 					else if(rightExpr instanceof LiteralExpression) {
 						LiteralExpression le = (LiteralExpression)rightExpr;
 						leftExpr.codeGen(cg, false, excs);
-						// Определяем использование FIXED
-						boolean isFixed = le.getType().isFixedPoint() || VarType.FIXED == leftType;
-						cgScope.append(cg.constToCells(cgScope, isFixed ? le.getFixedValue() : le.getNumValue(), leftCScope.getCells(), isFixed));
+						cg.cellsToCells(cgScope, leftCScope.getCells(), leftType,
+										new CGCells(rightType.isFixedPoint() ? le.getFixedValue() : le.getNumValue()), null, castType);
 					}
 					//================ ArrayExpression ==== OTHER ================================
 					else {
 						optimized = false;
-	/*					try {
-							if(	rightExpr instanceof VarFieldExpression && null!=rightExpr.getSymbol() && null!=rightExpr.getSymbol().getCGScope() &&
-								rightExpr.getSymbol().getCGScope() instanceof CGCellsScope && null!=((CGCellsScope)rightExpr.getSymbol().getCGScope()).getCells()) {
-
-								rightExpr.codeGen(cg, false, excs);
-								leftExpr.codeGen(cg, false, excs);
-								cg.cellsToCells(cgScope,
-												((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType,
-												((CGCellsScope)rightExpr.getSymbol().getCGScope()).getCells(), rightType);
-								optimized = true;
-							}
-						}
-						catch(Exception ex) {
-							System.out.println("TODO:" + ex.getMessage());
-						}
-	*/
 						if(!optimized) {
-		//					cg.accumLock(VarType.SHORT);
 							if(CodegenResult.RESULT_IN_ACCUM!=rightExpr.codeGen(cg, true, excs)) {
 								throw new CompileException("Accum not used for operand:" + rightExpr);
 							}
 							cg.pushAccBE(rightExpr.getCGScope(), (rightType.isReferenceType() ? cg.getRefSize() : rightType.getSize()), false);
 							leftExpr.codeGen(cg, false, excs);
 							cg.popAccBE(leftExpr.getCGScope(), (rightType.isReferenceType() ? cg.getRefSize() : rightType.getSize()));
-							cg.accToCells(cgScope, leftType, (CGCellsScope)leftExpr.getSymbol().getCGScope());
-		//					cg.accumUnlock();
+							cg.cellsToCells(cgScope, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType,
+											new CGCells(CGCells.Type.ACC), null, castType);
 						}
 					}
 				}
 			}
-
-			// Снимаем ограничение по размеру аккумулятора
-			cg.accumUnlock();
 
 			// Если в правой части ссылка, то нужно увеличить счетчик ссылок
 			//TODO добавить в оптимизатор проверку на рядом стоящие инкремент и декремент ссылки одного объекта

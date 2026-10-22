@@ -23,14 +23,15 @@ import ru.vm5277.common.VarType;
 import ru.vm5277.common.cg.CodeGenerator;
 import ru.vm5277.common.cg.RegPair;
 import ru.vm5277.common.exceptions.CompileException;
+import ru.vm5277.common.lexer.SourcePosition;
 
 public class CGVarScope extends CGCellsScope {
 	private			CGCells			cells;
 	private			CGScope			lastUsage;
 	private			Set<RegPair>	usedRegsShot = new HashSet<>();
 	
-	public CGVarScope(CGScope parent, int resId, VarType type, int size, boolean isConstant, String name) {
-		super(parent, resId, type, size, name);
+	public CGVarScope(CGScope parent, SourcePosition sp, int resId, VarType type, int size, boolean isConstant, String name) {
+		super(parent, sp, resId, type, size, name);
 
 		this.isConstant = isConstant;
 	}

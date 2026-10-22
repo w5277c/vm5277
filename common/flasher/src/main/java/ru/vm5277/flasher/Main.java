@@ -113,10 +113,7 @@ public class Main {
 
 				for(int i=(detectMode ? 2 : 3); i<args.length; i++) {
 					String arg = args[i];
-					if(args.length>i+1 && (arg.equals("-P") || arg.equals("--path"))) {
-						toolkitPath = FSUtils.resolveWithEnv(args[++i]);
-					}
-					else if(args.length>i+1 && (arg.equals("-S") || arg.equals("--serial"))) {
+					if(args.length>i+1 && (arg.equals("-S") || arg.equals("--serial"))) {
 						serialDeviceName = args[++i];
 					}
 					else if(!detectMode && args.length>i+1 && (arg.equals("-f") || arg.equals("--fwversion"))) {
@@ -207,7 +204,6 @@ public class Main {
 		if(!quiet) showDisclaimer();
 		
 		if(null==toolkitPath) {
-			showInvalidToolkitDir(null);
 			return 1;
 		}
 		if(!quiet) System.out.println("Toolkit path: " + toolkitPath.toString());
@@ -420,7 +416,7 @@ public class Main {
 									while(pos<message.length()) {
 										if(message.substring(pos).startsWith("..")) {
 											sb.append("...\n");
-											pos+=0x03;
+											pos+=0x02;
 										}
 										else {
 											endNumPos = getHexNumEndPos(message, pos);
@@ -453,6 +449,19 @@ public class Main {
 									
 									int percent = (used * 100 + total / 2) / total;
 									sb.append("] ").append(percent).append("% used (").append(used).append("/").append(total).append(" bytes)\n");
+									return sb.toString();
+								}
+								else if(message.startsWith("MSTCKUSG:")) {
+									StringBuilder sb = new StringBuilder("STACK: ");
+									int used = Integer.parseInt(message.substring(0x09, 0x09+0x04), 0x10);
+									int total = Integer.parseInt(message.substring(0x09+0x04+0x01, 0x09+0x04+0x01+0x04), 0x10);
+									if(0xffff==used) {
+										sb.append("!OVERFLOW! (>").append(total).append(" bytes)\n");
+									}
+									else {
+										int percent = (used * 100 + total / 2) / total;
+										sb.append(percent).append("% used (").append(used).append("/").append(total).append(" bytes)\n");
+									}
 									return sb.toString();
 								}
 							}
@@ -715,7 +724,6 @@ public class Main {
 		System.out.println("Options:");
 		System.out.println("  -S,  --serial <device>  Serial device name (default: auto-scan)");
 		System.out.println("                          Examples: /dev/ttyUSB0, COM3, /dev/ttyACM0");
-		System.out.println("  -P,  --path <dir>       Custom toolkit directory path");
 		System.out.println("  -s,  --smart            Enable smart flash (only write changed pages)");
 		System.out.println("  -e   --encrypted        Firmware is encrypted");
 		System.out.println("  -C   --clear-cache      Clear firmware cache for this device (smart mode)");
@@ -768,14 +776,6 @@ public class Main {
 	}
 	private static void showInvalidDir(Path subPath) {
 		System.err.println("[ERROR] Directory not found or empty:" + subPath.toString());
-	}
-	private static void showInvalidToolkitDir(Path toolkitPath) {
-		System.err.println("[ERROR] Toolkit directory not found or empty:" + toolkitPath.toString());
-		System.err.println();
-		System.err.println("Possible solutions:");
-		System.err.println("1. Specify custom path with --path (-P) option");
-		System.err.println("2. Add toolkit directory(vm5277) to system environment variables");
-		System.err.println("3. Check project source or documentation at https://github.com/w5277c/vm5277");
 	}
 	private static void showInvalidInteractiveMode(String interactiveMode) {
 		System.err.println("[ERROR] TODO Invalid interactive mode (-I): '" + interactiveMode + "', expected auto|none|out|full");

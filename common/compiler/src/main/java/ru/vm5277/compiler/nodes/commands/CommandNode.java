@@ -27,8 +27,6 @@ import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
-import ru.vm5277.compiler.Main;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.BlockNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -104,7 +102,7 @@ public abstract class CommandNode extends AstNode {
 
 		@Override
 		public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
-			cgScope = new CGScope(parent, CGScope.genId(), "case condition");
+			cgScope = new CGScope(parent, sp, CGScope.genId(), "case condition");
 			return true;
 		}
 	}

@@ -50,7 +50,7 @@ public class ComparisonExpression extends BinaryExpression {
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
 		this.scope = scope;
 		
-		cgScope = cg.enterExpression(parent, cgScope, toString());
+		cgScope = cg.enterExpression(parent, sp, cgScope, toString());
 
 		result&=rightExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
@@ -151,6 +151,9 @@ public class ComparisonExpression extends BinaryExpression {
 		// Похоже для всех выражений должны быть удовлетворены зависимости
 		depCodeGen(cg, expr1.getSymbol(), scope, excs);
 		depCodeGen(cg, expr2.getSymbol(), scope, excs);
+
+		// Похоже для каждого выражения с двумя операторами должен быть сброшен размер аккумулятора
+		cg._getAcc().setBytes(0); // Сброс размера аккумулятора
 		
 		// Оптимизация порядка для коммутативных операций
 		//TODO не работает, так как позиция CGScope устанавливается в postAnalyze для каждого выражения
@@ -192,8 +195,8 @@ public class ComparisonExpression extends BinaryExpression {
 			rightExpr.codeGen(cg, false, excs);
 
 			if(leftExpr instanceof LiteralExpression) {
-				CGCells leftCells = new CGCells(CGCells.Type.CONST, size);
-				leftCells.setConst(leftType.isFixedPoint() ? ((LiteralExpression)leftExpr).getFixedValue() : ((LiteralExpression)leftExpr).getNumValue());
+				LiteralExpression le = (LiteralExpression)leftExpr;
+				CGCells leftCells = new CGCells(leftType.isFixedPoint() ? le.getFixedValue() : le.getNumValue());
 				cg.cellsCpCells(cgScope,
 								leftCells, leftType,
 								((CGCellsScope)rightExpr.getSymbol().getCGScope()).getCells(), rightType,
@@ -217,12 +220,10 @@ public class ComparisonExpression extends BinaryExpression {
 			int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
 			leftExpr.codeGen(cg, false, excs);
 			if(rightExpr instanceof LiteralExpression) {
-				CGCells rightCells = new CGCells(CGCells.Type.CONST, size);
-				rightCells.setConst(rightType.isFixedPoint() ? ((LiteralExpression)rightExpr).getFixedValue() : ((LiteralExpression)rightExpr).getNumValue());
-				cg.cellsCpCells(cgScope,
-								((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType,
-								rightCells, rightType,
-								operator, isInvert, opOr, (CGBranch)branch);
+				LiteralExpression le = (LiteralExpression)rightExpr;
+				CGCells rightCells = new CGCells(rightType.isFixedPoint() ? le.getFixedValue() : le.getNumValue());
+				cg.cellsCpCells(cgScope, ((CGCellsScope)leftExpr.getSymbol().getCGScope()).getCells(), leftType, rightCells, rightType, operator,
+								isInvert, opOr, (CGBranch)branch);
 				releaseVars(cg);
 				return result;
 			}
@@ -236,11 +237,10 @@ public class ComparisonExpression extends BinaryExpression {
 			}
 		}
 		else if(leftExpr instanceof LiteralExpression) {
+			LiteralExpression le = (LiteralExpression)leftExpr;
 			// Определяем максмальный размер операнда
 			int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
-
-			CGCells leftCells = new CGCells(CGCells.Type.CONST, size);
-			leftCells.setConst(leftType.isFixedPoint() ? ((LiteralExpression)leftExpr).getFixedValue() : ((LiteralExpression)leftExpr).getNumValue());
+			CGCells leftCells = new CGCells(leftType.isFixedPoint() ? le.getFixedValue() : le.getNumValue());
 			if(CodegenResult.RESULT_IN_ACCUM==rightExpr.codeGen(cg, true, excs)) {
 				cg.cellsCpCells(cgScope, leftCells, null, new CGCells(CGCells.Type.ACC, size), rightType, operator, isInvert, opOr, (CGBranch)branch);
 				releaseVars(cg);
@@ -248,11 +248,10 @@ public class ComparisonExpression extends BinaryExpression {
 			}
 		}
 		else if(rightExpr instanceof LiteralExpression) {
+			LiteralExpression le = (LiteralExpression)rightExpr;			
 			// Определяем максмальный размер операнда
 			int size = (leftType.getSize()>rightType.getSize() ? leftType.getSize() : rightType.getSize());
-
-			CGCells rightCells = new CGCells(CGCells.Type.CONST, size);
-			rightCells.setConst(rightType.isFixedPoint() ? ((LiteralExpression)rightExpr).getFixedValue() : ((LiteralExpression)rightExpr).getNumValue());
+			CGCells rightCells = new CGCells(rightType.isFixedPoint() ? le.getFixedValue() : le.getNumValue());
 			if(CodegenResult.RESULT_IN_ACCUM==leftExpr.codeGen(cg, true, excs)) {
 				cg.cellsCpCells(cgScope, new CGCells(CGCells.Type.ACC, size), leftType, rightCells, null, operator, isInvert, opOr, (CGBranch)branch);
 				releaseVars(cg);

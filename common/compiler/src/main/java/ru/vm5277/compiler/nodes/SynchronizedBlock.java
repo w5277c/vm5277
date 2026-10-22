@@ -119,7 +119,7 @@ public class SynchronizedBlock extends BlockNode {
 		boolean result = true;
 
 		parent.append(cgHeader);
-		cgScope = new CGBlockScope(cg, parent, cgScope.genId(), "catch");
+		cgScope = new CGBlockScope(cg, parent, sp, cgScope.genId(), "catch");
 		
 		this.tryBlockNode = tryBlockNode;
 
@@ -180,6 +180,8 @@ public class SynchronizedBlock extends BlockNode {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 		
+		//TODO
+		
 //		CGScope cgs = null == parent ? cgScope : parent;
 		CGLabelScope lbCatchEndScope = null;
 		if(isUsed) {
@@ -197,7 +199,7 @@ public class SynchronizedBlock extends BlockNode {
 			}
 		}
 		
-		CGVarScope vScope = new CGVarScope(cgScope, CodeGenerator.genId(), VarType.SHORT, 0x02, true, varName);
+		CGVarScope vScope = new CGVarScope(cgScope, sp, CodeGenerator.genId(), VarType.SHORT, 0x02, true, varName);
 		vScope.setCells(new CGCells(CGCells.Type.ACC));
 		((VarSymbol)symbol).setCGScope(vScope);
 		

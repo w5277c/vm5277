@@ -15,7 +15,7 @@
  */
 
 .IF OS_FT_STIMER==0x01
-.IFNDEF OS_SOFT_TIMER_START
+.IFNDEF OS_SOFT_TIMER_START_NR
 
 /* Смещения
 	HANDLER_ADDR	= 0x0000;2B-адрес обработчика (0x0000-не имеет обработчика)

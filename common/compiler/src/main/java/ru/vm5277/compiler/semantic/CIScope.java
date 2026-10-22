@@ -118,7 +118,7 @@ public abstract class CIScope extends Scope implements ImportableScope {
 			// Прямое совпадение с родительским классом или интерфейсом
 			if(varType==type) return true;
 			// Разрешаем тип по имени через область видимости
-			CIScope cis = resolveCI(null, type.getName(), false);
+			CIScope cis = resolveCI(null, type.getName(), false, new HashSet<>());
 			// Рекурсивно проверяем только интерфейсы (они могут расширять другие интерфейсы)
 			// Классы не проверяем рекурсивно, т.к. множественное наследование классов запрещено
 			if(null!=cis && cis instanceof InterfaceScope) {
@@ -151,7 +151,7 @@ public abstract class CIScope extends Scope implements ImportableScope {
 		for(CIScope iScope : imported.values()) {
 //			VarType[] arr = (VarType[])method.getParameterTypes().toArray();
 //			String mName = method.getName();
-			iScope.resolveMethod(method.getName(), method.getParameterTypes().toArray(new VarType[0]), false);
+			iScope.resolveMethod(method.getName(), method.getParameterTypes().toArray(new VarType[0]), false, new HashSet<>());
 		}
 
 		String methodSignature = method.getSignature();
@@ -187,7 +187,7 @@ public abstract class CIScope extends Scope implements ImportableScope {
 		return result;
 	}
 
-	public MethodSymbol resolveMethod(String methodName, VarType[] argTypes, boolean isQualifiedAccess) throws CompileException {
+	public MethodSymbol resolveMethod(String methodName, VarType[] argTypes, boolean isQualifiedAccess, Set<CIScope> checked) throws CompileException {
 		// Ищем методы в текущем классе
 		for (MethodSymbol method : methods) {
 			if (method.getName().equals(methodName) && isApplicable(method, argTypes)) {
@@ -197,7 +197,7 @@ public abstract class CIScope extends Scope implements ImportableScope {
 		
 		// Проверяем реализации в интерфейсах
 		for(VarType type : implTypes) {
-			CIScope cis = resolveCI(null, type.getName(), false);
+			CIScope cis = resolveCI(null, type.getName(), false, checked);
 			if(null!=cis) {
 				for(MethodSymbol method : cis.getMethods(methodName)) {
 					//if(method.isNative || method.isStatic) { - явно не корректно для MethodCallExpression (стр. 237).
@@ -211,25 +211,25 @@ public abstract class CIScope extends Scope implements ImportableScope {
 		if(!isQualifiedAccess) {
 			for(CIScope cis : internal.values()) {
 				if(cis instanceof ClassScope) {
-					MethodSymbol method = cis.resolveMethod(methodName, argTypes, false);
+					MethodSymbol method = cis.resolveMethod(methodName, argTypes, false, checked);
 					if(null!=method) return method;
 				}
 			}
 			for(CIScope cis : imported.values()) {
 				if(cis instanceof ClassScope) {
-					MethodSymbol method = cis.resolveMethod(methodName, argTypes, false);
+					MethodSymbol method = cis.resolveMethod(methodName, argTypes, false, checked);
 					if(null!=method) return method;
 				}
 			}
 			for(CIScope cis : internal.values()) {
 				if(cis instanceof InterfaceScope) {
-					MethodSymbol method = cis.resolveMethod(methodName, argTypes, false);
+					MethodSymbol method = cis.resolveMethod(methodName, argTypes, false, checked);
 					if(null!=method) return method;
 				}
 			}
 			for(CIScope cis : imported.values()) {
 				if(cis instanceof InterfaceScope) {
-					MethodSymbol method = cis.resolveMethod(methodName, argTypes, false);
+					MethodSymbol method = cis.resolveMethod(methodName, argTypes, false, checked);
 					if(null!=method) return method;
 				}
 			}
@@ -238,10 +238,7 @@ public abstract class CIScope extends Scope implements ImportableScope {
 	}
 
 	@Override
-	public CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess) {
-		return resolveCI(caller, name, isQualifiedAccess, new HashSet<>());
-	}
-	protected CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess, Set<CIScope> checked) {
+	public CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess, Set<CIScope> checked) {
 		if(checked.contains(this)) {
 			return null;
 		}
@@ -272,14 +269,14 @@ public abstract class CIScope extends Scope implements ImportableScope {
 				return ((CIScope)parent).resolveCI(null==caller ? this : caller, name, false, checked);
 			}
 			else {
-				return parent.resolveCI(null==caller ? this : caller, name, false);
+				return parent.resolveCI(null==caller ? this : caller, name, false, checked);
 			}
 		}
 		return null;
 	}
 	
 	@Override
-	public Symbol resolveField(Scope caller, String name, boolean isQualifiedAccess) throws CompileException {
+	public Symbol resolveField(Scope caller, String name, boolean isQualifiedAccess, Set<CIScope> checked) throws CompileException {
 		if(isQualifiedAccess) {
 			// Поиск в полях только текущего класса
 			return fields.get(name);
@@ -292,15 +289,19 @@ public abstract class CIScope extends Scope implements ImportableScope {
 		if(null!=symbol) return symbol;
 		
 		// Зачем? Интерфейсы не содержат поля, только статику.... пока уберем, наблюдается ошибка зацикливания
-	/*		for(VarType type : implTypes) {
-			CIScope cis = resolveCI(null==caller ? this : caller, type.getName(), false);
-			symbol = cis.resolveField(null==caller ? this : caller, name, false);
+		// Затем что нужен доступ к статическим полям
+		for(VarType type : implTypes) {
+			CIScope cis = resolveCI(null==caller ? this : caller, type.getName(), false, checked);
+			if(null==cis) {
+				continue;
+			}
+			symbol = cis.resolveField(null==caller ? this : caller, name, false, checked);
 			if(null!=symbol) return symbol;
 		}
-*/
-		//TODO static inports
+
+		//TODO static imports
 		// Делегируем в родительскую область видимости
-		return parent!=null ? parent.resolveField(null==caller ? this : caller, name, false) : null;
+		return parent!=null ? parent.resolveField(null==caller ? this : caller, name, false, checked) : null;
 	}
 	
 	@Override

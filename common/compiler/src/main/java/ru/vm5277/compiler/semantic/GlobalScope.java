@@ -45,7 +45,7 @@ public class GlobalScope extends Scope implements ImportableScope {
 	}
 
 	@Override
-	public CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess) {
+	public CIScope resolveCI(Scope caller, String name, boolean isQualifiedAccess, Set<CIScope> checked) {
 		if(isQualifiedAccess) {
 			return internal.get(name);
 		}
@@ -61,7 +61,7 @@ public class GlobalScope extends Scope implements ImportableScope {
 	}
 
 	@Override
-	public Symbol resolveField(Scope caller, String name, boolean isQualifiedAccess) throws CompileException {
+	public Symbol resolveField(Scope caller, String name, boolean isQualifiedAccess, Set<CIScope> checked) throws CompileException {
 		return null;
 	}
 	@Override

@@ -153,7 +153,7 @@ public class ExecuteSettingsEditor extends SettingsEditor<ExecuteConfiguration> 
 							return !disposed;
 						}
 					};
-					boolean success = Toolkit.checkToolkit(log, toolkitPath, Toolkit.DONWLOAD_URL, true);
+					boolean success = Toolkit.checkToolkit(log, Toolkit.DONWLOAD_URL, true);
 					SwingUtilities.invokeLater(new Runnable() {
 						@Override
 						public void run() {
@@ -301,7 +301,7 @@ public class ExecuteSettingsEditor extends SettingsEditor<ExecuteConfiguration> 
 
 					String deviceId = (String) e.getItem();
 					if (toolkitExist) {
-						for (FlashTool flashTool : FlashToolProvider.getTools(null, toolkitPath, (PlatformType) platformCombo.getSelectedItem(), deviceId)) {
+						for (FlashTool flashTool : FlashToolProvider.getTools(null, (PlatformType) platformCombo.getSelectedItem(), deviceId)) {
 							flashToolCombo.addItem(flashTool);
 						}
 					}

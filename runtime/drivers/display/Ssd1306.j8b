@@ -201,34 +201,41 @@ public class Ssd1306 implements GraphicsDisplay {
 
 	@Override
 	public void drawImage(byte[] data, short xPos, short yPos, short imgWidth, short imgHeight) {
-System.out('!');
     	if(0!=(yPos&0x07) || 0!=(imgHeight&0x07)) DriverException.throw(DriverException.UNSUPPORTED);
     	if(null==data || xPos>=this.width || yPos>=this.height || 0==imgWidth || 0==imgHeight) return;
 
 		short origImgWidth = imgWidth;
 
 		byte startPage = (byte)(yPos>>3);
-		byte endPage = (byte)(startPage + (imgHeight>>3)-1);
-		byte endX = (byte)(xPos + imgWidth-1);
+		byte endPage = (byte)(startPage + ((byte)(imgHeight>>3))-1);
+		short potentialEndX = (short)(xPos + imgWidth - 1);
+		byte endX;
 
-		if(7<endPage) endPage=7;
-		if(endX>=this.width) {
-			endX = this.width-1;
-			imgWidth = endX - xPos+1;
+		byte maxPage = (byte)((this.height >> 3) - 1);
+		if(maxPage < endPage) endPage = maxPage;
+
+		if(potentialEndX >= this.width) {
+			endX = (byte)(this.width - 1);
+			imgWidth = (short)(endX - xPos + 1); // Сколько реально пикселей в строке пишем
+		} else {
+			endX = (byte)potentialEndX;
 		}
 
 		layer.sendCommand(CMD_SET_COLUMN_ADDR, (byte)xPos, endX);
 		layer.sendCommand(CMD_SET_PAGE_ADDR, startPage, endPage);
 
-		byte totalPages = endPage - startPage+1;
-		short index=0;
-		for(;0!=totalPages; totalPages--) {
-        	for(byte col=0; col<imgWidth; col++) {
+		short totalPages = (short)((endPage - startPage) + 1);
+		short index = 0;
+
+		for(; 0 != totalPages; totalPages--) {
+        	for(byte col = 0; col < imgWidth; col++) {
 				byte octet = data[index];
 				layer.sendData(octet);
 				index++;
             }
-        	if(origImgWidth!=imgWidth) index += origImgWidth-imgWidth;
+        	if(origImgWidth != imgWidth) {
+        		index = (short)(index + (origImgWidth - imgWidth));
+        	}
     	}
     }
 }

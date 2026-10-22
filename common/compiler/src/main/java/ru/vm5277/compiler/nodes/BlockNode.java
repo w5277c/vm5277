@@ -33,7 +33,7 @@ import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
 import ru.vm5277.common.cg.scopes.CGVarScope;
-import ru.vm5277.common.enums.RTOSParam;
+import ru.vm5277.common.enums.RtosParam;
 import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.exceptions.CompileException;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -65,6 +65,7 @@ public class BlockNode extends AstNode {
 	protected	List<AstNode>						children	= new ArrayList<>();
 	private		Map<String, LabelNode>				labels		= new HashMap<>();
 	private		boolean								isTry		= false;
+	private		boolean								hasFinally	= false;
 	protected	BlockScope							blockScope;
 	private		String								comment		= "";
 
@@ -297,7 +298,7 @@ public class BlockNode extends AstNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo());
-		cgScope = cg.enterBlock(parent, isTry, comment);
+		cgScope = cg.enterBlock(parent, sp, isTry, hasFinally, comment);
 		
 		if(null!=annotations) {
 			for(String annotation : annotations.keySet()) {
@@ -316,7 +317,9 @@ public class BlockNode extends AstNode {
 		
 		for(int i=0; i<children.size(); i++) {
 			AstNode node = children.get(i);
-			if(node.isDisabled()) continue;
+			if(node.isDisabled()) {
+				continue;
+			}
 			
 			sp = node.getSP();
 			
@@ -369,8 +372,6 @@ public class BlockNode extends AstNode {
 		if(cgDone || disabled) return;
 		cgDone = true;
 
-		int producedQnt = excs.getProduced().size();
-		
 		if(!codeGenCheckAnnotations(cg)) return;
 
 		for(AstNode node : children) {
@@ -403,6 +404,8 @@ public class BlockNode extends AstNode {
 		if(cgDone || disabled) return null;
 		cgDone = true;
 		
+		//Проверка для перехода по исключению не нужна(newCGExcs)?  Если не ошибаюсь, excs для первого блока всегда пуст, поэтому не нужна
+		
 		if(!codeGenCheckAnnotations(cg)) return null;
 		
 		for(AstNode node : children) {
@@ -428,7 +431,7 @@ public class BlockNode extends AstNode {
 				Integer paramValue = null;
 				if(0x02==apn.getValues().size()) {
 					try {
-						RTOSParam param = RTOSParam.fromName(apn.getTextValue(0));
+						RtosParam param = RtosParam.fromName(apn.getTextValue(0));
 						if(null!=param) {
 							Object tmp = cg.getDevice().getParam(param);
 							if(null==tmp) {
@@ -462,7 +465,7 @@ public class BlockNode extends AstNode {
 				Integer paramValue = null;
 				if(0x02==apn.getValues().size()) {
 					try {
-						RTOSParam param = RTOSParam.fromName(apn.getTextValue(0));
+						RtosParam param = RtosParam.fromName(apn.getTextValue(0));
 						if(null!=param) {
 							Object tmp = cg.getDevice().getParam(param);
 							if(null==tmp) {
@@ -511,5 +514,9 @@ public class BlockNode extends AstNode {
 	@Override
 	public List<AstNode> getChildren() {
 		return children;
+	}
+	
+	public void setHasFinally() {
+		hasFinally = true;
 	}
 }

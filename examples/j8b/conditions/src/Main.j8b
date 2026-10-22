@@ -39,7 +39,7 @@ class Main {
 		System.out(!(b1==0) && !(b2!=2));//true
 		
 		System.out("\n6. Сравнения с арифметикой[true]:");
-		System.out(b1 + b2 == 3 && b3 * b4 == 12);
+		System.out(((byte)(b1+b2)) == 3 && ((byte)(b3*b4)) == 12);
 
 		System.out("\n7. Смешанные типы сравнений[true]:");
 		System.out(b1 < b2 && b2 <= b3 && b3 > b1 && b4 >= b2);

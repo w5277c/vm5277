@@ -37,9 +37,9 @@ public interface AdcContract extends RtosDriver {
     void setReference(AdcReference ref)  throws DriverException;
     void setPrescaler(short prescaler);
     void setMode(AdcMode mode);
-    void setCallback(RtosCallback callback);
+    void setCallback(NativeCallback callback);
 
-    void init(RtosCallback callback) throws DriverException;
+    void init(NativeCallback callback) throws DriverException;
     void start();
     void shutdown();
 

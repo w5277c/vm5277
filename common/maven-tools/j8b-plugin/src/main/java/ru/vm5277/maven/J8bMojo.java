@@ -72,9 +72,6 @@ public abstract class J8bMojo extends AbstractMojo {
 	@Parameter(defaultValue = "Main.j8b")
 	protected String mainFile;
 
-	@Parameter(property = "j8b.toolkitPath", defaultValue = "${user.home}/vm5277")
-	protected String toolkitPath;
-
 	@Parameter(defaultValue = "${project.basedir}", readonly = true, required = true)
 	protected File projectBaseDir;
 
@@ -152,15 +149,16 @@ public abstract class J8bMojo extends AbstractMojo {
 												"or omit it for auto-detection. Example: avr:atmega328p");
 		}
 
+		Path toolkitPath = FSUtils.getToolkitPath();
 		if(null==target || target.isEmpty()) {
-			File binDir = Paths.get(toolkitPath, "bin").toFile();
+			File binDir = toolkitPath.resolve("bin").normalize().toFile();
 			if(!binDir.exists() || !binDir.isDirectory()) {
 				throw new MojoExecutionException("Libs directory not found: " + binDir);
 			}
 
 			try {
 				getLog().info("Try to detect target...");
-				String deviceInfo = runDeviceDetection(Paths.get(toolkitPath), Float.parseFloat(targetFreq));
+				String deviceInfo = runDeviceDetection(toolkitPath, Float.parseFloat(targetFreq));
 				if(null!=deviceInfo) {
 					String parts[] = deviceInfo.trim().split("\\s+", 2);
 					target = parts[0x00].toLowerCase();
@@ -237,7 +235,7 @@ public abstract class J8bMojo extends AbstractMojo {
 
 		String mainName = mainFile.substring(0, mainFile.lastIndexOf("."));
 
-		int exitCode = buildJ8b(toolkitPath, sourceDirectory, prebuildDirectory, mainName, strict, optimization, batch, false);
+		int exitCode = buildJ8b(sourceDirectory, prebuildDirectory, mainName, strict, optimization, batch, false);
 		if(0!=exitCode) {
 			throw new MojoExecutionException("Compilation failed with exit code: " + exitCode);
 		}
@@ -272,9 +270,9 @@ public abstract class J8bMojo extends AbstractMojo {
 			device = cachedDevices.get(platformName.toLowerCase() + ":" + mcuStr);
 			if(null==device) {
 				try {
-					Path _toolkitPath = Paths.get(toolkitPath).normalize().toAbsolutePath();
-					Path _rtosPath = _toolkitPath.resolve("rtos").resolve(platformType.name().toLowerCase()).normalize();
-					device = new Device(_toolkitPath, _rtosPath, platformType, mcuStr, null, optimizationType, strictLevel);
+					Path toolkitPath = FSUtils.getToolkitPath();
+					Path _rtosPath = toolkitPath.resolve("rtos").resolve(platformType.name().toLowerCase()).normalize();
+					device = new Device(_rtosPath, platformType, mcuStr, null, null, optimizationType, strictLevel);
 					cachedDevices.put(platformName.toLowerCase() + ":" + mcuStr, device);
 				}
 				catch (Exception ex) {
@@ -308,7 +306,7 @@ public abstract class J8bMojo extends AbstractMojo {
 		boolean develMode = false;
 //		getLog().info("=== device " + device.getUniqueName() + ", flash size:" + flashSize + ", develMode:" + develMode + " ===");
 
-		int exitCode = buildAsm(toolkitPath, sourceDirectory, prebuildDirectory, outputSubDirectory, platformName, mainName, batch);
+		int exitCode = buildAsm(sourceDirectory, prebuildDirectory, outputSubDirectory, platformName, mainName, batch);
 		if(0!=exitCode) {
 			throw new MojoExecutionException("Assembling failed with exit code: " + exitCode);
 		}
@@ -324,10 +322,10 @@ public abstract class J8bMojo extends AbstractMojo {
 //    Properties projectProperties = project.getProperties();
 		int exitCode = 1;
 		if(InternalFlashTool.NAME.equalsIgnoreCase(flashToolName)) {
-			exitCode = internalFlashHex(toolkitPath, outputSubDirectory, mainName + "_cseg", interactive);
+			exitCode = internalFlashHex(outputSubDirectory, mainName + "_cseg", interactive);
 		}
 		else {
-			FlashTool flashTool = FlashToolProvider.getExternalTool(log, Paths.get(toolkitPath), flashToolName);
+			FlashTool flashTool = FlashToolProvider.getExternalTool(log, flashToolName);
 			if(null==flashTool) {
 				throw new MojoExecutionException("Unsupported flash tool: " + flashToolName);
 			}
@@ -467,7 +465,7 @@ public abstract class J8bMojo extends AbstractMojo {
 			args.add("detect");
 			args.add(targetFreq);
 			args.add("-q");
-			if(0==FSUtils.runJ8BTool(Paths.get(this.toolkitPath), "ru.vm5277.flasher.Main", args, stdout)) {
+			if(0==FSUtils.runJ8BTool("ru.vm5277.flasher.Main", args, stdout)) {
 				result = stdout.toString();
 			}
 		}
@@ -499,8 +497,8 @@ public abstract class J8bMojo extends AbstractMojo {
 		}
 	}
 	
-	public int buildJ8b(String toolkitPath, File sourceDir, File prebuildDir, String mainName, String strictMode, String optMode,
-						boolean isBatch, boolean devMode)																		throws MojoExecutionException {
+	public int buildJ8b(File sourceDir, File prebuildDir, String mainName, String strictMode, String optMode, boolean isBatch, boolean devMode)
+																																throws MojoExecutionException {
 		int exitCode = 1;
 		
 		File mainJ8bFile = new File(sourceDir, mainName + ".j8b");
@@ -512,8 +510,6 @@ public abstract class J8bMojo extends AbstractMojo {
 			List<String> args = new ArrayList<>();
 			args.add(target);
 			args.add(mainJ8bFile.getAbsolutePath());
-			args.add("-P");
-			args.add(toolkitPath);
 			args.add("-F");
 			args.add(targetFreq);
 			args.add("-o");
@@ -553,7 +549,7 @@ public abstract class J8bMojo extends AbstractMojo {
 				args.add("BLDR_API_REUSE=1");
 			}
 
-			exitCode = FSUtils.runJ8BTool(Paths.get(toolkitPath), "ru.vm5277.compiler.Main", args, null);
+			exitCode = FSUtils.runJ8BTool("ru.vm5277.compiler.Main", args, null);
 		}
 		catch(Exception ex) {
 			getLog().error(ex);
@@ -561,11 +557,11 @@ public abstract class J8bMojo extends AbstractMojo {
 		return exitCode;
 	}
 	
-	public int buildAsm(String toolkitPath, File sourceDir, File prebuildDir, File outputDir, String platformName, String mainName, boolean isBatch)
-																																throws MojoExecutionException {
+	public int buildAsm(File sourceDir, File prebuildDir, File outputDir, String platformName, String mainName, boolean isBatch) throws MojoExecutionException {
 		int exitCode = 1;
 
-		Path rtosPath = Paths.get(toolkitPath, "rtos", platformName);
+		Path toolkitPath = FSUtils.getToolkitPath();
+		Path rtosPath = toolkitPath.resolve("rtos").resolve(platformName).normalize();
 		if(!rtosPath.toFile().exists()) {
 			throw new MojoExecutionException("RTOS directory not found: " + rtosPath.toString() + "\n");
 		}
@@ -582,8 +578,6 @@ public abstract class J8bMojo extends AbstractMojo {
 		try {
 			List<String> args = new ArrayList<>();
 			args.add(mainAsmFile.getAbsolutePath());
-			args.add("-P");
-			args.add(toolkitPath);
 			args.add("-I");
 			args.add(rtosPath.toAbsolutePath().toString());
 			args.add("-o");
@@ -603,7 +597,7 @@ public abstract class J8bMojo extends AbstractMojo {
 				args.add("-D");
 				args.add("os_ft_diag=1");
 			}
-			exitCode = FSUtils.runJ8BTool(Paths.get(toolkitPath), "ru.vm5277." + platformName + "_asm.Assembler" , args, null);
+			exitCode = FSUtils.runJ8BTool("ru.vm5277." + platformName + "_asm.Assembler" , args, null);
 		}
 		catch(Exception ex) {
 			getLog().error(ex);
@@ -611,7 +605,7 @@ public abstract class J8bMojo extends AbstractMojo {
 		return exitCode;
 	}
 	
-	public int internalFlashHex(String toolkitPath, File outputDir, String mainName, InteractiveMode intercativeMode) throws MojoExecutionException {
+	public int internalFlashHex(File outputDir, String mainName, InteractiveMode intercativeMode) throws MojoExecutionException {
 		int exitCode = 1;
 		
 		File mainHexFile = new File(outputDir, mainName + ".hex");
@@ -624,8 +618,6 @@ public abstract class J8bMojo extends AbstractMojo {
 			args.add(target);
 			args.add(targetFreq);
 			args.add(mainHexFile.getAbsolutePath());
-			args.add("-P");
-			args.add(toolkitPath);
 			args.add("-s");
 			args.add("-F");
 			args.add("-R");
@@ -637,7 +629,7 @@ public abstract class J8bMojo extends AbstractMojo {
 			if(Verbosity.MINIMAL.name().equalsIgnoreCase(verbosity)) {
 				args.add("-q");
 			}
-			exitCode = FSUtils.runJ8BTool(Paths.get(toolkitPath), "ru.vm5277.flasher.Main", args, null);
+			exitCode = FSUtils.runJ8BTool("ru.vm5277.flasher.Main", args, null);
 		}
 		catch(Exception ex) {
 			getLog().error(ex);

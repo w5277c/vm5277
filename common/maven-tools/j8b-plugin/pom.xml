@@ -5,12 +5,12 @@
 	<parent>
 		<groupId>ru.vm5277</groupId>
 		<artifactId>maven-tools</artifactId>
-		<version>0.2.0</version>
+		<version>0.2.1</version>
 	</parent>
 
 	<groupId>ru.vm5277</groupId>
 	<artifactId>j8b-plugin</artifactId>
-	<version>0.3.0</version>
+	<version>0.3.1</version>
 	<packaging>maven-plugin</packaging>
 
 	<dependencies>

@@ -23,7 +23,7 @@ public class Adc implements AdcContract {
     @Native("_DRV_ADC__STAT_FIELD_MODE")
     private static AdcMode mode = AdcMode.SINGLE;
     @Native("_DRV_ADC__STAT_FIELD_CALLBACK")
-    private static RtosCallback callback;
+    private static NativeCallback callback;
 	@Native("_DRV_ADC__STAT_FIELD_FLAGS")
 	private static byte flags;
 	@Native("_DRV_ADC__STAT_FIELD_RAWVALUE")
@@ -33,12 +33,12 @@ public class Adc implements AdcContract {
 
     @Override static public void setPrescaler(short _prescaler) {prescaler = (byte)_prescaler;}
     @Override static public void setMode(AdcMode _mode) {mode = _mode;}
-    @Override static public void setCallback(RtosCallback _callback) {callback = _callback;}
+    @Override static public void setCallback(NativeCallback _callback) {callback = _callback;}
     @Override static boolean isEnabled() {return 0!=(flags&(1<<AdcContract.FLAG_ENABLED));}
     @Override static boolean isBusy() {return 0!=(flags&(1<<AdcContract.FLAG_BUSY));}
     @Override static short getRawValue() {return rawValue;}
 	@Override static byte getResolution() {return 10;} // Вероятно нужно вынести в RTOS, так как вероятно не все ADC у AVR 10 битные
-    @Override static public native void init(RtosCallback callback) throws DriverException;
+    @Override static public native void init(NativeCallback callback) throws DriverException;
     @Override static public native void start();
     @Override static public native void shutdown();
 	// Эти параметры могу быть применены без повторного вызова init()

@@ -113,7 +113,7 @@ public class ReturnNode extends CommandNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterCommand(parent, "return");
+		cgScope = cg.enterCommand(parent, sp, "return");
 	
 		// Находим ближайший MethodScope
 		MethodScope methodScope = findEnclosingMethodScope(scope);
@@ -192,13 +192,14 @@ public class ReturnNode extends CommandNode {
 
 		CodegenResult result = null;
 		
-		cg.accumLock(type);
 		if(null!=expr) {
 
 			CGBranch branch = new CGBranch();
 			if(VarType.BOOLEAN==type) {
 				expr.getCGScope().setBranch(branch);
 			}
+			
+			VarType castType = cg._getAcc().pullCast();
 			
 			if(expr instanceof ComparisonExpression) {
 				expr.codeGen(cg, false, excs);
@@ -209,11 +210,11 @@ public class ReturnNode extends CommandNode {
 				}
 			}
 			if(branch.isUsed()) {
-				cg.constToAcc(expr.getCGScope(), 1, 1, false);
+				cg.cellsToCells(expr.getCGScope(), new CGCells(CGCells.Type.ACC), VarType.BOOLEAN, new CGCells(1), VarType.BOOLEAN, castType);
 				CGLabelScope lbScope = new CGLabelScope(null, null, LabelNames.LOCGIC_END, true);
 				cg.jump(expr.getCGScope(), lbScope);
 				expr.getCGScope().append(((CGBranch)branch).getEnd());
-				cg.constToAcc(expr.getCGScope(), 1, 0, false);
+				cg.cellsToCells(expr.getCGScope(), new CGCells(CGCells.Type.ACC), VarType.BOOLEAN, new CGCells(0), VarType.BOOLEAN, castType);
 				expr.getCGScope().append(lbScope);
 			}
 		}
@@ -237,8 +238,6 @@ public class ReturnNode extends CommandNode {
 				result = CodegenResult.RESULT_IN_ACCUM;
 			}
 		}
-		
-		cg.accumUnlock();
 		
 		releaseVars(cg);
 		return result;

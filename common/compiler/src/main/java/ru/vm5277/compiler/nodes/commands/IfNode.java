@@ -177,8 +177,7 @@ public class IfNode extends CommandNode {
 	@Override
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
-		cgScope = cg.enterCondBlock(parent, "if");
-		//cgScope = cg.enterCommand(parent, "if");
+		cgScope = cg.enterCondBlock(parent, sp, "if");
 
 		if(null!=conditionExpr) {
 			result&=conditionExpr.postAnalyze(scope, cg, cgScope);

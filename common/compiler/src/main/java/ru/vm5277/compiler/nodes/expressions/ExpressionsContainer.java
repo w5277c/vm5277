@@ -71,7 +71,7 @@ public class ExpressionsContainer extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterExpression(parent, cgScope, toString());
+		cgScope = cg.enterExpression(parent, sp, cgScope, toString());
 
 		for(int i=0; i<expressions.size(); i++) {
 			ExpressionNode expr = expressions.get(i);

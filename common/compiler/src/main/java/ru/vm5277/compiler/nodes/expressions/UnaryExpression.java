@@ -27,7 +27,6 @@ import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.VarType;
-import ru.vm5277.common.messages.MessageContainer;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.nodes.AstNode;
 import ru.vm5277.compiler.nodes.TokenBuffer;
@@ -108,7 +107,7 @@ public class UnaryExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterExpression(parent, cgScope, toString());
+		cgScope = cg.enterExpression(parent, sp, cgScope, toString());
 		//if(null != symbol) symbol.setCGScope(cgScope);
 		
 		result&=operand.postAnalyze(scope, cg, cgScope);
@@ -202,6 +201,8 @@ public class UnaryExpression extends ExpressionNode {
 		Object result = null;
 		excs.setSourcePosition(sp);
 		
+		VarType castType = cg._getAcc().pullCast();
+		
 		CGBranch branch = null;
 		CGScope _scope = cgScope;
 		while(null!=_scope) {
@@ -220,7 +221,7 @@ public class UnaryExpression extends ExpressionNode {
 //			newBranch = true;
 //		}
 
-		cg.accumLock(type);
+//		cg.accumLock(type);
 		if(operand instanceof BinaryExpression) {
 			if(Operator.NOT==operator && null!=branch) {
 				((BinaryExpression)operand).codeGen(cg, !isInvert, !opOr, toAccum, excs);
@@ -230,7 +231,7 @@ public class UnaryExpression extends ExpressionNode {
 					if(CodegenResult.RESULT_IN_ACCUM!=((BinaryExpression)operand).codeGen(cg, isInvert, opOr, true, excs)) {
 						throw new CompileException("Accum not used for operand:" + operand);					
 					}
-					cg.eUnary(cgScope, operator, new CGCells(CGCells.Type.ACC), toAccum, operand.getType().isFixedPoint(), excs);
+					cg.eUnary(cgScope, operator, new CGCells(CGCells.Type.ACC), toAccum, operand.getType().isFixedPoint(), castType, excs);
 				}
 				else {
 					throw new CompileException("Unsupported operand '" + operand + " in unary expression");
@@ -246,7 +247,7 @@ public class UnaryExpression extends ExpressionNode {
 			else {
 				ve.codeGen(cg, false, excs);
 				CGCellsScope cScope = (CGCellsScope)operand.getSymbol().getCGScope(CGCellsScope.class);
-				cg.eUnary(cgScope, operator, cScope.getCells(), toAccum, operand.getType().isFixedPoint(), excs);
+				cg.eUnary(cgScope, operator, cScope.getCells(), toAccum, operand.getType().isFixedPoint(), castType, excs);
 				if(toAccum)	 {
 					result = CodegenResult.RESULT_IN_ACCUM;
 				}
@@ -256,7 +257,7 @@ public class UnaryExpression extends ExpressionNode {
 			ArrayExpression ae = (ArrayExpression)operand;
 			ae.codeGen(cg, false, excs);
 			CGCellsScope cScope = (CGCellsScope)operand.getSymbol().getCGScope(CGCellsScope.class);
-			cg.eUnary(cgScope, operator, cScope.getCells(), toAccum, operand.getType().isFixedPoint(), excs);
+			cg.eUnary(cgScope, operator, cScope.getCells(), toAccum, operand.getType().isFixedPoint(), castType, excs);
 			if(toAccum)	 {
 				result = CodegenResult.RESULT_IN_ACCUM;
 			}
@@ -273,7 +274,7 @@ public class UnaryExpression extends ExpressionNode {
 			MethodCallExpression mce = (MethodCallExpression)operand;
 			Object mceResult = mce.codeGen(cg, true, excs);
 			if(CodegenResult.RESULT_IN_ACCUM==mceResult) {
-				cg.eUnary(cgScope, operator, new CGCells(CGCells.Type.ACC), toAccum, operand.getType().isFixedPoint(), excs);
+				cg.eUnary(cgScope, operator, new CGCells(CGCells.Type.ACC), toAccum, operand.getType().isFixedPoint(), castType, excs);
 				if(toAccum)	 {
 					result = CodegenResult.RESULT_IN_ACCUM;
 				}
@@ -295,15 +296,15 @@ public class UnaryExpression extends ExpressionNode {
 		}
 		
 		if(newBranch && branch.isUsed()) {
-			cg.constToAcc(cgScope, 1, 1, false);
+			//cg.constToAcc(cgScope, 1, 1, false);
+			cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ACC), VarType.BYTE, new CGCells(1), VarType.BYTE, null);
 			CGLabelScope lbScope = new CGLabelScope(null, null, LabelNames.LOCGIC_END, true);
 			cg.jump(cgScope, lbScope);
 			cgScope.append(((CGBranch)branch).getEnd());
-			cg.constToAcc(cgScope, 1, 0, false);
+			//cg.constToAcc(cgScope, 1, 0, false);
+			cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ACC), VarType.BYTE, new CGCells(0), VarType.BYTE, null);
 			cgScope.append(lbScope);
 		}
-		
-		cg.accumUnlock();
 		
 		releaseVars(cg);
 		return result;

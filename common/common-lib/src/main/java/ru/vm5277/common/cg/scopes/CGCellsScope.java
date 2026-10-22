@@ -18,6 +18,7 @@ package ru.vm5277.common.cg.scopes;
 import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.cg.DataSymbol;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.lexer.SourcePosition;
 
 
 public abstract class CGCellsScope extends CGScope {
@@ -27,8 +28,8 @@ public abstract class CGCellsScope extends CGScope {
 	protected			boolean		isConstant;
 	protected			boolean		isArrayView;
 	
-	public CGCellsScope(CGScope parent, int resId, VarType type, int size, String name) {
-		super(parent, resId, name);
+	public CGCellsScope(CGScope parent, SourcePosition sp, int resId, VarType type, int size, String name) {
+		super(parent, sp, resId, name);
 		this.type = type;
 		this.size = size;
 	}

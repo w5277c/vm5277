@@ -26,7 +26,7 @@
 	.EQU	OS_IR_QNT								= 0x1a	;Количество перырваний
 	.EQU	OS_INT_PINS_QNT						    = 0x02	;Количество пинов поддерживающих внешние прерывания(INT)
 	.EQU	OS_PCINT_PORTS_QNT						= 0x03	;Количество портов поддерживающих внешние прерывания(PCINT)
-	.EQU	OS_RAM_BORDER_SIZE						= 0x20	;Минимальное допустимое расстояние между вершинами FREE_RAM и STACK
+;	.EQU	OS_RAM_BORDER_SIZE						= 0x20	;Минимальное допустимое расстояние между вершинами FREE_RAM и STACK
 	.EQU    OS_PORTS_LAST                           = 0x03  ;Номер последнего порта (A-0,B-1,C-2,D-3,E-4,...)
 	.EQU	OS_ADC_CHANNELS_QNT						= 0x09	;Количество каналов ADC
 	.EQU	OS_TIMERS_QNT						    = 0x03	;Количество аппаратных таймеров
@@ -71,8 +71,8 @@
 	.DW _OS_IRQ_RAM_TABLE_SIZE
 	.SET	_OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
 .ELSE
-    JMP		_OS_INIT										; Failure -> reset
-    JMP		_OS_INIT										; Failure -> reset
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
 .ENDIF
 ;----PCINT--------------------------------------------------
 .IF OS_FT_IRQ_PCINT_BLOCK==0x01
@@ -89,9 +89,9 @@
 	.DB _OS_IRQ_RAM_TABLE_SIZE, 0x32                        ;0x32->PORTD,PCINT2
 	.SET	_OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
 .ELSE
-    JMP		_OS_INIT										; Failure -> reset
-    JMP		_OS_INIT										; Failure -> reset
-    JMP		_OS_INIT										; Failure -> reset
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
 .ENDIF
 ;----WATCHDOG-----------------------------------------------
 .IF OS_FT_IRQ_WD_BLOCK==0x01
@@ -100,7 +100,7 @@
 	.DW _OS_IRQ_RAM_TABLE_SIZE
 	.SET	_OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
 .ELSE
-    JMP		_OS_INIT										; Failure -> reset
+    JMP		_OS_INVALID_IRQ_HANDLER	    					; Failure -> halt
 .ENDIF
 ;----TIMER--------------------------------------------------
 .IF OS_FT_IRQ_TIMER_BLOCK==0x01
@@ -117,9 +117,9 @@
 	.DW _OS_IRQ_RAM_TABLE_SIZE
 	.SET	_OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
 .ELSE
-    JMP		_OS_INIT										; Failure -> reset
-    JMP		_OS_INIT										; Failure -> reset
-    JMP		_OS_INIT										; Failure -> reset
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
 .ENDIF
 ;----TIMER CAPTURE------------------------------------------
 .IF OS_FT_IRQ_TIMER_CAPTURE_BLOCK==0x01
@@ -128,7 +128,7 @@
 	.DW _OS_IRQ_RAM_TABLE_SIZE
 	.SET	_OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
 .ELSE
-    JMP		_OS_INIT										; Failure -> reset
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
 .ENDIF
 ;----TIMER--------------------------------------------------
 .IF OS_FT_IRQ_TIMER_BLOCK==0x01
@@ -145,9 +145,9 @@
 	.DW _OS_IRQ_RAM_TABLE_SIZE
 	.SET	_OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
 .ELSE
-    JMP		_OS_INIT										; Failure -> reset
-    JMP		_OS_INIT										; Failure -> reset
-    JMP		_OS_INIT										; Failure -> reset
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
 .ENDIF
 .IF OS_FT_TIMER == 0x01									    ; Timer/Counter0 Compare Match A
     JMP		_OS_SYSTIMER_HANDLER
@@ -158,7 +158,7 @@
         .DW _OS_IRQ_RAM_TABLE_SIZE
         .SET	_OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
     .ELSE
-        JMP		_OS_INIT										; Failure -> reset
+        JMP		_OS_INVALID_IRQ_HANDLER						; Failure -> halt
     .ENDIF
 .ENDIF
 .IF OS_FT_IRQ_TIMER_BLOCK==0x01
@@ -171,8 +171,8 @@
 	.DW _OS_IRQ_RAM_TABLE_SIZE
 	.SET	_OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
 .ELSE
-    JMP		_OS_INIT										; Failure -> reset
-    JMP		_OS_INIT										; Failure -> reset
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
 .ENDIF
 ;----SPI----------------------------------------------------
 .IF OS_FT_IRQ_SPI_BLOCK==0x01
@@ -181,7 +181,7 @@
 	.DW _OS_IRQ_RAM_TABLE_SIZE
 	.SET	_OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
 .ELSE
-    JMP		_OS_INIT										; Failure -> reset
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
 .ENDIF
 ;----UART---------------------------------------------------
 .IF OS_FT_IRQ_UART_BLOCK==0x01
@@ -198,9 +198,9 @@
 	.DW _OS_IRQ_RAM_TABLE_SIZE
 	.SET	_OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
 .ELSE
-    JMP		_OS_INIT										; Failure -> reset
-    JMP		_OS_INIT										; Failure -> reset
-    JMP		_OS_INIT										; Failure -> reset
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
 .ENDIF
 ;----ADC----------------------------------------------------
 .IF OS_FT_IRQ_ADC_BLOCK==0x01
@@ -209,7 +209,7 @@
 	.DW _OS_IRQ_RAM_TABLE_SIZE
 	.SET	_OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
 .ELSE
-    JMP		_OS_INIT										; Failure -> reset
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
 .ENDIF
 ;----EEPROM-------------------------------------------------
 .IF OS_FT_IRQ_EEPROM_BLOCK==0x01
@@ -218,7 +218,7 @@
 	.DW _OS_IRQ_RAM_TABLE_SIZE
 	.SET	_OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
 .ELSE
-    JMP		_OS_INIT										; Failure -> reset
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
 .ENDIF
 ;----ANALOG CMP---------------------------------------------
 .IF OS_FT_IRQ_ANALOG_CMP_BLOCK==0x01
@@ -227,7 +227,7 @@
 	.DW _OS_IRQ_RAM_TABLE_SIZE
 	.SET	_OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
 .ELSE
-    JMP		_OS_INIT										; Failure -> reset
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
 .ENDIF
 ;----TWI----------------------------------------------------
 .IF OS_FT_IRQ_TWI_BLOCK==0x01
@@ -236,7 +236,7 @@
 	.DW _OS_IRQ_RAM_TABLE_SIZE
 	.SET	_OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
 .ELSE
-    JMP		_OS_INIT										; Failure -> reset
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
 .ENDIF
 ;----SPM ready----------------------------------------------
 .IF OS_FT_IRQ_SPM_BLOCK==0x01
@@ -245,7 +245,7 @@
 	.DW _OS_IRQ_RAM_TABLE_SIZE
 	.SET	_OS_IRQ_RAM_TABLE_SIZE = _OS_IRQ_RAM_TABLE_SIZE+_OS_IRQ_RAM_ITEM_SIZE
 .ELSE
-    JMP		_OS_INIT										; Failure -> reset
+    JMP		_OS_INVALID_IRQ_HANDLER							; Failure -> halt
 .ENDIF
 .ENDIF
 

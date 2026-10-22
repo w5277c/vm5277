@@ -26,6 +26,7 @@ import ru.vm5277.common.lexer.Delimiter;
 import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.items.CGIText;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.semantic.ClassScope;
 import ru.vm5277.compiler.semantic.MethodSymbol;
@@ -153,7 +154,7 @@ public class ClassBlockNode extends AstNode {
 								markError("@" + sTimerAPN.getAnnotationName() + "." + (String)sTimerIdFieldName + " can only be applied to a byte field");
 							}
 							else {
-								fNode.setInitializer(new LiteralExpression(inst, null, inst.getAndIncSoftTimerCntr(), VarType.BYTE));
+								fNode.setInitializer(new LiteralExpression(inst, null, sp, inst.getAndIncSoftTimerCntr(), VarType.BYTE));
 								success = true;
 							}
 							break;

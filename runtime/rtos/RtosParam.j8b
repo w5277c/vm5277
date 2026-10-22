@@ -31,5 +31,6 @@ public class RtosParam {
 	public	final	static	byte	GPIO_PIN_NOCHECK	= 0x0f;
 	public	final	static	byte	ARRAY_INDEX_NOCHECK = 0x10;
 	public	final	static	byte	MATH_OVF_NOCHECK	= 0x11;
+	public	final	static	byte	DISPATCHER_DEBUG	= 0x12;
 
 }

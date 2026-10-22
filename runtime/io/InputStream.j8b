@@ -29,7 +29,7 @@ public interface InputStream {
  			short available = cBuff.getAvailable();
  			if(0!=available) {
              	for(; index<len && 0!=available; index++) {
- 					buff[off+index]=cBuff.read();
+ 					buff[(short)(off+index)]=cBuff.read();
  					available--;
  				}
  			}

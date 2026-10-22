@@ -19,24 +19,35 @@
 ;Сдвиг влево 32бит числа на 8бит величину сдвига
 ;IN: ACCUM_EH/EL/H/L-сдвигаемое число, TEMP_L-величина
 ;сдвига
-;OUT: ACCUM_EH/EL/H/L результат
+;OUT: ACCUM_EH/EL/H/L результат, флаг C=1-переполнение
 ;-----------------------------------------------------------
 OS_SHL32:
+	PUSH FLAGS
+
+	CPI TEMP_L,0x00
+	BREQ _OS_SHL32__END
 	CPI TEMP_L,0x20
 	BRCC _OS_SHL32__ZERO
+
+	LDI FLAGS,0x00
 _OS_SHL32__LOOP:
-	SUBI TEMP_L,0x01
-	BRCS _OS_SHL32__END
+	OR FLAGS,ACCUM_EH
 	LSL ACCUM_L
 	ROL ACCUM_H
 	ROL ACCUM_EL
 	ROL ACCUM_EH
-	RJMP _OS_SHL32__LOOP
+	DEC TEMP_L
+	BRNE _OS_SHL32__LOOP
+	LSL FLAGS
+	RJMP _OS_SHL32__END
 _OS_SHL32__ZERO:
 	LDI ACCUM_EH,0x00
 	LDI ACCUM_EL,0x00
 	LDI ACCUM_H,0x00
 	LDI ACCUM_L,0x00
+	SEC
 _OS_SHL32__END:
+
+	POP FLAGS
 	RET
 .ENDIF

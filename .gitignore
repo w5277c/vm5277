@@ -9,6 +9,7 @@
 /common/maven-tools/j8b-archetype/target/
 /common/maven-tools/j8b-packaging/target/
 /common/ide-plugins/nb-lsp-plugin/target/
+/common/ide-plugins/idea-plugin/.idea/
 /common/lsp-server/target/
 /common/maven-plugin/target/
 /examples/j8b_template/target/
@@ -20,3 +21,4 @@
 /common/common-lib/target/
 /common/avr-codegen/target/
 /common/stub-codegen/target/
+/common/tools/fontRotate/target/

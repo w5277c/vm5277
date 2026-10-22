@@ -16,6 +16,7 @@
 package ru.vm5277.compiler.nodes;
 
 import java.util.List;
+import java.util.Map;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.DECLARE;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.POST;
 import static ru.vm5277.common.enums.SemanticAnalyzePhase.PRE;
@@ -25,20 +26,24 @@ import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.lexer.J8BKeyword;
 import ru.vm5277.common.lexer.TokenType;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.enums.StrictLevel;
 import ru.vm5277.common.exceptions.CompileException;
-import ru.vm5277.common.messages.MessageContainer;
+import ru.vm5277.common.lexer.tokens.TAnnotation;
 import ru.vm5277.compiler.Instance;
 import static ru.vm5277.compiler.Main.debugAST;
 import ru.vm5277.compiler.semantic.MethodScope;
 import ru.vm5277.compiler.semantic.Scope;
 
 public class ParameterNode extends AstNode {
-	private			VarType	type;
-    private	final	String	name;
-	private			boolean	isFinal;
+	private			VarType								type;
+    private	final	String								name;
+	private			boolean								isFinal;
+	private	final	Map<String, AnnotationParamNode>	annotations;
 	
-	public ParameterNode(Instance inst, TokenBuffer tb) throws CompileException {
+	public ParameterNode(Instance inst, TokenBuffer tb, Map<String, AnnotationParamNode> annotations) throws CompileException {
 		super(inst, tb);
+		
+		this.annotations = annotations;
 		
 		if(tb.match(TokenType.MODIFIER, J8BKeyword.FINAL)) {
             consumeToken(tb); // Потребляем 'final'
@@ -53,14 +58,6 @@ public class ParameterNode extends AstNode {
 		name = (String)consumeToken(tb, TokenType.IDENTIFIER).getValue();
 	}
 
-	public ParameterNode(Instance inst, boolean isFinal, VarType type, String name) throws CompileException {
-		super(inst, null);
-		
-		this.isFinal = isFinal;
-		this.type = type;
-		this.name = name;
-	}
-	
 	public boolean isFinal() {
 		return isFinal;
 	}
@@ -89,6 +86,29 @@ public class ParameterNode extends AstNode {
 			result = false;
 		}
 
+		if(result && null!=annotations) {
+			for(String annotation : annotations.keySet()) {
+				if(annotation.equals(TAnnotation.PASSTHROUGH)) {
+					if(type!=VarType.fromClassName(VarType.CLASSNAME_NATIVE_CALLBACK)) {
+						markError(	"@Passthrough annotation is not applicable to type " + type.toString() + ", expected '" +
+									VarType.CLASSNAME_NATIVE_CALLBACK + "' or its subtypes.");
+						result = false;
+					}
+				}
+				else {
+					if(StrictLevel.LIGHT==inst.getStrictLevel()) {
+						markWarning("Unsupported field annotation: @" + annotation);
+					}
+					else if(StrictLevel.STRONG==inst.getStrictLevel()) {
+						markError("Unsupported field annotation: @" + annotation);
+						result = false;
+					}
+				}
+			}
+		}
+
+		
+		
 		debugAST(this, PRE, false, result, getFullInfo());
 		return result;
 	}
@@ -139,7 +159,6 @@ public class ParameterNode extends AstNode {
 
 	@Override
 	public Object codeGen(CodeGenerator cg, boolean toAccum, CGExcs excs) throws CompileException {
-		
 		releaseVars(cg);
 		return null;
 	}

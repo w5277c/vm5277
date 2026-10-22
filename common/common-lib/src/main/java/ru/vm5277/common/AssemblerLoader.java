@@ -24,7 +24,7 @@ import java.nio.file.Path;
 
 public class AssemblerLoader {
 	public static AssemblerInterface load(Path toolkitPath, String platform) throws Exception {
-        Path asmJarPath = toolkitPath.resolve("bin").resolve("libs").resolve(platform + "_assembler.jar").normalize();
+        Path asmJarPath = toolkitPath.resolve("bin").resolve("libs").resolve(platform + "-assembler.jar").normalize();
 		if(!asmJarPath.toFile().exists()) {
 			throw new FileNotFoundException(asmJarPath.toString());
 		}

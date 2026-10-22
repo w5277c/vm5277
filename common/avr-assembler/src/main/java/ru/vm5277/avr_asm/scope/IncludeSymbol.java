@@ -20,9 +20,8 @@ import ru.vm5277.common.lexer.SourcePosition;
 import ru.vm5277.common.exceptions.CompileException;
 
 public class IncludeSymbol extends Symbol {
-	private					boolean									hasTrue; //Блок для выполнения уже был
-	private					Stack<Boolean>							blockStates		= new Stack<>(); // Состояния вложенных блоков
-	private					Stack<Boolean>							hasTrueStack	= new Stack<>();
+	private					Stack<Boolean>							states		= new Stack<>(); // Состояния вложенных блоков
+	private					Stack<Boolean>							executed	= new Stack<>();
 	private					IncludeSymbol							parent;
 	
 	public IncludeSymbol(String name, IncludeSymbol parent) {
@@ -32,11 +31,8 @@ public class IncludeSymbol extends Symbol {
 	}
 
 	public void blockStart(boolean isTrue, SourcePosition sp) {
-		if(!blockStates.isEmpty()) {
-			hasTrueStack.add(hasTrue); // Запоминаем признак наличия предыдущего выполняемого блока (если блоки есть)
-		}
-		blockStates.add(isTrue); // Помещаем состояние нового блока
-		hasTrue = false;
+		executed.add(false);
+		states.add(isTrue); // Помещаем состояние нового блока
 	}
 
 	public void blockElse(SourcePosition sp) throws CompileException {
@@ -44,44 +40,44 @@ public class IncludeSymbol extends Symbol {
 	}
 
 	public void blockElseIf(boolean isTrue, SourcePosition sp) throws CompileException {
-		if(blockStates.isEmpty()) throw new CompileException("ELSE/ELSEIF directive without matching block", sp);
+		if(states.isEmpty()) throw new CompileException("ELSE/ELSEIF directive without matching block", sp);
 		
-		hasTrue |= blockStates.peek(); // true - был выполняемый блок
+		if(executed.peek() || states.peek()) {
+			executed.pop();
+			executed.add(true);
+		}
 		
 		if(!isTrue) return; // Ничего не делаем, если условие ложно
 		
-		if(!hasTrue) { // Ничего не делаем если выполняемый блок уже есть
-			blockStates.pop(); // Иначе заменяем последний на выполняемый
-			blockStates.add(true);
+		if(!executed.peek()) { // Ничего не делаем если выполняемый блок уже есть
+			states.pop(); // Иначе заменяем последний на выполняемый
+			states.add(true);
 		}
 	}
 
-	public int getBlockCntr() {
-		return  blockStates.size();
+	public int getBlockCounter() {
+		return  states.size();
 	}
 
 	public void blockEnd(SourcePosition sp) throws CompileException {
-		if(blockStates.isEmpty()) throw new CompileException("END directive without matching block", sp);
+		if(states.isEmpty()) throw new CompileException("END directive without matching block", sp);
 
-		blockStates.pop();
-		if(!hasTrueStack.isEmpty()) {
-			hasTrue = hasTrueStack.pop(); // Если блоки есть - восстанавливаем признак наличия выполняемого блока
-		}
+		states.pop();
+		executed.pop();
 	}
 	
 	public boolean isTrue() throws CompileException {
-		if(blockStates.isEmpty()) return true;
-		if(hasTrue) return false;
-		
+		if(states.isEmpty()) return true;
+
+		for(Boolean e : executed) {
+			if(e) return false;
+		}
+
 		boolean result = true;
-		for(Boolean state : blockStates) {
+		for(Boolean state : states) {
 			result &= state;
 		}
 		return result;
-	}
-	
-	public boolean hasTrue() {
-		return hasTrue;
 	}
 	
 	public IncludeSymbol getParent() {
@@ -90,11 +86,15 @@ public class IncludeSymbol extends Symbol {
 	
 	public String debugInfo() {
 		StringBuilder sb = new StringBuilder();
-		sb.append("hasTrue:").append(hasTrue);
-		sb.append(", blockStates:[");
-		for(int i=0; i<blockStates.size(); i++) {
+		sb.append("executed:[");
+		for(int i=0; i<executed.size(); i++) {
 			if(i>0) sb.append(",");
-			sb.append(blockStates.get(i));
+			sb.append(executed.get(i));
+		}
+		sb.append("], blockStates:[");
+		for(int i=0; i<states.size(); i++) {
+			if(i>0) sb.append(",");
+			sb.append(states.get(i));
 		}
 		sb.append("]");
 		return sb.toString();

@@ -4,7 +4,7 @@
 
 	<groupId>ru.vm5277.j8b.examples</groupId>
 	<artifactId>j8b-examples-parent</artifactId>
-	<version>1.0-SNAPSHOT</version>
+	<version>0.3.0</version>
 	<packaging>pom</packaging>
 
 	<name>j8b_examples</name>
@@ -17,6 +17,8 @@
 		<module>arrays2</module>
 		<module>arrays3</module>
 		<module>beeper</module>
+		<module>beeperbm</module>
+		<module>beeperst</module>
 		<module>bench_crc8</module>
 		<module>bmp580</module>
 		<module>buzzer</module>

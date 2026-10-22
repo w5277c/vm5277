@@ -19,6 +19,7 @@ import drivers.ifaces.I2cMasterHw;
 
 class Main {
 	public static void main() {
+		System.setParam(RtosParam.SHOW_WELCOME,1);
 		System.out("Fetching BMP580 sensor data (temperature & pressure).\n");
 		// Опрашиваем датчик
 		Bmp580 sensor = new Bmp580(new I2cMasterHw(Bmp580.ADDR, I2cMaster.I2cFreq.F100kHz));

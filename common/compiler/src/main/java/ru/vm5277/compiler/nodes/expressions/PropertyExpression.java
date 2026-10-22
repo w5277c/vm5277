@@ -31,6 +31,7 @@ import ru.vm5277.common.cg.scopes.CGCellsScope;
 import ru.vm5277.common.cg.scopes.CGScope;
 import ru.vm5277.common.enums.CodegenResult;
 import ru.vm5277.common.VarType;
+import ru.vm5277.common.cg.CGCells;
 import ru.vm5277.common.exceptions.CompileException;
 import ru.vm5277.compiler.Instance;
 import static ru.vm5277.compiler.Main.debugAST;
@@ -141,7 +142,7 @@ public class PropertyExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterExpression(parent, cgScope, toString());
+		cgScope = cg.enterExpression(parent, sp, cgScope, toString());
 
 		result&=targetExpr.postAnalyze(scope, cg, cgScope);
 		if(result) {
@@ -384,7 +385,6 @@ public class PropertyExpression extends ExpressionNode {
 		}
 	}
 
-	
 	@Override
 	public List<AstNode> getChildren() {
 		// У этого выражения нет дочерних узлов в AST
@@ -433,7 +433,8 @@ public class PropertyExpression extends ExpressionNode {
 			if(toAccum) {
 				if(Property.length == property) {
 					if(!isView && null!=nae && null!=nae.getConstDimensions()) {
-						cg.constToAcc(cgScope, 0x02, nae.getConstDimensions()[dimentionPos], false);
+						//cg.constToAcc(cgScope, 0x02, nae.getConstDimensions()[dimentionPos], false);
+						cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ACC), VarType.SHORT, new CGCells(nae.getConstDimensions()[dimentionPos]), null, null);
 					}
 					else {
 						CGCellsScope cScope = (CGCellsScope)targetExpr.getSymbol().getCGScope();
@@ -446,11 +447,14 @@ public class PropertyExpression extends ExpressionNode {
 		}
 		else if(targetExpr.getType().isClassType() && !targetExpr.getType().isEnum()) {
 			if(Property.instanceId==property) {
-				cg.cellsToAcc(cgScope, (CGCellsScope)targetExpr.getSymbol().getCGScope());
+				//cg.cellsToAcc(cgScope, (CGCellsScope)targetExpr.getSymbol().getCGScope());
+				cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ACC), VarType.SHORT,
+								((CGCellsScope)targetExpr.getSymbol().getCGScope()).getCells(), VarType.SHORT, null);
 				result = CodegenResult.RESULT_IN_ACCUM;
 			}
 			else if(Property.typeId==property) {
-				cg.constToAcc(cgScope, 0x01, targetExpr.getType().getId(), false);
+				//cg.constToAcc(cgScope, 0x01, targetExpr.getType().getId(), false);
+				cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ACC), VarType.BYTE, new CGCells(targetExpr.getType().getId()), VarType.BYTE, null);
 				result = CodegenResult.RESULT_IN_ACCUM;
 			}
 			else {
@@ -460,11 +464,14 @@ public class PropertyExpression extends ExpressionNode {
 		else {
 			if(toAccum) {
 				if(Property.size==property) {
-					cg.constToAcc(cgScope, 0x01, enumScope.getSize(), false);
+					//cg.constToAcc(cgScope, 0x01, enumScope.getSize(), false);
+					cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ACC), VarType.BYTE, new CGCells(enumScope.getSize()), VarType.BYTE, null);
 				}
 				else if(Property.index == property) {
 					if(targetExpr instanceof EnumExpression) {
-						cg.constToAcc(cgScope, 0x01, ((EnumExpression)targetExpr).getIndex(), false);
+						//cg.constToAcc(cgScope, 0x01, ((EnumExpression)targetExpr).getIndex(), false);
+						cg.cellsToCells(cgScope, new CGCells(CGCells.Type.ACC), VarType.BYTE,
+										new CGCells(((EnumExpression)targetExpr).getIndex()), VarType.BYTE, null);
 					}
 					else {
 						targetExpr.codeGen(cg, true, excs);

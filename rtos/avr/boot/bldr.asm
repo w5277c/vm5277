@@ -36,7 +36,6 @@
 	.EQU	REQ_BLDR_PAGE_EVERIFY					= 0x20	;Проверка FLASH страницы (зашифрованные данные - на будущее)
 	.EQU	REQ_BLDR_PAGE_EWRITE					= 0x21	;Запись FLASH страницы (зашифрованные данные - на будущее)
 	.EQU	REQ_BLDR_FUSE_READ						= 0x30	;Чтение значений фьюзов
-	.EQU	REQ_BLDR_FUSE_WRITE						= 0x31	;Запись значений фьюзов
 ;Ответы (от бутлоадера)
 	.EQU	RESP_BLDR_OK							= 0x80	;Успешное выполнение
 	.EQU	RESP_BLDR_IDENTICAL						= 0x81	;Страницы идентичны (для REQ_BLDR_PAGE_VERIFY и REQ_BLDR_PAGE_WRITE)
@@ -46,9 +45,9 @@
 	.EQU	RESP_BLDR_WRONG_PAGESIZE				= 0x8a	;Некорректный размер страницы
 	.EQU	RESP_BLDR_DENIED						= 0x8b	;Отклонено
 
-;Тело запроса REQ_BLDR_INFO (DATA_SIZE:0x11)
+;Тело ответа на запрос REQ_BLDR_INFO (DATA_SIZE:0x11)
 ;+----------------------------------------------+
-;|0x05:0x01-BLDR VERSION (7,6-type,5-0-version) |			;00-стандартный бутлоадер(atmega), 01-сокращенный(tiny)
+;|0x05:0x01-BLDR VERSION (7,6-type,5-0-version) |			;00-стандартный бутлоадер(mega), 01-сокращенный(tiny)
 ;+----------------------------------------------+
 ;|0x06:0x01-PLATFORM TYPE ID                    |
 ;+----------------------------------------------+
@@ -56,9 +55,9 @@
 ;+----------------------------------------------+
 ;|0x0b:0x02-STDION RX/TX PORT(S)                |
 ;+----------------------------------------------+
-;|0x0c:0x08-MCU UID                             |
+;|0x0d:0x08-MCU UID                             |
 ;+----------------------------------------------+
-;|0x15:0x01-FIRMWARE VERSION (0xff-empty)       |
+;|0x16:0x01-FIRMWARE VERSION (0xff-empty)       |
 ;+----------------------------------------------+
 
 ;Тело запроса REQ_BLDR_PAGE_VERIFY и REQ_BLDR_PAGE_WRITE(DATA_SIZE:0x02+PAGE_SIZE)
@@ -74,7 +73,7 @@
 ;+----------------------------------------+
 
 
-;Тело запроса REQ_BLDR_FUSE_WRITE и ответа на запрос REQ_BLDR_FUSE_READ (DATA_SIZE:0x06)
+;Тело ответа на запрос REQ_BLDR_FUSE_READ (DATA_SIZE:0x06)
 ;+----------------------------------------+
 ;|0x05:0x06-FUSE DATA                     | - LlHhEe (каждому байту добавлено инвертированное значение)
 ;+----------------------------------------+
@@ -85,7 +84,7 @@
 	.DEF	CMAGIC									= r9;	//=US_CNTR_EL
 
 	.EQU	BITDELAY_CONST							= 0x13
-	.EQU	BLDR_VERSION							= 0b01000010 | 0x00000001 ;7,6 - тип, 5-0 - версия
+	.EQU	BLDR_VERSION							= 0b01000000 | 0x00000100 ;7,6 - тип, 5-0 - версия
 	.EQU	BLDR_START_WADDR						= BOOT_512W_ADDR
 	.EQU	_BLDR_BUFFER_SIZE						= 0x08 + FLASH_PAGESIZE	;Максимально допустимый размер запроса
 	.EQU	_BLDR_PROTOCOL_HEADER_SIZE				= 0x05	;Размер заголовка с учетом XOR SUM
@@ -307,55 +306,6 @@ _BLDR_START__LOOP_NOT_BLDR_FUSE_READ:
 	RCALL _BLDR_ANSWER
 	RJMP _BLDR_START__LOOP
 _BLDR_START__LOOP_NOT_BLDR_PAGE_ERASE:
-	CPI ACCUM_L,REQ_BLDR_FUSE_WRITE
-	BRNE _BLDR_START__LOOP_NOT_BLDR_FUSE_WRITE
-;---FUSE-WRITE----------------------------------------------
-	CPI XL,_BLDR_PROTOCOL_HEADER_SIZE+0x06-0x01
-	BREQ PC+0x04
-	LDI ACCUM_L,RESP_BLDR_WRONG_REQUEST
-	RCALL _BLDR_ANSWER
-	RJMP _BLDR_START__LOOP
-	LDD TEMP_L,Y+0x02
-	CPI TEMP_L,0x00
-	BRNE _BLDR_START__LOOP_BLDR_FUSE_WRITE_INVALID_DATA
-	LDD TEMP_L,Y+0x03
-	CPI TEMP_L,0x06
-	BRNE _BLDR_START__LOOP_BLDR_FUSE_WRITE_INVALID_DATA
-	LDD ACCUM_L,Y+0x04
-	LDD ACCUM_H,Y+0x06
-	LDD ACCUM_EL,Y+0x08
-	LDD TEMP_L,Y+0x05
-	COM TEMP_L
-	CP ACCUM_L,TEMP_L
-	BRNE _BLDR_START__LOOP_BLDR_FUSE_WRITE_INVALID_DATA
-	LDD TEMP_L,Y+0x07
-	COM TEMP_L
-	CP ACCUM_H,TEMP_L
-	BRNE _BLDR_START__LOOP_BLDR_FUSE_WRITE_INVALID_DATA
-	LDD TEMP_L,Y+0x09
-	COM TEMP_L
-	CP ACCUM_EL,TEMP_L
-	BREQ PC+0x04
-_BLDR_START__LOOP_BLDR_FUSE_WRITE_INVALID_DATA:
-	LDI ACCUM_L,RESP_BLDR_WRONG_REQUEST
-	RCALL _BLDR_ANSWER
-	RJMP _BLDR_START__LOOP
-	MOV r1,C0x00
-	MOV r0,ACCUM_L											;Значение Low Fuse
-	LDI ACCUM_L,(1<<BLBSET)|(1<<SPMEN)
-	LDI ZH,0x00
-	LDI ZL,FUSE_LOW_ADDR*2
-	RCALL _BLDR_FLASHPAGE_DO_SMP_NR
-	MOV r0,ACCUM_H											;Значение High Fuse
-	LDI ZL,FUSE_HIGH_ADDR*2
-	RCALL _BLDR_FLASHPAGE_DO_SMP_NR
-	MOV r0,ACCUM_EL											;Значение Ext Fuse
-	LDI ZL,FUSE_EXT_ADDR*2
-	RCALL _BLDR_FLASHPAGE_DO_SMP_NR
-	LDI ACCUM_L,RESP_BLDR_OK
-	RCALL _BLDR_ANSWER
-	RJMP _BLDR_START__LOOP
-_BLDR_START__LOOP_NOT_BLDR_FUSE_WRITE:
 	CPI XH,high(_BLDR_PROTOCOL_HEADER_SIZE-0x01+0x02+FLASH_PAGESIZE)
 	BRNE PC+0x03
 	CPI XL,low(_BLDR_PROTOCOL_HEADER_SIZE-0x01+0x02+FLASH_PAGESIZE)

@@ -199,8 +199,7 @@ public class SwitchNode extends CommandNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		boolean allCasesReturn = true;		
-		cgScope = cg.enterCondBlock(parent, "switch");
-		//cgScope = cg.enterCommand(parent, "switch");
+		cgScope = cg.enterCondBlock(parent, sp, "switch");
 
 		// Проверка типа выражения switch
 		result&=expression.postAnalyze(scope, cg, cgScope);
@@ -291,13 +290,9 @@ public class SwitchNode extends CommandNode {
 		if(null==constantValue) {
 			CGLabelScope switchEndLabel = new CGLabelScope(null, CGScope.genId(), LabelNames.SWITCH_END, true);
 			
-			// Генерируем выражение switch
-			cg.accumLock(expression.getType());
 			if(CodegenResult.RESULT_IN_ACCUM!=expression.codeGen(cg, true, excs)) {
-				cg.accumUnlock();
 				throw new CompileException("Accum not used for expr:" + expression);
 			}
-			cg.accumUnlock();
 
 			// Создаем метки для всех case-блоков
 			List<CGBranch> branches = new ArrayList<>();
@@ -322,8 +317,8 @@ public class SwitchNode extends CommandNode {
 				
 				int j = 0;
 				while(j<values.size()) {
-					int from = values.get(j);
-					int to = from;
+					long from = values.get(j);
+					long to = from;
 
 					// Ищем непрерывную последовательность
 					while(j+1<values.size() && values.get(j+1)==values.get(j)+1) {
@@ -335,28 +330,28 @@ public class SwitchNode extends CommandNode {
 						// Одиночное значение
 						//EQ OR, переход на branch если true
 						//cg.constCond(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), Operator.EQ, from, false, false, false, true, endCondBranch); 
-						CGCells rightCells = new CGCells(CGCells.Type.CONST);
-						rightCells.setConst(from);
-						cg.cellsCpCells(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), expression.getType(), rightCells, null, Operator.EQ, false, true, endCondBranch);
+						CGCells rightCells = new CGCells(from);
+						cg.cellsCpCells(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), expression.getType(), rightCells, null, Operator.EQ,
+										false, true, endCondBranch);
 					}
 					else {
 						CGBranch endBranch = new CGBranch();
 						// Диапазон значений
 						//cg.constCond(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), Operator.LT, from, false, false,false, true, endBranch);
-						CGCells rightCells = new CGCells(CGCells.Type.CONST);
-						rightCells.setConst(from);
-						cg.cellsCpCells(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), expression.getType(), rightCells, null, Operator.LT, false, true, endBranch);
+						CGCells rightCells = new CGCells(from);
+						cg.cellsCpCells(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), expression.getType(), rightCells, null, Operator.LT,
+										false, true, endBranch);
 						if(255>to) {
 							//cg.constCond(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), Operator.LT, to + 1, false, false, false, true, endCondBranch);
-							rightCells = new CGCells(CGCells.Type.CONST);
-							rightCells.setConst(to+1);
-							cg.cellsCpCells(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), expression.getType(), rightCells, null, Operator.LT, false, true, endCondBranch);
+							rightCells = new CGCells(to+1);
+							cg.cellsCpCells(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), expression.getType(), rightCells, null, Operator.LT,
+											false, true, endCondBranch);
 						}
 						else {
 							//cg.constCond(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), Operator.LTE, to, false, false, false, true, endCondBranch);
-							rightCells = new CGCells(CGCells.Type.CONST);
-							rightCells.setConst(to);
-							cg.cellsCpCells(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), expression.getType(), rightCells, null, Operator.LTE, false, true, endCondBranch);
+							rightCells = new CGCells(to);
+							cg.cellsCpCells(astCase.getCGScope(), new CGCells(CGCells.Type.ACC), expression.getType(), rightCells, null, Operator.LTE,
+											false, true, endCondBranch);
 						}
 						astCase.getCGScope().append(endBranch.getEnd());
 					}

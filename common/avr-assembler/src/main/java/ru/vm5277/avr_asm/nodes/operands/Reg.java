@@ -46,7 +46,7 @@ public class Reg {
 				case "z+": id=30; inc=true; break;
 				case "-z": id=30; dec=true; break;
 				default:
-					throw new CompileException("TODO ожидаем регистр, получили " + expr, sp);
+					throw new CompileException("Expected register, got  " + expr, sp);
 			}
 		}
 		else if(expr instanceof IdExpression) {
@@ -61,10 +61,10 @@ public class Reg {
 			id = ((IRegExpression)expr).getId();
 		}
 		else {
-			throw new CompileException("TODO ожидаем регистр, получили " + expr, sp);
+			throw new CompileException("Expected register, got  " + expr, sp);
 		}
 		if(0x00>id || 0x1f<id) {
-			throw new CompileException("TODO ожидаем регистр, получили " + id, sp);
+			throw new CompileException("Expected register, got  " + id, sp);
 		}
 	}
 	public Reg(byte id) {

@@ -90,7 +90,7 @@ public class TernaryExpression extends ExpressionNode {
 	public boolean postAnalyze(Scope scope, CodeGenerator cg, CGScope parent) {
 		boolean result = true;
 		debugAST(this, POST, true, getFullInfo() + " type:" + type);
-		cgScope = cg.enterCondBlock(parent, "if");		
+		cgScope = cg.enterCondBlock(parent, sp, "if");		
 		//cgScope = cg.enterExpression(parent, cgScope, toString());
 		
 		// Проверяем условие и ветки
@@ -134,7 +134,9 @@ public class TernaryExpression extends ExpressionNode {
 		}
 
 		// Проверяем совместимость типов веток
-		if (!isCompatibleWith(scope, trueType, falseType)) {
+		if (!isCompatibleWith(scope,
+			(trueType.getSize() >= falseType.getSize() ? trueType : falseType),
+			(trueType.getSize() >= falseType.getSize() ? falseType : trueType))) {
 			markError("Incompatible types in branches: " + trueType + " and " + falseType);
 			result = false;
 		}
@@ -231,7 +233,7 @@ public class TernaryExpression extends ExpressionNode {
 		trueExpr.getCGScope().append(branch.getEnd());
 		falseExpr.codeGen(cg, toAccum, excs);
 		cgScope.append(endScope);
-
+		
 		releaseVars(cg);
 		return (toAccum ? CodegenResult.RESULT_IN_ACCUM : null);
 	}

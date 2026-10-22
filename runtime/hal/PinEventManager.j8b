@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-import rtos.RtosCallback;
-
 public class PinEventManager implements RtosDriver {
     public final static byte TRIGGER_MODE_FALLING	= 0b00000001;
     public final static byte TRIGGER_MODE_RISING	= 0b00000010;
@@ -31,7 +29,7 @@ public class PinEventManager implements RtosDriver {
      * @return ID регистрации (byte)
      * @throws DriverException
      */
-	public static byte register(byte port, RtosCallback callback, byte triggerMode) throws DriverException {
+	public static byte register(byte port, NativeCallback callback, byte triggerMode) throws DriverException {
 		byte result = intRegister(port, callback, triggerMode);
 		if(0x00==result) result = pcintRegister(port, callback, triggerMode);
 		if(0x00==result) result = poolingRegister(port, callback, triggerMode);
@@ -47,7 +45,7 @@ public class PinEventManager implements RtosDriver {
 		//TODO
 	}
 
-	public static native byte intRegister(byte port, RtosCallback callback, byte triggerMode);
-	public static native byte pcintRegister(byte port, RtosCallback callback, byte triggerMode);
-	public static native byte poolingRegister(byte port, RtosCallback callback, byte triggerMode);
+	public static native byte intRegister(byte port, NativeCallback callback, byte triggerMode);
+	public static native byte pcintRegister(byte port, NativeCallback callback, byte triggerMode);
+	public static native byte poolingRegister(byte port, NativeCallback callback, byte triggerMode);
 }

@@ -57,8 +57,6 @@ public class Main {
 	public			static	Path					toolkitPath;
 	
 	public static void main(String[] args) throws CompileException {
-		showDisclaimer();
-		
 		isWindows = (null != System.getProperty("os.name") && System.getProperty("os.name").toLowerCase().contains("windows"));
 		
 		toolkitPath = FSUtils.getToolkitPath();
@@ -76,6 +74,8 @@ public class Main {
 			}
 			System.exit(0);
 		}
+		
+		showDisclaimer();
 		
 		String platform = null;
 		String mcu = null;
@@ -124,9 +124,6 @@ public class Main {
 				}
 				else if(arg.equals("-l") || arg.equals("--list")) {
 					makeASMList = true;
-				}
-				else if(args.length>i+1 && (arg.equals("-P") || arg.equals("--path"))) {
-					toolkitPath = FSUtils.resolveWithEnv(args[++i]);
 				}
 				else if(args.length>i+1 && (arg.equals("-k") || arg.equals("--key"))) {
 					key = null;
@@ -614,8 +611,11 @@ public class Main {
 		System.out.println();
 		System.out.println("Usage: mkboot" + (isWindows ? ".exe" : "") + " <platform>:<mcu> <mcu port> [options]");
 		System.out.println();
+		System.out.println("  <mcu port>              Bootloader communication pin configuration (required):");
+		System.out.println("                          Single-wire:  'PB0' (bidirectional, uses RESET if supports GPIO)");
+		System.out.println("                          Two-wire:     'PB0/PB1' (RX/TX separate)");
+		System.out.println();
 		System.out.println("Options:");
-		System.out.println("  -P,  --path <dir>       Custom toolkit directory path");
 		System.out.println("  -k,  --key <hexdata>    Firmware decryption key (32 bytes, randomly generated if not specified)");
 		System.out.println("  -s,  --secure <asmfile> Assembly file for bootloader with decryption function, can be used with -k");
 		System.out.println("                          Decryption requires hardware support for protected bootloader sections");
@@ -628,18 +628,15 @@ public class Main {
 		System.out.println("                          local   - use local file uids.db (default, can be overridden with -i)");
 		System.out.println("                          param   - set manually (requires -u)");
 		System.out.println("  -o,  --overwrite        Overwrite existing UID in local database");
-		System.out.println("  -p,  --port <spec>      Bootloader communication pin configuration:");
-		System.out.println("                          Single-wire:  'PB0' (bidirectional, uses RESET if supports GPIO)");
-		System.out.println("                          Two-wire:     'PB0/PB1' (RX/TX separate)");
 		System.out.println("  -l, --list              Generate assembly listing file 'bldr.lst'");
 		System.out.println("  -v,  --version          Display version");
 		System.out.println("  -h,  --help             Show this help");
 		System.out.println();
 		System.out.println("Examples:");
-		System.out.println("  mkboot avr:atmega328p pb5 - for single-wire connection port");
-		System.out.println("  mkboot avr:atmega328p pd0/pd1 - for two-wire connection port");
-		System.out.println("  mkboot avr:atmega328p pb5 -k fe73...89 -s bldrsecure.asm -m local");
-		System.out.println("  mkboot avr:attiny85 pb5 -u 2d849f626c42ff33f29a054bcae564e79f753a7e89a4761b1ed5f2680ac7");
+		System.out.println("  j8bmb avr:atmega328p pb5 - for single-wire connection port");
+		System.out.println("  j8bmb avr:atmega328p pd0/pd1 - for two-wire connection port");
+		System.out.println("  j8bmb avr:atmega328p pb5 -k fe73...89 -s bldrsecure.asm -m local");
+		System.out.println("  j8bmb avr:attiny85 pb5 -u 2d849f626c42ff33f29a054bcae564e79f753a7e89a4761b1ed5f2680ac7");
 	}
 	
 	private static void showServerCommunicationFailed() {
